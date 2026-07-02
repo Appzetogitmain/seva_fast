@@ -986,14 +986,7 @@ export const updateOrderStatus = async (req, res) => {
       } catch (retractErr) {
         console.warn("[updateOrderStatus] retract broadcast failed:", retractErr.message);
       }
-      
-      // Emit FCM/Push notification event for assignment
-      emitNotificationEvent(NOTIFICATION_EVENTS.DELIVERY_ASSIGNED, {
-        orderId: canonicalOrderId,
-        deliveryId: deliveryBoyId,
-      });
 
-      // Emit real-time Socket event to delivery partner
       try {
         const orderRich = await Order.findById(order._id)
           .populate("seller", "shopName address name location serviceRadius")
@@ -1001,18 +994,31 @@ export const updateOrderStatus = async (req, res) => {
         const seller = orderRich?.seller || {};
         const pickup = seller.shopName || "Seller";
         const drop = orderRich?.address?.address || "Customer address";
-        
+        const assignPreview = {
+          pickup,
+          drop,
+          total: orderRich?.pricing?.total ?? 0,
+        };
+        const assignExpiresAt =
+          orderRich?.deliverySearchExpiresAt || new Date(Date.now() + 60000);
+
+        emitNotificationEvent(NOTIFICATION_EVENTS.DELIVERY_ASSIGNED, {
+          orderId: canonicalOrderId,
+          deliveryId: deliveryBoyId,
+          data: {
+            preview: assignPreview,
+            deliverySearchExpiresAt: assignExpiresAt,
+            eventType: NOTIFICATION_EVENTS.DELIVERY_ASSIGNED,
+          },
+        });
+
         emitToDelivery(deliveryBoyId, {
           event: "order:assigned",
           payload: {
             orderId: canonicalOrderId,
             workflowStatus: orderRich?.workflowStatus || orderRich?.status,
-            preview: {
-              pickup,
-              drop,
-              total: orderRich?.pricing?.total ?? 0,
-            },
-            deliverySearchExpiresAt: orderRich?.deliverySearchExpiresAt || new Date(Date.now() + 60000),
+            preview: assignPreview,
+            deliverySearchExpiresAt: assignExpiresAt,
             status: order.status,
             message: `You have been assigned order #${canonicalOrderId}.`,
           },

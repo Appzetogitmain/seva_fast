@@ -21,3 +21,18 @@ export function isDeliveryOrderNotification(notification) {
 
   return deliveryEvents.has(type);
 }
+
+export const INCOMING_DELIVERY_NOTIFICATION_TYPES = new Set([
+  "ORDER",
+  "DELIVERY_ASSIGNED",
+  "NEW_DELIVERY_BROADCAST",
+  "ORDER_READY",
+  "RETURN_PICKUP_ASSIGNED",
+  "NEW_RETURN_BROADCAST",
+]);
+
+export function isIncomingDeliveryNotification(notification) {
+  if (!notification?.data?.orderId) return false;
+  const type = String(notification.type || notification.data?.eventType || "").toUpperCase();
+  return INCOMING_DELIVERY_NOTIFICATION_TYPES.has(type);
+}

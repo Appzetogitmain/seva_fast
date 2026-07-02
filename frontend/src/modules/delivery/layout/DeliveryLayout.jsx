@@ -16,7 +16,10 @@ import {
   loadHandledIncomingOrderIds,
   markIncomingOrderHandled,
 } from "../utils/deliveryHandledOrders";
-import { buildDeliveryOrderDetailsPath } from "../utils/deliveryOrderNavigation";
+import {
+  buildDeliveryOrderDetailsPath,
+  isIncomingDeliveryNotification,
+} from "../utils/deliveryOrderNavigation";
 import { saveDeliveryPartnerLocation } from "../utils/deliveryLastLocation";
 import orderAlertSound from "@/assets/sounds/order_alert.mp3";
 
@@ -41,8 +44,6 @@ const DeliveryLayout = () => {
   const [availableOrdersCount, setAvailableOrdersCount] = useState(0);
   const [isAcceptingOrder, setIsAcceptingOrder] = useState(false);
   const acceptInFlightRef = useRef(false);
-  const didInitialAvailableFetchRef = useRef(false);
-  const didInitialNotificationsPollRef = useRef(false);
   const didInitialLocationSendRef = useRef(false);
   const availableOrdersRequestRef = useRef({ inFlight: false, controller: null });
   const notificationsRequestRef = useRef({ inFlight: false, controller: null });
@@ -329,55 +330,86 @@ const DeliveryLayout = () => {
     }
   }, []);
 
-  // Polling for available orders
-  useEffect(() => {
-    const fetchOrders = async () => {
-      // Only poll if online and NOT currently in an active order alert
-      if (!user?.isOnline || activeOrder || suppressIncomingModal) return;
-
-      try {
-        const res = await fetchAvailableOrders();
-        if (!res) return;
-        if (res.data.success) {
-          const availableOrders = res.data.results || res.data.result || [];
-          applyAvailableOrdersList(availableOrders);
-        }
-      } catch (error) {
-        // Silently handle aborted requests to reduce log noise
-        if (error.name !== 'CanceledError' && error.name !== 'AbortError') {
-          console.error("Delivery Polling Error:", error);
-        }
-      } finally {
-        if (isFirstLoad) setIsFirstLoad(false);
+  const syncAssignedOrders = useCallback(async () => {
+    if (!user?.isOnline || activeOrderRef.current || suppressIncomingModal) return;
+    try {
+      const res = await fetchAvailableOrders();
+      if (!res?.data?.success) return;
+      const availableOrders = res.data.results || res.data.result || [];
+      applyAvailableOrdersList(availableOrders);
+    } catch (error) {
+      if (
+        error?.code !== "ERR_CANCELED" &&
+        error?.name !== "CanceledError" &&
+        error?.name !== "AbortError"
+      ) {
+        console.error("Delivery assigned-order sync failed:", error);
       }
-    };
+    } finally {
+      if (isFirstLoad) setIsFirstLoad(false);
+    }
+  }, [
+    user?.isOnline,
+    suppressIncomingModal,
+    fetchAvailableOrders,
+    applyAvailableOrdersList,
+  ]);
 
+  const pollIncomingNotifications = useCallback(async () => {
+    if (!user?.isOnline || activeOrderRef.current || suppressIncomingModal) return;
+    try {
+      const res = await fetchNotifications();
+      if (!res?.data?.success) return;
+      const result = res.data.result || res.data.data;
+      const notifications = result?.notifications || [];
+      for (const n of notifications) {
+        if (!isIncomingDeliveryNotification(n) || n.isRead) continue;
+        const oid = n.data.orderId;
+        if (shownOrderIdsRef.current.has(oid)) continue;
+        const fromStored = applyFromBroadcastPayload(
+          {
+            orderId: oid,
+            preview: n.data.preview,
+            deliverySearchExpiresAt: n.data.deliverySearchExpiresAt,
+            type: n.data.type || n.data.eventType || n.type,
+          },
+          true,
+        );
+        if (fromStored) return;
+      }
+      await syncAssignedOrders();
+    } catch {
+      /* ignore */
+    }
+  }, [
+    user?.isOnline,
+    suppressIncomingModal,
+    fetchNotifications,
+    applyFromBroadcastPayload,
+    syncAssignedOrders,
+  ]);
+
+  // Poll for seller-assigned orders while online (fallback when socket/push is missed)
+  useEffect(() => {
     if (!user?.isOnline) {
-      didInitialAvailableFetchRef.current = false;
       if (availableOrdersRequestRef.current.controller) {
         availableOrdersRequestRef.current.controller.abort();
       }
       return undefined;
     }
 
-    if (didInitialAvailableFetchRef.current) return undefined;
-    didInitialAvailableFetchRef.current = true;
+    syncAssignedOrders();
+    const intervalId = setInterval(syncAssignedOrders, 12000);
 
-    fetchOrders(); // single fetch when going online
     return () => {
+      clearInterval(intervalId);
       if (availableOrdersRequestRef.current.controller) {
         availableOrdersRequestRef.current.controller.abort();
       }
     };
-  }, [
-    user?.isOnline,
-    activeOrder,
-    applyAvailableOrdersList,
-    suppressIncomingModal,
-    fetchAvailableOrders,
-  ]);
+  }, [user?.isOnline, syncAssignedOrders]);
 
-  // Real-time location while online — required for seller service-radius matching on new orders
+  // Real-time location while online
   useEffect(() => {
     if (!user?.isOnline || typeof navigator === "undefined" || !navigator.geolocation) {
       didInitialLocationSendRef.current = false;
@@ -408,22 +440,33 @@ const DeliveryLayout = () => {
   useEffect(() => {
     if (!user?.isOnline) return undefined;
     const getToken = () => localStorage.getItem("auth_delivery");
-    getOrderSocket(getToken);
+    const socket = getOrderSocket(getToken);
 
     const handleIncoming = (payload) => {
       if (activeOrderRef.current || suppressIncomingModal) return;
-      applyFromBroadcastPayload(payload, true);
+      const opened = applyFromBroadcastPayload(payload, true);
+      if (!opened) {
+        syncAssignedOrders();
+      }
     };
 
     const unsubAssigned = onOrderAssigned(getToken, handleIncoming);
+    const onConnect = () => {
+      syncAssignedOrders();
+      pollIncomingNotifications();
+    };
+    socket?.on("connect", onConnect);
 
     return () => {
       unsubAssigned();
+      socket?.off("connect", onConnect);
     };
   }, [
     user?.isOnline,
     applyFromBroadcastPayload,
     suppressIncomingModal,
+    syncAssignedOrders,
+    pollIncomingNotifications,
   ]);
 
   useEffect(() => {
@@ -446,56 +489,25 @@ const DeliveryLayout = () => {
     });
   }, [user?.isOnline]);
 
-  // When a new DB notification arrives (same row as bell list), open the same popup if socket was missed
+  // Poll notifications while online (fallback when socket/push is missed)
   useEffect(() => {
     if (!user?.isOnline) {
-      didInitialNotificationsPollRef.current = false;
       if (notificationsRequestRef.current.controller) {
         notificationsRequestRef.current.controller.abort();
       }
       return undefined;
     }
 
-    if (didInitialNotificationsPollRef.current) return undefined;
-    didInitialNotificationsPollRef.current = true;
+    pollIncomingNotifications();
+    const intervalId = setInterval(pollIncomingNotifications, 15000);
 
-    const poll = async () => {
-      try {
-        const res = await fetchNotifications();
-        if (!res?.data?.success) return;
-        const result = res.data.result || res.data.data;
-        const notifications = result?.notifications || [];
-        if (activeOrderRef.current) return;
-        for (const n of notifications) {
-          const isIncomingOrderType =
-            n.type === "order" || n.type === "RETURN_PICKUP_ASSIGNED";
-          if (!isIncomingOrderType || n.isRead || !n.data?.orderId) continue;
-          const oid = n.data.orderId;
-          if (shownOrderIdsRef.current.has(oid)) continue;
-          const fromStored = applyFromBroadcastPayload({
-            orderId: oid,
-            preview: n.data.preview,
-            deliverySearchExpiresAt: n.data.deliverySearchExpiresAt,
-            type: n.data.type || (n.data.preview?.type),
-          }, true);
-          if (fromStored) return;
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    poll();
     return () => {
+      clearInterval(intervalId);
       if (notificationsRequestRef.current.controller) {
         notificationsRequestRef.current.controller.abort();
       }
     };
-  }, [
-    user?.isOnline,
-    applyFromBroadcastPayload,
-    suppressIncomingModal,
-    fetchNotifications,
-  ]);
+  }, [user?.isOnline, pollIncomingNotifications]);
 
   const skipOrder = useCallback(async () => {
     const current = activeOrderRef.current;
