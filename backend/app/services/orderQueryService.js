@@ -273,35 +273,14 @@ export async function fetchAvailableOrdersForDelivery({
     }));
   }
 
-  const deliveryPartner = await Delivery.findById(userId);
-  if (
-    !deliveryPartner ||
-    !deliveryPartner.location ||
-    !Array.isArray(deliveryPartner.location.coordinates)
-  ) {
-    return {
-      requiresLocation: showDeliveries && assignedReturnPickups.length === 0,
-      orders: assignedReturnPickups,
-      limit,
-    };
-  }
-
-  const { sellerIds } = await resolveNearbySellerIds(deliveryPartner, userId);
-
   let v2Orders = [];
   if (showDeliveries) {
     const v2OrdersRaw = await Order.find({
       workflowVersion: { $gte: 2 },
-      workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-      $or: [
-        {
-          deliveryBoy: null,
-          seller: { $in: sellerIds },
-        },
-        {
-          deliveryBoy: userId,
-        },
-      ],
+      deliveryBoy: userId,
+      workflowStatus: {
+        $in: [WORKFLOW_STATUS.DELIVERY_SEARCH, WORKFLOW_STATUS.DELIVERY_ASSIGNED],
+      },
       skippedBy: { $nin: [userId] },
     })
       .sort({ createdAt: -1, _id: -1 })
@@ -310,34 +289,16 @@ export async function fetchAvailableOrdersForDelivery({
       .populate("seller", "shopName address name location serviceRadius")
       .lean();
 
-    v2Orders = filterV2OrdersByRadius(
-      v2OrdersRaw,
-      deliveryPartner.location.coordinates,
-      userId,
-    );
+    v2Orders = v2OrdersRaw;
   }
 
   let legacyOrders = [];
   if (showDeliveries) {
     legacyOrders = await Order.find({
-      $and: [
-        {
-          $or: [
-            { workflowVersion: { $exists: false } },
-            { workflowVersion: { $lt: 2 } },
-          ],
-        },
-        {
-          $or: [
-            {
-              deliveryBoy: null,
-              seller: { $in: sellerIds },
-            },
-            {
-              deliveryBoy: userId,
-            },
-          ],
-        },
+      deliveryBoy: userId,
+      $or: [
+        { workflowVersion: { $exists: false } },
+        { workflowVersion: { $lt: 2 } },
       ],
       status: { $in: ["confirmed", "packed"] },
       skippedBy: { $nin: [userId] },
@@ -349,37 +310,10 @@ export async function fetchAvailableOrdersForDelivery({
       .lean();
   }
 
-  let returnPickups = [];
-  if (showReturns) {
-    const returnPickupsRaw = await Order.find({
-      returnStatus: { $in: ["return_approved", "return_pickup_assigned"] },
-      skippedBy: { $nin: [userId] },
-      $or: [
-        {
-          returnDeliveryBoy: null,
-          seller: { $in: sellerIds },
-        },
-        {
-          returnDeliveryBoy: userId,
-        },
-      ],
-    })
-      .sort({ createdAt: -1, _id: -1 })
-      .limit(limit)
-      .populate("customer", "name phone")
-      .populate("seller", "shopName address name location")
-      .lean();
-
-    returnPickups = returnPickupsRaw.map((rp) => ({
-      ...rp,
-      isReturnPickup: true,
-    }));
-  }
-
   const orders = mergeAvailableOrders(
     v2Orders,
     legacyOrders,
-    [...assignedReturnPickups, ...returnPickups],
+    assignedReturnPickups,
     limit,
   );
 

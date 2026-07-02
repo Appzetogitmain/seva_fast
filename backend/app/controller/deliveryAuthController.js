@@ -182,8 +182,15 @@ export const loginDelivery = async (req, res) => {
 
         const delivery = await findDeliveryByPhone(phone);
 
-        if (!delivery || !delivery.isVerified) {
+        if (!delivery) {
             return handleResponse(res, 404, "Delivery partner not found");
+        }
+
+        if (!delivery.isVerified) {
+            return handleResponse(res, 403, "Your delivery partner account is pending admin approval.", {
+                isVerified: false,
+                applicationStatus: "pending",
+            });
         }
 
         let otp = generateOTP();
@@ -252,6 +259,8 @@ export const verifyDeliveryOTP = async (req, res) => {
         return handleResponse(res, 200, "Login successful", {
             token,
             delivery,
+            applicationStatus: delivery.isVerified ? "approved" : "pending",
+            requiresApproval: !delivery.isVerified,
         });
     } catch (error) {
         return handleResponse(res, error.statusCode || 500, error.message);

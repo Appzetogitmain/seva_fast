@@ -18,6 +18,7 @@ import Auth from '../../modules/seller/pages/Auth';
 import ApplicationPending from '../../modules/seller/pages/ApplicationPending';
 import AdminAuth from '../../modules/admin/pages/AdminAuth';
 import DeliveryAuth from '../../modules/delivery/pages/DeliveryAuth';
+import DeliveryApplicationPending from '../../modules/delivery/pages/ApplicationPending';
 import CustomerAuth from '../../modules/customer/pages/CustomerAuth';
 
 // Customer Pages (lazy-loaded)
@@ -121,6 +122,10 @@ const AppRouter = () => {
                 {
                     path: 'delivery/auth',
                     element: <DeliveryAuth />,
+                },
+                {
+                    path: 'delivery/pending-approval',
+                    element: <DeliveryApplicationPending />,
                 },
                 {
                     path: 'seller/*',

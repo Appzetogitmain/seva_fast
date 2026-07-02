@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import handleResponse from "../utils/helper.js";
 import Seller from "../models/seller.js";
+import Delivery from "../models/delivery.js";
 import Customer from "../models/customer.js";
 
 function extractJwtFromHeaders(req) {
@@ -128,5 +129,35 @@ export const requireApprovedSeller = async (req, res, next) => {
     next();
   } catch (error) {
     return handleResponse(res, 500, "Unable to validate seller approval status");
+  }
+};
+
+/* ===============================
+   Ensure delivery partner can access operational routes
+================================ */
+export const requireApprovedDelivery = async (req, res, next) => {
+  try {
+    if (req.user?.role !== "delivery") {
+      return next();
+    }
+
+    const delivery = await Delivery.findById(req.user.id)
+      .select("isVerified")
+      .lean();
+
+    if (!delivery) {
+      return handleResponse(res, 401, "Delivery partner account not found");
+    }
+
+    if (delivery.isVerified !== true) {
+      return handleResponse(res, 403, "Delivery partner account is pending approval.", {
+        isVerified: false,
+        applicationStatus: "pending",
+      });
+    }
+
+    next();
+  } catch (error) {
+    return handleResponse(res, 500, "Unable to validate delivery partner approval status");
   }
 };

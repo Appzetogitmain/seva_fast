@@ -148,6 +148,17 @@ const DeliveryAuth = () => {
       setStep("otp");
     } catch (error) {
       console.error(error);
+      if (mode === "login" && error.response?.status === 403) {
+        toast.info("Your account is pending approval.");
+        navigate("/delivery/pending-approval", {
+          replace: true,
+          state: {
+            approvalRequired: true,
+            applicationStatus: "pending",
+          },
+        });
+        return;
+      }
       toast.error(error.response?.data?.message || "Failed to send OTP");
     } finally {
       setLoading(false);
@@ -162,6 +173,24 @@ const DeliveryAuth = () => {
       const otpString = otp.join("");
       const response = await deliveryApi.verifyOtp({ phone, otp: otpString });
       const { token, delivery } = response.data.result;
+
+      if (!delivery?.isVerified) {
+        if (mode === "signup") {
+          toast.success(
+            "Application submitted. Dashboard access is enabled only after approval.",
+          );
+        } else {
+          toast.info("Your account is pending approval.");
+        }
+        navigate("/delivery/pending-approval", {
+          replace: true,
+          state: {
+            approvalRequired: true,
+            applicationStatus: "pending",
+          },
+        });
+        return;
+      }
 
       login({ ...delivery, token, role: "delivery" });
 

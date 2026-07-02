@@ -51,6 +51,23 @@ const ProtectedRoute = ({ children }) => {
         }
     }
 
+    if (location.pathname.startsWith('/delivery')) {
+        const isApprovedDelivery = Boolean(user) && user.isVerified === true;
+
+        if (!isApprovedDelivery) {
+            return (
+                <Navigate
+                    to="/delivery/pending-approval"
+                    state={{
+                        approvalRequired: true,
+                        applicationStatus: user?.isVerified ? 'approved' : 'pending',
+                    }}
+                    replace
+                />
+            );
+        }
+    }
+
     return <>{children}</>;
 };
 

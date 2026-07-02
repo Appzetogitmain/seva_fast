@@ -9,7 +9,6 @@ import { deliveryApi } from "../services/deliveryApi";
 import { useAuth } from "@core/context/AuthContext";
 import {
   getOrderSocket,
-  onDeliveryBroadcast,
   onDeliveryBroadcastWithdrawn,
   onOrderAssigned,
 } from "@/core/services/orderSocket";
@@ -17,6 +16,7 @@ import {
   loadHandledIncomingOrderIds,
   markIncomingOrderHandled,
 } from "../utils/deliveryHandledOrders";
+import { buildDeliveryOrderDetailsPath } from "../utils/deliveryOrderNavigation";
 import { saveDeliveryPartnerLocation } from "../utils/deliveryLastLocation";
 import orderAlertSound from "@/assets/sounds/order_alert.mp3";
 
@@ -410,32 +410,20 @@ const DeliveryLayout = () => {
     const getToken = () => localStorage.getItem("auth_delivery");
     getOrderSocket(getToken);
 
-    const handleIncoming = (payload, isManualAssignment = false) => {
+    const handleIncoming = (payload) => {
       if (activeOrderRef.current || suppressIncomingModal) return;
-      const opened = applyFromBroadcastPayload(payload, isManualAssignment);
-      if (opened) return;
-      fetchAvailableOrders()
-        .then((res) => {
-          if (!res?.data?.success) return;
-          const list = res.data.results || res.data.result || [];
-          applyAvailableOrdersList(list);
-        })
-        .catch(() => { });
+      applyFromBroadcastPayload(payload, true);
     };
 
-    const unsubBroadcast = onDeliveryBroadcast(getToken, (p) => handleIncoming(p, false));
-    const unsubAssigned = onOrderAssigned(getToken, (p) => handleIncoming(p, true));
+    const unsubAssigned = onOrderAssigned(getToken, handleIncoming);
 
     return () => {
-      unsubBroadcast();
       unsubAssigned();
     };
   }, [
     user?.isOnline,
-    applyAvailableOrdersList,
     applyFromBroadcastPayload,
     suppressIncomingModal,
-    fetchAvailableOrders,
   ]);
 
   useEffect(() => {
@@ -489,13 +477,8 @@ const DeliveryLayout = () => {
             preview: n.data.preview,
             deliverySearchExpiresAt: n.data.deliverySearchExpiresAt,
             type: n.data.type || (n.data.preview?.type),
-          });
+          }, true);
           if (fromStored) return;
-          const r2 = await fetchAvailableOrders();
-          if (!r2?.data?.success) return;
-          const list = r2.data.results || r2.data.result || [];
-          applyAvailableOrdersList(list);
-          return;
         }
       } catch {
         /* ignore */
@@ -510,10 +493,8 @@ const DeliveryLayout = () => {
   }, [
     user?.isOnline,
     applyFromBroadcastPayload,
-    applyAvailableOrdersList,
     suppressIncomingModal,
     fetchNotifications,
-    fetchAvailableOrders,
   ]);
 
   const skipOrder = useCallback(async () => {
@@ -564,6 +545,21 @@ const DeliveryLayout = () => {
     return () => clearInterval(timer);
   }, [activeOrder, skipOrder]);
 
+  const openOrderDetails = useCallback(
+    (orderId) => {
+      const id = String(orderId || "").trim();
+      if (!id) return;
+      shownOrderIdsRef.current = new Set(shownOrderIdsRef.current).add(id);
+      markIncomingOrderHandled(id);
+      stopOrderRingtone();
+      setActiveOrder(null);
+      acceptInFlightRef.current = false;
+      setIsAcceptingOrder(false);
+      navigate(buildDeliveryOrderDetailsPath(id), { replace: true });
+    },
+    [navigate],
+  );
+
   const handleAcceptOrder = async () => {
     if (!activeOrder || acceptInFlightRef.current) return;
     if (
@@ -576,32 +572,37 @@ const DeliveryLayout = () => {
     }
     acceptInFlightRef.current = true;
     setIsAcceptingOrder(true);
+    const orderId = activeOrder.id;
     try {
-      console.log("Delivery Alert - Accepting order:", activeOrder.id);
       const idem =
         typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()
           : `${Date.now()}`;
       if (activeOrder.isReturnPickup) {
-        await deliveryApi.acceptReturnPickup(activeOrder.id);
+        await deliveryApi.acceptReturnPickup(orderId);
       } else {
-        await deliveryApi.acceptOrder(activeOrder.id, idem);
+        await deliveryApi.acceptOrder(orderId, idem);
       }
       toast.success("Order accepted!");
-      const orderId = activeOrder.id;
-      shownOrderIdsRef.current = new Set(shownOrderIdsRef.current).add(orderId);
-      markIncomingOrderHandled(orderId);
-      stopOrderRingtone();
-      setActiveOrder(null);
-      navigate(`/delivery/order-details/${orderId}`);
+      openOrderDetails(orderId);
     } catch (error) {
       console.error("Delivery Alert - Accept failed:", error);
       const msg =
         error.response?.data?.message ||
         (typeof error.response?.data === "string" ? error.response.data : null);
+      const status = error.response?.status;
+      const canOpenAnyway =
+        status === 409 ||
+        /already accepted|already assigned|assigned to you|no longer open/i.test(
+          String(msg || ""),
+        );
+      if (canOpenAnyway) {
+        toast.info("Opening order details…");
+        openOrderDetails(orderId);
+        return;
+      }
       toast.error(msg || "Failed to accept order");
       setActiveOrder(null);
-    } finally {
       acceptInFlightRef.current = false;
       setIsAcceptingOrder(false);
     }

@@ -76,61 +76,29 @@ describe("orderQueryService", () => {
     expect(query.createdAt.$lte.getMilliseconds()).toBe(999);
   });
 
-  test("fetchAvailableOrdersForDelivery returns requiresLocation when rider has no coordinates", async () => {
-    mockDeliveryFindById.mockResolvedValue({
-      _id: "rider-1",
-      location: null,
-    });
-
-    const result = await fetchAvailableOrdersForDelivery({
-      userId: "rider-1",
-      requestedLimit: "15",
-    });
-
-    expect(result.requiresLocation).toBe(true);
-    expect(result.orders).toEqual([]);
-    expect(mockOrderFind).not.toHaveBeenCalled();
-  });
-
-  test("fetchAvailableOrdersForDelivery filters V2 orders by effective search radius and merges with legacy", async () => {
-    mockDeliveryFindById.mockResolvedValue({
-      _id: "rider-1",
-      location: {
-        type: "Point",
-        coordinates: [77.59, 12.97],
-      },
-    });
-
-    mockSellerFind.mockReturnValueOnce(
-      makeSelectChain([{ _id: "seller-1" }, { _id: "seller-2" }]),
-    );
-
+  test("fetchAvailableOrdersForDelivery returns seller-assigned orders only", async () => {
     mockOrderFind.mockImplementation((query) => {
+      if (query.returnStatus) {
+        return makeOrderQueryChain([]);
+      }
       if (query.workflowStatus) {
+        expect(query.deliveryBoy).toBe("rider-1");
+        expect(query.workflowStatus.$in).toEqual(["DELIVERY_SEARCH", "DELIVERY_ASSIGNED"]);
         return makeOrderQueryChain([
           {
             orderId: "ORD-1",
-            deliverySearchMeta: { radiusMeters: 5000 },
-            seller: { location: { coordinates: [77.591, 12.971] }, serviceRadius: 5 },
-          },
-          {
-            orderId: "ORD-2",
-            deliverySearchMeta: { radiusMeters: 5000 },
-            seller: { location: { coordinates: [77.8, 13.2] }, serviceRadius: 1 },
+            seller: { shopName: "Store A" },
           },
         ]);
       }
+      expect(query.deliveryBoy).toBe("rider-1");
       return makeOrderQueryChain([
         {
-          orderId: "ORD-3",
-          seller: { location: { coordinates: [77.592, 12.972] } },
+          orderId: "ORD-2",
+          seller: { shopName: "Store B" },
         },
       ]);
     });
-
-    mockDistanceMeters
-      .mockReturnValueOnce(300)
-      .mockReturnValueOnce(4000);
 
     const result = await fetchAvailableOrdersForDelivery({
       userId: "rider-1",
@@ -138,6 +106,8 @@ describe("orderQueryService", () => {
     });
 
     expect(result.requiresLocation).toBe(false);
-    expect(result.orders.map((order) => order.orderId)).toEqual(["ORD-1", "ORD-3"]);
+    expect(result.orders.map((order) => order.orderId)).toEqual(["ORD-1", "ORD-2"]);
+    expect(mockDeliveryFindById).not.toHaveBeenCalled();
+    expect(mockSellerFind).not.toHaveBeenCalled();
   });
 });

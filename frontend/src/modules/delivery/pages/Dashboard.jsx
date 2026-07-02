@@ -19,6 +19,7 @@ import Card from "@/shared/components/ui/Card";
 
 import { useAuth } from "@core/context/AuthContext";
 import { deliveryApi } from "../services/deliveryApi";
+import { buildDeliveryOrderDetailsPath } from "../utils/deliveryOrderNavigation";
 import {
   onDeliveryBroadcast,
   onOrderAssigned,
@@ -136,7 +137,7 @@ const Dashboard = () => {
         toast.success("Return pickup accepted!");
         fetchAvailableOrders();
         // Option: navigate to details
-        navigate(`/delivery/order-details/${orderId}`);
+        navigate(buildDeliveryOrderDetailsPath(orderId));
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to accept return");
@@ -475,7 +476,7 @@ const Dashboard = () => {
                         variant="ghost" 
                         size="sm" 
                         className="px-4 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-10"
-                        onClick={() => navigate(`/delivery/order-details/${order.orderId}`)}
+                        onClick={() => navigate(buildDeliveryOrderDetailsPath(order.orderId))}
                       >
                         View
                       </Button>

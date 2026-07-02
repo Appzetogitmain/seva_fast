@@ -13,6 +13,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
 import { deliveryApi } from "../services/deliveryApi";
+import {
+  buildDeliveryOrderDetailsPath,
+  isDeliveryOrderNotification,
+} from "../utils/deliveryOrderNavigation";
 import { toast } from "sonner";
 import {
   getOrderSocket,
@@ -87,6 +91,15 @@ const Notifications = () => {
     visible: { opacity: 1, x: 0 },
   };
 
+  const handleNotificationClick = async (notification) => {
+    if (!notification.isRead) {
+      await handleMarkAsRead(notification._id);
+    }
+    if (isDeliveryOrderNotification(notification)) {
+      navigate(buildDeliveryOrderDetailsPath(notification.data.orderId));
+    }
+  };
+
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24 font-sans">
       {/* Header */}
@@ -131,7 +144,7 @@ const Notifications = () => {
                   key={notification._id}
                   variants={itemVariants}
                   layout
-                  onClick={() => !notification.isRead && handleMarkAsRead(notification._id)}>
+                  onClick={() => handleNotificationClick(notification)}>
                   <Card
                     className={`p-4 border-none shadow-sm relative overflow-hidden transition-all duration-300 cursor-pointer ${!notification.isRead
                       ? "bg-brand-50/50 border-l-4 border-l-brand-500 shadow-brand-500/5 scale-[1.02]"

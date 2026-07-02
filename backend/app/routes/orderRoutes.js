@@ -45,6 +45,7 @@ import {
   verifyToken,
   allowRoles,
   requireApprovedSeller,
+  requireApprovedDelivery,
 } from "../middleware/authMiddleware.js";
 import { handleShiprocketWebhook } from "../controller/shippingWebhookController.js";
 import { loadSubadminZones } from "../middleware/zoneRestrictionMiddleware.js";
@@ -80,6 +81,7 @@ router.post(
   "/:id/cod/mark-collected",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   markCodCollectedAfterDelivery,
 );
 router.post(
@@ -93,6 +95,7 @@ router.post(
   "/:id/cod/reconcile",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   reconcileCodCashSubmission,
 );
 
@@ -164,36 +167,42 @@ router.get(
   "/available",
   verifyToken,
   allowRoles("admin", "delivery"),
+  requireApprovedDelivery,
   getAvailableOrders,
 );
 router.put(
   "/accept/:orderId",
   verifyToken,
   allowRoles("admin", "delivery"),
+  requireApprovedDelivery,
   acceptOrder,
 );
 router.put(
   "/skip/:orderId",
   verifyToken,
   allowRoles("admin", "delivery"),
+  requireApprovedDelivery,
   skipOrder,
 );
 router.put(
   "/returns/:orderId/accept-pickup",
   verifyToken,
   allowRoles("admin", "delivery"),
+  requireApprovedDelivery,
   acceptReturnPickup,
 );
 router.put(
   "/returns/:orderId/reject-pickup",
   verifyToken,
   allowRoles("admin", "delivery"),
+  requireApprovedDelivery,
   rejectReturnPickup,
 );
 router.put(
   "/return-status/:orderId",
   verifyToken,
   allowRoles("admin", "delivery"),
+  requireApprovedDelivery,
   updateReturnStatus,
 );
 
@@ -202,30 +211,35 @@ router.post(
   "/workflow/:orderId/pickup/confirm",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   confirmPickup,
 );
 router.post(
   "/workflow/:orderId/pickup/ready",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   markArrivedAtStore,
 );
 router.post(
   "/workflow/:orderId/rider/advance-ui",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   advanceDeliveryRiderUi,
 );
 router.post(
   "/workflow/:orderId/otp/request",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   requestDeliveryOtp,
 );
 router.post(
   "/workflow/:orderId/otp/verify",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   verifyDeliveryOtp,
 );
 
@@ -234,12 +248,14 @@ router.post(
   "/workflow/:orderId/return-otp/request",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   requestReturnPickupOtp,
 );
 router.post(
   "/workflow/:orderId/return-otp/verify",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   verifyReturnPickupOtp,
 );
 
@@ -248,12 +264,14 @@ router.post(
   "/workflow/:orderId/return-drop-otp/request",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   requestReturnDropOtp,
 );
 router.post(
   "/workflow/:orderId/return-drop-otp/verify",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   verifyReturnDropOtp,
 );
 
@@ -262,6 +280,7 @@ router.post(
   "/returns/:orderId/pickup-proof",
   verifyToken,
   allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
   uploadReturnPickupProof,
 );
 

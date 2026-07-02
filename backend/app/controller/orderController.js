@@ -12,7 +12,7 @@ import Payout from "../models/payout.js";
 import OrderOtp from "../models/orderOtp.js";
 import handleResponse from "../utils/helper.js";
 import getPagination from "../utils/pagination.js";
-import { WORKFLOW_STATUS, DEFAULT_SELLER_TIMEOUT_MS, workflowFromLegacyStatus } from "../constants/orderWorkflow.js";
+import { WORKFLOW_STATUS, DEFAULT_SELLER_TIMEOUT_MS, workflowFromLegacyStatus, legacyStatusFromWorkflow } from "../constants/orderWorkflow.js";
 import { ORDER_PAYMENT_STATUS } from "../constants/finance.js";
 import {
   afterPlaceOrderV2,
@@ -944,6 +944,9 @@ export const updateOrderStatus = async (req, res) => {
     if (deliveryBoyId && String(order.deliveryBoy || "") !== String(deliveryBoyId)) {
       if (typeof Delivery.findById === "function") {
         const rider = await Delivery.findById(deliveryBoyId);
+        if (rider && !rider.isVerified) {
+          return handleResponse(res, 400, "Delivery partner is not approved yet. Cannot assign order.");
+        }
         if (rider && !rider.isOnline) {
           return handleResponse(res, 400, "Delivery partner is offline. Cannot assign order.");
         }
@@ -962,6 +965,13 @@ export const updateOrderStatus = async (req, res) => {
     if (deliveryBoyId) {
       order.deliveryBoy = deliveryBoyId;
       order.deliverySearchExpiresAt = new Date(Date.now() + 60000);
+
+      if (order.workflowVersion >= 2 && order.workflowStatus === WORKFLOW_STATUS.DELIVERY_SEARCH) {
+        order.workflowStatus = WORKFLOW_STATUS.DELIVERY_ASSIGNED;
+        order.status = legacyStatusFromWorkflow(WORKFLOW_STATUS.DELIVERY_ASSIGNED);
+        order.assignedAt = new Date();
+        order.deliveryRiderStep = order.deliveryRiderStep || 1;
+      }
       
       if (Array.isArray(order.skippedBy)) {
         order.skippedBy = order.skippedBy.filter(
@@ -2022,15 +2032,14 @@ export const acceptOrder = async (req, res) => {
       }
     }
 
-    if (order.deliveryBoy && order.deliveryBoy.toString() !== userId.toString()) {
+    if (!order.deliveryBoy || order.deliveryBoy.toString() !== userId.toString()) {
       return handleResponse(
         res,
         400,
-        "Order already assigned to another delivery partner",
+        "This order is not assigned to you. Wait for seller assignment.",
       );
     }
 
-    order.deliveryBoy = userId;
     if (order.status === "pending") {
       order.status = "confirmed";
     }

@@ -406,15 +406,22 @@ export async function deliveryAcceptAtomic(deliveryId, orderId, idempotencyKey) 
     }
   }
 
+  const alreadyAccepted = await Order.findOne({
+    orderId,
+    workflowVersion: { $gte: 2 },
+    deliveryBoy: deliveryOid,
+    workflowStatus: WORKFLOW_STATUS.DELIVERY_ASSIGNED,
+  }).lean();
+  if (alreadyAccepted) {
+    return { order: alreadyAccepted, duplicate: true };
+  }
+
   const updated = await Order.findOneAndUpdate(
     {
       orderId,
       workflowVersion: { $gte: 2 },
       workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-      $or: [
-        { deliveryBoy: null },
-        { deliveryBoy: deliveryOid }
-      ],
+      deliveryBoy: deliveryOid,
       deliverySearchExpiresAt: { $gt: now },
       skippedBy: { $nin: [deliveryOid] },
     },
@@ -438,7 +445,7 @@ export async function deliveryAcceptAtomic(deliveryId, orderId, idempotencyKey) 
       err.statusCode = 404;
       throw err;
     }
-    let msg = "Order already assigned or not available";
+    let msg = "Order is not assigned to you. Wait for seller assignment.";
     if (o.deliverySearchExpiresAt && new Date(o.deliverySearchExpiresAt) <= now) {
       msg =
         "Accept window has expired. Wait for the next delivery request.";
