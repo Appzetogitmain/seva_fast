@@ -21,6 +21,47 @@ import {
   roundCurrency,
 } from "../../utils/money.js";
 import { getOrCreateFinanceSettings } from "./financeSettingsService.js";
+
+export const DELIVERY_FEE_SELLER_SHARE = 0.8;
+export const DELIVERY_FEE_ADMIN_SHARE = 0.2;
+
+export function splitDeliveryFee(deliveryFeeCharged = 0) {
+  const fee = roundCurrency(deliveryFeeCharged || 0);
+  return {
+    sellerDeliveryFeeShare: roundCurrency(fee * DELIVERY_FEE_SELLER_SHARE),
+    adminDeliveryFeeShare: roundCurrency(fee * DELIVERY_FEE_ADMIN_SHARE),
+  };
+}
+
+export function recalculateLogisticsEarnings({
+  deliveryFeeCharged = 0,
+  handlingFeeCharged = 0,
+  adminProductCommissionTotal = 0,
+  tipTotal = 0,
+} = {}) {
+  const { sellerDeliveryFeeShare, adminDeliveryFeeShare } = splitDeliveryFee(
+    deliveryFeeCharged,
+  );
+  const handling = roundCurrency(handlingFeeCharged || 0);
+  const tip = roundCurrency(tipTotal || 0);
+  const adminCommission = roundCurrency(adminProductCommissionTotal || 0);
+  const platformLogisticsMargin = roundCurrency(adminDeliveryFeeShare + handling);
+  const platformTotalEarning = roundCurrency(
+    adminCommission + platformLogisticsMargin + tip,
+  );
+
+  return {
+    sellerDeliveryFeeShare,
+    adminDeliveryFeeShare,
+    platformLogisticsMargin,
+    platformTotalEarning,
+    riderPayoutBase: 0,
+    riderPayoutDistance: 0,
+    riderPayoutBonus: 0,
+    riderTipAmount: tip,
+    riderPayoutTotal: 0,
+  };
+}
 import {
   productHasVariants,
   resolveVariantByKey,
@@ -517,7 +558,13 @@ export async function generateOrderPaymentBreakdown({
     };
   } else {
     delivery = calculateCustomerDeliveryFee(distanceKm, effectiveSettings, hasFreeDelivery);
-    rider = calculateRiderPayout(distanceKm, effectiveSettings);
+    rider = {
+      riderPayoutBase: 0,
+      riderPayoutDistance: 0,
+      riderPayoutBonus: 0,
+      riderPayoutTotal: 0,
+      roundedExtraKm: 0,
+    };
   }
 
   // Calculate Product Subtotal
@@ -526,10 +573,7 @@ export async function generateOrderPaymentBreakdown({
     productSubtotal = addMoney(productSubtotal, roundCurrency(item.price * item.quantity));
   }
 
-  // Deduct Shipping if configured
-  const shippingChargeToDeduct = effectiveSettings.deductShippingBeforeCommission
-    ? (rider.riderPayoutBase + rider.riderPayoutDistance + rider.riderPayoutBonus)
-    : 0;
+  const shippingChargeToDeduct = 0;
   const commissionBase = Math.max(productSubtotal - shippingChargeToDeduct, 0);
 
   // Determine membership discount
@@ -656,26 +700,25 @@ export async function generateOrderPaymentBreakdown({
   );
 
   const riderTipAmount = normalizedTip;
-  const riderPayoutTotal = roundCurrency(
-    rider.riderPayoutBase +
-      rider.riderPayoutDistance +
-      rider.riderPayoutBonus +
-      riderTipAmount,
-  );
+  const logisticsEarnings = recalculateLogisticsEarnings({
+    deliveryFeeCharged: delivery.deliveryFeeCharged,
+    handlingFeeCharged: handling.handlingFeeCharged,
+    adminProductCommissionTotal: totalCommissionAmount,
+    tipTotal: riderTipAmount,
+  });
 
-  const platformLogisticsMargin = roundCurrency(
-    delivery.deliveryFeeCharged +
-      handling.handlingFeeCharged -
-      (rider.riderPayoutBase + rider.riderPayoutDistance + rider.riderPayoutBonus),
-  );
-
-  // Admin total earning from commission split
   const adminProductCommissionTotal = totalCommissionAmount;
-  const platformTotalEarning = roundCurrency(
-    adminProductCommissionTotal + platformLogisticsMargin,
-  );
+  const {
+    sellerDeliveryFeeShare,
+    adminDeliveryFeeShare,
+    platformLogisticsMargin,
+    platformTotalEarning,
+    riderPayoutTotal,
+  } = logisticsEarnings;
 
-  const sellerPayoutTotal = Math.max(productSubtotal - totalCommissionAmount, 0);
+  const sellerPayoutTotal = roundCurrency(
+    Math.max(productSubtotal - totalCommissionAmount, 0) + sellerDeliveryFeeShare,
+  );
 
   const snapshots = {
     deliverySettings: {
@@ -710,9 +753,11 @@ export async function generateOrderPaymentBreakdown({
     grandTotal,
     sellerPayoutTotal,
     adminProductCommissionTotal,
-    riderPayoutBase: rider.riderPayoutBase,
-    riderPayoutDistance: rider.riderPayoutDistance,
-    riderPayoutBonus: rider.riderPayoutBonus,
+    sellerDeliveryFeeShare,
+    adminDeliveryFeeShare,
+    riderPayoutBase: 0,
+    riderPayoutDistance: 0,
+    riderPayoutBonus: 0,
     riderTipAmount,
     riderPayoutTotal,
     platformLogisticsMargin,

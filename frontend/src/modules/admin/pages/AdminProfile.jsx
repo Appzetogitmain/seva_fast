@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Card from '@shared/components/ui/Card';
 import {
     Save,
@@ -10,7 +10,8 @@ import {
     Camera,
     LogOut,
     Key,
-    X
+    X,
+    ImagePlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -23,11 +24,15 @@ const AdminProfile = () => {
     const { requestSignOut, signOutDialog } = useSignOutConfirmation();
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
     const [activeTab, setActiveTab] = useState('profile');
+    const cameraInputRef = useRef(null);
+    const galleryInputRef = useRef(null);
     const [profile, setProfile] = useState({
         name: '',
         email: '',
-        role: 'Admin'
+        role: 'Admin',
+        profileImage: '',
     });
 
     const [security, setSecurity] = useState({
@@ -47,7 +52,8 @@ const AdminProfile = () => {
             setProfile({
                 name: data.name,
                 email: data.email,
-                role: data.role || 'Admin'
+                role: data.role || 'Admin',
+                profileImage: data.profileImage || '',
             });
         } catch (error) {
             toast.error('Failed to fetch admin profile');
@@ -62,7 +68,8 @@ const AdminProfile = () => {
         try {
             await adminApi.updateProfile({
                 name: profile.name,
-                email: profile.email
+                email: profile.email,
+                profileImage: profile.profileImage,
             });
             toast.success('Profile updated successfully');
             fetchProfile();
@@ -94,6 +101,49 @@ const AdminProfile = () => {
             setIsSaving(false);
         }
     };
+
+    const handlePhotoSelect = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file');
+            return;
+        }
+
+        try {
+            setIsUploadingPhoto(true);
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadRes = await adminApi.uploadMedia(formData);
+            const photoUrl =
+                uploadRes.data?.result?.secureUrl ||
+                uploadRes.data?.result?.url ||
+                uploadRes.data?.secureUrl ||
+                uploadRes.data?.url;
+
+            if (!photoUrl) {
+                throw new Error('No image URL returned');
+            }
+
+            await adminApi.updateProfile({
+                name: profile.name,
+                email: profile.email,
+                profileImage: photoUrl,
+            });
+
+            setProfile((prev) => ({ ...prev, profileImage: photoUrl }));
+            toast.success('Profile picture updated');
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to upload profile picture');
+        } finally {
+            setIsUploadingPhoto(false);
+        }
+    };
+
+    const profileInitial = profile.name?.charAt(0)?.toUpperCase() || '?';
 
     if (isLoading) {
         return (
@@ -133,17 +183,64 @@ const AdminProfile = () => {
                 <div className="lg:col-span-4 space-y-6">
                     <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
                         <div className="p-8 flex flex-col items-center text-center">
-                            <div className="relative group cursor-pointer">
+                            <div className="relative group">
                                 <div className="h-32 w-32 rounded-full ring-4 ring-slate-50 bg-slate-100 flex items-center justify-center overflow-hidden">
-                                    {/* Placeholder Avatar */}
-                                    <span className="text-4xl font-black text-slate-300">
-                                        {profile.name?.charAt(0)}
-                                    </span>
+                                    {profile.profileImage ? (
+                                        <img
+                                            src={profile.profileImage}
+                                            alt={profile.name || 'Profile'}
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        <span className="text-4xl font-black text-slate-300">
+                                            {profileInitial}
+                                        </span>
+                                    )}
+                                    {isUploadingPhoto ? (
+                                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                            <div className="h-8 w-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        </div>
+                                    ) : null}
                                 </div>
-                                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Camera className="h-8 w-8 text-white" />
+                                <div className="absolute -bottom-1 -right-1 flex gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => cameraInputRef.current?.click()}
+                                        disabled={isUploadingPhoto}
+                                        className="p-2.5 bg-black text-white rounded-full shadow-lg hover:bg-brand-700 transition-all disabled:opacity-60"
+                                        title="Take photo with camera"
+                                    >
+                                        <Camera className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => galleryInputRef.current?.click()}
+                                        disabled={isUploadingPhoto}
+                                        className="p-2.5 bg-white text-slate-700 ring-1 ring-slate-200 rounded-full shadow-lg hover:bg-slate-50 transition-all disabled:opacity-60"
+                                        title="Choose from gallery"
+                                    >
+                                        <ImagePlus className="h-4 w-4" />
+                                    </button>
                                 </div>
+                                <input
+                                    ref={cameraInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    capture="user"
+                                    className="hidden"
+                                    onChange={handlePhotoSelect}
+                                />
+                                <input
+                                    ref={galleryInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handlePhotoSelect}
+                                />
                             </div>
+                            <p className="mt-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                Tap camera to capture or gallery to upload
+                            </p>
                             <h2 className="mt-6 ds-h2 font-black text-slate-900">{profile.name}</h2>
                             <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-50 text-brand-700 ring-1 ring-brand-200">
                                 <Shield className="h-3 w-3" />

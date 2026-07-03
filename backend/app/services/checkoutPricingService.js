@@ -6,6 +6,7 @@ import {
   calculateHandlingFee,
   generateOrderPaymentBreakdown,
   hydrateOrderItems,
+  recalculateLogisticsEarnings,
 } from "./finance/pricingService.js";
 
 function normalizeLocation(location = null) {
@@ -155,8 +156,8 @@ function allocateCheckoutTipToSellerBreakdowns(
     breakdown.riderTipAmount = round2(
       Number(breakdown.riderTipAmount || 0) + allocatedTip,
     );
-    breakdown.riderPayoutTotal = round2(
-      Number(breakdown.riderPayoutTotal || 0) + allocatedTip,
+    breakdown.platformTotalEarning = round2(
+      Number(breakdown.platformTotalEarning || 0) + allocatedTip,
     );
     breakdown.grandTotal = round2(Number(breakdown.grandTotal || 0) + allocatedTip);
   });
@@ -233,17 +234,22 @@ function applyGlobalHandlingFeeToSellerBreakdowns(
     const deliveryFeeCharged = Number(breakdown.deliveryFeeCharged || 0);
     const discountTotal = Number(breakdown.discountTotal || 0);
     const taxTotal = Number(breakdown.taxTotal || 0);
-    const riderPayoutTotal = Number(breakdown.riderPayoutTotal || 0);
     const adminProductCommissionTotal = Number(breakdown.adminProductCommissionTotal || 0);
 
     breakdown.grandTotal = round2(
       productSubtotal + deliveryFeeCharged + handlingFeeCharged - discountTotal + taxTotal,
     );
-    breakdown.platformLogisticsMargin = round2(
-      deliveryFeeCharged + handlingFeeCharged - riderPayoutTotal,
-    );
-    breakdown.platformTotalEarning = round2(
-      adminProductCommissionTotal + breakdown.platformLogisticsMargin,
+
+    const logistics = recalculateLogisticsEarnings({
+      deliveryFeeCharged,
+      handlingFeeCharged,
+      adminProductCommissionTotal,
+      tipTotal: breakdown.tipTotal || 0,
+    });
+    Object.assign(breakdown, logistics);
+    breakdown.sellerPayoutTotal = round2(
+      Math.max(productSubtotal - adminProductCommissionTotal, 0) +
+        logistics.sellerDeliveryFeeShare,
     );
   }
 }

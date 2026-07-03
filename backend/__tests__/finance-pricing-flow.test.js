@@ -332,17 +332,19 @@ describe("finance pricing flow", () => {
     // Product split
     expect(breakdown.productSubtotal).toBe(200);
     expect(breakdown.adminProductCommissionTotal).toBe(20);
-    expect(breakdown.sellerPayoutTotal).toBe(180);
+    expect(breakdown.sellerPayoutTotal).toBe(220); // 180 product + 40 (80% of delivery fee)
 
-    // Logistics split
+    // Logistics split: delivery fee goes 80% seller / 20% admin; rider gets nothing
     expect(breakdown.deliveryFeeCharged).toBe(50);
     expect(breakdown.handlingFeeCharged).toBe(20);
-    expect(breakdown.riderPayoutTotal).toBe(40);
-    expect(breakdown.platformLogisticsMargin).toBe(30);
+    expect(breakdown.sellerDeliveryFeeShare).toBe(40);
+    expect(breakdown.adminDeliveryFeeShare).toBe(10);
+    expect(breakdown.riderPayoutTotal).toBe(0);
+    expect(breakdown.platformLogisticsMargin).toBe(30); // 10 admin delivery share + 20 handling
 
     // Final totals
     expect(breakdown.grandTotal).toBe(260); // 200 + 50 + 20 - 15 + 5
-    expect(breakdown.platformTotalEarning).toBe(50); // 20 + 30
+    expect(breakdown.platformTotalEarning).toBe(50); // 20 commission + 30 logistics
     expect(breakdown.snapshots.deliverySettings.deliveryPricingMode).toBe(
       "distance_based",
     );

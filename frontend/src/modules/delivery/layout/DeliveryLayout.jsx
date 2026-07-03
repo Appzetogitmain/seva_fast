@@ -157,7 +157,7 @@ const DeliveryLayout = () => {
     shownOrderIdsRef.current = new Set(shownOrderIdsRef.current).add(payload.orderId);
     const total = typeof p.total === "number" ? p.total : Number(p.total) || 0;
     const dropLabel = typeof p.drop === "string" ? p.drop : String(p.drop);
-    const earnings = typeof p.earnings === "number" ? p.earnings : Math.round(total * 0.1);
+    const earnings = typeof p.earnings === "number" ? p.earnings : 0;
     setActiveOrder({
       id: payload.orderId,
       mongoId: undefined,
@@ -191,7 +191,7 @@ const DeliveryLayout = () => {
     shownOrderIdsRef.current = new Set(shownOrderIdsRef.current).add(newOrder.orderId);
     const total = newOrder.pricing?.total || 0;
     const isReturnPickup = newOrder.isReturnPickup || false;
-    const earnings = newOrder.riderEarnings || Math.round(total * 0.1);
+    const earnings = newOrder.riderEarnings || 0;
     setActiveOrder({
       id: newOrder.orderId,
       mongoId: newOrder._id,
@@ -655,12 +655,14 @@ const DeliveryLayout = () => {
                     <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-4">
                       {activeOrder.isReturnPickup ? "Collect return item" : "Accept or reject"}
                     </p>
-                    <div className="flex items-center gap-2 mb-6">
-                      <span className="text-2xl font-black text-brand-600">₹{activeOrder.earnings}</span>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider font-outfit">
-                        Earnings
-                      </span>
-                    </div>
+                    {activeOrder.earnings > 0 ? (
+                      <div className="flex items-center gap-2 mb-6">
+                        <span className="text-2xl font-black text-brand-600">₹{activeOrder.earnings}</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider font-outfit">
+                          Earnings
+                        </span>
+                      </div>
+                    ) : null}
 
                     <div className="w-full space-y-4 mb-6">
                       {/* Return Items "Small Cart" */}

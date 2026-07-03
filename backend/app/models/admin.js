@@ -35,6 +35,11 @@ const adminSchema = new mongoose.Schema(
       enum: ["admin", "sub-admin"],
       default: "admin",
     },
+    profileImage: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     assignedZones: [
       {
         type: mongoose.Schema.Types.ObjectId,
