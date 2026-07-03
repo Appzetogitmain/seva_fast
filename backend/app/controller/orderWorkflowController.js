@@ -464,12 +464,15 @@ export const verifyReturnDropOtp = async (req, res) => {
 
     // Notify admin + seller + customer
     try {
+      const { getAdminIds } = await import("../utils/adminIds.js");
+      const adminIds = await getAdminIds();
       emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_COMPLETED, {
         orderId: order.orderId,
         customerId: order.customer,
         userId: order.customer,
         sellerId: order.seller?._id || order.seller,
         deliveryId: userId,
+        adminIds,
         data: { message: "Product returned to seller. Admin QC pending." },
       });
     } catch (notifErr) {

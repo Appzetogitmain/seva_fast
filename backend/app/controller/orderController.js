@@ -55,6 +55,7 @@ import {
 import * as walletService from "../services/finance/walletService.js";
 import { OWNER_TYPE } from "../constants/finance.js";
 import { processPayout } from "../services/finance/payoutService.js";
+import { getAdminIds } from "../utils/adminIds.js";
 import { buildKey, getOrSet, getTTL, invalidate } from "../services/cacheService.js";
 
 function validateWithJoi(schema, payload) {
@@ -110,11 +111,19 @@ function parsePositiveInt(value, fallback) {
 }
 
 function getReturnEligibilityDelayMinutes() {
-  return parsePositiveInt(process.env.RETURN_ELIGIBILITY_DELAY_MINUTES, 2);
+  return parsePositiveInt(process.env.RETURN_ELIGIBILITY_DELAY_MINUTES, 0);
 }
 
 function getReturnWindowMinutes() {
-  return parsePositiveInt(process.env.RETURN_WINDOW_MINUTES, 2);
+  return parsePositiveInt(process.env.RETURN_WINDOW_MINUTES, 24 * 60);
+}
+
+function formatDurationMinutes(minutes) {
+  if (minutes >= 60 && minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return hours === 1 ? "1 hour" : `${hours} hours`;
+  }
+  return minutes === 1 ? "1 minute" : `${minutes} minutes`;
 }
 
 function computeReturnWindowForOrder(order) {
@@ -122,8 +131,8 @@ function computeReturnWindowForOrder(order) {
   const deliveredAt = base instanceof Date ? base : new Date(base);
   const eligibleDelay = getReturnEligibilityDelayMinutes();
   const windowMinutes = getReturnWindowMinutes();
-  const eligibleAt = order?.returnEligibleAt || new Date(deliveredAt.getTime() + eligibleDelay * 60 * 1000);
-  let windowExpiresAt = order?.returnWindowExpiresAt || new Date(deliveredAt.getTime() + windowMinutes * 60 * 1000);
+  const eligibleAt = new Date(deliveredAt.getTime() + eligibleDelay * 60 * 1000);
+  let windowExpiresAt = new Date(deliveredAt.getTime() + windowMinutes * 60 * 1000);
   if (windowExpiresAt < eligibleAt) {
     windowExpiresAt = eligibleAt;
   }
@@ -669,7 +678,7 @@ export const requestReturn = async (req, res) => {
       return handleResponse(
         res,
         400,
-        `Return is available after ${eligibleDelay} minutes from delivery. Please try again later.`,
+        `Return is available after ${formatDurationMinutes(eligibleDelay)} from delivery. Please try again later.`,
       );
     }
 
@@ -677,7 +686,7 @@ export const requestReturn = async (req, res) => {
       return handleResponse(
         res,
         400,
-        `Return window has expired. You can only request a return within ${windowMinutes} minutes of delivery.`,
+        `Return window has expired. You can only request a return within ${formatDurationMinutes(windowMinutes)} of delivery.`,
       );
     }
 
@@ -725,10 +734,12 @@ export const requestReturn = async (req, res) => {
 
     await order.save();
 
+    const adminIds = await getAdminIds();
     emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_REQUESTED, {
       orderId: order.orderId,
       customerId: order.customer,
       sellerId: order.seller,
+      adminIds,
       data: {
         reason: order.returnReason,
         reasonDetail: order.returnReasonDetail,
@@ -826,6 +837,8 @@ export const getReturnDetails = async (req, res) => {
       activeOtp = otpDoc?.code || null;
     }
 
+    const { eligibleAt, windowExpiresAt } = computeReturnWindowForOrder(order);
+
     const payload = {
       orderId: order.orderId,
       status: order.status,
@@ -835,9 +848,9 @@ export const getReturnDetails = async (req, res) => {
       returnConditionAssurance: order.returnConditionAssurance,
       returnRejectedReason: order.returnRejectedReason,
       returnRequestedAt: order.returnRequestedAt,
-      returnDeadline: order.returnDeadline,
-      returnEligibleAt: order.returnEligibleAt,
-      returnWindowExpiresAt: order.returnWindowExpiresAt,
+      returnDeadline: windowExpiresAt,
+      returnEligibleAt: eligibleAt,
+      returnWindowExpiresAt: windowExpiresAt,
       returnImages: order.returnImages || [],
       returnItems: order.returnItems || [],
       returnRefundAmount: order.returnRefundAmount,
@@ -1178,13 +1191,12 @@ export const approveReturnRequest = async (req, res) => {
 
     const isOwnerSeller =
       role === "seller" && order.seller?.toString() === userId;
-    const isAdmin = role === "admin";
 
-    if (!isOwnerSeller && !isAdmin) {
+    if (!isOwnerSeller) {
       return handleResponse(
         res,
         403,
-        "Access denied. You are not authorized to approve this return.",
+        "Only the seller can approve return requests.",
       );
     }
 
@@ -1215,7 +1227,7 @@ export const approveReturnRequest = async (req, res) => {
     order.returnRefundAmount = refundAmount;
     order.returnDeliveryCommission = returnCommission;
 
-    // Move to approved state (broadcast)
+    // Approved — seller assigns a rider manually (same as forward orders)
     order.returnStatus = "return_approved";
     order.returnDeliveryBoy = null;
     order.skippedBy = [];
@@ -1230,59 +1242,6 @@ export const approveReturnRequest = async (req, res) => {
       data: {
         refundAmount,
       },
-    });
-
-    // Broadcast to nearby delivery partners for return pickup
-    let sellerInfo = null;
-    try {
-      sellerInfo = await Seller.findById(order.seller)
-        .select("shopName address phone")
-        .lean();
-    } catch {
-      sellerInfo = null;
-    }
-
-    // Fetch customer info for enriched ride panel display
-    let customerInfo = null;
-    try {
-      customerInfo = await User.findById(order.customer)
-        .select("name phone")
-        .lean();
-    } catch {
-      customerInfo = null;
-    }
-
-    const payload = {
-      orderId: order.orderId,
-      type: "RETURN_PICKUP",
-      commission: returnCommission,
-      preview: {
-        pickup: order.address?.address || "Customer Address",
-        pickupPhone: order.address?.phone || customerInfo?.phone || "",
-        customerName: order.address?.name || customerInfo?.name || "Customer",
-        drop: sellerInfo?.shopName || "Seller Store",
-        dropAddress: sellerInfo?.address || "",
-        total: order.pricing?.total || 0,
-        returnReason: order.returnReason || "",
-        returnItems: Array.isArray(order.returnItems)
-          ? order.returnItems.map((i) => ({
-            name: i.name || "",
-            quantity: i.quantity || 1,
-            price: i.price || 0,
-            image: i.image || "",
-          }))
-          : [],
-      },
-      deliverySearchExpiresAt: new Date(Date.now() + 60 * 1000).toISOString(),
-    };
-
-    const customerLocation = order.address?.location;
-    emitReturnBroadcastForCustomer(customerLocation, payload);
-    emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_PICKUP_ASSIGNED, {
-      orderId: order.orderId,
-      sellerId: order.seller,
-      customerId: order.customer,
-      data: { commission: returnCommission },
     });
 
     return handleResponse(res, 200, "Return request approved", order);
@@ -1317,13 +1276,12 @@ export const rejectReturnRequest = async (req, res) => {
 
     const isOwnerSeller =
       role === "seller" && order.seller?.toString() === userId;
-    const isAdmin = role === "admin";
 
-    if (!isOwnerSeller && !isAdmin) {
+    if (!isOwnerSeller) {
       return handleResponse(
         res,
         403,
-        "Access denied. You are not authorized to reject this return.",
+        "Only the seller can reject return requests.",
       );
     }
 
@@ -1389,6 +1347,23 @@ export const updateReturnQcStatus = async (req, res) => {
         400,
         "QC can only be completed after the item is returned.",
       );
+    }
+
+    if (qcStatus === "qc_passed") {
+      if (!Array.isArray(order.returnImages) || order.returnImages.length === 0) {
+        return handleResponse(
+          res,
+          400,
+          "Customer return photos are required before approving QC.",
+        );
+      }
+      if (!Array.isArray(order.returnPickupImages) || order.returnPickupImages.length === 0) {
+        return handleResponse(
+          res,
+          400,
+          "Rider pickup photos are required before approving QC.",
+        );
+      }
     }
 
     order.returnStatus = qcStatus;
@@ -1462,13 +1437,12 @@ export const assignReturnDelivery = async (req, res) => {
     }
 
     const isOwnerSeller = role === "seller" && order.seller?.toString() === userId;
-    const isAdmin = role === "admin";
 
-    if (!isOwnerSeller && !isAdmin) {
+    if (!isOwnerSeller) {
       return handleResponse(
         res,
         403,
-        "Access denied. You are not authorized to assign return pickup.",
+        "Only the seller can assign a delivery partner for return pickup.",
       );
     }
 
@@ -1484,6 +1458,14 @@ export const assignReturnDelivery = async (req, res) => {
       typeof deliveryBoyId === "string" && deliveryBoyId.trim().length > 0
         ? deliveryBoyId.trim()
         : null;
+
+    if (role === "seller" && !riderId) {
+      return handleResponse(
+        res,
+        400,
+        "Please select a delivery partner to assign return pickup.",
+      );
+    }
 
     // If Admin/Seller manually specified a rider
     if (riderId) {
@@ -1801,6 +1783,13 @@ export const completeReturnAndRefund = async (order) => {
   }
 
   await order.save();
+  emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_QC_PASSED, {
+    orderId: order.orderId,
+    customerId: order.customer,
+    userId: order.customer,
+    sellerId: order.seller,
+    data: { refundAmount },
+  });
   emitNotificationEvent(NOTIFICATION_EVENTS.REFUND_COMPLETED, {
     orderId: order.orderId,
     customerId: order.customer,

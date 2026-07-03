@@ -12,6 +12,7 @@ import ProductCard from '../components/shared/ProductCard';
 import ProductDetailSheet from '../components/shared/ProductDetailSheet';
 import { useProductDetail } from '../context/ProductDetailContext';
 import { customerApi } from '../services/customerApi';
+import { mapProductForCustomerListing } from '../utils/productPricing';
 import MiniCart from '../components/shared/MiniCart';
 import SectionRenderer from "../components/experience/SectionRenderer";
 import { useLocation as useAppLocation } from '../context/LocationContext';
@@ -69,18 +70,7 @@ const CategoryProductsPage = () => {
                     ? rawResult
                     : [];
 
-                const formattedProds = dbProds.map(p => ({
-                    ...p,
-                    id: p._id,
-                    image:
-                      p.mainImage ||
-                      p.image ||
-                      "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&q=80&w=400&h=400",
-                    price: p.salePrice || p.price,
-                    originalPrice: p.price,
-                    weight: p.weight || "1 unit",
-                    deliveryTime: "8-15 mins"
-                }));
+                const formattedProds = dbProds.map((p) => mapProductForCustomerListing(p));
                 setProducts(Array.isArray(formattedProds) ? formattedProds : []);
             } else {
                 setProducts([]);

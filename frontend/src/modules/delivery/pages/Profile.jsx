@@ -21,12 +21,14 @@ import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
 import { useAuth } from "@core/context/AuthContext";
 import { useSettings } from "@core/context/SettingsContext";
+import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 import axiosInstance from '@core/api/axios';
 import { useEffect } from 'react';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { requestSignOut, signOutDialog } = useSignOutConfirmation();
   const { settings } = useSettings();
   const appName = settings?.appName || "App";
   const [faqs, setFaqs] = useState([]);
@@ -261,7 +263,7 @@ const Profile = () => {
 
         <motion.div variants={itemVariants} className="pt-4">
           <Button
-            onClick={logout}
+            onClick={requestSignOut}
             variant="outline"
             className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 py-6">
             <LogOut size={20} className="mr-2" /> Logout
@@ -274,6 +276,7 @@ const Profile = () => {
         <br />
         Version 1.2.0 (Build 450)
       </div>
+      {signOutDialog}
     </div>
   );
 };

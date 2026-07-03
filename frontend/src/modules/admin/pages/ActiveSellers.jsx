@@ -3,7 +3,6 @@ import Card from "@shared/components/ui/Card";
 import Badge from "@shared/components/ui/Badge";
 import Pagination from "@shared/components/ui/Pagination";
 import {
-  HiOutlineBuildingOffice2,
   HiOutlineMagnifyingGlass,
   HiOutlineFunnel,
   HiOutlineEnvelope,
@@ -17,6 +16,7 @@ import {
   HiOutlineArrowPath,
   HiOutlineDocumentText,
 } from "react-icons/hi2";
+import { Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -215,7 +215,7 @@ const ActiveSellers = () => {
       {
         label: "Active Sellers",
         value: stats.totalActiveSellers.toLocaleString("en-IN"),
-        icon: HiOutlineBuildingOffice2,
+        icon: Store,
         color: "blue",
         note: "Verified and live",
       },

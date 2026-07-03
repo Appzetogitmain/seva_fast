@@ -18,7 +18,7 @@ const transactionSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ["Order Payment", "Delivery Earning", "Withdrawal", "Refund", "Incentive", "Bonus", "Cash Collection", "Cash Settlement", "Cashback", "Wallet Payment"],
+            enum: ["Order Payment", "Delivery Earning", "Withdrawal", "Refund", "Incentive", "Bonus", "Commission", "Cash Collection", "Cash Settlement", "Cashback", "Wallet Payment"],
             required: true,
         },
         amount: {
@@ -51,4 +51,4 @@ transactionSchema.index({ user: 1, userModel: 1, status: 1, createdAt: -1 });
 transactionSchema.index({ order: 1 });
 transactionSchema.index({ status: 1, type: 1 });
 
-export default mongoose.model("Transaction", transactionSchema);
+export default mongoose.models.Transaction || mongoose.model("Transaction", transactionSchema);

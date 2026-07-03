@@ -16,9 +16,11 @@ import NotificationPopup from './NotificationPopup';
 import { toast } from 'sonner';
 
 import { useSettings } from '@core/context/SettingsContext';
+import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 
 const Topbar = ({ onMenuClick }) => {
-    const { user, logout, role } = useAuth();
+    const { user, role } = useAuth();
+    const { requestSignOut, signOutDialog } = useSignOutConfirmation();
     const { settings } = useSettings();
     const navigate = useNavigate();
     const location = useLocation();
@@ -41,6 +43,10 @@ const Topbar = ({ onMenuClick }) => {
         if (!q) return;
         if (isSeller) {
             navigate(`/seller/products?q=${encodeURIComponent(q)}`);
+            return;
+        }
+        if (isAdmin) {
+            navigate(`/admin/orders/all?search=${encodeURIComponent(q)}`);
         }
     };
 
@@ -51,10 +57,14 @@ const Topbar = ({ onMenuClick }) => {
                 ? await sellerApi.getNotifications()
                 : await adminApi.getNotifications();
             if (response.data.success) {
-                setNotifications(response.data.result.notifications);
-                setUnreadCount(response.data.result.unreadCount);
+                const payload = response.data.result || {};
+                const items = payload.notifications || payload.items || [];
+                setNotifications(items);
+                setUnreadCount(Number(payload.unreadCount || 0));
             }
         } catch (error) {
+            const status = error?.response?.status;
+            if (status === 503) return;
             console.error("Notif Fetch Error:", error);
         }
     };
@@ -100,10 +110,11 @@ const Topbar = ({ onMenuClick }) => {
     };
 
     const handleLogout = () => {
-        logout();
+        requestSignOut();
     };
 
     return (
+        <>
         <header className={cn(
             "bg-white/70 backdrop-blur-xl border-b border-gray-100/50 flex items-center justify-between shadow-[0_4px_30px_rgba(0,0,0,0.02)] transition-all duration-300",
             (role === 'admin' || role === 'seller')
@@ -209,6 +220,8 @@ const Topbar = ({ onMenuClick }) => {
                 </button>
             </div>
         </header>
+        {signOutDialog}
+        </>
     );
 };
 

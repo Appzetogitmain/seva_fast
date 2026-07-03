@@ -1,4 +1,4 @@
-import React, { lazy, useMemo, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../guards/ProtectedRoute';
 import RoleGuard from '../guards/RoleGuard';
@@ -92,8 +92,7 @@ const CustomerLayoutWrapper = () => (
     </PlanEnforcer>
 );
 
-const AppRouter = () => {
-    const router = useMemo(() => createBrowserRouter([
+const router = createBrowserRouter([
         {
             path: '/',
             element: <Outlet />,
@@ -198,9 +197,8 @@ const AppRouter = () => {
                 }
             ]
         }
-    ]), []);
+    ]);
 
-    return <RouterProvider router={router} />;
-};
+const AppRouter = () => <RouterProvider router={router} />;
 
 export default AppRouter;

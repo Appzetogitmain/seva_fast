@@ -40,6 +40,7 @@ const ALL_PERMISSIONS = [
     "Fees & Charges",
     "Settings",
     "Subscription Plans",
+    "Login Activity",
     "My Profile",
     "System Settings"
 ];

@@ -21,6 +21,11 @@ import {
   roundCurrency,
 } from "../../utils/money.js";
 import { getOrCreateFinanceSettings } from "./financeSettingsService.js";
+import {
+  productHasVariants,
+  resolveVariantByKey,
+  resolveVariantUnitPrice,
+} from "../../utils/productPricing.js";
 
 function toObjectIdString(value) {
   if (!value) return "";
@@ -378,13 +383,16 @@ export async function hydrateOrderItems(
     }
 
     const rawVariantSku = String(item.variantSku || item.variantSlot || "").trim();
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    if (productHasVariants(product) && !rawVariantSku) {
+      const err = new Error(`Please select a variant for: ${product.name}`);
+      err.statusCode = 400;
+      throw err;
+    }
+
     let resolvedVariant = null;
     if (rawVariantSku) {
-      const variants = Array.isArray(product.variants) ? product.variants : [];
-      resolvedVariant =
-        variants.find((v) => String(v?.sku || "").trim() === rawVariantSku) ||
-        variants.find((v) => String(v?.name || "").trim() === rawVariantSku) ||
-        null;
+      resolvedVariant = resolveVariantByKey(variants, rawVariantSku);
       if (!resolvedVariant) {
         const err = new Error(`Invalid variant for product: ${product.name}`);
         err.statusCode = 400;
@@ -394,9 +402,7 @@ export async function hydrateOrderItems(
 
     const quantity = normalizeLineQuantity(item.quantity);
     const serverUnitPrice = normalizeLinePrice(
-      resolvedVariant
-        ? resolvedVariant.salePrice || resolvedVariant.price || product.salePrice || product.price
-        : product.salePrice || product.price,
+      resolveVariantUnitPrice(resolvedVariant, product),
     );
     const inferredUnitPrice = enforceServerPricing
       ? serverUnitPrice

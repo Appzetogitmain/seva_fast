@@ -1,17 +1,28 @@
 import User from "../../models/customer.js";
 import Seller from "../../models/seller.js";
-import Delivery from "../../models/delivery.js";
 import Order from "../../models/order.js";
 import Product from "../../models/product.js";
 
 const DASHBOARD_CATEGORY_COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444"];
 
+const formatOrderDateTime = (value) => {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
 export async function getAdminDashboardStats(assignedZones) {
   const hasZones = Array.isArray(assignedZones) && assignedZones.length > 0;
 
-  const sellerQuery = hasZones ? { zoneId: { $in: assignedZones } } : {};
   const activeSellerQuery = hasZones ? { isVerified: true, zoneId: { $in: assignedZones } } : { isVerified: true };
-  const deliveryQuery = hasZones ? { zoneId: { $in: assignedZones } } : {};
   const orderQuery = hasZones ? { zoneId: { $in: assignedZones } } : {};
 
   let sellerIds = [];
@@ -20,15 +31,10 @@ export async function getAdminDashboardStats(assignedZones) {
     sellerIds = sellersInZones.map(s => s._id);
   }
 
-  const [totalCustomers, totalSellers, totalRiders, totalOrders] =
-    await Promise.all([
-      User.countDocuments({ role: "user" }),
-      Seller.countDocuments(sellerQuery),
-      Delivery.countDocuments(deliveryQuery),
-      Order.countDocuments(orderQuery),
-    ]);
-
-  const totalUsers = totalCustomers + totalSellers + totalRiders;
+  const [totalCustomers, totalOrders] = await Promise.all([
+    User.countDocuments({ role: { $in: ["user", "customer"] } }),
+    Order.countDocuments(orderQuery),
+  ]);
   const activeSellers = await Seller.countDocuments(activeSellerQuery);
 
   const revenueMatch = hasZones 
@@ -141,7 +147,7 @@ export async function getAdminDashboardStats(assignedZones) {
 
   return {
     overview: {
-      totalUsers,
+      totalUsers: totalCustomers,
       activeSellers,
       totalOrders,
       totalRevenue,
@@ -158,7 +164,8 @@ export async function getAdminDashboardStats(assignedZones) {
             ? "error"
             : "warning",
       amount: `\u20B9${order.pricing.total}`,
-      time: "Recently",
+      createdAt: order.createdAt,
+      time: formatOrderDateTime(order.createdAt),
     })),
     categoryData: categoryData.map((category, index) => ({
       ...category,

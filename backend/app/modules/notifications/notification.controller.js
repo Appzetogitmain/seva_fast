@@ -34,6 +34,17 @@ const BROADCAST_AUDIENCES = Object.freeze({
   delivery: [NOTIFICATION_ROLES.DELIVERY],
 });
 
+function isDatabaseUnavailableError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.name === "MongoNotConnectedError" ||
+    error?.name === "MongoServerSelectionError" ||
+    error?.name === "MongoNetworkError" ||
+    message.includes("buffering timed out") ||
+    message.includes("not connected")
+  );
+}
+
 function resolveNotificationFilter(req) {
   const userId = req?.user?.id;
   return {
@@ -247,6 +258,9 @@ export const getNotifications = async (req, res) => {
       totalPages: Math.ceil(total / limit) || 1,
     });
   } catch (error) {
+    if (isDatabaseUnavailableError(error)) {
+      return handleResponse(res, 503, "Database is temporarily unavailable. Please retry.");
+    }
     return handleResponse(res, 500, error.message);
   }
 };

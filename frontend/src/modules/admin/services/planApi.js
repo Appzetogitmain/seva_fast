@@ -5,5 +5,5 @@ export const planApi = {
     createPlan: (data) => axiosInstance.post('/plans', data),
     updatePlan: (id, data) => axiosInstance.put(`/plans/${id}`, data),
     deletePlan: (id) => axiosInstance.delete(`/plans/${id}`),
-    subscribe: (planId) => axiosInstance.post('/plans/subscribe', { planId }),
+    subscribe: (planId) => axiosInstance.post('/plans/subscribe/initiate', { planId }),
 };

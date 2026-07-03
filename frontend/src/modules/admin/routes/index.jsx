@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   Tag,
   Box,
-  Building2,
+  Store,
   Truck,
   Wallet,
   Banknote,
@@ -24,6 +24,7 @@ import {
   Briefcase,
   Shield,
   MapPin,
+  History,
 } from "lucide-react";
 
 const Dashboard = React.lazy(() => import("../pages/Dashboard"));
@@ -99,6 +100,7 @@ const ShopByStoreManagement = React.lazy(
 );
 const AdminSettings = React.lazy(() => import("../pages/AdminSettings"));
 const EnvSettings = React.lazy(() => import("../pages/EnvSettings"));
+const AuthActivityLogs = React.lazy(() => import("../pages/AuthActivityLogs"));
 const AdminProfile = React.lazy(() => import("../pages/AdminProfile"));
 const PlanManagement = React.lazy(() => import("../pages/PlanManagement"));
 
@@ -152,7 +154,7 @@ const navItems = [
   },
   {
     label: "Sellers",
-    icon: Building2,
+    icon: Store,
     color: "blue",
     children: [
       { label: "Active Sellers", path: "/admin/sellers/active" },
@@ -239,6 +241,7 @@ const navItems = [
     color: "amber",
   },
   { label: "My Profile", path: "/admin/profile", icon: User, color: "indigo" },
+  { label: "Login Activity", path: "/admin/login-activity", icon: History, color: "cyan" },
   { label: "System Settings", path: "/admin/env", icon: Terminal, color: "dark" },
 ];
 
@@ -328,6 +331,7 @@ const AdminRoutes = () => {
         <Route path="/billing" element={<SubadminRoute permission="Fees & Charges"><BillingCharges /></SubadminRoute>} />
         <Route path="/settings" element={<SubadminRoute permission="Settings"><AdminSettings /></SubadminRoute>} />
         <Route path="/env" element={<SubadminRoute permission="System Settings"><EnvSettings /></SubadminRoute>} />
+        <Route path="/login-activity" element={<SubadminRoute permission="Login Activity"><AuthActivityLogs /></SubadminRoute>} />
         <Route path="/plans" element={<SubadminRoute permission="Subscription Plans"><PlanManagement /></SubadminRoute>} />
         <Route path="/professional-directory" element={<SubadminRoute permission="Professional Directory"><ProfessionalAdsManagement /></SubadminRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />

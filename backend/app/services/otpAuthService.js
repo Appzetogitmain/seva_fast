@@ -164,11 +164,8 @@ export async function issueCustomerOtp({
           throw err;
         }
       }
-    } else if (flow === "signup") {
-      const err = new Error("Referral Code is required");
-      err.statusCode = 400;
-      throw err;
     }
+
     customer = await Customer.create({
       name: name || "Customer",
       phone,

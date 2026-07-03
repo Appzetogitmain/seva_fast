@@ -154,13 +154,17 @@ const OrderDetailPage = () => {
   const [handoffOtp, setHandoffOtp] = useState(null);
   const [clockTick, setClockTick] = useState(Date.now());
   const parsedReturnWindowMinutes = parseInt(
-    import.meta.env.VITE_RETURN_WINDOW_MINUTES || "2",
+    import.meta.env.VITE_RETURN_WINDOW_MINUTES || String(24 * 60),
     10,
   );
   const returnWindowMinutes =
     Number.isFinite(parsedReturnWindowMinutes) && parsedReturnWindowMinutes > 0
       ? parsedReturnWindowMinutes
-      : 2;
+      : 24 * 60;
+  const returnWindowLabel =
+    returnWindowMinutes >= 60 && returnWindowMinutes % 60 === 0
+      ? `${returnWindowMinutes / 60} hours`
+      : `${returnWindowMinutes} minutes`;
   const routeOriginRef = useRef(null);
   const routeRequestRef = useRef({ phase: "", startedAt: 0 });
   const [returnCountdown, setReturnCountdown] = useState(null);
@@ -410,10 +414,31 @@ const OrderDetailPage = () => {
         setReturnCountdown(null);
         return;
       }
-      const windowStart = new Date(order.deliveredAt || order.createdAt).getTime();
+      const eligibleAtMs = returnDetails?.returnEligibleAt
+        ? new Date(returnDetails.returnEligibleAt).getTime()
+        : order.returnEligibleAt
+          ? new Date(order.returnEligibleAt).getTime()
+          : new Date(order.deliveredAt || order.createdAt).getTime();
+      const expiresAtMs = returnDetails?.returnWindowExpiresAt
+        ? new Date(returnDetails.returnWindowExpiresAt).getTime()
+        : order.returnWindowExpiresAt
+          ? new Date(order.returnWindowExpiresAt).getTime()
+          : eligibleAtMs + returnWindowMinutes * 60 * 1000;
       const now = Date.now();
-      const windowMs = returnWindowMinutes * 60 * 1000;
-      const remaining = Math.max(0, (windowStart + windowMs) - now);
+
+      if (now < eligibleAtMs) {
+        const waitMs = eligibleAtMs - now;
+        const waitMins = Math.floor(waitMs / 60000);
+        const waitSecs = Math.floor((waitMs % 60000) / 1000);
+        setReturnCountdown(
+          waitMins >= 60
+            ? `Available in ${Math.floor(waitMins / 60)}h ${waitMins % 60}m`
+            : `Available in ${waitMins}:${waitSecs.toString().padStart(2, "0")}`,
+        );
+        return;
+      }
+
+      const remaining = Math.max(0, expiresAtMs - now);
 
       if (remaining <= 0) {
         setReturnCountdown(0);
@@ -422,13 +447,19 @@ const OrderDetailPage = () => {
 
       const mins = Math.floor(remaining / 60000);
       const secs = Math.floor((remaining % 60000) / 1000);
+      if (mins >= 60) {
+        const hrs = Math.floor(mins / 60);
+        const remMins = mins % 60;
+        setReturnCountdown(`${hrs}h ${remMins}m`);
+        return;
+      }
       setReturnCountdown(`${mins}:${secs.toString().padStart(2, "0")}`);
     };
 
     calculateCountdown();
     const iv = setInterval(calculateCountdown, 1000);
     return () => clearInterval(iv);
-  }, [order, returnWindowMinutes]);
+  }, [order, returnDetails, returnWindowMinutes]);
 
   const handleOpenInMaps = () => {
     const loc = order?.address?.location;
@@ -619,10 +650,18 @@ const OrderDetailPage = () => {
       return false;
     }
 
-    const windowStart = new Date(order.deliveredAt || order.createdAt).getTime();
+    const eligibleAtMs = returnDetails?.returnEligibleAt
+      ? new Date(returnDetails.returnEligibleAt).getTime()
+      : order.returnEligibleAt
+        ? new Date(order.returnEligibleAt).getTime()
+        : new Date(order.deliveredAt || order.createdAt).getTime();
+    const expiresAtMs = returnDetails?.returnWindowExpiresAt
+      ? new Date(returnDetails.returnWindowExpiresAt).getTime()
+      : order.returnWindowExpiresAt
+        ? new Date(order.returnWindowExpiresAt).getTime()
+        : eligibleAtMs + returnWindowMinutes * 60 * 1000;
     const now = Date.now();
-    const windowMs = returnWindowMinutes * 60 * 1000;
-    return now - windowStart <= windowMs;
+    return now >= eligibleAtMs && now <= expiresAtMs;
   };
 
   const toggleItemSelection = (index) => {
@@ -1296,7 +1335,7 @@ const OrderDetailPage = () => {
               </div>
             ) : (
               <p className="text-sm text-slate-500 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                You can request a return within the first {returnWindowMinutes} minutes after delivery.
+                You can request a return within the first {returnWindowLabel} after delivery.
               </p>
             )}
 

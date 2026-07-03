@@ -156,6 +156,7 @@ export const customerApi = {
 
   // Plans
   getPlans: (options = {}) => getWithDedupe("/plans", {}, options),
+  initiatePlanSubscription: (data) => axiosInstance.post("/plans/subscribe/initiate", data),
   verifyPlanPayment: (data) => axiosInstance.post("/plans/subscribe/verify", data),
 
   // Professional Ads & Public Search

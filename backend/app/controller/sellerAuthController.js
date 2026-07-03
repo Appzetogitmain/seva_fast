@@ -7,6 +7,7 @@ import {
     verifySellerVerificationToken,
 } from "../services/sellerVerificationService.js";
 import { uploadToCloudinary } from "../services/mediaService.js";
+import { recordAuthActivity } from "../services/authActivityService.js";
 
 /* ===============================
    Utils
@@ -356,6 +357,14 @@ export const loginSeller = async (req, res) => {
 
         seller.lastLogin = new Date();
         await seller.save();
+
+        await recordAuthActivity({
+            role: "seller",
+            action: "login",
+            userId: seller._id,
+            user: seller,
+            req,
+        });
 
         const token = generateToken(seller);
 

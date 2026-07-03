@@ -12,6 +12,12 @@ import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 import { customerApi } from '../../services/customerApi';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import {
+  effectiveUnitPrice,
+  resolveDisplayedProductPrice,
+  variantIdentityKey,
+  variantsMatch,
+} from '../../utils/productPricing';
 
 const ProductDetailSheet = () => {
     const { selectedProduct, isOpen, closeProduct } = useProductDetail();
@@ -130,7 +136,14 @@ const ProductDetailSheet = () => {
         return text;
     };
 
-    const variantKey = String(selectedVariant?.sku || selectedVariant?.name || "").trim();
+    const variantKey = variantIdentityKey(selectedVariant);
+    const activePricing = useMemo(
+        () =>
+            selectedProduct
+                ? resolveDisplayedProductPrice(selectedProduct, selectedVariant)
+                : { unitPrice: 0, originalPrice: 0, hasDiscount: false },
+        [selectedProduct, selectedVariant],
+    );
     const cartItem = selectedProduct
         ? cart.find(
             (item) =>
@@ -212,19 +225,19 @@ const ProductDetailSheet = () => {
     const handleAddToCart = () => {
         addToCart({
             ...selectedProduct,
-            variantSku: String(selectedVariant?.sku || selectedVariant?.name || "").trim(),
+            variantSku: variantKey,
         });
         showToast(`${selectedProduct.name} added to cart`, 'success');
     };
 
     const handleIncrement = () =>
-        updateQuantity(selectedProduct.id, 1, String(selectedVariant?.sku || selectedVariant?.name || "").trim());
+        updateQuantity(selectedProduct.id, 1, variantKey);
 
     const handleDecrement = () => {
         if (quantity === 1) {
-            removeFromCart(selectedProduct.id, String(selectedVariant?.sku || selectedVariant?.name || "").trim());
+            removeFromCart(selectedProduct.id, variantKey);
         } else {
-            updateQuantity(selectedProduct.id, -1, String(selectedVariant?.sku || selectedVariant?.name || "").trim());
+            updateQuantity(selectedProduct.id, -1, variantKey);
         }
     };
 
@@ -335,14 +348,14 @@ const ProductDetailSheet = () => {
                                         </motion.button>
 
                                         {/* Discount Badge (center) */}
-                                        {(selectedProduct.originalPrice > selectedProduct.price) && (
+                                        {activePricing.hasDiscount && (
                                             <motion.div
                                                 initial={{ scale: 0, rotate: -10 }}
                                                 animate={{ scale: 1, rotate: 0 }}
                                                 transition={{ type: 'spring', delay: 0.2 }}
                                                 className="bg-gradient-to-r from-primary to-[var(--brand-400)] text-white text-[10px] font-[800] px-3 py-1.5 rounded-xl uppercase tracking-wider shadow-md shadow-brand-200/40"
                                             >
-                                                {Math.round(((selectedProduct.originalPrice - selectedProduct.price) / selectedProduct.originalPrice) * 100)}% OFF
+                                                {Math.round(((activePricing.originalPrice - activePricing.unitPrice) / activePricing.originalPrice) * 100)}% OFF
                                             </motion.div>
                                         )}
 
@@ -449,14 +462,14 @@ const ProductDetailSheet = () => {
                                                 <Clock size={12} strokeWidth={2.5} className="text-primary" />
                                                 {selectedProduct.deliveryTime || '8-15 MINS'}
                                             </motion.div>
-                                            {selectedProduct.originalPrice > selectedProduct.price && (
+                                            {activePricing.hasDiscount && (
                                                 <motion.div
                                                     initial={{ opacity: 0, x: -10 }}
                                                     animate={{ opacity: 1, x: 0 }}
                                                     transition={{ delay: 0.15 }}
                                                     className="text-[10px] font-[700] text-primary bg-brand-50 px-3 py-1.5 rounded-lg border border-brand-200/50 uppercase tracking-wider"
                                                 >
-                                                    💰 Save ₹{selectedProduct.originalPrice - selectedProduct.price}
+                                                    💰 Save ₹{activePricing.originalPrice - activePricing.unitPrice}
                                                 </motion.div>
                                             )}
                                             <motion.div
@@ -501,15 +514,15 @@ const ProductDetailSheet = () => {
                                                 <div className="flex flex-col gap-1">
                                                     <div className="flex items-baseline gap-2">
                                                         <span className="text-[28px] lg:text-[32px] font-[800] text-primary tracking-tight leading-none">
-                                                            ₹{selectedProduct.price}
+                                                            ₹{activePricing.unitPrice}
                                                         </span>
-                                                        {selectedProduct.originalPrice > selectedProduct.price && (
-                                                            <span className="text-[14px] text-gray-400 line-through font-[600]">₹{selectedProduct.originalPrice}</span>
+                                                        {activePricing.hasDiscount && (
+                                                            <span className="text-[14px] text-gray-400 line-through font-[600]">₹{activePricing.originalPrice}</span>
                                                         )}
                                                     </div>
-                                                    {selectedProduct.originalPrice > selectedProduct.price && (
+                                                    {activePricing.hasDiscount && (
                                                         <span className="inline-flex w-fit items-center text-[10px] font-[800] text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-md uppercase tracking-wide">
-                                                            {Math.round(((selectedProduct.originalPrice - selectedProduct.price) / selectedProduct.originalPrice) * 100)}% off
+                                                            {Math.round(((activePricing.originalPrice - activePricing.unitPrice) / activePricing.originalPrice) * 100)}% off
                                                         </span>
                                                     )}
                                                 </div>
@@ -556,12 +569,7 @@ const ProductDetailSheet = () => {
                                                         <span className="text-[12px] font-[700] uppercase tracking-wider">View Cart</span>
                                                     </div>
                                                     <div className="flex items-center justify-center gap-1.5 bg-white/10 px-2 py-1 rounded-lg">
-                                                        <span className="text-[13px] font-[800] tracking-tight">₹{cart.reduce((total, item) => {
-                                                            const mrp = Number(item.price || 0);
-                                                            const sale = Number(item.salePrice || 0);
-                                                            const unit = sale > 0 && sale < mrp ? sale : mrp;
-                                                            return total + (unit * Number(item.quantity || 0));
-                                                        }, 0)}</span>
+                                                        <span className="text-[13px] font-[800] tracking-tight">₹{cart.reduce((total, item) => total + (effectiveUnitPrice(item.price, item.salePrice) * Number(item.quantity || 0)), 0)}</span>
                                                         <ChevronRight size={14} strokeWidth={2.5} />
                                                     </div>
                                                 </Link>
@@ -586,7 +594,7 @@ const ProductDetailSheet = () => {
                                                             onClick={() => setSelectedVariant(v)}
                                                             className={cn(
                                                                 'px-4 py-2 font-[600] rounded-lg text-[13px] transition-all border-2',
-                                                                selectedVariant?.sku === v.sku
+                                                                selectedVariant && variantsMatch(selectedVariant, v)
                                                                     ? 'bg-brand-50 border-primary text-primary shadow-md shadow-brand-100/50'
                                                                     : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:shadow-sm'
                                                             )}
@@ -617,7 +625,7 @@ const ProductDetailSheet = () => {
                                                             onClick={() => setSelectedVariant(v)}
                                                             className={cn(
                                                                 'px-4 py-2 font-black rounded-xl text-xs transition-all border-2',
-                                                                selectedVariant?.sku === v.sku
+                                                                selectedVariant && variantsMatch(selectedVariant, v)
                                                                     ? 'bg-white border-primary text-primary shadow-sm shadow-brand-100'
                                                                     : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
                                                             )}
@@ -908,13 +916,13 @@ const ProductDetailSheet = () => {
                                                     onClick={() => setSelectedVariant(v)}
                                                     className={cn(
                                                         "flex-shrink-0 px-5 py-2.5 font-bold rounded-xl text-sm transition-all relative border-2",
-                                                        selectedVariant?.sku === v.sku
+                                                        selectedVariant && variantsMatch(selectedVariant, v)
                                                             ? "bg-[#ecfeff] border-primary text-primary shadow-sm shadow-brand-100"
                                                             : "bg-slate-50 border-slate-100 text-slate-500"
                                                     )}
                                                 >
                                                     {v.name}
-                                                    {selectedVariant?.sku === v.sku && (
+                                                    {selectedVariant && variantsMatch(selectedVariant, v) && (
                                                         <div className="absolute top-0 right-0 w-3 h-3 bg-primary rounded-bl-lg" />
                                                     )}
                                                 </motion.button>
@@ -1041,21 +1049,18 @@ const ProductDetailSheet = () => {
                             <div className="flex flex-col gap-3">
                                 <div className="flex items-center justify-between gap-4">
                                     <div className="flex flex-col min-w-[80px]">
-                                        {((selectedVariant?.salePrice && selectedVariant.salePrice < selectedVariant.price) || 
-                                           (!selectedVariant && selectedProduct.originalPrice > selectedProduct.price)) && (
+                                        {activePricing.hasDiscount && (
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm font-medium text-gray-400 line-through decoration-gray-400/50">
-                                                    ₹{selectedVariant?.price || selectedProduct.originalPrice}
+                                                    ₹{activePricing.originalPrice}
                                                 </span>
                                                 <span className="bg-red-50 text-red-500 text-[10px] font-black px-1.5 py-0.5 rounded leading-none">
-                                                    {selectedVariant
-                                                        ? Math.round(((selectedVariant.price - selectedVariant.salePrice) / selectedVariant.price) * 100)
-                                                        : Math.round(((selectedProduct.originalPrice - selectedProduct.price) / selectedProduct.originalPrice) * 100)}% OFF
+                                                    {Math.round(((activePricing.originalPrice - activePricing.unitPrice) / activePricing.originalPrice) * 100)}% OFF
                                                 </span>
                                             </div>
                                         )}
                                         <div className="text-2xl font-black text-[#1A1A1A] leading-none mt-1">
-                                            ₹{selectedVariant?.salePrice || selectedVariant?.price || selectedProduct.price}
+                                            ₹{activePricing.unitPrice}
                                         </div>
                                     </div>
 

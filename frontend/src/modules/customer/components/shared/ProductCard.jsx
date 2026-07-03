@@ -1,18 +1,18 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { Heart, Plus, Minus, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Heart, Plus, Minus, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWishlist } from "../../context/WishlistContext";
 import { useCart } from "../../context/CartContext";
 import { useToast } from "@shared/components/ui/Toast";
 import { useCartAnimation } from "../../context/CartAnimationContext";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
-
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock } from "lucide-react";
-
 import { useProductDetail } from "../../context/ProductDetailContext";
+import {
+  hasProductVariants,
+  variantIdentityKey,
+  variantEffectiveUnitPrice,
+} from "../../utils/productPricing";
 
 const ProductCard = React.memo(
   ({ product, badge, className, compact = false, neutralBg = false }) => {
@@ -27,49 +27,37 @@ const ProductCard = React.memo(
 
     const imageRef = React.useRef(null);
 
-    const defaultVariant = React.useMemo(() => {
-      const variants = Array.isArray(product?.variants) ? product.variants : [];
-      if (variants.length === 0) return null;
-
-      const displayed = Number(product?.price || 0);
-      const displayedOriginal = Number(product?.originalPrice || 0);
-
-      const matchesDisplayedPrice = (variant) => {
-        const mrp = Number(variant?.price || 0);
-        const sale = Number(variant?.salePrice || 0);
-        const effective = sale > 0 && sale < mrp ? sale : mrp;
-
-        if (Number.isFinite(displayedOriginal) && displayedOriginal > displayed) {
-          // Try to match both (sale + original) when card shows a discount.
-          if (effective === displayed && (mrp === displayedOriginal || displayedOriginal === 0)) {
-            return true;
-          }
-        }
-
-        return effective === displayed || mrp === displayed;
-      };
-
-      const picked = variants.find(matchesDisplayedPrice) || variants[0];
-      const key = String(picked?.sku || picked?.name || "").trim();
-      return {
-        key,
-        name: String(picked?.name || "").trim(),
-      };
-    }, [product]);
+    const requiresVariantSelection =
+      product?.hasVariants ?? hasProductVariants(product);
 
     const productId = product.id || product._id;
-    const variantKey = String(defaultVariant?.key || "").trim();
-    const cartKey = `${productId}::${variantKey || ""}`;
 
-    const cartItem = React.useMemo(
-      () =>
-        cart.find(
-          (item) =>
-            `${item.id || item._id}::${String(item.variantSku || "").trim()}` ===
-            cartKey,
-        ),
-      [cart, cartKey],
-    );
+    const defaultVariant = React.useMemo(() => {
+      if (!requiresVariantSelection) return null;
+      const variants = Array.isArray(product?.variants) ? product.variants : [];
+      if (!variants.length) return null;
+
+      const targetPrice = Number(product?.price || 0);
+      const pricedVariant = variants.find(
+        (variant) => variantEffectiveUnitPrice(variant) === targetPrice,
+      );
+      return pricedVariant || variants[0];
+    }, [product?.variants, product?.price, requiresVariantSelection]);
+
+    const defaultVariantSku = defaultVariant
+      ? variantIdentityKey(defaultVariant)
+      : "";
+
+    const cartKey = `${productId}::${requiresVariantSelection ? defaultVariantSku : ""}`;
+
+    const cartItem = React.useMemo(() => {
+      return cart.find(
+        (item) =>
+          `${item.id || item._id}::${String(item.variantSku || "").trim()}` ===
+          cartKey,
+      );
+    }, [cart, cartKey]);
+
     const quantity = cartItem ? cartItem.quantity : 0;
     const isWishlisted = isInWishlist(product.id || product._id);
 
@@ -108,6 +96,12 @@ const ProductCard = React.memo(
       (e) => {
         e.preventDefault();
         e.stopPropagation();
+
+        if (requiresVariantSelection && !defaultVariant) {
+          openProduct?.(product);
+          return;
+        }
+
         if (imageRef.current) {
           animateAddToCart(
             imageRef.current.getBoundingClientRect(),
@@ -116,20 +110,27 @@ const ProductCard = React.memo(
         }
         addToCart({
           ...product,
-          variantSku: variantKey,
-          variantName: defaultVariant?.name || "",
+          variantSku: defaultVariantSku,
         });
       },
-      [animateAddToCart, product, addToCart, variantKey, defaultVariant?.name],
+      [
+        animateAddToCart,
+        product,
+        addToCart,
+        requiresVariantSelection,
+        defaultVariant,
+        defaultVariantSku,
+        openProduct,
+      ],
     );
 
     const handleIncrement = React.useCallback(
       (e) => {
         e.preventDefault();
         e.stopPropagation();
-        updateQuantity(productId, 1, variantKey);
+        updateQuantity(productId, 1, defaultVariantSku);
       },
-      [updateQuantity, productId, variantKey],
+      [updateQuantity, productId, defaultVariantSku],
     );
 
     const handleDecrement = React.useCallback(
@@ -139,9 +140,9 @@ const ProductCard = React.memo(
 
         if (quantity === 1) {
           animateRemoveFromCart(product.image);
-          removeFromCart(productId, variantKey);
+          removeFromCart(productId, defaultVariantSku);
         } else {
-          updateQuantity(productId, -1, variantKey);
+          updateQuantity(productId, -1, defaultVariantSku);
         }
       },
       [
@@ -150,8 +151,8 @@ const ProductCard = React.memo(
         product.image,
         removeFromCart,
         productId,
+        defaultVariantSku,
         updateQuantity,
-        variantKey,
       ],
     );
 
@@ -167,24 +168,22 @@ const ProductCard = React.memo(
           className,
         )}
         onClick={handleProductClick}>
-        {/* Top Image Section */}
         <div className="relative">
-          {/* Badge (Custom or Discount) */}
           {(badge ||
             product.discount ||
             product.originalPrice > product.price) && (
-              <div
-                className={cn(
-                  "absolute z-10 bg-primary text-primary-foreground font-[900] rounded-md shadow-sm uppercase tracking-wider flex items-center justify-center",
-                  compact
-                    ? "top-2 left-2 px-1.5 py-0.5 text-[7px]"
-                    : "top-2 left-2 px-1 py-0.5 text-[7px] sm:top-3 sm:left-3 sm:px-2 sm:py-1 sm:text-[9px]",
-                )}>
-                {badge ||
-                  product.discount ||
-                  `${Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF`}
-              </div>
-            )}
+            <div
+              className={cn(
+                "absolute z-10 bg-primary text-primary-foreground font-[900] rounded-md shadow-sm uppercase tracking-wider flex items-center justify-center",
+                compact
+                  ? "top-2 left-2 px-1.5 py-0.5 text-[7px]"
+                  : "top-2 left-2 px-1 py-0.5 text-[7px] sm:top-3 sm:left-3 sm:px-2 sm:py-1 sm:text-[9px]",
+              )}>
+              {badge ||
+                product.discount ||
+                `${Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF`}
+            </div>
+          )}
 
           <button
             onClick={toggleWishlist}
@@ -224,7 +223,7 @@ const ProductCard = React.memo(
           <div
             className={cn(
               "block w-full overflow-hidden flex items-center justify-center transition-transform duration-500 group-hover:scale-105 aspect-square",
-              compact || neutralBg ? "bg-white/70" : "bg-white/50"
+              compact || neutralBg ? "bg-white/70" : "bg-white/50",
             )}>
             <img
               ref={imageRef}
@@ -236,7 +235,6 @@ const ProductCard = React.memo(
           </div>
         </div>
 
-        {/* Info Section */}
         <div
           className={cn(
             "flex flex-col flex-1",
@@ -276,7 +274,6 @@ const ProductCard = React.memo(
             </h4>
           </div>
 
-          {/* Delivery Time & Unit info */}
           <div className="flex items-center gap-1 text-gray-500 mt-0.5 mb-1 sm:gap-1.5 sm:mt-1 sm:mb-2">
             <Clock size={compact ? 9 : 10} className="text-primary/80" />
             <span
@@ -288,7 +285,6 @@ const ProductCard = React.memo(
             </span>
           </div>
 
-          {/* Price Row / ADD Button Combination for compact */}
           <div className="mt-auto flex items-center justify-between gap-1">
             <div className="flex flex-col">
               <span
@@ -309,13 +305,14 @@ const ProductCard = React.memo(
               )}
             </div>
 
-            {/* ADD Button / Quantity Selector (Always in price row) */}
             <div className="flex">
               {quantity > 0 ? (
                 <div
                   className={cn(
                     "flex items-center bg-white border-[1.5px] border-primary rounded-lg p-0.5 justify-between",
-                    compact ? "min-w-[60px]" : "min-w-[68px] sm:min-w-[90px] md:min-w-[100px]",
+                    compact
+                      ? "min-w-[60px]"
+                      : "min-w-[68px] sm:min-w-[90px] md:min-w-[100px]",
                   )}>
                   <button
                     onClick={handleDecrement}
@@ -325,7 +322,9 @@ const ProductCard = React.memo(
                   <span
                     className={cn(
                       "font-black text-primary",
-                      compact ? "text-[10px]" : "text-[11px] sm:text-[13px] md:text-sm",
+                      compact
+                        ? "text-[10px]"
+                        : "text-[11px] sm:text-[13px] md:text-sm",
                     )}>
                     {quantity}
                   </span>

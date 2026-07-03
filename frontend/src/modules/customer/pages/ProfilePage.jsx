@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@core/context/AuthContext';
 import { useSettings } from '@core/context/SettingsContext';
+import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 import { customerApi } from '../services/customerApi';
 import axiosInstance from '@core/api/axios';
 import { toast } from 'sonner';
@@ -20,9 +21,18 @@ import {
 const TEST_PUSH_STATUS_POLL_INTERVAL_MS = 1500;
 const TEST_PUSH_STATUS_MAX_ATTEMPTS = 20;
 
+function getReferrerDisplayName(referredBy) {
+    if (!referredBy) return null;
+    if (typeof referredBy === 'object') {
+        return referredBy.name || referredBy.referralCode || null;
+    }
+    return null;
+}
+
 const ProfilePage = () => {
     const navigate = useNavigate();
-    const { user, role, logout } = useAuth();
+    const { user, role } = useAuth();
+    const { requestSignOut, signOutDialog } = useSignOutConfirmation();
     const { settings } = useSettings();
     const appName = settings?.appName || 'App';
     const [isTestingPush, setIsTestingPush] = React.useState(false);
@@ -171,111 +181,119 @@ const ProfilePage = () => {
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-4">
 
-                {/* User Identity Card (ATM Style) */}
+                {/* User Identity Card */}
                 <div 
                     onClick={() => setIsReferralTreeModalOpen(true)}
-                    className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white shadow-xl border border-slate-700 p-6 mb-2 cursor-pointer transition-all hover:scale-[1.01] hover:brightness-110 active:scale-[0.99]"
+                    className="group relative overflow-hidden rounded-none mb-2 cursor-pointer transition-all duration-300 hover:brightness-105 active:scale-[0.995] shadow-[0_16px_40px_-18px_rgba(234,88,12,0.45)]"
                 >
-                    {/* Background decorations */}
-                    <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
-                    <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl"></div>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
-                    
-                    <div className="relative z-10 flex justify-between items-start mb-4">
-                        
-                        {/* Left Side: Brand Text */}
-                        <div className="flex items-center">
-                            <span className="text-sm sm:text-base font-black text-white italic tracking-widest drop-shadow-md opacity-90">
-                                SEVA FAST
-                            </span>
-                        </div>
-                        
-                        {/* Right Side: Actions */}
-                        <div className="flex items-center gap-2">
-                            <button 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleShare();
-                                }}
-                                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-md cursor-pointer active:scale-95 flex items-center justify-center"
-                                title="Share"
-                            >
-                                <Share2 size={14} className="text-white/90" />
-                            </button>
-                            <Link 
-                                to="/profile/edit" 
-                                onClick={(e) => e.stopPropagation()}
-                                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-md" 
-                                title="Edit Profile"
-                            >
-                                <Edit2 size={14} className="text-white/90" />
-                            </Link>
-                        </div>
-                    </div>
+                    <div className="relative overflow-hidden rounded-none bg-gradient-to-br from-orange-500 via-amber-400 to-green-500 text-white p-3.5 sm:p-4">
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-orange-600/30 via-transparent to-green-600/35" />
+                        <div className="pointer-events-none absolute inset-0 bg-black/10" />
+                        <div className="pointer-events-none absolute inset-0 opacity-25 bg-[repeating-linear-gradient(-45deg,rgba(255,255,255,0.12)_0px,rgba(255,255,255,0.12)_1px,transparent_1px,transparent_8px)]" />
 
-                    <div className="relative z-10 flex justify-between gap-4">
-                        {/* Left Column */}
-                        <div className="flex flex-col justify-between flex-1">
-                            {/* Name and Phone */}
-                            <div>
-                                <h2 className="text-xl leading-tight font-black text-white tracking-wide">{user?.name || 'Customer'}</h2>
-                                <p className="text-slate-400 text-xs font-medium flex items-center gap-1 mt-1 mb-2">
-                                    <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] uppercase text-white">India</span> +91 {formatIndiaPhone(user?.phone)}
-                                </p>
-                                {user?.referredBy && (
-                                    <div className="flex items-center gap-1.5 bg-white/10 text-white px-2 py-1 rounded-md w-fit">
-                                        <span className="text-[10px] font-black uppercase tracking-wider">
-                                            Referred By: {user.referredBy.name || "Admin"}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Referral Code */}
-                            <div className="mt-8">
-                                <p className="text-[9px] text-slate-400 uppercase tracking-widest mb-1 font-bold">Referral Code</p>
-                                {user?.referralCode ? (
-                                    <div 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            navigator.clipboard.writeText(user.referralCode);
-                                            toast.success("Referral code copied to clipboard!");
-                                        }}
-                                        className="flex items-center gap-2 cursor-pointer group w-fit"
-                                    >
-                                        <span className="text-lg font-bold font-mono tracking-widest group-hover:text-amber-300 transition-colors">
-                                            {user.referralCode}
-                                        </span>
-                                        <Copy size={14} className="opacity-50 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                ) : (
-                                    <span className="text-sm font-mono opacity-50 tracking-widest">N/A</span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Right Column */}
-                        <div className="flex flex-col items-end justify-between flex-shrink-0">
-                            {/* QR Code */}
-                            {user?.referralCode && (
-                                <div className="flex flex-col items-center">
-                                    <div className="bg-white p-1.5 rounded-xl shadow-sm">
-                                        <img 
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/signup?ref=${user.referralCode}`)}`} 
-                                            alt="Signup QR Code" 
-                                            className="w-[72px] h-[72px] object-contain mix-blend-multiply"
-                                            crossOrigin="anonymous"
-                                        />
-                                    </div>
-                                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 mt-2 text-center leading-tight">Scan to<br/>Join</span>
+                        <div className="relative z-10 flex justify-between items-center mb-2.5">
+                            <div className="flex items-center gap-2">
+                                <div className="h-7 w-9 rounded-none bg-white/25 backdrop-blur-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.55),0_4px_10px_rgba(0,0,0,0.2)] border border-white/35 relative overflow-hidden">
+                                    <div className="absolute inset-x-1 top-1.5 h-px bg-white/60" />
+                                    <div className="absolute inset-x-1 top-3 h-px bg-white/45" />
+                                    <div className="absolute inset-y-1.5 left-2.5 w-px bg-white/40" />
                                 </div>
-                            )}
+                                <span className="text-xs sm:text-sm font-black italic tracking-[0.18em] text-white drop-shadow-sm">
+                                    SEVA FAST
+                                </span>
+                            </div>
 
-                            {/* Valid Thru */}
-                            <div className="text-right mt-6">
-                                <p className="text-[9px] text-slate-400 uppercase tracking-widest mb-1 font-bold">Valid Thru</p>
-                                <div className="text-lg font-bold font-mono tracking-widest">
-                                    {user?.currentPlan && user?.planExpiry ? new Date(user.planExpiry).toLocaleDateString('en-US', { month: '2-digit', year: '2-digit' }).replace('/', ' / ') : 'N / A'}
+                            <div className="flex items-center gap-1.5">
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleShare();
+                                    }}
+                                    className="p-1.5 rounded-none bg-white/10 hover:bg-white/20 border border-white/15 transition-all backdrop-blur-md cursor-pointer active:scale-95 flex items-center justify-center"
+                                    title="Share"
+                                >
+                                    <Share2 size={13} className="text-white" />
+                                </button>
+                                <Link 
+                                    to="/profile/edit" 
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-1.5 rounded-none bg-white/10 hover:bg-white/20 border border-white/15 transition-all backdrop-blur-md" 
+                                    title="Edit Profile"
+                                >
+                                    <Edit2 size={13} className="text-white" />
+                                </Link>
+                            </div>
+                        </div>
+
+                        <div className="relative z-10 flex justify-between gap-3">
+                            <div className="flex flex-col flex-1 min-w-0">
+                                <div>
+                                    <h2 className="text-lg leading-tight font-black text-white tracking-wide">
+                                        {user?.name || 'Customer'}
+                                    </h2>
+                                    <p className="text-white/90 text-[11px] font-medium flex items-center gap-1 mt-1 mb-1.5 drop-shadow-sm">
+                                        <span className="bg-black/20 border border-white/20 px-1.5 py-px rounded-none text-[9px] uppercase text-white font-bold tracking-wider">
+                                            India
+                                        </span>
+                                        <span className="truncate">+91 {formatIndiaPhone(user?.phone)}</span>
+                                    </p>
+                                    {getReferrerDisplayName(user?.referredBy) && (
+                                        <div className="flex items-center bg-black/20 border border-white/20 text-white px-2 py-0.5 rounded-none w-fit">
+                                            <span className="text-[9px] font-black uppercase tracking-wider">
+                                                Referred By: {getReferrerDisplayName(user.referredBy)}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-3">
+                                    <p className="text-[8px] text-white/85 uppercase tracking-[0.2em] mb-0.5 font-bold drop-shadow-sm">
+                                        Referral Code
+                                    </p>
+                                    {user?.referralCode ? (
+                                        <div 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigator.clipboard.writeText(user.referralCode);
+                                                toast.success("Referral code copied to clipboard!");
+                                            }}
+                                            className="flex items-center gap-1.5 cursor-pointer group w-fit"
+                                        >
+                                            <span className="text-base font-bold font-mono tracking-[0.16em] text-white group-hover:text-white/90 transition-colors drop-shadow-sm">
+                                                {user.referralCode}
+                                            </span>
+                                            <Copy size={12} className="opacity-75 group-hover:opacity-100 text-white transition-opacity" />
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs font-mono opacity-50 tracking-widest">N/A</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col items-end justify-between flex-shrink-0">
+                                {user?.referralCode && (
+                                    <div className="flex flex-col items-center">
+                                        <div className="bg-white p-1 rounded-none shadow-md ring-1 ring-white/70">
+                                            <img 
+                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/signup?ref=${user.referralCode}`)}`} 
+                                                alt="Signup QR Code" 
+                                                className="w-[58px] h-[58px] object-contain"
+                                                crossOrigin="anonymous"
+                                            />
+                                        </div>
+                                        <span className="text-[7px] font-black uppercase tracking-[0.16em] text-white/90 mt-1 text-center leading-tight drop-shadow-sm">
+                                            Scan to Join
+                                        </span>
+                                    </div>
+                                )}
+
+                                <div className="text-right mt-2">
+                                    <p className="text-[8px] text-white/85 uppercase tracking-[0.2em] mb-0.5 font-bold drop-shadow-sm">
+                                        Valid Thru
+                                    </p>
+                                    <div className="text-sm font-bold font-mono tracking-[0.14em] text-white drop-shadow-sm">
+                                        {user?.currentPlan && user?.planExpiry ? new Date(user.planExpiry).toLocaleDateString('en-US', { month: '2-digit', year: '2-digit' }).replace('/', ' / ') : 'N / A'}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -468,7 +486,7 @@ const ProfilePage = () => {
 
                 {/* Logout Button */}
                 <button
-                    onClick={logout}
+                    onClick={requestSignOut}
                     className="w-full py-3 rounded-lg border border-slate-300 text-slate-700 font-semibold bg-white hover:bg-slate-100 transition-colors flex items-center justify-center gap-2 mt-2"
                 >
                     <LogOut size={20} />
@@ -490,6 +508,7 @@ const ProfilePage = () => {
                 onClose={() => setIsReferralTreeModalOpen(false)}
                 user={user}
             />
+            {signOutDialog}
         </div>
     );
 };

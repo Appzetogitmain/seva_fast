@@ -34,12 +34,19 @@ const PlanCard = ({ plan, onEdit, onDelete, isAdmin = false, isActive = false, e
             <div className="relative z-10">
                 <div className="flex justify-between items-start mb-6">
                     <div>
-                        <span 
-                            className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white mb-3 inline-block"
-                            style={{ backgroundColor: plan.displayColor }}
-                        >
-                            {plan.name}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                            {isActive && (
+                                <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white shadow-sm">
+                                    Active
+                                </span>
+                            )}
+                            <span 
+                                className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white inline-block"
+                                style={{ backgroundColor: plan.displayColor }}
+                            >
+                                {plan.name}
+                            </span>
+                        </div>
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-baseline gap-2 flex-wrap">
                                 <span className="text-4xl font-black text-slate-900">₹{activePrice}</span>
@@ -109,7 +116,7 @@ const PlanCard = ({ plan, onEdit, onDelete, isAdmin = false, isActive = false, e
                             )}
                             style={!isActive ? { backgroundColor: plan.displayColor } : {}}
                         >
-                            {isActive ? "Currently Active" : "Subscribe Now"}
+                            {isActive ? "Active Plan" : "Subscribe Now"}
                         </button>
                     </div>
                 )}

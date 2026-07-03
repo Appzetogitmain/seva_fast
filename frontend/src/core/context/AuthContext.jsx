@@ -154,6 +154,14 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         const storageKey = ROLE_STORAGE_KEYS[currentRole];
 
+        if (token) {
+            try {
+                await axiosInstance.post('/auth/activity/logout');
+            } catch (error) {
+                console.warn('Failed to record logout activity:', error);
+            }
+        }
+
         try {
             const { removeStoredFcmToken } = await import('@core/firebase/pushClient');
             await removeStoredFcmToken({ role: currentRole });

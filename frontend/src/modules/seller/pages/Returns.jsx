@@ -10,6 +10,7 @@ import {
     HiOutlineEye,
     HiOutlineCalendarDays,
     HiOutlineTruck,
+    HiOutlineChevronDown,
 } from "react-icons/hi2";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { MagicCard } from "@/components/ui/magic-card";
@@ -29,6 +30,7 @@ const Returns = () => {
     const [rejectReason, setRejectReason] = useState("");
     const [submittingReject, setSubmittingReject] = useState(false);
     const [assigningPickup, setAssigningPickup] = useState(false);
+    const [deliveryBoys, setDeliveryBoys] = useState([]);
     const [activeOtps, setActiveOtps] = useState({}); // { orderId: { otp, expiresAt } }
     const canManageReturns = true;
 
@@ -93,6 +95,17 @@ const Returns = () => {
         }
     };
 
+    const fetchDeliveryBoys = async () => {
+        try {
+            const response = await sellerApi.getDeliveryPartners({ verified: 'true', status: 'online' });
+            const payload = response.data.result || {};
+            const list = Array.isArray(payload.items) ? payload.items : (response.data.results || []);
+            setDeliveryBoys(list);
+        } catch (error) {
+            console.error("Failed to fetch delivery partners:", error);
+        }
+    };
+
     const fetchReturns = async () => {
         try {
             setLoading(true);
@@ -112,6 +125,7 @@ const Returns = () => {
 
     useEffect(() => {
         fetchReturns();
+        fetchDeliveryBoys();
 
         const getToken = () => localStorage.getItem("auth_seller");
 
@@ -197,18 +211,38 @@ const Returns = () => {
         }
     };
 
-    const handleAssignPickup = async (orderId) => {
+    const handleAssignReturnRider = async (orderId, deliveryBoyId) => {
+        if (!deliveryBoyId) return;
         try {
             setAssigningPickup(true);
-            await sellerApi.assignReturnDelivery(orderId, {});
-            showToast("Riders notified for return pickup", "success");
-            setIsDetailsOpen(false);
+            await sellerApi.assignReturnDelivery(orderId, { deliveryBoyId });
+            showToast("Delivery partner assigned for return pickup", "success");
+            const assignedBoy = deliveryBoys.find(
+                (b) => b._id === deliveryBoyId || b.id === deliveryBoyId,
+            );
+            const returnDeliveryBoy = assignedBoy
+                ? { _id: assignedBoy._id, name: assignedBoy.name, phone: assignedBoy.phone }
+                : null;
+            setReturns((prev) =>
+                prev.map((r) =>
+                    r.orderId === orderId
+                        ? { ...r, returnDeliveryBoy, returnStatus: "return_pickup_assigned" }
+                        : r,
+                ),
+            );
+            if (selectedReturn?.orderId === orderId) {
+                setSelectedReturn({
+                    ...selectedReturn,
+                    returnDeliveryBoy,
+                    returnStatus: "return_pickup_assigned",
+                });
+            }
             await fetchReturns();
         } catch (error) {
-            console.error("Failed to assign pickup", error);
+            console.error("Failed to assign return rider:", error);
             showToast(
-                error.response?.data?.message || "No nearby riders found or assignment failed",
-                "error"
+                error.response?.data?.message || "Failed to assign delivery partner",
+                "error",
             );
         } finally {
             setAssigningPickup(false);
@@ -677,6 +711,108 @@ const Returns = () => {
                                     </p>
                                 </div>
 
+                                {(selectedReturn.returnStatus === "return_approved" ||
+                                    selectedReturn.returnStatus === "return_pickup_assigned") && (
+                                    <div>
+                                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                            <HiOutlineTruck className="h-3 w-3 text-primary" /> Return Pickup Rider
+                                        </h4>
+                                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+                                            {selectedReturn.returnDeliveryBoy ? (
+                                                <div className="flex flex-col gap-1.5">
+                                                    <div className="flex justify-between items-center">
+                                                        <div>
+                                                            <p className="text-xs font-bold text-slate-800">
+                                                                {selectedReturn.returnDeliveryBoy.name}
+                                                            </p>
+                                                            <p className="text-[11px] font-semibold text-slate-600">
+                                                                {selectedReturn.returnDeliveryBoy.phone}
+                                                            </p>
+                                                        </div>
+                                                        <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                                            Assigned
+                                                        </span>
+                                                    </div>
+                                                    {selectedReturn.returnStatus === "return_approved" ||
+                                                    selectedReturn.returnStatus === "return_pickup_assigned" ? (
+                                                        <>
+                                                            <div className="h-px bg-slate-200 my-1" />
+                                                            <div className="relative">
+                                                                <select
+                                                                    value={selectedReturn.returnDeliveryBoy._id || selectedReturn.returnDeliveryBoy.id || ""}
+                                                                    onChange={(e) =>
+                                                                        handleAssignReturnRider(
+                                                                            selectedReturn.orderId,
+                                                                            e.target.value,
+                                                                        )
+                                                                    }
+                                                                    disabled={assigningPickup}
+                                                                    className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800 disabled:opacity-60"
+                                                                >
+                                                                    <option
+                                                                        value={
+                                                                            selectedReturn.returnDeliveryBoy._id ||
+                                                                            selectedReturn.returnDeliveryBoy.id ||
+                                                                            ""
+                                                                        }
+                                                                    >
+                                                                        {selectedReturn.returnDeliveryBoy.name} (
+                                                                        {selectedReturn.returnDeliveryBoy.phone})
+                                                                    </option>
+                                                                    <option value="" disabled>
+                                                                        Change Rider...
+                                                                    </option>
+                                                                    {deliveryBoys
+                                                                        .filter(
+                                                                            (boy) =>
+                                                                                (boy._id || boy.id) !==
+                                                                                (selectedReturn.returnDeliveryBoy._id ||
+                                                                                    selectedReturn.returnDeliveryBoy.id),
+                                                                        )
+                                                                        .map((boy) => (
+                                                                            <option key={boy._id} value={boy._id}>
+                                                                                {boy.name} ({boy.phone})
+                                                                            </option>
+                                                                        ))}
+                                                                </select>
+                                                                <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                                            </div>
+                                                        </>
+                                                    ) : null}
+                                                </div>
+                                            ) : (
+                                                <div className="relative">
+                                                    <select
+                                                        value=""
+                                                        onChange={(e) =>
+                                                            handleAssignReturnRider(
+                                                                selectedReturn.orderId,
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        disabled={assigningPickup}
+                                                        className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800 disabled:opacity-60"
+                                                    >
+                                                        <option value="">Assign Rider...</option>
+                                                        {deliveryBoys.length === 0 ? (
+                                                            <option value="" disabled>
+                                                                No online riders available
+                                                            </option>
+                                                        ) : (
+                                                            deliveryBoys.map((boy) => (
+                                                                <option key={boy._id} value={boy._id}>
+                                                                    {boy.name} ({boy.phone})
+                                                                </option>
+                                                            ))
+                                                        )}
+                                                    </select>
+                                                    <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Active OTP Display */}
                                 {activeOtps[selectedReturn.orderId] && (
                                     <div className="bg-brand-50 border-2 border-dashed border-brand-200 rounded-3xl p-6 text-center space-y-3 animate-in fade-in zoom-in duration-500">
@@ -723,22 +859,6 @@ const Returns = () => {
                                                 Approve Return
                                             </Button>
                                         </>
-                                    )}
-
-                                    {/* Action: Assign Pickup */}
-                                    {canManageReturns && (selectedReturn.returnStatus === "return_approved") && (
-                                        <Button
-                                            className="text-xs font-bold bg-black  hover:bg-brand-700"
-                                            disabled={assigningPickup}
-                                            onClick={() => handleAssignPickup(selectedReturn.orderId)}
-                                        >
-                                            {assigningPickup ? (
-                                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                            ) : (
-                                                <HiOutlineInboxStack className="h-4 w-4 mr-2" />
-                                            )}
-                                            Assign Pickup
-                                        </Button>
                                     )}
                                 </div>
                             </div>

@@ -1,6 +1,7 @@
 import React from "react";
 import { Plus, Minus } from "lucide-react";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
+import { effectiveUnitPrice } from "../../../utils/productPricing";
 
 /**
  * CheckoutCartSummary
@@ -70,12 +71,8 @@ const CheckoutCartSummary = React.memo(function CheckoutCartSummary({
               const mrp = Number(item.price || 0);
               const sale = Number(item.salePrice || 0);
               const qty = Math.max(0, Number(item.quantity || 0));
-              const hasDiscount =
-                Number.isFinite(mrp) &&
-                Number.isFinite(sale) &&
-                sale > 0 &&
-                sale < mrp;
-              const unit = hasDiscount ? sale : mrp;
+              const unit = effectiveUnitPrice(mrp, sale);
+              const hasDiscount = sale > 0 && sale < mrp;
               const total = Math.round(unit * qty);
               const totalMrp = Math.round(mrp * qty);
               return (

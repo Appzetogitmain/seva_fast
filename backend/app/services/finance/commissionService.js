@@ -3,6 +3,194 @@ import Seller from "../../models/seller.js";
 import Plan from "../../models/plan.js";
 import Transaction from "../../models/transaction.js";
 import Order from "../../models/order.js";
+import { roundCurrency } from "../../utils/money.js";
+
+const DEFAULT_LEVEL_COMMISSIONS = [10, 5, 2, 1, 0.5];
+const ADMIN_LEVEL_COMMISSIONS = [10, 5, 2, 1, 0.5];
+const MAX_REFERRAL_DEPTH = 15;
+
+function resolvePurchasedPlanMaxLevels(plan) {
+  const levelsFeature = plan?.features?.find((feature) => feature.key === "REFERRAL_LEVELS");
+  const configuredLevels = Number(levelsFeature?.value || 0);
+  if (configuredLevels > 0) {
+    return configuredLevels;
+  }
+  return DEFAULT_LEVEL_COMMISSIONS.length;
+}
+
+function resolvePurchasedPlanLevelCommissionPercent(plan, level) {
+  if (!plan || level < 1) return 0;
+
+  const maxLevels = resolvePurchasedPlanMaxLevels(plan);
+  if (level > maxLevels) {
+    return 0;
+  }
+
+  const levelFeature = plan.features?.find((feature) => feature.key === "LEVEL_COMMISSION");
+  if (levelFeature && Array.isArray(levelFeature.value)) {
+    return Number(levelFeature.value[level - 1] || 0);
+  }
+
+  if (level <= DEFAULT_LEVEL_COMMISSIONS.length) {
+    return Number(DEFAULT_LEVEL_COMMISSIONS[level - 1] || 0);
+  }
+
+  return 0;
+}
+
+function resolveReferrerCommissionPercent(referrer, level) {
+  if (!referrer || level < 1) return 0;
+
+  const isAdmin =
+    referrer.role === "admin" && String(referrer.referralCode || "").toUpperCase() === "SEVAFAST";
+  const hasActivePlan =
+    referrer.currentPlan && referrer.planExpiry && new Date(referrer.planExpiry) > new Date();
+
+  if (isAdmin) {
+    return Number(ADMIN_LEVEL_COMMISSIONS[level - 1] || 0);
+  }
+
+  if (hasActivePlan) {
+    return 0;
+  }
+
+  if (level <= DEFAULT_LEVEL_COMMISSIONS.length) {
+    return Number(DEFAULT_LEVEL_COMMISSIONS[level - 1] || 0);
+  }
+
+  return 0;
+}
+
+async function resolveReferrerCommissionPercentFromPlan(referrer, level) {
+  if (!referrer || level < 1) return 0;
+
+  const isAdmin =
+    referrer.role === "admin" && String(referrer.referralCode || "").toUpperCase() === "SEVAFAST";
+  if (isAdmin) {
+    return Number(ADMIN_LEVEL_COMMISSIONS[level - 1] || 0);
+  }
+
+  const hasActivePlan =
+    referrer.currentPlan && referrer.planExpiry && new Date(referrer.planExpiry) > new Date();
+  if (!hasActivePlan) {
+    return resolveReferrerCommissionPercent(referrer, level);
+  }
+
+  const plan = await Plan.findById(referrer.currentPlan).lean();
+  if (!plan) return 0;
+
+  const levelsFeature = plan.features?.find((feature) => feature.key === "REFERRAL_LEVELS");
+  const configuredLevels = Number(levelsFeature?.value || 0);
+  if (configuredLevels > 0 && level > configuredLevels) {
+    return 0;
+  }
+
+  const levelFeature = plan.features?.find((feature) => feature.key === "LEVEL_COMMISSION");
+  if (levelFeature && Array.isArray(levelFeature.value)) {
+    const percent = Number(levelFeature.value[level - 1] || 0);
+    if (percent > 0) {
+      return percent;
+    }
+  }
+
+  if (level <= DEFAULT_LEVEL_COMMISSIONS.length) {
+    return Number(DEFAULT_LEVEL_COMMISSIONS[level - 1] || 0);
+  }
+
+  return 0;
+}
+
+export async function processPlanPurchaseLevelCommissions({
+  buyerId,
+  planPrice,
+  planId,
+  planName = "",
+  paymentReference,
+  directReferrerId = null,
+}) {
+  const normalizedPrice = roundCurrency(planPrice);
+  if (!buyerId || !normalizedPrice || normalizedPrice <= 0) {
+    return { credited: 0 };
+  }
+
+  const buyer = await User.findById(buyerId).lean();
+  if (!buyer) {
+    return { credited: 0 };
+  }
+
+  const purchasedPlan = await Plan.findById(planId).lean();
+  if (!purchasedPlan) {
+    return { credited: 0 };
+  }
+
+  const maxLevels = Math.min(
+    resolvePurchasedPlanMaxLevels(purchasedPlan),
+    MAX_REFERRAL_DEPTH,
+  );
+
+  const buyerName = buyer.name || "User";
+  const baseReference = String(paymentReference || `plan-${planId}-${buyerId}`);
+  const visited = new Set([String(buyerId)]);
+  let currentLevel = 0;
+  let credited = 0;
+  let nextReferrerId = directReferrerId || buyer.referredBy || null;
+
+  while (nextReferrerId && currentLevel < maxLevels) {
+    const referrerId = String(nextReferrerId);
+    if (visited.has(referrerId)) break;
+    visited.add(referrerId);
+    currentLevel += 1;
+
+    const referrer = await User.findById(referrerId);
+    if (!referrer) break;
+
+    const commissionPercent = resolvePurchasedPlanLevelCommissionPercent(
+      purchasedPlan,
+      currentLevel,
+    );
+
+    if (commissionPercent > 0) {
+      const commissionAmount = roundCurrency((normalizedPrice * commissionPercent) / 100);
+      const txReference = `PLAN-LVL-COMM-${baseReference}-${currentLevel}-${referrerId}`;
+      const existingTransaction = await Transaction.findOne({ reference: txReference }).lean();
+
+      if (!existingTransaction && commissionAmount > 0) {
+        referrer.walletBalance = roundCurrency(
+          Number(referrer.walletBalance || 0) + commissionAmount,
+        );
+        await referrer.save();
+
+        await Transaction.create({
+          user: referrer._id,
+          userModel: "User",
+          type: "Commission",
+          amount: commissionAmount,
+          status: "Settled",
+          reference: txReference,
+          meta: {
+            planId,
+            planName,
+            planPrice: normalizedPrice,
+            level: currentLevel,
+            commissionPercent,
+            referredUser: buyerId,
+            description: `Plan referral commission (${commissionPercent}%) from ${buyerName}`,
+          },
+        });
+        credited += 1;
+      }
+    }
+
+    nextReferrerId = referrer.referredBy || null;
+  }
+
+  const targetReferrerId = directReferrerId || buyer.referredBy;
+  if (targetReferrerId) {
+    await checkAndRewardMonthlyReferralTarget(targetReferrerId);
+  }
+
+  return { credited };
+}
 
 export const processMonthlyTurnoverCommissions = async () => {
     try {

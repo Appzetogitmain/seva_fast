@@ -1,13 +1,12 @@
 import React from 'react';
 import { useRouteError, useNavigate, isRouteErrorResponse } from 'react-router-dom';
 import { ShoppingBag, RefreshCw, Home, AlertCircle } from 'lucide-react';
-import { useSettings } from '@core/context/SettingsContext';
+import { DEFAULT_SETTINGS } from '@core/context/SettingsDefaults';
 
 const RootErrorBoundary = () => {
     const error = useRouteError();
     const navigate = useNavigate();
-    const { settings } = useSettings();
-    const appName = settings?.appName || 'App';
+    const appName = DEFAULT_SETTINGS.appName || 'App';
     console.error('Route Error:', error);
 
     let errorMessage = "An unexpected error occurred.";

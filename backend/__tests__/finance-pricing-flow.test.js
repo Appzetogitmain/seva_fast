@@ -189,9 +189,11 @@ describe("finance pricing flow", () => {
           salePrice: 120,
           price: 125,
           status: "active",
+          approvalStatus: "approved",
           mainImage: "apple.jpg",
           headerId: "cat-1",
           sellerId: "seller-1",
+          variants: [],
         },
       ]),
     );
@@ -204,6 +206,56 @@ describe("finance pricing flow", () => {
     expect(hydrated[0].price).toBe(120);
     expect(hydrated[0].headerCategoryId).toBe("cat-1");
     expect(hydrated[0].sellerId).toBe("seller-1");
+  });
+
+  it("requires variant selection when product has variants", async () => {
+    mockProductFind.mockReturnValue(
+      createQueryChain([
+        {
+          _id: "prod-2",
+          name: "Rice",
+          price: 100,
+          salePrice: 0,
+          status: "active",
+          approvalStatus: "approved",
+          headerId: "cat-1",
+          sellerId: "seller-1",
+          variants: [{ name: "1kg", sku: "RICE-1KG", price: 120, salePrice: 110 }],
+        },
+      ]),
+    );
+
+    await expect(
+      hydrateOrderItems([{ product: "prod-2", quantity: 1 }]),
+    ).rejects.toThrow("Please select a variant for: Rice");
+  });
+
+  it("uses selected variant sale price when it is lower than mrp", async () => {
+    mockProductFind.mockReturnValue(
+      createQueryChain([
+        {
+          _id: "prod-3",
+          name: "Oil",
+          price: 200,
+          salePrice: 0,
+          status: "active",
+          approvalStatus: "approved",
+          headerId: "cat-1",
+          sellerId: "seller-1",
+          variants: [
+            { name: "500ml", sku: "OIL-500", price: 150, salePrice: 130 },
+            { name: "1L", sku: "OIL-1L", price: 280, salePrice: 0 },
+          ],
+        },
+      ]),
+    );
+
+    const hydrated = await hydrateOrderItems([
+      { product: "prod-3", variantSku: "OIL-1L", quantity: 1 },
+    ]);
+
+    expect(hydrated[0].price).toBe(280);
+    expect(hydrated[0].variantName).toBe("1L");
   });
 
   it("throws when multi-seller checkout is attempted", async () => {

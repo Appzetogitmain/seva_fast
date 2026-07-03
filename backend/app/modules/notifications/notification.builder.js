@@ -64,6 +64,14 @@ function buildSellerInventoryLink(productId) {
     : `${baseUrl}/seller/inventory`;
 }
 
+function buildAdminReturnsLink(orderId) {
+  const baseUrl = getFrontendBaseUrl();
+  const id = String(orderId || "").trim();
+  return id
+    ? `${baseUrl}/admin/returns?orderId=${encodeURIComponent(id)}`
+    : `${baseUrl}/admin/returns`;
+}
+
 function eventDefinition(eventType) {
   switch (eventType) {
     case NOTIFICATION_EVENTS.ORDER_PLACED:
@@ -211,13 +219,27 @@ function eventDefinition(eventType) {
     // ── Return Workflow Events ──────────────────────────────────────────────
     case NOTIFICATION_EVENTS.RETURN_REQUESTED:
       return {
-        role: NOTIFICATION_ROLES.SELLER,
-        recipientIds: (payload) => normalizeIdList(payload.sellerId),
-        title: () => "Return Request Received",
-        body: (payload) =>
-          payload.orderId
-            ? `Customer has requested a return for order #${payload.orderId}.`
-            : "A new return request has been received.",
+        multi: true,
+        definitions: [
+          {
+            role: NOTIFICATION_ROLES.SELLER,
+            recipientIds: (payload) => normalizeIdList(payload.sellerId),
+            title: () => "Return Request Received",
+            body: (payload) =>
+              payload.orderId
+                ? `Customer has requested a return for order #${payload.orderId}.`
+                : "A new return request has been received.",
+          },
+          {
+            role: NOTIFICATION_ROLES.ADMIN,
+            recipientIds: (payload) => normalizeIdList(payload.adminIds),
+            title: () => "New Return Request",
+            body: (payload) =>
+              payload.orderId
+                ? `Customer requested a return for order #${payload.orderId}. Seller will review.`
+                : "A new return request needs monitoring.",
+          },
+        ],
       };
     case NOTIFICATION_EVENTS.RETURN_APPROVED:
       return {
@@ -286,11 +308,23 @@ function eventDefinition(eventType) {
       };
     case NOTIFICATION_EVENTS.RETURN_COMPLETED:
       return {
-        role: NOTIFICATION_ROLES.SELLER,
-        recipientIds: (payload) => normalizeIdList(payload.sellerId),
-        title: () => "Product Returned to Store",
-        body: (payload) =>
-          `Product for order #${payload.orderId || ""} has been returned. Admin QC is pending.`,
+        multi: true,
+        definitions: [
+          {
+            role: NOTIFICATION_ROLES.SELLER,
+            recipientIds: (payload) => normalizeIdList(payload.sellerId),
+            title: () => "Product Returned to Store",
+            body: (payload) =>
+              `Product for order #${payload.orderId || ""} has been returned. Admin QC is pending.`,
+          },
+          {
+            role: NOTIFICATION_ROLES.ADMIN,
+            recipientIds: (payload) => normalizeIdList(payload.adminIds),
+            title: () => "Return Ready for QC",
+            body: (payload) =>
+              `Order #${payload.orderId || ""} returned to seller. Compare photos and complete QC.`,
+          },
+        ],
       };
     case NOTIFICATION_EVENTS.RETURN_QC_PASSED:
       return {
@@ -396,11 +430,17 @@ function eventData(eventType, payload = {}, role) {
 
   const orderId = String(payload.orderId || "").trim() || undefined;
   const checkoutGroupId = String(payload.checkoutGroupId || "").trim() || undefined;
+  const link =
+    role === NOTIFICATION_ROLES.ADMIN &&
+    (eventType === NOTIFICATION_EVENTS.RETURN_REQUESTED ||
+      eventType === NOTIFICATION_EVENTS.RETURN_COMPLETED)
+      ? buildAdminReturnsLink(orderId)
+      : buildOrderLink(orderId);
   return {
     eventType,
     orderId,
     checkoutGroupId,
-    link: buildOrderLink(orderId),
+    link,
     ...(payload.data || {}),
   };
 }

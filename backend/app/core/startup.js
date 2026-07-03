@@ -192,6 +192,9 @@ async function connectMongoDB(maxRetries = 5) {
   const options = {
     serverSelectionTimeoutMS: connectTimeout,
     socketTimeoutMS: 45000,
+    bufferCommands: false,
+    maxPoolSize: 10,
+    minPoolSize: 1,
   };
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {

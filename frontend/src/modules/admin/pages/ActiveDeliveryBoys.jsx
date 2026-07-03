@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import Card from '@shared/components/ui/Card';
 import Badge from '@shared/components/ui/Badge';
 import {
@@ -8,8 +9,7 @@ import {
     Trophy,
     Search,
     Filter,
-    Plus,
-    MoreVertical,
+    Pencil,
     Phone,
     MapPin,
     Truck,
@@ -18,7 +18,6 @@ import {
     DollarSign,
     ShieldCheck,
     XCircle,
-    Pencil,
     Trash2,
     Eye,
     X
@@ -30,6 +29,8 @@ import Pagination from '@shared/components/ui/Pagination';
 import { adminApi } from '../services/adminApi';
 
 const ActiveDeliveryBoys = () => {
+    const location = useLocation();
+    const isSellerView = location.pathname.startsWith('/seller/');
     const [riders, setRiders] = useState([]);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(25);
@@ -161,13 +162,6 @@ return (
                 </h1>
                 <p className="ds-description mt-1">Manage all your active delivery partners here.</p>
             </div>
-            <button
-                onClick={() => setIsOnboardModalOpen(true)}
-                className="flex items-center space-x-2 bg-slate-900 text-white px-6 py-3.5 rounded-2xl text-xs font-bold hover:bg-slate-800 transition-all shadow-xl hover:shadow-slate-200 active:scale-95 group"
-            >
-                <Plus className="h-4 w-4 group-hover:rotate-90 transition-transform" />
-                <span>ADD NEW RIDER</span>
-            </button>
         </div>
 
         {/* Quick Stats Grid */}
@@ -467,7 +461,7 @@ return (
 
         {/* Onboard / Edit Modal */}
         <AnimatePresence>
-            {(isOnboardModalOpen || isEditModalOpen) && (
+            {(isEditModalOpen || (!isSellerView && isOnboardModalOpen)) && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
                     <motion.div
                         initial={{ opacity: 0 }}

@@ -107,11 +107,11 @@ function parsePositiveInt(value, fallback) {
 }
 
 function getReturnEligibilityDelayMinutes() {
-  return parsePositiveInt(process.env.RETURN_ELIGIBILITY_DELAY_MINUTES, 2);
+  return parsePositiveInt(process.env.RETURN_ELIGIBILITY_DELAY_MINUTES, 0);
 }
 
 function getReturnWindowMinutes() {
-  return parsePositiveInt(process.env.RETURN_WINDOW_MINUTES, 2);
+  return parsePositiveInt(process.env.RETURN_WINDOW_MINUTES, 24 * 60);
 }
 
 function computeReturnWindowDates(deliveredAt) {
@@ -766,6 +766,11 @@ export async function settleDeliveredOrder(orderOrId, { actorId = null } = {}) {
       order.returnEligibleAt = order.returnEligibleAt || eligibleAt;
       order.returnWindowExpiresAt = order.returnWindowExpiresAt || windowExpiresAt;
       order.returnDeadline = order.returnDeadline || windowExpiresAt;
+    } else if (!order.returnStatus || order.returnStatus === "none") {
+      const { eligibleAt, windowExpiresAt } = computeReturnWindowDates(order.deliveredAt);
+      order.returnEligibleAt = eligibleAt;
+      order.returnWindowExpiresAt = windowExpiresAt;
+      order.returnDeadline = windowExpiresAt;
     }
 
     if (order.paymentMode === "ONLINE" && !order.financeFlags?.onlinePaymentCaptured) {

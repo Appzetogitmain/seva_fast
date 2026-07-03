@@ -6,6 +6,7 @@ import { sendSmsIndiaHubOtp } from "../services/smsIndiaHubService.js";
 import { generateOTP } from "../utils/otp.js";
 import { uploadToCloudinary } from "../services/mediaService.js";
 import { __testables as otpTestables } from "../modules/otp/otp.service.js";
+import { recordAuthActivity } from "../services/authActivityService.js";
 
 const DELIVERY_TEST_NUMBERS = new Set(["6268423925", "9111966732", "8888888888"]);
 const DELIVERY_TEST_OTP = "123456";
@@ -253,6 +254,14 @@ export const verifyDeliveryOTP = async (req, res) => {
         delivery.lastLogin = new Date();
 
         await delivery.save();
+
+        await recordAuthActivity({
+            role: "delivery",
+            action: "login",
+            userId: delivery._id,
+            user: delivery,
+            req,
+        });
 
         const token = generateToken(delivery);
 

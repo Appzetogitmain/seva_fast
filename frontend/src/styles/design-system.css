@@ -440,6 +440,16 @@
   margin-top: 0.75rem;
 }
 
+.ds-chart-container .recharts-wrapper,
+.ds-chart-container .recharts-surface,
+.ds-chart-container svg,
+.ds-chart-container .recharts-wrapper:focus,
+.ds-chart-container .recharts-wrapper:focus-visible,
+.ds-chart-container svg:focus,
+.ds-chart-container svg:focus-visible {
+  outline: none !important;
+}
+
 .ds-chart-container-lg {
   height: 21.875rem;
   width: 100%;

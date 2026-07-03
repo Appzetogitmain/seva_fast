@@ -8,6 +8,7 @@ import {
   getBackgroundGradientByValue,
 } from "@/shared/constants/offerSectionOptions";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
+import { mapProductForCustomerListing } from "../../utils/productPricing";
 
 const OfferSections = ({ sections, noServiceData }) => {
   if (!sections || sections.length === 0) return null;
@@ -20,16 +21,7 @@ const OfferSections = ({ sections, noServiceData }) => {
           const bgColor = getBackgroundColorByValue(section.backgroundColor);
           const sectionProducts = (section.productIds || [])
             .filter((p) => typeof p === "object" && p !== null)
-            .map((p) => ({
-              id: p._id,
-              _id: p._id,
-              name: p.name,
-              image: p.mainImage || p.image || "",
-              price: p.salePrice ?? p.price,
-              originalPrice: p.price ?? p.salePrice,
-              weight: p.weight,
-              deliveryTime: p.deliveryTime,
-            }));
+            .map((p) => mapProductForCustomerListing(p));
 
           return (
             <motion.div

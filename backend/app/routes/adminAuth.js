@@ -47,6 +47,7 @@ import {
     updateSubadmin,
     deleteSubadmin
 } from "../controller/adminController.js";
+import { getAuthActivityLogs } from "../controller/authActivityController.js";
 import {
     exportAdminFinanceStatementController,
     getAdminFinanceLedgerController,
@@ -224,6 +225,13 @@ router.get("/subadmins", verifyToken, allowRoles("admin"), getSubadmins);
 router.post("/subadmins", verifyToken, allowRoles("admin"), createSubadmin);
 router.put("/subadmins/:id", verifyToken, allowRoles("admin"), updateSubadmin);
 router.delete("/subadmins/:id", verifyToken, allowRoles("admin"), deleteSubadmin);
+
+router.get(
+    "/auth-activity",
+    verifyToken,
+    allowRoles("admin", "sub-admin"),
+    getAuthActivityLogs,
+);
 
 // Protected admin route example
 router.get(

@@ -4,7 +4,7 @@ import Order from "../../models/order.js";
 
 export async function getUsersData({ page, limit, skip }) {
   const pipeline = [
-    { $match: { role: "user" } },
+    { $match: { role: { $in: ["user", "customer"] } } },
     {
       $lookup: {
         from: "orders",
@@ -112,7 +112,7 @@ export async function getUserByIdData(id) {
     {
       $match: {
         _id: new mongoose.Types.ObjectId(id),
-        role: "user",
+        role: { $in: ["user", "customer"] },
       },
     },
     {

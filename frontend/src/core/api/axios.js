@@ -44,7 +44,7 @@ axiosInstance.interceptors.request.use(
             if (url.startsWith('/seller')) token = getStoredAuthToken('auth_seller');
             else if (url.startsWith('/admin')) token = getStoredAuthToken('auth_admin');
             else if (url.startsWith('/delivery')) token = getStoredAuthToken('auth_delivery');
-            else if (url.startsWith('/customer') || url.startsWith('/cart') || url.startsWith('/wishlist') || url.startsWith('/categories') || url.startsWith('/products') || url.startsWith('/payments')) {
+            else if (url.startsWith('/customer') || url.startsWith('/cart') || url.startsWith('/wishlist') || url.startsWith('/categories') || url.startsWith('/products') || url.startsWith('/payments') || url.startsWith('/plans') || url.startsWith('/auth/activity')) {
                 token = getStoredAuthToken('auth_customer');
             }
         }

@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from "react";
 import { customerApi } from "../services/customerApi";
 import { useAuth } from "../../../core/context/AuthContext";
+import {
+  effectiveUnitPrice,
+  resolveVariantPricing as getVariantPricing,
+} from "../utils/productPricing";
 
 const CartContext = createContext();
 
@@ -28,7 +32,7 @@ export const CartProvider = ({ children }) => {
     return items.map((item) => {
       const product = item.productId;
       const variantKey = String(item.variantSku || "").trim();
-      const { price, salePrice, variantName } = resolveVariantPricing(product, variantKey);
+      const { price, salePrice, variantName } = getVariantPricing(product, variantKey);
       return {
         ...product,
         id: product?._id, // Normalize ID
@@ -40,29 +44,6 @@ export const CartProvider = ({ children }) => {
         image: product?.mainImage, // Handle mapping for frontend
       };
     });
-  };
-
-  const resolveVariantPricing = (product, variantSku = "") => {
-    const normalizedKey = String(variantSku || "").trim();
-    if (!normalizedKey) {
-      return {
-        price: Number(product?.price || 0),
-        salePrice: Number(product?.salePrice || 0),
-        variantName: "",
-      };
-    }
-
-    const variants = Array.isArray(product?.variants) ? product.variants : [];
-    const hit = variants.find((v) => {
-      const sku = String(v?.sku || "").trim();
-      const name = String(v?.name || "").trim();
-      return (sku && sku === normalizedKey) || (!sku && name === normalizedKey) || name === normalizedKey;
-    });
-    return {
-      price: Number(hit?.price || product?.price || 0),
-      salePrice: Number(hit?.salePrice || 0),
-      variantName: String(hit?.name || "").trim(),
-    };
   };
 
   const syncCart = (backendItems) => {
@@ -122,7 +103,7 @@ export const CartProvider = ({ children }) => {
     const variantSku = String(product?.variantSku || product?.variantName || "").trim();
     const id = product.id || product._id;
     const key = `${id}::${variantSku || ""}`;
-    const { price, salePrice, variantName } = resolveVariantPricing(product, variantSku);
+    const { price, salePrice, variantName } = getVariantPricing(product, variantSku);
 
     // Optimistic UI update for instant feedback
     setCart((prev) => {
@@ -268,10 +249,7 @@ export const CartProvider = ({ children }) => {
   };
 
   const cartTotal = cart.reduce((total, item) => {
-    const unit =
-      Number(item.salePrice || 0) > 0 && Number(item.salePrice) < Number(item.price || 0)
-        ? Number(item.salePrice)
-        : Number(item.price || 0);
+    const unit = effectiveUnitPrice(item.price, item.salePrice);
     return total + unit * Number(item.quantity || 0);
   }, 0);
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);

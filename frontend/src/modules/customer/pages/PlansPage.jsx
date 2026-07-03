@@ -1,14 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { ArrowLeft, X } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
-import axiosInstance from '@/core/api/axios';
 import { useAuth } from '@/core/context/AuthContext';
 import PlanCard from '@/shared/components/ui/PlanCard';
 
-// Plan subscriptions use Razorpay checkout
+const DEFAULT_REFERRAL_CODE = 'SEVAFAST';
+
+const unlockPageScroll = () => {
+    document.body.style.overflow = '';
+    document.body.style.touchAction = '';
+    document.body.style.position = '';
+    document.documentElement.style.overflow = '';
+};
+
+const lockPageScroll = () => {
+    document.body.style.overflow = 'hidden';
+};
+
+const normalizePlanId = (value) => {
+    if (!value) return '';
+    if (typeof value === 'object') {
+        return String(value._id || value.id || '').trim();
+    }
+    return String(value).trim();
+};
+
 const PlansPage = () => {
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -26,12 +45,29 @@ const PlansPage = () => {
 
     useEffect(() => {
         if (referralModalOpen) {
-            document.body.style.overflow = 'hidden';
+            lockPageScroll();
         } else {
-            document.body.style.overflow = '';
+            unlockPageScroll();
         }
         return () => {
-            document.body.style.overflow = '';
+            unlockPageScroll();
+        };
+    }, [referralModalOpen]);
+
+    useEffect(() => {
+        const restoreScrollOnReturn = () => {
+            if (!referralModalOpen) {
+                unlockPageScroll();
+            }
+        };
+
+        window.addEventListener('focus', restoreScrollOnReturn);
+        document.addEventListener('visibilitychange', restoreScrollOnReturn);
+
+        return () => {
+            window.removeEventListener('focus', restoreScrollOnReturn);
+            document.removeEventListener('visibilitychange', restoreScrollOnReturn);
+            unlockPageScroll();
         };
     }, [referralModalOpen]);
 
@@ -45,12 +81,6 @@ const PlansPage = () => {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleSubscribeClick = (plan) => {
-        setSelectedPlan(plan);
-        setReferralCode('');
-        setReferralModalOpen(true);
     };
 
     const loadRazorpayScript = () => {
@@ -67,92 +97,161 @@ const PlansPage = () => {
         });
     };
 
-    const initiateRazorpay = async () => {
-        if (!selectedPlan) return;
-        if (!referralCode.trim()) {
-            toast.error("Referral code is required to activate a plan.");
-            return;
+    const resolveReferralForPurchase = () => {
+        const entered = referralCode.trim().toUpperCase();
+        if (!entered) return DEFAULT_REFERRAL_CODE;
+        if (user?.referralCode && entered === String(user.referralCode).trim().toUpperCase()) {
+            return DEFAULT_REFERRAL_CODE;
         }
-        
-        setProcessingPlanId(selectedPlan._id);
+        return entered;
+    };
+
+    const initiateRazorpay = async (planOverride) => {
+        const plan = planOverride || selectedPlan;
+        if (!plan) return;
+
+        const codeForPurchase = resolveReferralForPurchase();
+
+        setProcessingPlanId(plan._id || plan.id);
         
         try {
             const isLoaded = await loadRazorpayScript();
             if (!isLoaded) {
                 toast.error("Razorpay SDK failed to load. Are you online?");
-                setProcessingPlanId(null);
                 return;
             }
 
-            const initRes = await axiosInstance.post('/plans/subscribe/initiate', {
-                planId: selectedPlan._id,
-                referralCode: referralCode.trim() || undefined
+            const planId = String(plan._id || plan.id || "").trim();
+            if (!planId) {
+                toast.error("Invalid plan selected. Please refresh and try again.");
+                return;
+            }
+
+            const initRes = await customerApi.initiatePlanSubscription({
+                planId,
+                referralCode: codeForPurchase,
             });
 
-            if (initRes.data.result.success) {
-                const { orderId, amount, currency, referredBy, razorpayKey } = initRes.data.result;
+            const payload = initRes.data?.result || {};
+            const orderId = payload.orderId;
+            const razorpayKey = payload.razorpayKey || import.meta.env.VITE_RAZORPAY_KEY_ID;
 
-                const options = {
-                    key: razorpayKey,
-                    amount: amount,
-                    currency: currency,
-                    name: "Seva Fast",
-                    description: `Subscription: ${selectedPlan.name}`,
-                    order_id: orderId,
-                    handler: async function (response) {
-                        try {
-                            const verifyRes = await axiosInstance.post('/plans/subscribe/verify', {
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                                planId: selectedPlan._id,
-                                referredBy: referredBy
-                            });
-                            
-                            if (verifyRes.data.result) {
-                                toast.success("Plan activated successfully!");
-                                if (refreshUser) {
-                                    await refreshUser();
-                                }
-                            } else {
-                                toast.error("Payment verification failed");
-                            }
-                        } catch (err) {
-                            toast.error("Failed to verify payment");
-                        }
-                    },
-                    prefill: {
-                        name: user?.name || "Customer",
-                        contact: user?.phone || ""
-                    },
-                    theme: {
-                        color: "#0f172a"
-                    }
-                };
-                
-                const rzp = new window.Razorpay(options);
-                rzp.on('payment.failed', function (response){
-                    toast.error(response.error.description || "Payment failed");
-                });
-                setReferralModalOpen(false);
-                rzp.open();
-            } else {
-                toast.error("Failed to activate plan");
-                setReferralModalOpen(false);
+            if (!payload.success || !orderId || !razorpayKey) {
+                toast.error(payload.message || initRes.data?.message || "Failed to activate plan. Please try again.");
+                return;
             }
-        } catch (error) {
-            toast.error(error.response?.data?.message || "Failed to initiate payment");
+
+            const { amount, currency, referredBy } = payload;
+
+            const options = {
+                key: razorpayKey,
+                amount,
+                currency,
+                name: "Seva Fast",
+                description: `Subscription: ${plan.name}`,
+                order_id: orderId,
+                handler: async function (response) {
+                    try {
+                        const verifyRes = await customerApi.verifyPlanPayment({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                            planId,
+                            referredBy,
+                        });
+                        
+                        if (verifyRes.data.result) {
+                            toast.success("Plan activated successfully!");
+                            if (refreshUser) {
+                                await refreshUser();
+                            }
+                            fetchPlans();
+                        } else {
+                            toast.error("Payment verification failed");
+                        }
+                    } catch (err) {
+                        toast.error(err?.response?.data?.message || "Failed to verify payment");
+                    } finally {
+                        unlockPageScroll();
+                        setSelectedPlan(null);
+                        setReferralModalOpen(false);
+                    }
+                },
+                prefill: {
+                    name: user?.name || "Customer",
+                    contact: user?.phone || "",
+                },
+                theme: {
+                    color: "#0f172a",
+                },
+                modal: {
+                    ondismiss: () => {
+                        unlockPageScroll();
+                        setSelectedPlan(null);
+                        setReferralModalOpen(false);
+                    },
+                },
+            };
+            
+            const rzp = new window.Razorpay(options);
+            rzp.on('payment.failed', function (response) {
+                toast.error(response.error.description || "Payment failed");
+                unlockPageScroll();
+                setSelectedPlan(null);
+                setReferralModalOpen(false);
+            });
             setReferralModalOpen(false);
+            unlockPageScroll();
+            rzp.open();
+        } catch (error) {
+            const message =
+                error?.response?.data?.message ||
+                (error?.response?.status === 404
+                    ? "Plan subscription API not found. Please restart the backend server."
+                    : "Failed to initiate payment");
+            toast.error(message);
         } finally {
             setProcessingPlanId(null);
         }
     };
 
-    const displayPlans = plans;
+    const handleSubscribeClick = (plan) => {
+        setSelectedPlan(plan);
+        setReferralCode('');
+        setReferralModalOpen(true);
+    };
+
+    const activePlanSubscriptions = useMemo(() => {
+        const now = Date.now();
+        const map = new Map();
+
+        (user?.planSubscriptions || []).forEach((subscription) => {
+            const planId = normalizePlanId(subscription?.plan);
+            const expiresAt = subscription?.expiresAt
+                ? new Date(subscription.expiresAt).getTime()
+                : 0;
+            if (planId && expiresAt > now) {
+                map.set(planId, subscription.expiresAt);
+            }
+        });
+
+        if (map.size === 0 && user?.currentPlan) {
+            const legacyPlanId = normalizePlanId(user.currentPlan);
+            const legacyExpiry = user?.planExpiry
+                ? new Date(user.planExpiry).getTime()
+                : 0;
+            if (legacyPlanId && legacyExpiry > now) {
+                map.set(legacyPlanId, user.planExpiry);
+            }
+        }
+
+        return map;
+    }, [user]);
+
+    const hasAnyActivePlan = activePlanSubscriptions.size > 0;
 
     return (
-        <div className="min-h-screen bg-slate-50 pt-safe-top pb-safe-bottom font-['Outfit',_sans-serif]">
-            {/* Header */}
+        <div className="min-h-screen bg-slate-50 pt-safe-top pb-safe-bottom pb-24 font-['Outfit',_sans-serif]">
             <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100 shadow-sm">
                 <div className="px-4 h-16 flex items-center gap-4 max-w-7xl mx-auto">
                     <button 
@@ -163,10 +262,10 @@ const PlansPage = () => {
                     </button>
                     <div>
                         <h1 className="text-xl font-black text-slate-900 tracking-tight">
-                            {user?.currentPlan ? "My Subscription" : "Subscription Plans"}
+                            {hasAnyActivePlan ? "My Subscription" : "Subscription Plans"}
                         </h1>
                         <p className="text-xs font-bold text-slate-400">
-                            {user?.currentPlan ? "Your active plan details" : "Choose a plan to continue shopping"}
+                            {hasAnyActivePlan ? "Your active plan details" : "Choose a plan to continue"}
                         </p>
                     </div>
                 </div>
@@ -178,17 +277,19 @@ const PlansPage = () => {
                         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin mb-4"></div>
                         Loading Plans...
                     </div>
-                ) : displayPlans.length === 0 ? (
+                ) : plans.length === 0 ? (
                     <div className="py-20 text-center font-bold text-slate-400 uppercase tracking-widest text-sm">
                         No active plans available
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {displayPlans.map(plan => {
-                            const isActivePlan = user?.currentPlan && (user.currentPlan === plan._id || user.currentPlan._id === plan._id);
+                        {plans.map((plan) => {
+                            const planId = normalizePlanId(plan._id || plan.id);
+                            const isActivePlan = activePlanSubscriptions.has(planId);
+                            const planExpiry = activePlanSubscriptions.get(planId);
                             return (
-                                <div key={plan._id} className="relative">
-                                    {processingPlanId === plan._id && (
+                                <div key={planId} className="relative">
+                                    {processingPlanId === planId && (
                                         <div className="absolute inset-0 z-20 bg-white/50 backdrop-blur-sm rounded-[32px] flex items-center justify-center">
                                             <div className="w-8 h-8 border-4 border-white border-t-black rounded-full animate-spin"></div>
                                         </div>
@@ -201,15 +302,12 @@ const PlansPage = () => {
                                             plan={plan} 
                                             isAdmin={false} 
                                             isActive={isActivePlan}
-                                            expiryDate={user?.planExpiry}
+                                            expiryDate={planExpiry}
                                         />
-                                        {isActivePlan && (
-                                            <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
-                                                <div className="bg-emerald-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md">
-                                                    Active Plan
-                                                </div>
-                                                <div className="bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[9px] font-bold text-slate-500 uppercase shadow-sm border border-slate-100">
-                                                    Valid till: {new Date(user.planExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        {isActivePlan && planExpiry && (
+                                            <div className="absolute top-4 right-4">
+                                                <div className="bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-[9px] font-bold text-slate-500 uppercase shadow-sm border border-slate-100">
+                                                    Valid till: {new Date(planExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                 </div>
                                             </div>
                                         )}
@@ -221,9 +319,8 @@ const PlansPage = () => {
                 )}
             </div>
 
-            {/* Referral Modal */}
             <AnimatePresence>
-                {referralModalOpen && (
+                {referralModalOpen && selectedPlan && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -246,7 +343,7 @@ const PlansPage = () => {
                             <div className="mb-6">
                                 <h3 className="text-xl font-black text-slate-900 tracking-tight">Enter Referral Code</h3>
                                 <p className="text-sm font-medium text-slate-500 mt-1 mb-3">
-                                    A valid referral code is required to proceed with payment.
+                                    <strong>{selectedPlan?.name}</strong> plan ke liye referral code daalein. Har plan purchase par code zaroori hai.
                                 </p>
                                 <div className="bg-amber-50/80 border border-amber-100 rounded-xl p-3 flex items-start gap-3">
                                     <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -255,14 +352,18 @@ const PlansPage = () => {
                                     <div>
                                         <p className="text-[10px] font-bold text-amber-900/60 uppercase tracking-widest mb-0.5">Default Admin Code</p>
                                         <p className="text-xs font-bold text-amber-900 leading-tight">
-                                            Don't have a referral code? Use <span 
+                                            Referral nahi hai?{' '}
+                                            <button
+                                                type="button"
                                                 onClick={() => {
-                                                    navigator.clipboard.writeText('SEVAFAST');
-                                                    toast.success('Admin code copied!');
+                                                    setReferralCode(DEFAULT_REFERRAL_CODE);
+                                                    toast.success('SEVAFAST code applied');
                                                 }}
-                                                className="font-black text-amber-700 tracking-wider cursor-pointer hover:underline"
-                                                title="Click to copy"
-                                            >SEVAFAST</span> to continue.
+                                                className="font-black text-amber-700 tracking-wider hover:underline"
+                                            >
+                                                SEVAFAST
+                                            </button>{' '}
+                                            use karein — isse admin ko commission milega.
                                         </p>
                                     </div>
                                 </div>
@@ -272,14 +373,14 @@ const PlansPage = () => {
                                 type="text"
                                 value={referralCode}
                                 onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                                placeholder="ENTER CODE (REQUIRED)"
+                                placeholder="REFERRAL CODE (optional)"
                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-slate-800 placeholder:text-slate-400 outline-none focus:border-slate-800 focus:ring-4 focus:ring-slate-100 transition-all uppercase tracking-widest mb-6"
                             />
 
                             <button 
-                                onClick={initiateRazorpay}
-                                disabled={!referralCode.trim()}
-                                className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-200 transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+                                type="button"
+                                onClick={() => initiateRazorpay()}
+                                className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2"
                             >
                                 Activate Plan (₹{selectedPlan?.price})
                             </button>

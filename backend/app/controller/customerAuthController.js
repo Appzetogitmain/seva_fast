@@ -15,6 +15,18 @@ import {
     validateSchema,
     verifyOtpSchema,
 } from "../validation/customerAuthValidation.js";
+import { recordAuthActivity } from "../services/authActivityService.js";
+import { ensurePlanSubscriptionsSynced } from "../services/planSubscriptionService.js";
+
+const CUSTOMER_REFERRED_BY_FIELDS = "name phone referralCode role";
+
+async function loadCustomerProfile(customerId) {
+    await ensurePlanSubscriptionsSynced(customerId);
+    return Customer.findById(customerId)
+        .populate("currentPlan")
+        .populate("planSubscriptions.plan")
+        .populate("referredBy", CUSTOMER_REFERRED_BY_FIELDS);
+}
 
 const generateToken = (customer) =>
     jwt.sign(
@@ -35,7 +47,6 @@ export const signupCustomer = async (req, res) => {
             rawPhone: payload.phone,
             flow: "signup",
             ipAddress: req.ip,
-            referralCode: payload.referralCode,
         });
 
         return handleResponse(res, 200, "If the number is eligible, OTP has been sent");
@@ -75,6 +86,17 @@ export const verifyCustomerOTP = async (req, res) => {
             ipAddress: req.ip,
         });
         await customer.populate("currentPlan");
+        await customer.populate("planSubscriptions.plan");
+        await customer.populate("referredBy", CUSTOMER_REFERRED_BY_FIELDS);
+
+        await recordAuthActivity({
+            role: "customer",
+            action: "login",
+            userId: customer._id,
+            user: customer,
+            req,
+        });
+
         const token = generateToken(customer);
 
         return handleResponse(
@@ -96,7 +118,7 @@ export const verifyCustomerOTP = async (req, res) => {
 ================================ */
 export const getCustomerProfile = async (req, res) => {
     try {
-        const customer = await Customer.findById(req.user.id).populate("currentPlan");
+        const customer = await loadCustomerProfile(req.user.id);
         if (!customer) {
             return handleResponse(res, 404, "Customer not found");
         }
@@ -267,7 +289,9 @@ export const updateCustomerProfile = async (req, res) => {
 
         await customer.save();
 
-        return handleResponse(res, 200, "Profile updated successfully", customer);
+        const updatedCustomer = await loadCustomerProfile(customer._id);
+
+        return handleResponse(res, 200, "Profile updated successfully", updatedCustomer);
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }

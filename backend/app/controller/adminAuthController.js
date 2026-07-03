@@ -6,6 +6,7 @@ import {
   loginAdminSchema,
   validateSchema,
 } from "../validation/adminAuthValidation.js";
+import { recordAuthActivity } from "../services/authActivityService.js";
 
 const PUBLIC_ADMIN_SIGNUP_ENABLED = () =>
   process.env.ENABLE_PUBLIC_ADMIN_SIGNUP === "true";
@@ -123,6 +124,14 @@ export const loginAdmin = async (req, res) => {
 
     admin.lastLogin = new Date();
     await admin.save();
+
+    await recordAuthActivity({
+      role: admin.role || "admin",
+      action: "login",
+      userId: admin._id,
+      user: admin,
+      req,
+    });
 
     const token = generateToken(admin);
     return handleResponse(res, 200, "Login successful", {

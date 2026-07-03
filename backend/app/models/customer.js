@@ -134,6 +134,28 @@ const userSchema = new mongoose.Schema(
             ref: "Plan",
         },
         planExpiry: Date,
+        planSubscriptions: [
+            {
+                plan: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "Plan",
+                    required: true,
+                },
+                purchasedAt: {
+                    type: Date,
+                    default: Date.now,
+                },
+                expiresAt: {
+                    type: Date,
+                    required: true,
+                },
+                paymentReference: {
+                    type: String,
+                    trim: true,
+                    default: "",
+                },
+            },
+        ],
         referredBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",

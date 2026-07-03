@@ -1,15 +1,10 @@
 import Ticket from "../models/ticket.js";
-import Admin from "../models/admin.js";
 import handleResponse from "../utils/helper.js";
 import getPagination from "../utils/pagination.js";
+import { getAdminIds } from "../utils/adminIds.js";
 import { emitTicketCreated, emitTicketMessage } from "../services/ticketSocketEmitter.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
-
-async function getAdminIds() {
-    const admins = await Admin.find().select("_id").lean();
-    return (admins || []).map((a) => a?._id).filter(Boolean);
-}
 
 // Create a new ticket (Customer/Seller/Rider)
 export const createTicket = async (req, res) => {

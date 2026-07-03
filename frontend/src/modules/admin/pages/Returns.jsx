@@ -28,7 +28,6 @@ const Returns = () => {
   const [actionModal, setActionModal] = useState({ open: false, mode: null });
   const [actionNote, setActionNote] = useState("");
   const [submittingAction, setSubmittingAction] = useState(false);
-  const [assigningPickup, setAssigningPickup] = useState(false);
 
   const tabs = [
     "All",
@@ -115,16 +114,29 @@ const Returns = () => {
   }, []);
 
   useEffect(() => {
-    if (isDetailsOpen || actionModal.open) {
-      document.body.style.overflow = "hidden";
-      document.documentElement.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-      document.documentElement.style.overflow = "unset";
-    }
+    if (!isDetailsOpen && !actionModal.open) return undefined;
+
+    const scrollY = window.scrollY;
+    const { style: bodyStyle } = document.body;
+    const { style: htmlStyle } = document.documentElement;
+
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+    document.body.style.width = "100%";
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
     return () => {
-      document.body.style.overflow = "unset";
-      document.documentElement.style.overflow = "unset";
+      document.body.style.position = bodyStyle.position;
+      document.body.style.top = bodyStyle.top;
+      document.body.style.left = bodyStyle.left;
+      document.body.style.right = bodyStyle.right;
+      document.body.style.width = bodyStyle.width;
+      document.body.style.overflow = bodyStyle.overflow;
+      document.documentElement.style.overflow = htmlStyle.overflow;
+      window.scrollTo(0, scrollY);
     };
   }, [isDetailsOpen, actionModal.open]);
 
@@ -142,59 +154,6 @@ const Returns = () => {
   const openDetails = (ret) => {
     setSelectedReturn(ret);
     setIsDetailsOpen(true);
-  };
-
-  const handleApprove = async (orderId) => {
-    try {
-      await adminApi.approveReturn(orderId, {});
-      showToast("Return approved", "success");
-      await fetchReturns();
-    } catch (error) {
-      console.error("Failed to approve return", error);
-      showToast(
-        error.response?.data?.message || "Failed to approve return",
-        "error",
-      );
-    }
-  };
-
-  const handleReject = async () => {
-    if (!actionNote.trim() || !selectedReturn) return;
-    try {
-      setSubmittingAction(true);
-      await adminApi.rejectReturn(selectedReturn.orderId, { reason: actionNote });
-      showToast("Return rejected", "success");
-      setActionModal({ open: false, mode: null });
-      setActionNote("");
-      setIsDetailsOpen(false);
-      await fetchReturns();
-    } catch (error) {
-      console.error("Failed to reject return", error);
-      showToast(
-        error.response?.data?.message || "Failed to reject return",
-        "error",
-      );
-    } finally {
-      setSubmittingAction(false);
-    }
-  };
-
-  const handleAssignPickup = async (orderId) => {
-    try {
-      setAssigningPickup(true);
-      await adminApi.assignReturnDelivery(orderId, {});
-      showToast("Riders notified for return pickup", "success");
-      setIsDetailsOpen(false);
-      await fetchReturns();
-    } catch (error) {
-      console.error("Failed to assign pickup", error);
-      showToast(
-        error.response?.data?.message || "No nearby riders found or assignment failed",
-        "error",
-      );
-    } finally {
-      setAssigningPickup(false);
-    }
   };
 
   const handleQcPass = async (orderId) => {
@@ -448,7 +407,7 @@ const Returns = () => {
 
       <AnimatePresence>
         {isDetailsOpen && selectedReturn && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden overscroll-none pointer-events-auto">
+          <div className="fixed inset-0 z-[100] overflow-hidden overscroll-none">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -456,13 +415,14 @@ const Returns = () => {
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
               onClick={() => setIsDetailsOpen(false)}
             />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="w-full max-w-2xl relative z-10 bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col"
-              style={{ maxHeight: 'calc(100vh - 2rem)' }}
-            >
+            <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6 lg:p-8 pointer-events-none overflow-hidden">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="pointer-events-auto w-full max-w-2xl max-h-[calc(100dvh-2rem)] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
               <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 shrink-0">
                 <div>
                   <h3 className="text-base font-black text-slate-900">
@@ -485,7 +445,7 @@ const Returns = () => {
                 </button>
               </div>
 
-              <div className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-4">
+              <div className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-4 custom-scrollbar">
                 <div className="space-y-2">
                   <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                     Customer
@@ -610,34 +570,56 @@ const Returns = () => {
                   </div>
                 )}
 
-                {/* Quality Check Comparison (2-Way) */}
+                {/* Quality Check Comparison */}
                 <div className="space-y-3 pt-2">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
-                    Product Comparison (QC)
+                    Photo Comparison (QC)
+                  </p>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Compare customer return photos with rider pickup photos before approving refund.
                   </p>
                   <div className="grid grid-cols-2 gap-3">
-                    {/* 1. Original Listing Image */}
                     <div className="space-y-1.5 flex flex-col h-full group">
-                      <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group-hover:border-slate-300 transition-colors">
-                        <img
-                          src={selectedReturn.items?.[0]?.image || "https://placehold.co/400x400/f8fafc/64748b?text=Original"}
-                          alt="Original"
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/60 to-transparent p-2">
-                          <p className="text-[9px] font-black text-white uppercase leading-none">Listing</p>
-                        </div>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">
+                        Customer Upload
+                      </p>
+                      <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner flex items-center justify-center">
+                        {selectedReturn.returnImages?.[0] ? (
+                          <img
+                            src={selectedReturn.returnImages[0]}
+                            alt="Customer return"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5 text-slate-400 px-3 text-center">
+                            <HiOutlineInboxStack className="h-5 w-5" />
+                            <p className="text-[8px] font-bold leading-tight uppercase">No Customer Photo</p>
+                          </div>
+                        )}
                       </div>
+                      {(selectedReturn.returnImages || []).length > 1 && (
+                        <div className="flex gap-1 overflow-x-auto pb-1">
+                          {selectedReturn.returnImages.slice(1).map((img, i) => (
+                            <img
+                              key={i}
+                              src={img}
+                              alt={`Customer ${i + 2}`}
+                              className="h-10 w-10 rounded-lg object-cover border border-slate-200 shrink-0"
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-
-                    {/* 3. Return Pickup Proof */}
                     <div className="space-y-1.5 flex flex-col h-full group">
-                      <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner group-hover:border-slate-300 transition-colors flex items-center justify-center">
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">
+                        Rider Pickup
+                      </p>
+                      <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner flex items-center justify-center">
                         {selectedReturn.returnPickupImages?.[0] ? (
                           <img
                             src={selectedReturn.returnPickupImages[0]}
-                            alt="Return Pickup"
+                            alt="Rider pickup"
                             className="h-full w-full object-cover"
                           />
                         ) : (
@@ -646,10 +628,19 @@ const Returns = () => {
                             <p className="text-[8px] font-bold leading-tight uppercase">Not Picked Yet</p>
                           </div>
                         )}
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-emerald-900/60 to-transparent p-2">
-                          <p className="text-[9px] font-black text-white uppercase leading-none">Return</p>
-                        </div>
                       </div>
+                      {(selectedReturn.returnPickupImages || []).length > 1 && (
+                        <div className="flex gap-1 overflow-x-auto pb-1">
+                          {selectedReturn.returnPickupImages.slice(1).map((img, i) => (
+                            <img
+                              key={i}
+                              src={img}
+                              alt={`Rider ${i + 2}`}
+                              className="h-10 w-10 rounded-lg object-cover border border-slate-200 shrink-0"
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   {selectedReturn.returnPickupCondition && (
@@ -705,7 +696,14 @@ const Returns = () => {
                 </div>
               </div>
 
-              <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center justify-end shrink-0">
+              <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center justify-between shrink-0">
+                <p className="text-[11px] text-slate-500 font-medium max-w-md">
+                  {["return_requested", "return_approved", "return_pickup_assigned", "return_in_transit", "return_drop_pending"].includes(selectedReturn.returnStatus)
+                    ? "Seller approves the return and assigns the delivery partner. Admin completes QC after the product is returned."
+                    : selectedReturn.returnStatus === "returned"
+                      ? "Compare customer and rider photos, then approve QC to credit the customer wallet."
+                      : ""}
+                </p>
                 <div className="flex gap-2 items-center flex-wrap">
                   <button
                     onClick={() => setIsDetailsOpen(false)}
@@ -713,39 +711,6 @@ const Returns = () => {
                   >
                     Close
                   </button>
-
-                  {selectedReturn.returnStatus === "return_requested" && (
-                    <>
-                      <Button
-                        variant="outline"
-                        className="text-xs font-bold border-rose-200 text-rose-600 hover:bg-rose-50"
-                        onClick={() => setActionModal({ open: true, mode: "reject" })}
-                      >
-                        Reject Request
-                      </Button>
-                      <Button
-                        className="text-xs font-bold bg-slate-900"
-                        onClick={() => handleApprove(selectedReturn.orderId)}
-                      >
-                        Approve Return
-                      </Button>
-                    </>
-                  )}
-
-                  {selectedReturn.returnStatus === "return_approved" && (
-                    <Button
-                      className="text-xs font-bold bg-black  hover:bg-brand-700"
-                      disabled={assigningPickup}
-                      onClick={() => handleAssignPickup(selectedReturn.orderId)}
-                    >
-                      {assigningPickup ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : (
-                        <HiOutlineInboxStack className="h-4 w-4 mr-2" />
-                      )}
-                      Assign Pickup
-                    </Button>
-                  )}
 
                   {selectedReturn.returnStatus === "returned" && (
                     <>
@@ -759,21 +724,26 @@ const Returns = () => {
                       <Button
                         className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700"
                         onClick={() => handleQcPass(selectedReturn.orderId)}
+                        disabled={
+                          !selectedReturn.returnImages?.length ||
+                          !selectedReturn.returnPickupImages?.length
+                        }
                       >
-                        QC Passed
+                        QC Passed — Refund Wallet
                       </Button>
                     </>
                   )}
                 </div>
               </div>
             </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {actionModal.open && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[110] overflow-hidden overscroll-none">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -781,19 +751,21 @@ const Returns = () => {
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
               onClick={() => !submittingAction && setActionModal({ open: false, mode: null })}
             />
+            <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none overflow-hidden">
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="w-full max-w-md relative z-10 bg-white rounded-3xl shadow-2xl p-6 space-y-4"
+              className="pointer-events-auto w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain relative bg-white rounded-3xl shadow-2xl p-6 space-y-4"
+              onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-xl font-black text-slate-900">
-                {actionModal.mode === "qc_fail" ? "QC Failed" : "Reject Return"}
+                {actionModal.mode === "qc_fail" ? "QC Failed" : "Action"}
               </h3>
               <p className="text-sm text-slate-600 font-medium">
                 {actionModal.mode === "qc_fail"
                   ? "Add a note for QC failure. This will be visible to the customer."
-                  : "Please provide a reason for rejecting this return request."}
+                  : "Add a note for this action."}
               </p>
 
               <div className="space-y-2">
@@ -820,7 +792,7 @@ const Returns = () => {
                 </Button>
                 <Button
                   className="flex-1 font-bold bg-rose-600 hover:bg-rose-700"
-                  onClick={actionModal.mode === "qc_fail" ? handleQcFail : handleReject}
+                  onClick={handleQcFail}
                   isLoading={submittingAction}
                   disabled={!actionNote.trim() || submittingAction}
                 >
@@ -828,6 +800,7 @@ const Returns = () => {
                 </Button>
               </div>
             </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>

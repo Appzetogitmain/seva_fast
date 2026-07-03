@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Card from '@shared/components/ui/Card';
 import PageHeader from '@shared/components/ui/PageHeader';
 import StatCard from '@shared/components/ui/StatCard';
@@ -30,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const AdminDashboard = () => {
+    const navigate = useNavigate();
     const [statsData, setStatsData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
@@ -82,15 +84,31 @@ const AdminDashboard = () => {
         return `Last Update: ${dayLabel}, ${timeLabel}`;
     };
 
+    const formatOrderDateTime = (order) => {
+        const raw = order?.createdAt || order?.time;
+        if (!raw || raw === 'Recently') return '--';
+        const date = new Date(raw);
+        if (Number.isNaN(date.getTime())) return String(raw);
+        return date.toLocaleString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+        });
+    };
+
     const stats = [
         {
-            label: 'Total Users',
+            label: 'Total Customers',
             value: overview.totalUsers?.toLocaleString() || '0',
             icon: Users,
             color: 'text-brand-600',
             bg: 'bg-brand-50',
             trend: '+12.5%',
-            description: 'Active this month'
+            description: 'Registered customers',
+            path: '/admin/customers',
         },
         {
             label: 'Active Sellers',
@@ -99,7 +117,8 @@ const AdminDashboard = () => {
             color: 'text-purple-600',
             bg: 'bg-purple-50',
             trend: '+5.2%',
-            description: 'Verified stores'
+            description: 'Verified stores',
+            path: '/admin/sellers/active',
         },
         {
             label: 'Total Orders',
@@ -108,7 +127,8 @@ const AdminDashboard = () => {
             color: 'text-orange-600',
             bg: 'bg-orange-50',
             trend: '+18.4%',
-            description: 'Last 30 days'
+            description: 'Last 30 days',
+            path: '/admin/orders/all',
         },
         {
             label: 'Revenue',
@@ -117,7 +137,8 @@ const AdminDashboard = () => {
             color: 'text-brand-600',
             bg: 'bg-brand-50',
             trend: '+8.2%',
-            description: 'Net earnings'
+            description: 'Net earnings',
+            path: '/admin/wallet',
         },
     ];
 
@@ -152,7 +173,8 @@ const AdminDashboard = () => {
                         description={stat.description}
                         color={stat.color}
                         bg={stat.bg}
-                        className={cn("ring-1 ring-gray-100", stat.bg + "/30")}
+                        onClick={() => navigate(stat.path)}
+                        className={cn("ring-1 ring-gray-100 cursor-pointer hover:ring-primary/30", stat.bg + "/30")}
                     />
                 ))}
             </div>
@@ -219,7 +241,7 @@ const AdminDashboard = () => {
                         subtitle="Sales breakdown by category"
                         className="h-full border-none shadow-sm ring-1 ring-gray-100"
                     >
-                        <div className="h-[250px] min-h-[250px] relative">
+                        <div className="ds-chart-container min-h-[250px] relative">
                             <ResponsiveContainer width="100%" height={250}>
                                 <PieChart>
                                     <Pie
@@ -274,12 +296,16 @@ const AdminDashboard = () => {
                                         <th className="admin-table-header">Customer</th>
                                         <th className="admin-table-header">Status</th>
                                         <th className="admin-table-header">Amount</th>
-                                        <th className="admin-table-header">Time</th>
+                                        <th className="admin-table-header">Date & Time</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
                                     {recentOrders.map((order) => (
-                                        <tr key={order.id} className="group hover:bg-gray-50/50 transition-all">
+                                        <tr
+                                            key={order.id}
+                                            className="group hover:bg-gray-50/50 transition-all cursor-pointer"
+                                            onClick={() => navigate(`/admin/orders/view/${String(order.id).replace('#', '')}`)}
+                                        >
                                             <td className="py-4 text-sm font-semibold text-primary">{order.id}</td>
                                             <td className="py-4">
                                                 <div className="flex items-center space-x-2">
@@ -295,13 +321,19 @@ const AdminDashboard = () => {
                                                 </Badge>
                                             </td>
                                             <td className="py-4 text-sm font-bold text-gray-900">{order.amount}</td>
-                                            <td className="py-4 text-xs font-semibold text-gray-400">{order.time}</td>
+                                            <td className="py-4 text-xs font-semibold text-gray-500 whitespace-nowrap">
+                                                {formatOrderDateTime(order)}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                        <button className="w-full mt-6 py-3 rounded-xl bg-gray-50 text-xs font-bold text-gray-500 hover:bg-primary hover:text-white transition-all">
+                        <button
+                            type="button"
+                            onClick={() => navigate('/admin/orders/all')}
+                            className="w-full mt-6 py-3 rounded-xl bg-gray-50 text-xs font-bold text-gray-500 hover:bg-primary hover:text-white transition-all"
+                        >
                             VIEW ALL ORDERS
                         </button>
                     </Card>
@@ -339,7 +371,11 @@ const AdminDashboard = () => {
                                 <div className="py-12 text-center text-slate-300 italic text-xs">No sales data yet</div>
                             )}
                         </div>
-                        <button className="w-full mt-6 py-3 border-2 border-dashed border-gray-100 rounded-xl text-xs font-bold text-gray-400 hover:border-primary hover:text-primary transition-all">
+                        <button
+                            type="button"
+                            onClick={() => navigate('/admin/products')}
+                            className="w-full mt-6 py-3 border-2 border-dashed border-gray-100 rounded-xl text-xs font-bold text-gray-400 hover:border-primary hover:text-primary transition-all"
+                        >
                             VIEW ALL PRODUCTS
                         </button>
                     </Card>

@@ -16,9 +16,11 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useAuth } from '@core/context/AuthContext';
 import { adminApi } from '../services/adminApi';
+import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 
 const AdminProfile = () => {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
+    const { requestSignOut, signOutDialog } = useSignOutConfirmation();
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('profile');
@@ -103,6 +105,7 @@ const AdminProfile = () => {
 
     return (
         <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
+            {signOutDialog}
             {/* Header Section */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-1">
                 <div>
@@ -116,7 +119,7 @@ const AdminProfile = () => {
                 </div>
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={logout}
+                        onClick={requestSignOut}
                         className="flex items-center gap-2 px-5 py-3 bg-white ring-1 ring-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-red-600 transition-all shadow-sm"
                     >
                         <LogOut className="h-4 w-4" />

@@ -1,6 +1,6 @@
 // Comprehensive Order Management System
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Card from '@shared/components/ui/Card';
 import Badge from '@shared/components/ui/Badge';
 import Pagination from '@shared/components/ui/Pagination';
@@ -29,11 +29,18 @@ import {
     adminRouteMatchesOrder,
 } from '@/shared/utils/orderStatus';
 
+const formatOrderIdDisplay = (orderId) => {
+    const id = String(orderId || '').replace(/^#/, '').trim();
+    if (id.length <= 16) return id;
+    return `${id.slice(0, 10)}...${id.slice(-4)}`;
+};
+
 const OrdersList = () => {
     const { status = 'all' } = useParams();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { showToast } = useToast();
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') || '');
     const [dateRange, setDateRange] = useState('All Time');
     const [orders, setOrders] = useState([]);
     const [summary, setSummary] = useState({
@@ -162,6 +169,14 @@ const OrdersList = () => {
         }, 500);
         return () => clearTimeout(timer);
     }, [pageSize, status, searchTerm, dateRange]);
+
+    useEffect(() => {
+        const qFromUrl = searchParams.get('search') || '';
+        if (qFromUrl !== searchTerm) {
+            setSearchTerm(qFromUrl);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const safeOrders = useMemo(
         () => (Array.isArray(orders) ? orders : []),
@@ -339,7 +354,17 @@ const OrdersList = () => {
                             type="text"
                             placeholder="Search by Order ID, Customer, or Shop..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => {
+                                const next = e.target.value;
+                                setSearchTerm(next);
+                                const params = new URLSearchParams(searchParams);
+                                if (next.trim()) {
+                                    params.set('search', next.trim());
+                                } else {
+                                    params.delete('search');
+                                }
+                                setSearchParams(params, { replace: true });
+                            }}
                             className="w-full pl-11 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-semibold outline-none focus:ring-2 focus:ring-fuchsia-500/10 transition-all"
                         />
                     </div>
@@ -390,10 +415,15 @@ const OrdersList = () => {
                                                 <Package className="h-5 w-5" />
                                             </div>
                                             <div>
-                                                <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                                                    #{order.id}
-                                                    <ArrowUpRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-all text-slate-400" />
-                                                </h4>
+                                                <div className="flex items-center gap-1.5 min-w-0 max-w-[10.5rem]">
+                                                    <h4
+                                                        className="text-[10px] font-bold text-slate-800 font-mono tracking-tight truncate"
+                                                        title={`#${order.id}`}
+                                                    >
+                                                        #{formatOrderIdDisplay(order.id)}
+                                                    </h4>
+                                                    <ArrowUpRight className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-all text-slate-400" />
+                                                </div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <Badge variant="outline" className="text-[9px] font-bold border-slate-200 text-slate-400 py-0.5">
                                                         {order.items} {order.items > 1 ? 'Items' : 'Item'}

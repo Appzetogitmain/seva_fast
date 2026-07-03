@@ -326,6 +326,13 @@ export async function generateReturnPickupOtp(orderId, requester = {}) {
       return { success: false, error: 'Return is not in pickup assigned status.' };
     }
 
+    if (!Array.isArray(order.returnPickupImages) || order.returnPickupImages.length === 0) {
+      return {
+        success: false,
+        error: 'Please upload pickup proof photos before requesting customer OTP.',
+      };
+    }
+
     const requesterId = requester?.id || requester?._id || null;
     const requesterRole = String(requester?.role || '').toLowerCase();
     if (

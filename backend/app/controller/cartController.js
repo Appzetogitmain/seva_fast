@@ -2,6 +2,10 @@ import Cart from "../models/cart.js";
 import Product from "../models/product.js";
 import handleResponse from "../utils/helper.js";
 import { getApprovedOrLegacyFilter } from "../services/productModerationService.js";
+import {
+  productHasVariants,
+  resolveVariantByKey,
+} from "../utils/productPricing.js";
 
 const CART_POPULATE_FIELDS =
   "name slug price salePrice mainImage stock status headerId categoryId subcategoryId sellerId variants";
@@ -17,14 +21,29 @@ function sanitizeCartItems(cart) {
   return cart;
 }
 
-async function getCustomerVisibleProductById(productId) {
+async function getCustomerVisibleProductById(productId, { select = "_id" } = {}) {
   if (!productId) return null;
   return Product.findOne({
     _id: productId,
     ...CUSTOMER_VISIBLE_PRODUCT_MATCH,
   })
-    .select("_id")
+    .select(select)
     .lean();
+}
+
+function validateVariantSelection(product, variantSku = "") {
+  const normalizedVariantSku = String(variantSku || "").trim();
+  if (!productHasVariants(product)) {
+    return null;
+  }
+  if (!normalizedVariantSku) {
+    return "Please select a variant for this product";
+  }
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  if (!resolveVariantByKey(variants, normalizedVariantSku)) {
+    return "Selected variant is not available for this product";
+  }
+  return null;
 }
 
 async function fetchPopulatedCart(cartId) {
@@ -72,9 +91,19 @@ export const addToCart = async (req, res) => {
     const customerId = req.user.id;
     const { productId, quantity = 1, variantSku = "" } = req.body;
     const normalizedVariantSku = String(variantSku || "").trim();
-    const customerVisibleProduct = await getCustomerVisibleProductById(productId);
+    const customerVisibleProduct = await getCustomerVisibleProductById(productId, {
+      select: "_id name variants",
+    });
     if (!customerVisibleProduct) {
       return handleResponse(res, 404, "Product is not available for purchase");
+    }
+
+    const variantError = validateVariantSelection(
+      customerVisibleProduct,
+      normalizedVariantSku,
+    );
+    if (variantError) {
+      return handleResponse(res, 400, variantError);
     }
 
     let cart = await Cart.findOne({ customerId });

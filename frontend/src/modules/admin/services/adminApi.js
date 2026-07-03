@@ -75,6 +75,7 @@ export const adminApi = {
     markAllNotificationsRead: () => axiosInstance.put('/notifications/mark-all-read'),
     broadcastNotification: (data) => axiosInstance.post('/notifications/broadcast', data),
     getBroadcastAudienceStats: () => axiosInstance.get('/notifications/broadcast/audience-stats'),
+    getAuthActivityLogs: (params) => axiosInstance.get('/admin/auth-activity', { params }),
 
     // Reviews
     getPendingReviews: (params) => axiosInstance.get('/reviews/admin/pending', { params }),

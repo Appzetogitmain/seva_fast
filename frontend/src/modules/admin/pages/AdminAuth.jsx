@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@core/context/AuthContext';
@@ -20,9 +20,9 @@ import { adminApi } from '../services/adminApi';
 
 const AdminAuth = () => {
     const [isLogin, setIsLogin] = useState(true);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const { login } = useAuth();
+    const { login, isAuthenticated, isLoading: authLoading, role } = useAuth();
     const { settings } = useSettings();
     const navigate = useNavigate();
     const appName = settings?.appName || 'App';
@@ -36,6 +36,20 @@ const AdminAuth = () => {
         phone: ''
     });
 
+    useEffect(() => {
+        if (!authLoading && isAuthenticated && role === 'admin') {
+            navigate('/admin', { replace: true });
+        }
+    }, [authLoading, isAuthenticated, role, navigate]);
+
+    if (!authLoading && isAuthenticated && role === 'admin') {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-[#f3f6ff]">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" />
+            </div>
+        );
+    }
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData({ ...formData, [name]: value });
@@ -43,7 +57,7 @@ const AdminAuth = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setIsLoading(true);
+        setIsSubmitting(true);
 
         // Debug logging
         console.log('=== FRONTEND LOGIN ATTEMPT ===');
@@ -58,22 +72,22 @@ const AdminAuth = () => {
             const pwd = (formData.password || '').trim();
             if (pwd.length < 8) {
                 toast.error('Password must be at least 8 characters long.');
-                setIsLoading(false);
+                setIsSubmitting(false);
                 return;
             }
             if (!/[a-z]/.test(pwd)) {
                 toast.error('Password must contain at least one lowercase letter.');
-                setIsLoading(false);
+                setIsSubmitting(false);
                 return;
             }
             if (!/[A-Z]/.test(pwd)) {
                 toast.error('Password must contain at least one uppercase letter.');
-                setIsLoading(false);
+                setIsSubmitting(false);
                 return;
             }
             if (!/[0-9]/.test(pwd)) {
                 toast.error('Password must contain at least one number.');
-                setIsLoading(false);
+                setIsSubmitting(false);
                 return;
             }
         }
@@ -99,18 +113,18 @@ const AdminAuth = () => {
             login(authData);
 
             toast.success(isLogin ? 'Welcome back, Administrator.' : 'Administrator Account Created.');
-            navigate('/admin');
+            navigate('/admin', { replace: true });
         } catch (error) {
             console.error('Login error:', error);
             console.error('Error response:', error.response?.data);
             toast.error(error.response?.data?.message || 'Authentication failed');
         } finally {
-            setIsLoading(false);
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-[#f3f6ff] p-6 font-['Outfit',_sans-serif]">
+        <div className="relative flex min-h-screen flex-col items-center justify-center bg-[#f3f6ff] p-6 py-10 font-['Outfit',_sans-serif]">
             {/* Background Decorations */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-brand-50 opacity-40 rounded-full blur-[120px]"></div>
@@ -216,10 +230,10 @@ const AdminAuth = () => {
 
                                 <button
                                     type="submit"
-                                    disabled={isLoading}
+                                    disabled={isSubmitting}
                                     className="w-full bg-black  text-primary-foreground rounded-[24px] py-5 text-base font-black shadow-2xl shadow-brand-200 hover:bg-brand-700 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
                                 >
-                                    {isLoading ? (
+                                    {isSubmitting ? (
                                         <motion.div
                                             animate={{ rotate: 360 }}
                                             transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
@@ -285,11 +299,10 @@ const AdminAuth = () => {
                 </div>
             </motion.div>
 
-            {/* Verification Label */}
-            <div className="absolute bottom-8 text-gray-400 font-bold text-[10px] tracking-[5px] uppercase flex items-center gap-3">
-                <div className="w-8 h-[1px] bg-gray-200"></div>
+            <div className="relative z-10 mt-6 text-gray-400 font-bold text-[10px] tracking-[0.35em] uppercase flex items-center justify-center gap-3 text-center px-4">
+                <div className="w-8 h-px bg-gray-200 shrink-0"></div>
                 {`Protected by ${appName} Security`}
-                <div className="w-8 h-[1px] bg-gray-200"></div>
+                <div className="w-8 h-px bg-gray-200 shrink-0"></div>
             </div>
         </div>
     );

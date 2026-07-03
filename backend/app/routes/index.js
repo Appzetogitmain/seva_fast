@@ -27,17 +27,21 @@ import photoOrderRoute from "./photoOrderRoutes.js";
 import sellerPhotoOrderRoute from "./sellerPhotoOrderRoutes.js";
 import professionalRoute from "./professionalRoutes.js";
 import adminProfessionalRoute from "./adminProfessionalRoutes.js";
+import authActivityRoute from "./authActivityRoutes.js";
 
 
 import express from "express";
+import { ensureDatabaseConnected } from "../middleware/databaseMiddleware.js";
 
 const setupRoutes = (app) => {
     const router = express.Router();
+    router.use(ensureDatabaseConnected);
 
     // Health and metrics endpoints (no /api prefix for standard paths)
     app.use("/health", healthRoute);
     app.use("/metrics", metricsRoute);
 
+    router.use("/auth/activity", authActivityRoute);
     router.use("/customer", customerRoute);
     router.use("/auth/otp", authOtpRoute);
     router.use("/delivery", deliveryRoute);

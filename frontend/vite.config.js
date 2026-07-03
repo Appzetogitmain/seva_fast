@@ -62,6 +62,7 @@ export default defineConfig({
       '@shared': path.resolve(__dirname, './src/shared'),
       '@modules': path.resolve(__dirname, './src/modules'),
     },
+    dedupe: ['react', 'react-dom'],
   },
   build: {
     minify: 'esbuild',

@@ -2,23 +2,18 @@ import Plan from "../models/plan.js";
 import User from "../models/customer.js";
 import handleResponse from "../utils/helper.js";
 import mongoose from "mongoose";
-import { StandardCheckoutClient, Env, StandardCheckoutPayRequest } from '@phonepe-pg/pg-sdk-node';
 import crypto from "crypto";
-import Transaction from "../models/transaction.js";
 import Razorpay from "razorpay";
+import { processPlanPurchaseLevelCommissions } from "../services/finance/commissionService.js";
+import { resolvePlanPurchaseReferrer } from "../services/referralService.js";
+import { upsertPlanSubscription } from "../services/planSubscriptionService.js";
 
-function getPhonePeClient() {
-    const clientId = String(process.env.PHONEPE_CLIENT_ID || "").trim();
-    const clientSecret = String(process.env.PHONEPE_CLIENT_SECRET || "").trim();
-    const clientVersion = parseInt(process.env.PHONEPE_CLIENT_VERSION || "1", 10);
-    const isProd = String(process.env.PHONEPE_ENV || "").toUpperCase() === "PRODUCTION";
-
-    return StandardCheckoutClient.getInstance(
-        clientId,
-        clientSecret,
-        clientVersion,
-        isProd ? Env.PRODUCTION : Env.SANDBOX
-    );
+function resolvePlanId(rawPlanId) {
+    const planId = String(rawPlanId || "").trim();
+    if (!planId || !mongoose.Types.ObjectId.isValid(planId)) {
+        return null;
+    }
+    return planId;
 }
 
 /* ===============================
@@ -80,20 +75,25 @@ export const getPlans = async (req, res) => {
  ================================ */
 export const createPlanOrder = async (req, res) => {
     try {
-        const { planId, referralCode } = req.body;
+        const { planId: rawPlanId, referralCode } = req.body;
         const userId = req.user.id;
+        const planId = resolvePlanId(rawPlanId);
+
+        if (!planId) {
+            return handleResponse(res, 400, "A valid planId is required");
+        }
 
         const plan = await Plan.findById(planId);
-        if (!plan || !plan.isActive) {
-            return handleResponse(res, 404, "Plan not found or inactive");
+        if (!plan) {
+            return handleResponse(res, 404, "Plan not found");
+        }
+        if (!plan.isActive) {
+            return handleResponse(res, 400, "This plan is currently inactive");
         }
 
-        let referredBy = null;
-        if (referralCode) {
-            const referrer = await User.findOne({ referralCode: referralCode.toUpperCase() });
-            if (referrer) referredBy = referrer._id;
-            else return handleResponse(res, 400, "Invalid Referral Code");
-        }
+        const referredBy = await resolvePlanPurchaseReferrer(userId, {
+            referralCode,
+        });
 
         const razorpay = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID || "dummy_key",
@@ -126,8 +126,13 @@ export const createPlanOrder = async (req, res) => {
  ================================ */
 export const verifyPlanPayment = async (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId, referredBy } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId: rawPlanId, referredBy } = req.body;
         const userId = req.user.id;
+        const planId = resolvePlanId(rawPlanId);
+
+        if (!planId) {
+            return handleResponse(res, 400, "A valid planId is required");
+        }
 
         const generated_signature = crypto
             .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "dummy_secret")
@@ -140,6 +145,12 @@ export const verifyPlanPayment = async (req, res) => {
 
         const plan = await Plan.findById(planId);
         if (!plan) return handleResponse(res, 404, "Plan not found");
+        if (!plan.isActive) {
+            return handleResponse(res, 400, "This plan is currently inactive");
+        }
+
+        const existingUser = await User.findById(userId).select("referredBy planSubscriptions");
+        if (!existingUser) return handleResponse(res, 404, "User not found");
 
         const expiryDate = new Date();
         expiryDate.setDate(expiryDate.getDate() + (plan.validityDays || 365));
@@ -151,10 +162,15 @@ export const verifyPlanPayment = async (req, res) => {
         const updateData = {
             currentPlan: plan._id,
             planExpiry: expiryDate,
-            permissions: permissions
+            permissions: permissions,
+            planSubscriptions: upsertPlanSubscription(existingUser.planSubscriptions, {
+                planId: plan._id,
+                validityDays: plan.validityDays || 365,
+                paymentReference: razorpay_payment_id,
+            }),
         };
 
-        if (referredBy) {
+        if (referredBy && !existingUser.referredBy) {
             updateData.referredBy = referredBy;
         }
 
@@ -162,41 +178,25 @@ export const verifyPlanPayment = async (req, res) => {
             userId,
             updateData,
             { new: true }
-        ).populate("currentPlan");
+        )
+            .populate("currentPlan")
+            .populate("planSubscriptions.plan")
+            .populate("referredBy", "name phone referralCode role");
 
-        const finalReferrerId = referredBy || updatedUser.referredBy;
-        if (finalReferrerId) {
-            const rewardFeature = plan.features.find(f => f.key === "REFERRAL_REWARD");
-            if (rewardFeature && rewardFeature.value) {
-                let rewardAmount = 0;
-                if (rewardFeature.unit === "%") {
-                    rewardAmount = (plan.price * Number(rewardFeature.value)) / 100;
-                } else {
-                    rewardAmount = Number(rewardFeature.value);
-                }
-
-                if (rewardAmount > 0) {
-                    const referrer = await User.findById(finalReferrerId);
-                    if (referrer) {
-                        referrer.walletBalance = (referrer.walletBalance || 0) + rewardAmount;
-                        await referrer.save();
-
-                        await Transaction.create({
-                            user: referrer._id,
-                            userModel: "User",
-                            type: "Bonus",
-                            amount: rewardAmount,
-                            status: "Settled",
-                            reference: `PLAN-COMM-${userId}-${Date.now()}`,
-                            meta: {
-                                planId: plan._id,
-                                referredUser: userId,
-                                description: `Referral Commission for Plan Purchase (${plan.name})`
-                            }
-                        });
-                    }
-                }
-            }
+        try {
+            await processPlanPurchaseLevelCommissions({
+                buyerId: userId,
+                planPrice: plan.price,
+                planId: plan._id,
+                planName: plan.name,
+                paymentReference: razorpay_payment_id,
+                directReferrerId: referredBy || null,
+            });
+        } catch (commissionError) {
+            console.error(
+                "[planController] Plan referral commission failed after successful payment:",
+                commissionError?.message || commissionError,
+            );
         }
 
         return handleResponse(res, 200, "Subscribed to plan successfully", updatedUser);
