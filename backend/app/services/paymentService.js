@@ -14,6 +14,7 @@ import {
   canTransitionPaymentStatus,
 } from "../constants/payment.js";
 import { handleOnlineOrderFinance } from "./finance/orderFinanceService.js";
+import { resolveSellerOrderEarning } from "./finance/pricingService.js";
 import { DEFAULT_SELLER_TIMEOUT_MS, WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
 import { afterPlaceOrderV2 } from "./orderWorkflowService.js";
 import { releaseReservedStockForOrder } from "./stockService.js";
@@ -238,15 +239,25 @@ function validatePaymentEligibility(target, userId) {
 }
 
 function getPayableAmountPaise(target) {
-  const amountRupees = target.orders.reduce(
+  const grossRupees = target.orders.reduce(
     (sum, order) =>
       sum + Number(order?.paymentBreakdown?.grandTotal ?? order?.pricing?.total ?? 0),
     0,
   );
-  if (!Number.isFinite(amountRupees) || amountRupees <= 0) {
+  const walletFromGroup = Number(target.checkoutGroup?.walletAmount || 0);
+  const walletFromOrders = target.orders.reduce(
+    (sum, order) => sum + Number(order?.pricing?.walletAmount || 0),
+    0,
+  );
+  const walletUsed = Math.max(walletFromGroup, walletFromOrders);
+  const amountRupees = Math.max(0, grossRupees - walletUsed);
+  if (!Number.isFinite(amountRupees) || amountRupees < 0) {
     const err = new Error("Unable to determine payable amount for this checkout");
     err.statusCode = 400;
     throw err;
+  }
+  if (amountRupees === 0) {
+    return 0;
   }
   return Math.round(amountRupees * 100);
 }
@@ -322,6 +333,49 @@ async function transitionPaymentState(payment, {
   return payment;
 }
 
+export async function finalizeWalletCoveredOnlineCheckout({
+  orders,
+  checkoutGroupId,
+  customerId,
+}) {
+  if (!Array.isArray(orders) || orders.length === 0) return;
+
+  const walletRef = `WLT-CHOUT-${checkoutGroupId}`;
+  for (const order of orders) {
+    await handleOnlineOrderFinance(order._id, {
+      actorId: null,
+      transactionId: walletRef,
+      metadata: {
+        checkoutGroupId,
+        paidVia: "wallet",
+      },
+    });
+    await moveOrderToSellerPendingAfterPayment(order._id);
+    emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_PLACED, {
+      orderId: order.orderId,
+      checkoutGroupId,
+      customerId,
+      userId: customerId,
+    });
+    emitNotificationEvent(NOTIFICATION_EVENTS.PAYMENT_SUCCESS, {
+      orderId: order.orderId,
+      checkoutGroupId,
+      customerId,
+      userId: customerId,
+      sellerId: order.seller,
+    });
+    if (order.seller) {
+      emitNotificationEvent(NOTIFICATION_EVENTS.NEW_ORDER, {
+        orderId: order.orderId,
+        checkoutGroupId,
+        sellerId: order.seller,
+        sellerEarning: resolveSellerOrderEarning(order),
+      });
+    }
+  }
+  await updateCheckoutGroupPaymentStatus(checkoutGroupId, PAYMENT_STATUS.CAPTURED);
+}
+
 async function moveOrderToSellerPendingAfterPayment(orderId) {
   const now = new Date();
   const sellerPendingUntil = new Date(now.getTime() + DEFAULT_SELLER_TIMEOUT_MS());
@@ -336,7 +390,6 @@ async function moveOrderToSellerPendingAfterPayment(orderId) {
       $set: {
         workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
         sellerPendingExpiresAt: sellerPendingUntil,
-        expiresAt: sellerPendingUntil,
       },
     },
     { new: true },
@@ -438,6 +491,7 @@ async function handleOrderSideEffectsFromPaymentStatus(payment, nextStatus, reas
       emitNotificationEvent(NOTIFICATION_EVENTS.NEW_ORDER, {
         orderId: order.orderId,
         sellerId: order.seller,
+        sellerEarning: resolveSellerOrderEarning(order),
       });
     }
     await updateCheckoutGroupPaymentStatus(payment.checkoutGroupId, nextStatus);
@@ -575,6 +629,11 @@ export async function createPaymentOrderForOrderRef({
   }
 
   const amountPaise = getPayableAmountPaise(target);
+  if (amountPaise === 0) {
+    const err = new Error("No online payment required for this order");
+    err.statusCode = 400;
+    throw err;
+  }
   const currency = String(primaryOrder?.paymentBreakdown?.currency || "INR").toUpperCase();
   const attemptCount = (await Payment.countDocuments(paymentScopeQuery)) + 1;
   const receipt = buildGatewayReceipt(

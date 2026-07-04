@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Search,
   Calendar,
@@ -23,6 +23,7 @@ const displayOrderStatus = (order) => {
 
 const OrderHistory = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
@@ -30,6 +31,16 @@ const OrderHistory = () => {
   const prevFilterRef = useRef(filter);
   const fetchSeqRef = useRef(0);
   const visibilityAbortRef = useRef(null);
+
+  const fetchOrders = useCallback(async (signal) => {
+    const response = await deliveryApi.getOrderHistory(
+      { status: filter },
+      { signal },
+    );
+    const list =
+      response.data?.results ?? response.data?.result ?? [];
+    setOrders(Array.isArray(list) ? list : []);
+  }, [filter]);
 
   useEffect(() => {
     visibilityAbortRef.current?.abort();
@@ -45,14 +56,7 @@ const OrderHistory = () => {
     setLoading(true);
     (async () => {
       try {
-        const response = await deliveryApi.getOrderHistory(
-          { status: filter },
-          { signal: abortController.signal },
-        );
-        if (runSeq !== fetchSeqRef.current) return;
-        const list =
-          response.data?.results ?? response.data?.result ?? [];
-        setOrders(Array.isArray(list) ? list : []);
+        await fetchOrders(abortController.signal);
       } catch (error) {
         if (
           error?.code === "ERR_CANCELED" ||
@@ -74,7 +78,7 @@ const OrderHistory = () => {
       abortController.abort();
       visibilityAbortRef.current?.abort();
     };
-  }, [filter]);
+  }, [filter, location.pathname, fetchOrders]);
 
   useEffect(() => {
     let sawHidden = false;

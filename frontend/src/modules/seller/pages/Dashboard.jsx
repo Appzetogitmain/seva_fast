@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { sellerApi } from "../services/sellerApi";
 import { toast } from "sonner";
 import { useSellerOrders } from "../context/SellerOrdersContext";
+import { getSellerOrderEarning, getSellerEarningBreakdown } from "@/shared/utils/sellerOrderEarning";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -238,7 +239,9 @@ const Dashboard = () => {
       },
       address: addressStr || "—",
       items,
-      total: Number(order.pricing?.total ?? 0),
+      total: getSellerOrderEarning(order),
+      sellerEarning: getSellerOrderEarning(order),
+      sellerEarningBreakdown: order.sellerEarningBreakdown || null,
       status: order.status || "pending",
       payment:
         order.payment?.method === "cash" || order.payment?.method === "cod"
@@ -485,7 +488,7 @@ const Dashboard = () => {
                   Date
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">
-                  Amount
+                  Your Earning
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-slate-600 uppercase tracking-wider">
                   Status
@@ -513,7 +516,7 @@ const Dashboard = () => {
                     <span className="text-sm text-slate-600">{new Date(order.createdAt).toLocaleDateString()}</span>
                   </td>
                   <td className="py-4 px-4 align-middle">
-                    <span className="text-sm font-semibold text-slate-900">₹{order.pricing?.total || 0}</span>
+                    <span className="text-sm font-semibold text-slate-900">₹{getSellerOrderEarning(order).toLocaleString('en-IN')}</span>
                   </td>
                   <td className="py-4 px-4 align-middle">
                     <Badge variant={getStatusColor(order.status)} className="capitalize">
@@ -664,34 +667,42 @@ const Dashboard = () => {
                   <div className="space-y-3 sm:space-y-4">
                     <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest mb-3">
-                        Order Summary
+                        Your Earning
                       </h4>
                       <div className="space-y-2">
-                        <div className="flex justify-between text-xs">
-                          <span className="font-bold text-slate-600">
-                            Subtotal
-                          </span>
-                          <span className="font-black text-slate-900">
-                            ₹{(selectedOrder.total - 10).toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="font-bold text-slate-600">
-                            Delivery Fee
-                          </span>
-                          <span className="font-black text-brand-600">
-                            ₹10.00
-                          </span>
-                        </div>
-                        <div className="h-px bg-primary/10 my-2" />
-                        <div className="flex justify-between text-sm">
-                          <span className="font-black text-slate-900">
-                            Total
-                          </span>
-                          <span className="font-black text-primary">
-                            ₹{selectedOrder.total.toFixed(2)}
-                          </span>
-                        </div>
+                        {(() => {
+                          const { productEarning, deliveryShare, total } =
+                            getSellerEarningBreakdown(selectedOrder);
+                          return (
+                            <>
+                              <div className="flex justify-between text-xs">
+                                <span className="font-bold text-slate-600">Product</span>
+                                <span className="font-black text-slate-900">
+                                  ₹{productEarning.toFixed(2)}
+                                </span>
+                              </div>
+                              {deliveryShare > 0 ? (
+                                <div className="flex justify-between text-xs">
+                                  <span className="font-bold text-slate-600">
+                                    Delivery (80%)
+                                  </span>
+                                  <span className="font-black text-brand-600">
+                                    ₹{deliveryShare.toFixed(2)}
+                                  </span>
+                                </div>
+                              ) : null}
+                              <div className="h-px bg-primary/10 my-2" />
+                              <div className="flex justify-between text-sm">
+                                <span className="font-black text-slate-900">
+                                  Your Earning
+                                </span>
+                                <span className="font-black text-primary">
+                                  ₹{total.toFixed(2)}
+                                </span>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="bg-slate-900 p-3 sm:p-4 rounded-3xl text-white shadow-xl shadow-slate-900/10">

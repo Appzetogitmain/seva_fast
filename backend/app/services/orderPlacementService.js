@@ -8,6 +8,7 @@ import Coupon from "../models/coupon.js";
 import { WORKFLOW_STATUS, DEFAULT_SELLER_TIMEOUT_MS } from "../constants/orderWorkflow.js";
 import { ORDER_PAYMENT_STATUS } from "../constants/finance.js";
 import { freezeFinancialSnapshot } from "./finance/orderFinanceService.js";
+import { resolveSellerOrderEarning } from "./finance/pricingService.js";
 import {
   generateUniqueCheckoutGroupId,
   generateUniquePublicOrderId,
@@ -17,6 +18,7 @@ import {
   computeStockReservationWindow,
   reserveStockForItems,
 } from "./stockService.js";
+import { finalizeWalletCoveredOnlineCheckout } from "./paymentService.js";
 import { isLowStockAlertsEnabled } from "./lowStockAlertService.js";
 import {
   checkIdempotency,
@@ -37,6 +39,48 @@ const IDEMPOTENCY_RECORD_TTL_MS = 24 * 60 * 60 * 1000;
 function normalizePaymentMode(raw) {
   const mode = String(raw || "COD").trim().toUpperCase();
   return mode === "ONLINE" ? "ONLINE" : "COD";
+}
+
+function toObjectId(value, fieldName) {
+  if (value == null || value === "") {
+    const err = new Error(`${fieldName} is required for transaction`);
+    err.statusCode = 500;
+    throw err;
+  }
+  if (value instanceof mongoose.Types.ObjectId) return value;
+  if (typeof value === "object" && value._id != null) {
+    return new mongoose.Types.ObjectId(String(value._id));
+  }
+  return new mongoose.Types.ObjectId(String(value));
+}
+
+async function persistTransaction(record, session) {
+  const reference = String(record.reference || "").trim();
+  if (!reference) {
+    const err = new Error("Transaction reference is required");
+    err.statusCode = 500;
+    throw err;
+  }
+
+  const amount = Number(record.amount);
+  if (!Number.isFinite(amount)) {
+    const err = new Error("Transaction amount must be a valid number");
+    err.statusCode = 500;
+    throw err;
+  }
+
+  const doc = new Transaction({
+    user: toObjectId(record.user, "user"),
+    userModel: record.userModel,
+    type: record.type,
+    amount,
+    status: record.status || "Pending",
+    reference,
+    order: record.order || undefined,
+    meta: record.meta || undefined,
+  });
+  await doc.save({ session });
+  return doc;
 }
 
 function normalizeAddress(address = {}) {
@@ -289,6 +333,15 @@ export async function placeOrderAtomic({
     const source = placementSource(normalizedPayload);
     const walletAmount = Math.max(0, Number(normalizedPayload.walletAmount || 0));
     const tipAmount = Math.max(0, Number(normalizedPayload.tipAmount || 0));
+    const couponId = normalizedPayload.couponId || null;
+    let couponCode = null;
+    if (couponId) {
+      const couponDoc = await Coupon.findById(couponId)
+        .session(session)
+        .select("code")
+        .lean();
+      couponCode = couponDoc?.code || null;
+    }
 
     // 1. Fetch user and validate wallet
     const user = await User.findById(customerId).populate("currentPlan").session(session);
@@ -402,7 +455,9 @@ export async function placeOrderAtomic({
       const sellerPendingUntil = shouldStartSellerWorkflow
         ? new Date(Date.now() + sellerTimeoutMs)
         : null;
-      const orderExpiresAt = orderReservation.expiresAt || sellerPendingUntil || null;
+      // Top-level expiresAt is for unpaid ONLINE reservation TTL only — never mirror sellerPendingUntil
+      // or MongoDB TTL can delete the order when the seller does not accept in time.
+      const orderExpiresAt = orderReservation.expiresAt || null;
 
       const sellerLowStockAlerts = await reserveStockForItems({
         items: entry.items,
@@ -424,6 +479,8 @@ export async function placeOrderAtomic({
         orderId,
         customer: customerId,
         seller: entry.sellerId,
+        couponId: couponId || undefined,
+        couponCode: couponCode || undefined,
         items: mapOrderItemsForPersistence(entry.items),
         address: normalizedAddress,
         paymentMode,
@@ -490,34 +547,40 @@ export async function placeOrderAtomic({
 
     // Deduct wallet balance if used
     if (walletAmount > 0) {
+      if (!user) throw new Error("User not found");
       user.walletBalance -= walletAmount;
       await user.save({ session });
 
-      await Transaction.create({
-        user: customerId,
-        userModel: "User",
-        type: "Wallet Payment",
-        amount: -walletAmount,
-        status: "Settled",
-        reference: `WLT-CHOUT-${checkoutGroupId}`,
-        meta: { checkoutGroupId }
-      }, { session });
+      await persistTransaction(
+        {
+          user: user._id,
+          userModel: "User",
+          type: "Wallet Payment",
+          amount: -Number(walletAmount.toFixed(2)),
+          status: "Settled",
+          reference: `WLT-CHOUT-${checkoutGroupId}`,
+          meta: { checkoutGroupId },
+        },
+        session,
+      );
     }
 
-    const transactionRows = orders.map((order) => ({
-      user: order.seller,
-      userModel: "Seller",
-      order: order._id,
-      type: "Order Payment",
-      amount: Number(order.paymentBreakdown?.grandTotal || order.pricing?.total || 0),
-      status: "Pending",
-      reference: order.orderId,
-      meta: {
-        checkoutGroupId,
-      },
-    }));
-    if (transactionRows.length > 0) {
-      await Transaction.create(transactionRows, { session, ordered: true });
+    for (const order of orders) {
+      await persistTransaction(
+        {
+          user: order.seller,
+          userModel: "Seller",
+          order: order._id,
+          type: "Order Payment",
+          amount: Number(
+            order.paymentBreakdown?.grandTotal || order.pricing?.total || 0,
+          ),
+          status: "Pending",
+          reference: order.orderId,
+          meta: { checkoutGroupId },
+        },
+        session,
+      );
     }
 
     await consumeCartItems({
@@ -530,8 +593,25 @@ export async function placeOrderAtomic({
 
     await session.commitTransaction();
 
+    const grandTotal = Number(pricingSnapshot.aggregateBreakdown?.grandTotal || 0);
+    const walletCoversTotal =
+      walletAmount > 0 &&
+      Number(walletAmount.toFixed(2)) >= Number(grandTotal.toFixed(2));
+
+    if (paymentMode === "ONLINE" && walletCoversTotal) {
+      void finalizeWalletCoveredOnlineCheckout({
+        orders,
+        checkoutGroupId,
+        customerId,
+      }).catch((error) => {
+        logger.warn("[placeOrderAtomic] wallet checkout finalization failed", {
+          checkoutGroupId,
+          message: error.message,
+        });
+      });
+    }
+
     // Increment coupon usedCount after successful order placement (outside transaction — best effort)
-    const couponId = normalizedPayload.couponId;
     if (couponId) {
       Coupon.findByIdAndUpdate(couponId, { $inc: { usedCount: 1 } }).catch(() => {});
     }
@@ -570,6 +650,7 @@ export async function placeOrderAtomic({
             checkoutGroupId,
             sellerId: order.seller,
             customerId,
+            sellerEarning: resolveSellerOrderEarning(order),
           });
         }
       }

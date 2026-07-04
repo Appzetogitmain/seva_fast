@@ -4,6 +4,7 @@ import {
   settleDeliveredOrder,
 } from "./finance/orderFinanceService.js";
 import { processOrderLevelCommissions } from "./finance/commissionService.js";
+import { resolveSellerOrderEarning } from "./finance/pricingService.js";
 
 /**
  * Financial side effects when order becomes delivered (mirrors orderController).
@@ -20,10 +21,32 @@ export async function applyDeliveredSettlement(order, orderIdString) {
   }
 
   // Legacy transaction compatibility for existing seller/rider dashboards.
-  await Transaction.findOneAndUpdate(
-    { reference: orderIdString, userModel: "Seller" },
-    { status: "Settled" },
-  );
+  const sellerEarning = Math.round(resolveSellerOrderEarning(settled));
+  if (settled.seller && sellerEarning > 0) {
+    await Transaction.findOneAndUpdate(
+      { reference: orderIdString, userModel: "Seller" },
+      {
+        $set: {
+          amount: sellerEarning,
+          status: "Settled",
+          type: "Order Payment",
+        },
+        $setOnInsert: {
+          user: settled.seller,
+          userModel: "Seller",
+          order: settled._id,
+          type: "Order Payment",
+          reference: orderIdString,
+        },
+      },
+      { upsert: true, new: true },
+    );
+  } else {
+    await Transaction.findOneAndUpdate(
+      { reference: orderIdString, userModel: "Seller" },
+      { status: "Settled" },
+    );
+  }
 
   if (settled.deliveryBoy) {
     const deliveryEarning = Math.round(settled.paymentBreakdown?.riderPayoutTotal || 0);
@@ -71,12 +94,28 @@ export async function applyDeliveredSettlement(order, orderIdString) {
     }
   }
 
-  // Credit cashback to customer wallet if applicable
-  const estimatedCashback = settled.paymentBreakdown?.estimatedCashback || 0;
+  // Credit plan cashback to customer wallet (subscription required)
+  let estimatedCashback = Number(settled.paymentBreakdown?.estimatedCashback || 0);
   if (estimatedCashback > 0 && settled.customer && !settled.financeFlags?.cashbackCredited) {
     const User = (await import("../models/customer.js")).default;
-    const user = await User.findById(settled.customer);
-    if (user) {
+    const user = await User.findById(settled.customer).populate("currentPlan");
+    const hasActivePlan =
+      user?.currentPlan &&
+      user.planExpiry &&
+      new Date(user.planExpiry) > new Date();
+    const cashbackFeature = user?.currentPlan?.features?.find(
+      (feature) => feature.key === "CASHBACK",
+    );
+    const planCashbackPct =
+      hasActivePlan && cashbackFeature?.value
+        ? parseFloat(cashbackFeature.value) || 0
+        : 0;
+
+    if (!hasActivePlan || planCashbackPct <= 0) {
+      estimatedCashback = 0;
+    }
+
+    if (estimatedCashback > 0 && user) {
       user.walletBalance = (user.walletBalance || 0) + estimatedCashback;
       await user.save();
       

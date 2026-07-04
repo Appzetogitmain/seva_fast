@@ -1208,6 +1208,41 @@ const OrderDetailPage = () => {
                   : `₹${order.pricing.deliveryFee}`}
               </span>
             </div>
+            {(order.pricing.platformFee ?? order.paymentBreakdown?.handlingFeeCharged) > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Handling Fee</span>
+                <span className="font-semibold">
+                  ₹{order.pricing.platformFee ?? order.paymentBreakdown?.handlingFeeCharged}
+                </span>
+              </div>
+            )}
+            {(order.pricing.gst ?? order.paymentBreakdown?.taxTotal) > 0 && (
+              <div className="flex justify-between text-slate-600">
+                <span>Tax (GST)</span>
+                <span className="font-semibold">
+                  ₹{order.pricing.gst ?? order.paymentBreakdown?.taxTotal}
+                </span>
+              </div>
+            )}
+            {(order.pricing.discount ?? order.paymentBreakdown?.discountTotal) > 0 && (
+              <div className="flex justify-between text-emerald-600">
+                <span>
+                  Discount
+                  {order.couponCode ? ` (${order.couponCode})` : ""}
+                </span>
+                <span className="font-semibold">
+                  -₹{order.pricing.discount ?? order.paymentBreakdown?.discountTotal}
+                </span>
+              </div>
+            )}
+            {(order.pricing.walletAmount ?? order.paymentBreakdown?.walletAmount) > 0 && (
+              <div className="flex justify-between text-emerald-600">
+                <span>Wallet Applied</span>
+                <span className="font-semibold">
+                  -₹{order.pricing.walletAmount ?? order.paymentBreakdown?.walletAmount}
+                </span>
+              </div>
+            )}
             {order.pricing.tip > 0 && (
               <div className="flex justify-between text-slate-600">
                 <span>Tip</span>
@@ -1235,9 +1270,15 @@ const OrderDetailPage = () => {
                   Payment
                 </p>
                 <p className="text-sm font-bold text-slate-900">
-                  {order.payment.method === "cash"
-                    ? "Cash on Delivery"
-                    : order.payment.method}
+                  {(() => {
+                    const method = String(
+                      order.paymentMode || order.payment?.method || "",
+                    ).toLowerCase();
+                    if (method === "cod" || method === "cash") return "Cash on Delivery";
+                    if (method === "online") return "Paid Online";
+                    if (method === "wallet") return "Wallet";
+                    return order.payment?.method || "—";
+                  })()}
                 </p>
               </div>
             </div>

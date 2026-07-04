@@ -118,6 +118,10 @@ const DeliveryAuth = () => {
         if (!signupName.trim()) { toast.error("Please enter your name"); return; }
         if (!signupPhone || signupPhone.length < 10) { toast.error("Please enter a valid 10-digit phone number"); return; }
         if (!profileImageFile) { toast.error("Please upload your profile photo"); return; }
+        if (!signupSellerCode.trim()) {
+          toast.error("Please enter seller invite code");
+          return;
+        }
 
         const formData = new FormData();
         formData.append("name", signupName.trim());
@@ -130,9 +134,7 @@ const DeliveryAuth = () => {
         formData.append("accountHolder", signupAccountHolder);
         formData.append("accountNumber", signupAccountNumber);
         formData.append("ifsc", signupIfsc);
-        if (signupSellerCode && signupSellerCode.trim()) {
-          formData.append("sellerCode", signupSellerCode.trim().toUpperCase());
-        }
+        formData.append("sellerCode", signupSellerCode.trim().toUpperCase());
 
         if (profileImageFile) formData.append("profileImage", profileImageFile);
         if (aadharFile) formData.append("aadhar", aadharFile);
@@ -459,7 +461,9 @@ const DeliveryAuth = () => {
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Seller Invite Code (Optional)</label>
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">
+                              Seller Invite Code <span className="text-red-500">*</span>
+                            </label>
                             <div className="relative">
                               <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
                               <input
@@ -468,14 +472,15 @@ const DeliveryAuth = () => {
                                 onChange={(e) => setSignupSellerCode(e.target.value.toUpperCase())}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                                 placeholder="E.G. SV-XXXXXX"
+                                required
                               />
                             </div>
                           </div>
 
                           <button
                             onClick={() => {
-                              if (!signupName || !signupPhone || !signupEmail || !signupAddress || !profileImageFile) {
-                                toast.error("Please fill all personal information fields and upload photo");
+                              if (!signupName || !signupPhone || !signupEmail || !signupAddress || !profileImageFile || !signupSellerCode.trim()) {
+                                toast.error("Please fill all personal information fields, upload photo, and enter seller invite code");
                                 return;
                               }
                               if (signupPhone.length !== 10) {

@@ -97,6 +97,15 @@ const orderSchema = new mongoose.Schema(
         default: 0,
       },
     },
+    couponId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      default: null,
+    },
+    couponCode: {
+      type: String,
+      default: null,
+    },
     paymentMode: {
       type: String,
       enum: ALL_PAYMENT_MODES,

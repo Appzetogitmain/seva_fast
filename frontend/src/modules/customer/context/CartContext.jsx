@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useRef 
 import { customerApi } from "../services/customerApi";
 import { useAuth } from "../../../core/context/AuthContext";
 import {
-  effectiveUnitPrice,
+  cartItemUnitPrice,
   resolveVariantPricing as getVariantPricing,
 } from "../utils/productPricing";
 
@@ -249,8 +249,7 @@ export const CartProvider = ({ children }) => {
   };
 
   const cartTotal = cart.reduce((total, item) => {
-    const unit = effectiveUnitPrice(item.price, item.salePrice);
-    return total + unit * Number(item.quantity || 0);
+    return total + cartItemUnitPrice(item) * Number(item.quantity || 0);
   }, 0);
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
 

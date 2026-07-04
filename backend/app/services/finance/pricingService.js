@@ -33,6 +33,30 @@ export function splitDeliveryFee(deliveryFeeCharged = 0) {
   };
 }
 
+export function resolveSellerOrderEarning(order) {
+  if (!order) return 0;
+
+  const fromBreakdown = Number(order.paymentBreakdown?.sellerPayoutTotal);
+  if (Number.isFinite(fromBreakdown) && fromBreakdown >= 0) {
+    return roundCurrency(fromBreakdown);
+  }
+
+  const subtotal = Number(
+    order.pricing?.subtotal ?? order.paymentBreakdown?.productSubtotal ?? 0,
+  );
+  const commission = Number(
+    order.paymentBreakdown?.adminProductCommissionTotal ?? 0,
+  );
+  const deliveryFee = Number(
+    order.pricing?.deliveryFee ?? order.paymentBreakdown?.deliveryFeeCharged ?? 0,
+  );
+  const { sellerDeliveryFeeShare } = splitDeliveryFee(deliveryFee);
+
+  return roundCurrency(
+    Math.max(subtotal - commission, 0) + sellerDeliveryFeeShare,
+  );
+}
+
 export function recalculateLogisticsEarnings({
   deliveryFeeCharged = 0,
   handlingFeeCharged = 0,
@@ -765,7 +789,7 @@ export async function generateOrderPaymentBreakdown({
     codCollectedAmount: 0,
     codRemittedAmount: 0,
     codPendingAmount: 0,
-    estimatedCashback: commissionBreakdown.siteCashbackAmount, // cashback is paid by admin
+    estimatedCashback: 0,
     distanceKmActual: delivery.distanceKmActual,
     distanceKmRounded: delivery.distanceKmRounded,
     snapshots,

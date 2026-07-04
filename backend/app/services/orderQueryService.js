@@ -3,6 +3,8 @@ import Delivery from "../models/delivery.js";
 import Seller from "../models/seller.js";
 import { WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
 import { distanceMeters } from "../utils/geoUtils.js";
+import { resolveSellerOrderEarning } from "./finance/pricingService.js";
+import { sanitizeOrdersForSellerView } from "../utils/sellerOrderView.js";
 
 function normalizeSellerStatusFilter(statusParam) {
   if (!statusParam || statusParam === "all") {
@@ -109,7 +111,39 @@ export async function fetchSellerOrdersPage({
         $group: {
           _id: null,
           totalOrders: { $sum: 1 },
-          totalAmount: { $sum: { $ifNull: ["$pricing.total", 0] } },
+          totalAmount: {
+            $sum: {
+              $let: {
+                vars: {
+                  breakdown: { $ifNull: ["$paymentBreakdown.sellerPayoutTotal", 0] },
+                  subtotal: { $ifNull: ["$pricing.subtotal", 0] },
+                  commission: {
+                    $ifNull: ["$paymentBreakdown.adminProductCommissionTotal", 0],
+                  },
+                  deliveryFee: {
+                    $ifNull: [
+                      "$pricing.deliveryFee",
+                      { $ifNull: ["$paymentBreakdown.deliveryFeeCharged", 0] },
+                    ],
+                  },
+                },
+                in: {
+                  $cond: [
+                    { $gt: ["$$breakdown", 0] },
+                    "$$breakdown",
+                    {
+                      $add: [
+                        {
+                          $max: [{ $subtract: ["$$subtotal", "$$commission"] }, 0],
+                        },
+                        { $multiply: ["$$deliveryFee", 0.8] },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+          },
           pending: {
             $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
           },
@@ -168,7 +202,18 @@ export async function fetchSellerOrdersPage({
 
   return {
     query,
-    orders,
+    orders:
+      role === "seller"
+        ? sanitizeOrdersForSellerView(
+            orders.map((order) => ({
+              ...order,
+              sellerEarning: resolveSellerOrderEarning(order),
+            })),
+          )
+        : orders.map((order) => ({
+            ...order,
+            sellerEarning: resolveSellerOrderEarning(order),
+          })),
     total,
     summary,
   };

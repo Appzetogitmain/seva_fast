@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import SellerOrdersContext from '@/modules/seller/context/SellerOrdersContext';
 import SellerEarningsContext, { defaultEarnings } from '@/modules/seller/context/SellerEarningsContext';
 import { getOrderSocket, onSellerOrderNew, onReturnDropOtp, onOrderStatusUpdate } from '@/core/services/orderSocket';
+import { getSellerOrderEarning } from '@/shared/utils/sellerOrderEarning';
 import orderAlertSound from '@/assets/sounds/order_alert.mp3';
 
 const POLL_INTERVAL_MS = 15000;
@@ -451,7 +452,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
 
                                 <h2 className="text-2xl font-black text-slate-900 mb-2">New Order Received!</h2>
                                 <p className="text-slate-600 font-medium mb-6">
-                                    You have a new order <span className="text-primary font-bold">#{newOrderAlert.orderId}</span> for <span className="text-slate-900 font-bold">₹{newOrderAlert.pricing?.total || newOrderAlert.total}</span>
+                                    You have a new order <span className="text-primary font-bold">#{newOrderAlert.orderId}</span> — your earning <span className="text-slate-900 font-bold">₹{getSellerOrderEarning(newOrderAlert).toLocaleString('en-IN')}</span>
                                 </p>
 
                                 {/* Timer Bar — width from real server deadline */}

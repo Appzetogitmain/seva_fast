@@ -4,6 +4,11 @@ import Product from "../models/product.js";
 import handleResponse from "../utils/helper.js";
 import mongoose from "mongoose";
 import Wallet from "../models/wallet.js";
+import {
+  sellerDeliveredOrderMatch,
+  sellerOrderEarningAmount,
+  sellerOrderRevenueAmount,
+} from "../utils/sellerRevenue.js";
 
 /* ===============================
    GET SELLER DASHBOARD STATS
@@ -37,52 +42,59 @@ export const getSellerStats = async (req, res) => {
         // Single aggregation pipeline with $facet — replaces 5 separate DB queries
         const [statsResult] = await Order.aggregate([
             {
-                $match: {
-                    seller: sellerOid,
-                    status: { $ne: 'cancelled' },
-                }
+                $match: sellerDeliveredOrderMatch(sellerOid),
+            },
+            {
+                $addFields: {
+                    revenueDate: {
+                        $ifNull: [
+                            "$deliveredAt",
+                            { $ifNull: ["$updatedAt", "$createdAt"] },
+                        ],
+                    },
+                },
             },
             {
                 $facet: {
-                    // Overview totals (replaces Order.find + in-memory reduce)
+                    // Overview totals — delivered orders only
                     overview: [
                         {
                             $group: {
                                 _id: null,
-                                totalSales: { $sum: { $ifNull: ["$pricing.total", 0] } },
+                                totalSales: { $sum: sellerOrderRevenueAmount() },
                                 totalOrders: { $sum: 1 },
                             }
                         }
                     ],
-                    // Current week stats (replaces Order.find with date filter)
+                    // Current week stats (by delivery date)
                     currentWeek: [
-                        { $match: { createdAt: { $gte: sevenDaysAgo } } },
+                        { $match: { revenueDate: { $gte: sevenDaysAgo } } },
                         {
                             $group: {
                                 _id: null,
-                                sales: { $sum: { $ifNull: ["$pricing.total", 0] } },
+                                sales: { $sum: sellerOrderRevenueAmount() },
                                 count: { $sum: 1 },
                             }
                         }
                     ],
-                    // Previous week stats (replaces second Order.find)
+                    // Previous week stats
                     prevWeek: [
-                        { $match: { createdAt: { $gte: fourteenDaysAgo, $lt: sevenDaysAgo } } },
+                        { $match: { revenueDate: { $gte: fourteenDaysAgo, $lt: sevenDaysAgo } } },
                         {
                             $group: {
                                 _id: null,
-                                sales: { $sum: { $ifNull: ["$pricing.total", 0] } },
+                                sales: { $sum: sellerOrderRevenueAmount() },
                                 count: { $sum: 1 },
                             }
                         }
                     ],
                     // Sales trend chart data
                     salesTrend: [
-                        { $match: { createdAt: { $gte: trendStartDate } } },
+                        { $match: { revenueDate: { $gte: trendStartDate } } },
                         {
                             $group: {
-                                _id: { $dateToString: { format: aggregationFormat, date: "$createdAt" } },
-                                sales: { $sum: { $ifNull: ["$pricing.total", 0] } },
+                                _id: { $dateToString: { format: aggregationFormat, date: "$revenueDate" } },
+                                sales: { $sum: sellerOrderRevenueAmount() },
                                 orders: { $sum: 1 }
                             }
                         },
@@ -102,7 +114,7 @@ export const getSellerStats = async (req, res) => {
                     ],
                     // Top products with trends (current + prev week via sub-facet)
                     topProductsCurrent: [
-                        { $match: { createdAt: { $gte: sevenDaysAgo } } },
+                        { $match: { revenueDate: { $gte: sevenDaysAgo } } },
                         { $unwind: "$items" },
                         {
                             $group: {
@@ -116,7 +128,7 @@ export const getSellerStats = async (req, res) => {
                         { $limit: 10 }
                     ],
                     topProductsPrev: [
-                        { $match: { createdAt: { $gte: fourteenDaysAgo, $lt: sevenDaysAgo } } },
+                        { $match: { revenueDate: { $gte: fourteenDaysAgo, $lt: sevenDaysAgo } } },
                         { $unwind: "$items" },
                         {
                             $group: {
@@ -318,19 +330,15 @@ export const getSellerEarnings = async (req, res) => {
         const onHoldBalance = wallet ? wallet.pendingBalance : 0;
         const liveAvailableBalance = wallet ? wallet.availableBalance : settledBalance;
 
-        // Keep "Total Revenue" aligned with Dashboard definition:
-        // sum of non-cancelled seller orders from Order collection.
+        // Total revenue = sum of delivered order amounts only
         const [orderRevenueAgg] = await Order.aggregate([
             {
-                $match: {
-                    seller: sellerOid,
-                    status: { $ne: 'cancelled' },
-                },
+                $match: sellerDeliveredOrderMatch(sellerOid),
             },
             {
                 $group: {
                     _id: null,
-                    totalRevenue: { $sum: { $ifNull: ["$pricing.total", 0] } },
+                    totalRevenue: { $sum: sellerOrderRevenueAmount() },
                 },
             },
         ]);
@@ -344,20 +352,18 @@ export const getSellerEarnings = async (req, res) => {
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-        const monthlyAggregation = await Transaction.aggregate([
+        const monthlyAggregation = await Order.aggregate([
             {
                 $match: {
-                    user: new mongoose.Types.ObjectId(sellerId),
-                    userModel: 'Seller',
-                    type: 'Order Payment',
-                    createdAt: { $gte: sixMonthsAgo }
-                }
+                    ...sellerDeliveredOrderMatch(sellerOid),
+                    deliveredAt: { $gte: sixMonthsAgo },
+                },
             },
             {
                 $group: {
-                    _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
-                    revenue: { $sum: "$amount" }
-                }
+                    _id: { $dateToString: { format: "%Y-%m", date: "$deliveredAt" } },
+                    revenue: { $sum: sellerOrderEarningAmount() },
+                },
             },
             { $sort: { _id: 1 } }
         ]);

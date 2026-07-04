@@ -70,16 +70,19 @@ export const signupDelivery = async (req, res) => {
             return handleResponse(res, 400, "Name and phone are required");
         }
 
-        let sellerId = null;
-        if (sellerCode && sellerCode.trim()) {
-            const seller = await mongoose.model("Seller").findOne({
-                sellerCode: sellerCode.trim().toUpperCase()
-            });
-            if (!seller) {
-                return handleResponse(res, 400, "Invalid Seller Code");
-            }
-            sellerId = seller._id;
+        const normalizedSellerCode = String(sellerCode || "").trim().toUpperCase();
+        if (!normalizedSellerCode) {
+            return handleResponse(res, 400, "Seller invite code is required");
         }
+
+        let sellerId = null;
+        const seller = await mongoose.model("Seller").findOne({
+            sellerCode: normalizedSellerCode,
+        });
+        if (!seller) {
+            return handleResponse(res, 400, "Invalid seller invite code");
+        }
+        sellerId = seller._id;
 
         let delivery = await findDeliveryByPhone(phone);
 

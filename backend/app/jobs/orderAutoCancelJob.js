@@ -94,6 +94,7 @@ const autoCancelExpiredOrders = async () => {
               cancelledBy: "system",
               cancelReason: "Payment timeout",
             },
+            $unset: { expiresAt: 1 },
           },
           { new: true },
         );
@@ -127,30 +128,39 @@ const autoCancelExpiredOrders = async () => {
     });
 
     for (const order of legacyExpired) {
-      order.status = "cancelled";
-      order.cancelledBy = "system";
-      order.cancelReason = "Seller timeout (60s)";
-      await order.save();
+      const updated = await Order.findOneAndUpdate(
+        { _id: order._id, status: "pending" },
+        {
+          $set: {
+            status: "cancelled",
+            cancelledBy: "system",
+            cancelReason: "Seller timeout (60s)",
+          },
+          $unset: { expiresAt: 1 },
+        },
+        { new: true },
+      );
+      if (!updated) continue;
 
       try {
-        await compensateOrderCancellation(order, order.orderId);
+        await compensateOrderCancellation(updated, updated.orderId);
       } catch (e) {
         logger.error('legacy compensation failed', {
           jobName: 'orderAutoCancelJob',
-          orderId: order.orderId,
+          orderId: updated.orderId,
           error: e.message
         });
       }
 
       emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
-        orderId: order.orderId,
-        customerId: order.customer,
-        userId: order.customer,
-        sellerId: order.seller,
+        orderId: updated.orderId,
+        customerId: updated.customer,
+        userId: updated.customer,
+        sellerId: updated.seller,
         customerMessage:
           "Your order was cancelled because it was not accepted in time.",
         sellerMessage:
-          `Order #${order.orderId} was cancelled because it was not accepted in time.`,
+          `Order #${updated.orderId} was cancelled because it was not accepted in time.`,
       });
     }
 

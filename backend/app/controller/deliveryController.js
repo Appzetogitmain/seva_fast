@@ -12,6 +12,7 @@ import { getRedisClient } from "../config/redis.js";
 import { distanceMeters } from "../utils/geoUtils.js";
 import { applyDeliveredSettlement } from "../services/orderSettlement.js";
 import { roundCurrency } from "../utils/money.js";
+import { sanitizeOrdersForDeliveryView } from "../utils/deliveryOrderView.js";
 
 const LOC_MIN_INTERVAL_MS = () =>
   parseInt(process.env.LOCATION_MIN_INTERVAL_MS || "3000", 10);
@@ -491,7 +492,7 @@ export const getMyDeliveryOrders = async (req, res) => {
             .populate("customer", "name phone")
             .lean();
 
-        return handleResponse(res, 200, "Delivery orders fetched", orders);
+        return handleResponse(res, 200, "Delivery orders fetched", sanitizeOrdersForDeliveryView(orders));
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }

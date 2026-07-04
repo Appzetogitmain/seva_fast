@@ -40,6 +40,8 @@ import {
   orderMatchQueryFromRouteParam,
   orderMatchQueryFlexible,
 } from "../utils/orderLookup.js";
+import { sanitizeOrderForDeliveryView, sanitizeOrdersForDeliveryView } from "../utils/deliveryOrderView.js";
+import { sanitizeOrderForSellerView } from "../utils/sellerOrderView.js";
 import { createFinanceOrderSchema } from "../validation/financeValidation.js";
 import { placeOrderAtomic } from "../services/orderPlacementService.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
@@ -217,6 +219,9 @@ export const placeOrder = async (req, res) => {
         "COD",
       timeSlot: timeSlot || "now",
       tipAmount: Number(req.body?.tipAmount || 0),
+      walletAmount: Number(req.body?.walletAmount || 0),
+      discountTotal: Number(req.body?.discountTotal || 0),
+      couponId: req.body?.couponId || null,
     });
 
     const idempotencyKey = String(req.headers?.["idempotency-key"] || "").trim() || null;
@@ -544,6 +549,14 @@ export const getOrderDetails = async (req, res) => {
         order.deliveryOtp = otpDoc.code;
         order.deliveryOtpExpiresAt = otpDoc.expiresAt;
       }
+    }
+
+    if (roleNorm === "delivery") {
+      order = sanitizeOrderForDeliveryView(order);
+    }
+
+    if (isOwnerSeller) {
+      order = sanitizeOrderForSellerView(order);
     }
 
     return handleResponse(res, 200, "Order details fetched", order);
@@ -1973,7 +1986,7 @@ export const getAvailableOrders = async (req, res) => {
       res,
       200,
       orders.length > 0 ? "Available orders fetched" : "No orders found",
-      orders,
+      sanitizeOrdersForDeliveryView(orders),
     );
   } catch (error) {
     return handleResponse(res, 500, error.message);

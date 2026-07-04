@@ -17,6 +17,7 @@ import {
   resolveDisplayedProductPrice,
   variantIdentityKey,
   variantsMatch,
+  pickListingVariant,
 } from '../../utils/productPricing';
 
 const ProductDetailSheet = () => {
@@ -67,8 +68,19 @@ const ProductDetailSheet = () => {
 
     // Update variant when product changes
     useEffect(() => {
-        if (selectedProduct && selectedProduct.variants && selectedProduct.variants.length > 0) {
-            setSelectedVariant(selectedProduct.variants[0]);
+        if (selectedProduct?.variants?.length > 0) {
+            const listingSku = String(selectedProduct.listingVariantSku || "").trim();
+            const listingVariant = listingSku
+              ? selectedProduct.variants.find(
+                  (variant) => variantIdentityKey(variant) === listingSku,
+                )
+              : null;
+
+            setSelectedVariant(
+              listingVariant ||
+                pickListingVariant(selectedProduct)?.variant ||
+                selectedProduct.variants[0],
+            );
         } else {
             setSelectedVariant(null);
         }
@@ -1112,7 +1124,7 @@ const ProductDetailSheet = () => {
                                                 <span className="text-[11px] font-bold opacity-90 mt-1">{cartCount} {cartCount === 1 ? 'item' : 'items'} in cart</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className="text-[16px] font-[1000] tracking-tight">₹{cart.reduce((total, item) => total + (item.price * item.quantity), 0)}</span>
+                                                <span className="text-[16px] font-[1000] tracking-tight">₹{cart.reduce((total, item) => total + (effectiveUnitPrice(item.price, item.salePrice) * Number(item.quantity || 0)), 0)}</span>
                                                 <ChevronRight size={18} strokeWidth={4} />
                                             </div>
                                         </Link>

@@ -151,7 +151,6 @@ const CheckoutPage = () => {
   // State management
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("now");
   const [selectedPayment, setSelectedPayment] = useState("cash");
-  const [selectedTip, setSelectedTip] = useState(0);
   const [showAllCartItems, setShowAllCartItems] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [selectedCoupon, setSelectedCoupon] = useState(null);
@@ -214,13 +213,6 @@ const CheckoutPage = () => {
             sublabel: "Pay after delivery",
           },
         ]),
-  ];
-
-  const tipAmounts = [
-    { value: 0, label: "No Tip" },
-    { value: 10, label: "Rs.10" },
-    { value: 20, label: "Rs.20" },
-    { value: 30, label: "Rs.30" },
   ];
 
   const discountAmount = selectedCoupon
@@ -764,7 +756,7 @@ const CheckoutPage = () => {
       address: buildAddressForOrder(),
       discountTotal: discountAmount,
       taxTotal: 0,
-      tipAmount: selectedTip,
+      tipAmount: 0,
       paymentMode: selectedPayment === "online" ? "ONLINE" : "COD",
       timeSlot: selectedTimeSlot,
     });
@@ -791,7 +783,6 @@ const CheckoutPage = () => {
     isAuthenticated,
     cart,
     selectedPayment,
-    selectedTip,
     selectedTimeSlot,
     discountAmount,
     savedRecipient,
@@ -842,8 +833,9 @@ const CheckoutPage = () => {
         address: buildAddressForOrder(),
         paymentMode: selectedPayment === "online" ? "ONLINE" : "COD",
         discountTotal: discountAmount,
+        couponId: selectedCoupon?.couponId || selectedCoupon?._id || null,
         taxTotal: taxAmount,
-        tipAmount: selectedTip,
+        tipAmount: 0,
         timeSlot: selectedTimeSlot,
         walletAmount: walletAmountToUse,
         items: cart.map((item) => ({
@@ -877,7 +869,7 @@ const CheckoutPage = () => {
           return;
         }
 
-        if (selectedPayment === "online") {
+        if (selectedPayment === "online" && finalAmountToPay > 0) {
           try {
             const paymentRes = await customerApi.createPaymentOrder({
               orderRef: paymentRef,
@@ -966,6 +958,23 @@ const CheckoutPage = () => {
             );
             return;
           }
+        }
+
+        if (selectedPayment === "online" && finalAmountToPay === 0) {
+          clearCart();
+          showToast("Order placed — paid from wallet.", "success");
+          setOrderId(mainOrderId);
+          setShowSuccess(true);
+
+          if (postOrderNavigateRef.current) {
+            clearTimeout(postOrderNavigateRef.current);
+          }
+          postOrderNavigateRef.current = setTimeout(() => {
+            postOrderNavigateRef.current = null;
+            setIsPlacingOrder(false);
+            navigate(`/orders/${mainOrderId}`);
+          }, 3000);
+          return;
         }
 
         // COD flow
@@ -1209,9 +1218,6 @@ const CheckoutPage = () => {
             <CheckoutPricingBreakdown
               pricingPreview={pricingPreview}
               isPreviewLoading={isPreviewLoading}
-              selectedTip={selectedTip}
-              onSelectTip={setSelectedTip}
-              tipAmounts={tipAmounts}
               walletAmountToUse={walletAmountToUse}
               finalAmountToPay={finalAmountToPay}
               cartTotal={cartTotal}

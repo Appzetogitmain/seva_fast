@@ -253,6 +253,26 @@ async function startup() {
     } catch (error) {
       console.error('[Startup] Warning: Failed to create indexes:', error.message);
     }
+
+    // Repair v2 orders that incorrectly stored seller-timeout on expiresAt (TTL could delete them)
+    try {
+      const Order = (await import('../models/order.js')).default;
+      const repairResult = await Order.updateMany(
+        {
+          workflowVersion: { $gte: 2 },
+          workflowStatus: { $ne: "CREATED" },
+          expiresAt: { $exists: true, $ne: null },
+        },
+        { $unset: { expiresAt: 1 } },
+      );
+      if (repairResult.modifiedCount > 0) {
+        console.log(
+          `[Startup] Cleared erroneous expiresAt on ${repairResult.modifiedCount} order(s)`,
+        );
+      }
+    } catch (error) {
+      console.error('[Startup] Warning: Order expiresAt repair failed:', error.message);
+    }
     
     // Step 7: Start search index worker (if worker role)
     if (isComponentEnabled('worker')) {

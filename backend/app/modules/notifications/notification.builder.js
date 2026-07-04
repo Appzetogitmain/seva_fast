@@ -181,10 +181,16 @@ function eventDefinition(eventType) {
         recipientIds: (payload) =>
           normalizeIdList(payload.sellerId || payload.sellerIds),
         title: () => "New Order",
-        body: (payload) =>
-          payload.orderId
-            ? `New order #${payload.orderId} received.`
-            : "You have received a new order.",
+        body: (payload) => {
+          const amount = Number(payload.sellerEarning);
+          const amountSuffix =
+            Number.isFinite(amount) && amount > 0
+              ? ` Your earning: ₹${Math.round(amount).toLocaleString("en-IN")}.`
+              : "";
+          return payload.orderId
+            ? `New order #${payload.orderId} received.${amountSuffix}`
+            : `You have received a new order.${amountSuffix}`;
+        },
       };
     case NOTIFICATION_EVENTS.DELIVERY_ASSIGNED:
       return {

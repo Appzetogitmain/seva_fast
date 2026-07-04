@@ -24,6 +24,7 @@ import {
   onDeliveryBroadcast,
   onOrderAssigned,
   onDeliveryBroadcastWithdrawn,
+  onOrderStatusUpdate,
 } from "@/core/services/orderSocket";
 
 const Dashboard = () => {
@@ -106,11 +107,13 @@ const Dashboard = () => {
     const unsubBroadcast = onDeliveryBroadcast(getToken, refreshDashboardData);
     const unsubAssigned = onOrderAssigned(getToken, refreshDashboardData);
     const unsubWithdrawn = onDeliveryBroadcastWithdrawn(getToken, refreshDashboardData);
+    const unsubStatus = onOrderStatusUpdate(getToken, refreshDashboardData);
 
     return () => {
       unsubBroadcast();
       unsubAssigned();
       unsubWithdrawn();
+      unsubStatus();
     };
   }, [isOnline, activeTab]);
 

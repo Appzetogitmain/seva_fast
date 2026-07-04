@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@shared/components/ui/Toast';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
+import { cartItemUnitPrice } from '../utils/productPricing';
 
 const CartPage = () => {
     const { cart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
@@ -57,7 +58,14 @@ const CartPage = () => {
                             </div>
 
                             <div className="space-y-3">
-                                {cart.map((item) => (
+                                {cart.map((item) => {
+                                    const unitPrice = cartItemUnitPrice(item);
+                                    const lineTotal = unitPrice * item.quantity;
+                                    const hasDiscount =
+                                        Number(item.salePrice || 0) > 0 &&
+                                        Number(item.salePrice) < Number(item.price || 0);
+
+                                    return (
                                     <article
                                         key={`${item.id}::${String(item.variantSku || "").trim()}`}
                                         className="group overflow-hidden rounded-[1.5rem] border border-white/80 bg-white/85 backdrop-blur-sm shadow-[0_12px_35px_rgba(15,23,42,0.08)] transition-transform duration-300 hover:-translate-y-0.5"
@@ -98,8 +106,13 @@ const CartPage = () => {
                                                 <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                                     <div className="flex items-end gap-2">
                                                         <div className="text-2xl font-black tracking-tight text-slate-900">
-                                                            ₹{item.price * item.quantity}
+                                                            ₹{lineTotal}
                                                         </div>
+                                                        {hasDiscount && (
+                                                            <div className="pb-0.5 text-sm font-semibold text-slate-400 line-through">
+                                                                ₹{Number(item.price || 0) * item.quantity}
+                                                            </div>
+                                                        )}
                                                         <div className="pb-0.5 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
                                                             total
                                                         </div>
@@ -127,7 +140,8 @@ const CartPage = () => {
                                             </div>
                                         </div>
                                     </article>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             <div className="flex flex-col gap-3 rounded-[1.5rem] border border-white/80 bg-white/80 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] sm:flex-row sm:items-center sm:justify-between">

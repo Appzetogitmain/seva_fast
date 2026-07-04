@@ -11,12 +11,13 @@ import {
 import {
   handleCodOrderFinance,
   reconcileCodCash,
-  settleDeliveredOrder,
 } from "../services/finance/orderFinanceService.js";
+import { applyDeliveredSettlement } from "../services/orderSettlement.js";
 import { placeOrderAtomic } from "../services/orderPlacementService.js";
 import { orderMatchQueryFromRouteParam } from "../utils/orderLookup.js";
 import { verifyClientPaymentCallback } from "../services/paymentService.js";
 import { buildCheckoutPricingSnapshot } from "../services/checkoutPricingService.js";
+import { WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
 
 function validateWithJoi(schema, payload) {
   const { error, value } = schema.validate(payload, {
@@ -107,7 +108,10 @@ export const previewCheckoutFinance = async (req, res) => {
 
     return handleResponse(res, 200, "Checkout preview generated", {
       paymentMode: payload.paymentMode,
-      breakdown: pricingSnapshot.aggregateBreakdown,
+      breakdown: {
+        ...pricingSnapshot.aggregateBreakdown,
+        cashbackPercentage: cashbackPercentage > 0 ? cashbackPercentage : 0,
+      },
       sellerCount: pricingSnapshot.sellerCount,
       itemCount: pricingSnapshot.itemCount,
       sellerBreakdowns,
@@ -133,6 +137,7 @@ export const createOrderWithFinancialSnapshot = async (req, res) => {
       timeSlot: validated.timeSlot || "now",
       tipAmount: validated.tipAmount || 0,
       walletAmount: validated.walletAmount || 0,
+      discountTotal: validated.discountTotal || 0,
       couponId: validated.couponId || null,
     };
     const idempotencyKey = String(req.headers["idempotency-key"] || "").trim() || null;
@@ -252,7 +257,7 @@ export const markOrderDeliveredAndSettle = async (req, res) => {
     if (!orderKey) {
       return handleResponse(res, 404, "Order not found");
     }
-    const order = await Order.findOne(orderKey).select("_id deliveryBoy seller").lean();
+    const order = await Order.findOne(orderKey);
     if (!order) {
       return handleResponse(res, 404, "Order not found");
     }
@@ -272,9 +277,17 @@ export const markOrderDeliveredAndSettle = async (req, res) => {
       return handleResponse(res, 403, "Only order seller can mark this order delivered");
     }
 
-    const updated = await settleDeliveredOrder(order._id, {
-      actorId: req.user?.id || null,
-    });
+    if (order.status !== "delivered") {
+      order.status = "delivered";
+      order.orderStatus = "delivered";
+      order.workflowStatus = WORKFLOW_STATUS.DELIVERED;
+      if (!order.deliveredAt) {
+        order.deliveredAt = new Date();
+      }
+      await order.save();
+    }
+
+    const updated = await applyDeliveredSettlement(order, order.orderId);
 
     // For COD orders, "delivery" implies cash is collected by the assigned delivery partner.
     // This updates System Float (COD) as: grandTotal - riderPayoutTotal.

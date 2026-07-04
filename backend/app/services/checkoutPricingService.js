@@ -325,9 +325,12 @@ export async function buildCheckoutPricingSnapshot({
       membershipTier,
     });
     
-    // Add estimatedCashback
     if (cashbackPercentage > 0) {
-      breakdown.estimatedCashback = round2(Math.max(breakdown.estimatedCashback || 0, (breakdown.productSubtotal * cashbackPercentage) / 100));
+      breakdown.estimatedCashback = round2(
+        (breakdown.productSubtotal * cashbackPercentage) / 100,
+      );
+    } else {
+      breakdown.estimatedCashback = 0;
     }
 
     sellerBreakdownEntries.push({

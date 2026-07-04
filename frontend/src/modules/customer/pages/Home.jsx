@@ -27,8 +27,6 @@ import SectionRenderer from "../components/experience/SectionRenderer";
 import ExperienceBannerCarousel from "../components/experience/ExperienceBannerCarousel";
 import { useLocation } from "../context/LocationContext";
 import Lottie from "lottie-react";
-import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
-
 import {
   MARQUEE_MESSAGES,
   ICON_COMPONENTS,
@@ -372,15 +370,6 @@ const Home = () => {
     };
     fetchHeroConfig();
   }, [activeCategory, currentLocation?.latitude, currentLocation?.longitude]);
-
-  useEffect(() => {
-    const firstUrl = heroConfig?.banners?.items?.[0]?.imageUrl;
-    if (!firstUrl) return;
-    const link = document.createElement("link");
-    link.rel = "preload"; link.as = "image"; link.href = applyCloudinaryTransform(firstUrl, "f_auto,q_auto,c_fill,g_auto,w_824,h_380");
-    link.setAttribute("fetchpriority", "high"); document.head.appendChild(link);
-    return () => { if (link.parentNode) link.parentNode.removeChild(link); };
-  }, [heroConfig?.banners?.items?.[0]?.imageUrl]);
 
   useEffect(() => {
     const totalSlides = 3;

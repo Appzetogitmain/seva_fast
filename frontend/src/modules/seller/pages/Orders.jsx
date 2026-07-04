@@ -38,6 +38,7 @@ import { Loader2 } from 'lucide-react';
 import Pagination from '@shared/components/ui/Pagination';
 import { DatePicker } from "@/components/ui/date-picker";
 import { onSellerOrderNew } from '@core/services/orderSocket';
+import { getSellerOrderEarning, getSellerEarningBreakdown } from '@/shared/utils/sellerOrderEarning';
 
 
 const Orders = () => {
@@ -156,8 +157,9 @@ const Orders = () => {
                     qty: item.quantity,
                     image: item.image
                 })),
-                total: order.pricing?.total || 0,
-                pricing: order.pricing || null,
+                total: getSellerOrderEarning(order),
+                sellerEarning: getSellerOrderEarning(order),
+                sellerEarningBreakdown: order.sellerEarningBreakdown || null,
                 status: getLegacyStatusFromOrder(order),
                 workflowStatus: order.workflowStatus,
                 workflowVersion: order.workflowVersion,
@@ -296,14 +298,8 @@ const Orders = () => {
             return `<div style="font-family: monospace; font-size: 12px; white-space: pre;">${left}${spaces}${priceStr}</div>`;
         }).join('');
 
-        const subtotal = order.pricing?.subtotal || (order.total - (order.pricing?.deliveryFee || 0));
-        const deliveryFee = order.pricing?.deliveryFee || 0;
-        const platformFee = order.pricing?.platformFee || 0;
-        const gst = order.pricing?.gst || 0;
-        const tip = order.pricing?.tip || 0;
-        const discount = order.pricing?.discount || 0;
-        const walletAmount = order.pricing?.walletAmount || 0;
-        const total = order.total;
+        const { productEarning, deliveryShare, total: earningTotal } =
+            getSellerEarningBreakdown(order);
 
         const formatRow = (label, value) => {
             const spacesCount = Math.max(1, 32 - label.length - value.length);
@@ -318,24 +314,9 @@ const Orders = () => {
         };
 
         let pricingRows = '';
-        pricingRows += formatRow('Subtotal:', `₹${subtotal.toFixed(0)}`);
-        if (deliveryFee > 0) {
-            pricingRows += formatRow('Delivery Fee:', `₹${deliveryFee.toFixed(0)}`);
-        }
-        if (platformFee > 0) {
-            pricingRows += formatRow('Platform Fee:', `₹${platformFee.toFixed(0)}`);
-        }
-        if (gst > 0) {
-            pricingRows += formatRow('Tax (GST):', `₹${gst.toFixed(0)}`);
-        }
-        if (tip > 0) {
-            pricingRows += formatRow('Tip:', `₹${tip.toFixed(0)}`);
-        }
-        if (discount > 0) {
-            pricingRows += formatRow('Discount:', `-₹${discount.toFixed(0)}`);
-        }
-        if (walletAmount > 0) {
-            pricingRows += formatRow('Wallet Used:', `-₹${walletAmount.toFixed(0)}`);
+        pricingRows += formatRow('Product:', `₹${productEarning.toFixed(0)}`);
+        if (deliveryShare > 0) {
+            pricingRows += formatRow('Delivery (80%):', `₹${deliveryShare.toFixed(0)}`);
         }
 
         const html = `
@@ -388,7 +369,7 @@ const Orders = () => {
                 <div class="divider"></div>
                 ${pricingRows}
                 <div class="divider"></div>
-                ${formatBoldRow('GRAND TOTAL:', '₹' + total.toFixed(0))}
+                ${formatBoldRow('YOUR EARNING:', '₹' + earningTotal.toFixed(0))}
                 <div class="divider"></div>
                 <div class="text-center" style="margin-top: 15px; font-size: 10px; font-family: monospace;">Thank you for ordering!</div>
                 <script>
@@ -428,13 +409,8 @@ const Orders = () => {
             `;
         }).join('');
 
-        const subtotal = order.pricing?.subtotal || (order.total - (order.pricing?.deliveryFee || 0));
-        const deliveryFee = order.pricing?.deliveryFee || 0;
-        const platformFee = order.pricing?.platformFee || 0;
-        const gst = order.pricing?.gst || 0;
-        const tip = order.pricing?.tip || 0;
-        const discount = order.pricing?.discount || 0;
-        const walletAmount = order.pricing?.walletAmount || 0;
+        const { productEarning, deliveryShare, total: earningTotal } =
+            getSellerEarningBreakdown(order);
 
         const html = `
             <!DOCTYPE html>
@@ -569,19 +545,14 @@ const Orders = () => {
 
                     <div class="totals">
                         <div class="totals-row">
-                            <span>Subtotal</span>
-                            <span>₹${subtotal.toFixed(2)}</span>
+                            <span>Product</span>
+                            <span>₹${productEarning.toFixed(2)}</span>
                         </div>
-                        ${deliveryFee > 0 ? `<div class="totals-row"><span>Delivery Fee</span><span>₹${deliveryFee.toFixed(2)}</span></div>` : ''}
-                        ${platformFee > 0 ? `<div class="totals-row"><span>Platform Fee</span><span>₹${platformFee.toFixed(2)}</span></div>` : ''}
-                        ${gst > 0 ? `<div class="totals-row"><span>Tax (GST)</span><span>₹${gst.toFixed(2)}</span></div>` : ''}
-                        ${tip > 0 ? `<div class="totals-row"><span>Tip</span><span>₹${tip.toFixed(2)}</span></div>` : ''}
-                        ${discount > 0 ? `<div class="totals-row" style="color: #10b981;"><span>Discount</span><span>-₹${discount.toFixed(2)}</span></div>` : ''}
-                        ${walletAmount > 0 ? `<div class="totals-row" style="color: #10b981;"><span>Wallet Used</span><span>-₹${walletAmount.toFixed(2)}</span></div>` : ''}
+                        ${deliveryShare > 0 ? `<div class="totals-row"><span>Delivery (80%)</span><span>₹${deliveryShare.toFixed(2)}</span></div>` : ''}
                         
                         <div class="totals-row grand-total">
-                            <span>Grand Total</span>
-                            <span>₹${Number(order.total).toFixed(2)}</span>
+                            <span>Your Earning</span>
+                            <span>₹${earningTotal.toFixed(2)}</span>
                         </div>
                     </div>
                     
@@ -647,7 +618,7 @@ const Orders = () => {
             const s = String(v ?? "").replace(/"/g, '""');
             return /[",\n\r]/.test(s) ? `"${s}"` : s;
         };
-        const headers = ["Order ID", "Customer", "Phone", "Date", "Time", "Total (₹)", "Status", "Address", "Payment"];
+        const headers = ["Order ID", "Customer", "Phone", "Date", "Time", "Your Earning (₹)", "Status", "Address", "Payment"];
         const rows = data.map((o) => [
             o.id,
             o.customer?.name ?? "",
@@ -882,7 +853,8 @@ const Orders = () => {
                                                         </div>
                                                         <p className="text-xs font-bold text-slate-800 truncate">{order.customer.name}</p>
                                                     </div>
-                                                    <p className="text-sm font-black text-slate-900 mt-2">₹{order.total.toLocaleString()}</p>
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-2">Your Earning</p>
+                                                    <p className="text-sm font-black text-slate-900">₹{order.total.toLocaleString()}</p>
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2 shrink-0">
                                                     <Badge variant={getStatusColor(order.status)} className="text-[10px] font-black uppercase px-2 py-0">
@@ -947,7 +919,7 @@ const Orders = () => {
                                         <tr className="bg-slate-50/50 border-b border-slate-100">
                                             <th className="px-4 lg:px-6 py-3 lg:py-4 text-xs font-bold text-slate-600 uppercase tracking-widest">Order Details</th>
                                             <th className="px-4 lg:px-6 py-3 lg:py-4 text-xs font-bold text-slate-600 uppercase tracking-widest">Customer</th>
-                                            <th className="px-4 lg:px-6 py-3 lg:py-4 text-xs font-bold text-slate-600 uppercase tracking-widest">Total</th>
+                                            <th className="px-4 lg:px-6 py-3 lg:py-4 text-xs font-bold text-slate-600 uppercase tracking-widest">Your Earning</th>
                                             <th className="px-4 lg:px-6 py-3 lg:py-4 text-xs font-bold text-slate-600 uppercase tracking-widest">Status</th>
                                             <th className="px-4 lg:px-6 py-3 lg:py-4 text-xs font-bold text-slate-600 uppercase tracking-widest text-right">Actions</th>
                                         </tr>
@@ -1156,11 +1128,11 @@ const Orders = () => {
                                         {/* Summary Grid */}
                                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                             <div className="p-3 sm:p-4 rounded-2xl bg-brand-50 border border-brand-100">
-                                                <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Total Revenue</p>
+                                                <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Your Earnings</p>
                                                 <p className="text-base sm:text-xl font-black text-brand-700 truncate">₹{summary.totalAmount.toLocaleString('en-IN')}</p>
                                             </div>
                                             <div className="p-3 sm:p-4 rounded-2xl bg-brand-50 border border-brand-100">
-                                                <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Avg. Order Value</p>
+                                                <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Avg. Earning / Order</p>
                                                 <p className="text-base sm:text-xl font-black text-brand-700">₹{summary.totalOrders ? (summary.totalAmount / summary.totalOrders).toFixed(0) : '0'}</p>
                                             </div>
                                         </div>
@@ -1352,21 +1324,31 @@ const Orders = () => {
                                             </div>
                                             <div className="space-y-3 sm:space-y-4">
                                                 <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
-                                                    <h4 className="text-xs font-black text-primary uppercase tracking-widest mb-3">Order Summary</h4>
+                                                    <h4 className="text-xs font-black text-primary uppercase tracking-widest mb-3">Your Earning</h4>
                                                     <div className="space-y-2">
-                                                        <div className="flex justify-between text-xs">
-                                                            <span className="font-bold text-slate-600">Subtotal</span>
-                                                            <span className="font-black text-slate-900">₹{(selectedOrder.total - 10).toFixed(2)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-xs">
-                                                            <span className="font-bold text-slate-600">Delivery Fee</span>
-                                                            <span className="font-black text-brand-600">₹10.00</span>
-                                                        </div>
-                                                        <div className="h-px bg-primary/10 my-2" />
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="font-black text-slate-900">Total</span>
-                                                            <span className="font-black text-primary">₹{selectedOrder.total.toFixed(2)}</span>
-                                                        </div>
+                                                        {(() => {
+                                                            const { productEarning, deliveryShare, total } =
+                                                                getSellerEarningBreakdown(selectedOrder);
+                                                            return (
+                                                                <>
+                                                                    <div className="flex justify-between text-xs">
+                                                                        <span className="font-bold text-slate-600">Product</span>
+                                                                        <span className="font-black text-slate-900">₹{productEarning.toFixed(2)}</span>
+                                                                    </div>
+                                                                    {deliveryShare > 0 ? (
+                                                                        <div className="flex justify-between text-xs">
+                                                                            <span className="font-bold text-slate-600">Delivery (80%)</span>
+                                                                            <span className="font-black text-brand-600">₹{deliveryShare.toFixed(2)}</span>
+                                                                        </div>
+                                                                    ) : null}
+                                                                    <div className="h-px bg-primary/10 my-2" />
+                                                                    <div className="flex justify-between text-sm">
+                                                                        <span className="font-black text-slate-900">Your Earning</span>
+                                                                        <span className="font-black text-primary">₹{total.toFixed(2)}</span>
+                                                                    </div>
+                                                                </>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </div>
                                                 <div className="bg-slate-900 p-3 sm:p-4 rounded-3xl text-white shadow-xl shadow-slate-900/10">

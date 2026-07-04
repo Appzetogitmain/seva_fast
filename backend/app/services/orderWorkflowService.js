@@ -339,6 +339,7 @@ export async function sellerRejectAtomic(sellerId, orderId) {
         cancelledBy: "seller",
         cancelReason: "Rejected by seller",
       },
+      $unset: { expiresAt: 1 },
     },
     { new: true },
   );
@@ -538,6 +539,7 @@ export async function processSellerTimeoutJob({ orderId }) {
         cancelledBy: "system",
         cancelReason: "Seller timeout (60s)",
       },
+      $unset: { expiresAt: 1 },
     },
     { new: true },
   );
@@ -620,6 +622,7 @@ export async function processDeliveryTimeoutJob({ orderId, attempt }) {
         cancelledBy: "system",
         cancelReason: "No delivery partner (timeout)",
       },
+      $unset: { expiresAt: 1 },
     },
     { new: true },
   );
@@ -674,6 +677,7 @@ export async function customerCancelV2(customerId, orderId, reason) {
         cancelledBy: "customer",
         cancelReason: reason || "Cancelled by customer",
       },
+      $unset: { expiresAt: 1 },
     },
     { new: true },
   );

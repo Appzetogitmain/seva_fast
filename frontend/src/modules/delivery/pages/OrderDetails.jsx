@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/core/context/AuthContext";
 import {
@@ -165,7 +165,6 @@ const OrderDetails = () => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState(1); // Internal rider flow: 1 pickup, 2 at store, 3 delivery, 4 delivered
-  const [itemsExpanded, setItemsExpanded] = useState(false);
   const [isSlideComplete, setIsSlideComplete] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -176,15 +175,27 @@ const OrderDetails = () => {
 
   const isReturn = order?.returnStatus && order.returnStatus !== "none";
 
-  useEffect(() => {
-    const fetchOrderDetails = async () => {
-      try {
-        const response = await deliveryApi.getOrderDetails(orderId);
-        const ord = response.data.result;
+  const fetchOrderDetails = useCallback(async () => {
+    if (!orderId) return null;
+    try {
+      const response = await deliveryApi.getOrderDetails(orderId);
+      const ord = response.data.result;
+      if (ord) {
         setOrder(ord);
-
         setStep(getPersistedRiderStep(ord));
-      } catch (error) {
+      }
+      return ord;
+    } catch (error) {
+      console.error("Failed to fetch order details", error);
+      return null;
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        await fetchOrderDetails();
+      } catch {
         toast.error("Failed to fetch order details");
         navigate("/delivery/dashboard");
       } finally {
@@ -193,9 +204,10 @@ const OrderDetails = () => {
     };
 
     if (orderId) {
-      fetchOrderDetails();
+      setLoading(true);
+      load();
     }
-  }, [orderId, navigate]);
+  }, [orderId, navigate, fetchOrderDetails]);
 
   useEffect(() => {
     const iv = setInterval(() => setClockTick(Date.now()), 30000);
@@ -213,7 +225,7 @@ const OrderDetails = () => {
       const ws = String(payload?.workflowStatus || "").toUpperCase();
       if (ws === "DELIVERED") {
         setStep(4);
-        setOrder((prev) => prev ? { ...prev, status: "delivered", workflowStatus: "DELIVERED" } : prev);
+        fetchOrderDetails();
       }
     });
 
@@ -221,7 +233,7 @@ const OrderDetails = () => {
       off();
       leaveOrderRoom(orderId, getToken);
     };
-  }, [orderId]);
+  }, [orderId, fetchOrderDetails]);
 
   const steps = useMemo(() => {
 
@@ -502,31 +514,29 @@ const OrderDetails = () => {
     console.error("Failed to generate OTP:", error);
   };
 
-  const handleOtpValidationSuccess = (data) => {
-    const updatedOrder = data?.result || data?.data?.result;
-
+  const handleOtpValidationSuccess = async () => {
     setShowOtpInput(false);
     setPickupProofSubmitted(false);
     setIsSlideComplete(false);
     setDragX(0);
 
     if (isReturn) {
-      // Return pickup OTP → navigate to seller for drop-off
       setStep(3);
-      if (updatedOrder) setOrder(updatedOrder);
+      await fetchOrderDetails();
       window.scrollTo({ top: 0, behavior: "smooth" });
       toast.success("✅ Pickup verified! Navigate to seller for drop-off.");
-    } else {
-      // Standard delivery OTP → order is delivered, hide map immediately
-      setStep(4);
-      if (updatedOrder) {
-        setOrder({ ...updatedOrder, status: "delivered", workflowStatus: "DELIVERED" });
-      } else {
-        setOrder((prev) => prev ? { ...prev, status: "delivered", workflowStatus: "DELIVERED" } : prev);
-      }
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      toast.success("✅ Order delivered successfully!");
+      return;
     }
+
+    setStep(4);
+    const refreshed = await fetchOrderDetails();
+    if (!refreshed) {
+      setOrder((prev) =>
+        prev ? { ...prev, status: "delivered", workflowStatus: "DELIVERED" } : prev,
+      );
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast.success("✅ Order delivered successfully!");
   };
 
   const handleOtpValidationError = (error) => {
@@ -560,9 +570,22 @@ const OrderDetails = () => {
 
   const isReturnWaitAccept = useMemo(() => {
     if (!order) return false;
-    const isReturn = order.returnStatus && order.returnStatus !== "none";
     return isReturn && !order.returnDeliveryBoy;
-  }, [order]);
+  }, [order, isReturn]);
+
+  const isOrderDelivered =
+    !isReturn &&
+    (step >= 4 ||
+      String(order?.status || "").toLowerCase() === "delivered" ||
+      String(order?.workflowStatus || "").toUpperCase() === "DELIVERED");
+
+  const showPickupCard =
+    !isReturnWaitAccept &&
+    (isReturn ? step === 1 || step === 2 : step <= 2 || isOrderDelivered);
+
+  const showDropCard =
+    !isReturnWaitAccept &&
+    (isReturn ? step === 3 || step === 4 || step >= 5 : step >= 3);
 
   // Determine current phase for map
   // Return: steps 1-2 = navigate to customer (pickup), steps 3-4 = navigate to seller (delivery)
@@ -830,7 +853,7 @@ const OrderDetails = () => {
 
         <AnimatePresence mode="wait">
           {/* Customer pickup card: show at return steps 1-2, standard delivery steps 1-2 */}
-          {(isReturn ? (step === 1 || step === 2) : step <= 2) && (
+          {(showPickupCard) && (
             <motion.div
               key="pickup"
               variants={containerVariants}
@@ -893,7 +916,7 @@ const OrderDetails = () => {
 
         <AnimatePresence mode="wait">
           {/* Seller card: return steps 3-4, standard delivery steps 3-4 */}
-          {(isReturn ? (step === 3 || step === 4) : step >= 3) && step < (isReturn ? 5 : 5) && (
+          {(showDropCard) && (
             <motion.div
               key="customer"
               variants={containerVariants}
@@ -969,55 +992,17 @@ const OrderDetails = () => {
         </AnimatePresence>
 
         <Card className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-          <motion.div
-            className="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors"
-            onClick={() => setItemsExpanded(!itemsExpanded)}
-          >
+          <div className="p-4 flex justify-between items-center">
             <div className="flex items-center font-bold text-gray-800">
               <div className="p-2 bg-purple-100 text-purple-600 rounded-lg mr-3">
                 <Package size={20} />
               </div>
-              <div>
-                <span>Order Items</span>
-                <span className="ml-2 text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                  {order.items?.length || 0} items
-                </span>
-              </div>
+              <span>Order Amount</span>
             </div>
-            <motion.div animate={{ rotate: itemsExpanded ? 180 : 0 }} transition={{ duration: 0.3 }}>
-              <ChevronDown size={20} className="text-gray-400" />
-            </motion.div>
-          </motion.div>
-
-          <AnimatePresence>
-            {itemsExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="overflow-hidden"
-              >
-                <div className="p-4 border-t border-gray-100 bg-gray-50/50 space-y-3">
-                  {(isReturn ? order.returnItems : order.items)?.map((item, i) => (
-                    <div key={i} className="flex justify-between items-center text-sm">
-                      <div className="flex items-center">
-                        <span className="font-bold text-gray-500 mr-3 text-xs w-6 bg-white border border-gray-200 text-center rounded py-0.5">
-                          x{item.quantity}
-                        </span>
-                        <span className="text-gray-800 font-medium">{item.name}</span>
-                      </div>
-                      <span className="font-bold text-gray-600">Rs.{item.price * item.quantity}</span>
-                    </div>
-                  ))}
-                  <div className="pt-3 mt-2 border-t border-gray-200 flex justify-between items-center">
-                    <span className="text-gray-500 text-sm">Total Bill</span>
-                    <span className="text-lg font-bold text-gray-900">Rs.{order.pricing?.total}</span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            <span className="text-lg font-bold text-gray-900">
+              Rs.{order.pricing?.total ?? 0}
+            </span>
+          </div>
         </Card>
 
         <motion.div
@@ -1136,9 +1121,8 @@ const OrderDetails = () => {
                 orderId={orderId}
                 isReturn={false}
                 isReturnDrop={true}
-                onSuccess={(data) => {
-                  const updatedOrder = data?.result || data?.data?.result;
-                  if (updatedOrder) setOrder(updatedOrder);
+                onSuccess={async () => {
+                  await fetchOrderDetails();
                   setStep(5);
                   toast.success("✅ Return complete! Commission credited to your wallet.");
                   setTimeout(() => navigate("/delivery/dashboard"), 1800);

@@ -12,6 +12,7 @@ import {
   hasProductVariants,
   variantIdentityKey,
   variantEffectiveUnitPrice,
+  pickListingVariant,
 } from "../../utils/productPricing";
 
 const ProductCard = React.memo(
@@ -37,12 +38,25 @@ const ProductCard = React.memo(
       const variants = Array.isArray(product?.variants) ? product.variants : [];
       if (!variants.length) return null;
 
+      const listingSku = String(product?.listingVariantSku || "").trim();
+      if (listingSku) {
+        const listingVariant = variants.find(
+          (variant) => variantIdentityKey(variant) === listingSku,
+        );
+        if (listingVariant) return listingVariant;
+      }
+
       const targetPrice = Number(product?.price || 0);
       const pricedVariant = variants.find(
         (variant) => variantEffectiveUnitPrice(variant) === targetPrice,
       );
-      return pricedVariant || variants[0];
-    }, [product?.variants, product?.price, requiresVariantSelection]);
+      return pricedVariant || pickListingVariant(product)?.variant || variants[0];
+    }, [
+      product?.variants,
+      product?.price,
+      product?.listingVariantSku,
+      requiresVariantSelection,
+    ]);
 
     const defaultVariantSku = defaultVariant
       ? variantIdentityKey(defaultVariant)
