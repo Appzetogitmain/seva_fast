@@ -627,19 +627,14 @@ export async function generateOrderPaymentBreakdown({
     ? categoryCommissionVal
     : (effectiveSettings.adminCommissionPercent ?? 0);
 
-  const totalCommissionPercent = isExempt
-    ? 0
-    : (adminCommPercent +
-       (effectiveSettings.technicalChargePercent ?? 0) +
-       (effectiveSettings.subAdminCommissionPercent ?? 0) +
-       (effectiveSettings.fieldWorkerCommissionPercent ?? 0) +
-       (effectiveSettings.advertiseChargePercent ?? 0) +
-       (effectiveSettings.otherMaintenancePercent ?? 0) +
-       (effectiveSettings.affiliateMarketingPercent ?? 0) +
-       (effectiveSettings.directSlabCommissionPercent ?? 0) +
-       (effectiveSettings.siteCashbackPercent ?? 0));
-
-  const totalCommissionAmount = roundCurrency((commissionBase * totalCommissionPercent) / 100);
+  // IMPORTANT:
+  // Seller payout should be reduced only by seller/category commission.
+  // Platform allocation percentages (technical/sub-admin/site cashback/etc.)
+  // are internal splits and must not be additionally deducted from seller.
+  const totalCommissionPercent = isExempt ? 0 : adminCommPercent;
+  const totalCommissionAmount = roundCurrency(
+    (commissionBase * totalCommissionPercent) / 100,
+  );
 
   const commissionBreakdown = {
     adminCommissionPercent: adminCommPercent,

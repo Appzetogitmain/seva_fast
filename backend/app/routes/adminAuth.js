@@ -12,6 +12,7 @@ import {
     getDeliveryPartners,
     approveDeliveryPartner,
     rejectDeliveryPartner,
+    updateDeliveryPartner,
     getActiveFleet,
     getAdminWalletData,
     getDeliveryTransactions,
@@ -45,7 +46,8 @@ import {
     getSubadmins,
     createSubadmin,
     updateSubadmin,
-    deleteSubadmin
+    deleteSubadmin,
+    getSubadminWalletController,
 } from "../controller/adminController.js";
 import { getAuthActivityLogs } from "../controller/authActivityController.js";
 import {
@@ -53,6 +55,8 @@ import {
     getAdminFinanceLedgerController,
     getAdminFinancePayoutsController,
     getAdminFinanceSummaryController,
+    getAdminOrderEarningsController,
+    getCommissionSplitsReportController,
     getDeliverySettingsController,
     processAdminFinancePayoutsController,
     updateDeliverySettingsController,
@@ -120,6 +124,18 @@ router.get(
     getAdminFinanceLedgerController,
 );
 router.get(
+    "/finance/order-earnings",
+    verifyToken,
+    allowRoles("admin"),
+    getAdminOrderEarningsController,
+);
+router.get(
+    "/finance/commission-splits",
+    verifyToken,
+    allowRoles("admin"),
+    getCommissionSplitsReportController,
+);
+router.get(
     "/finance/payouts",
     verifyToken,
     allowRoles("admin"),
@@ -180,6 +196,13 @@ router.get(
     getDeliveryPartners
 );
 
+router.put(
+    "/delivery-partners/:id",
+    verifyToken,
+    allowRoles("admin", "seller"),
+    updateDeliveryPartner
+);
+
 router.patch(
     "/delivery-partners/approve/:id",
     verifyToken,
@@ -225,6 +248,7 @@ router.get("/subadmins", verifyToken, allowRoles("admin"), getSubadmins);
 router.post("/subadmins", verifyToken, allowRoles("admin"), createSubadmin);
 router.put("/subadmins/:id", verifyToken, allowRoles("admin"), updateSubadmin);
 router.delete("/subadmins/:id", verifyToken, allowRoles("admin"), deleteSubadmin);
+router.get("/subadmins/:id/wallet", verifyToken, allowRoles("admin"), getSubadminWalletController);
 
 router.get(
     "/auth-activity",

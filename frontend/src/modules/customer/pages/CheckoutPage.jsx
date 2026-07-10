@@ -1242,7 +1242,8 @@ const CheckoutPage = () => {
               <SlideToPay
                 amount={finalAmountToPay}
                 onSuccess={handlePlaceOrder}
-                isLoading={isPlacingOrder || isPreviewLoading || !pricingPreview}
+                isLoading={isPlacingOrder || isPreviewLoading}
+                disabled={isPlacingOrder || isPreviewLoading}
                 text={slideToPayText}
               />
               <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-[0.1em]">
@@ -1261,7 +1262,8 @@ const CheckoutPage = () => {
           <SlideToPay
             amount={finalAmountToPay}
             onSuccess={handlePlaceOrder}
-            isLoading={isPlacingOrder || isPreviewLoading || !pricingPreview}
+            isLoading={isPlacingOrder || isPreviewLoading}
+            disabled={isPlacingOrder || isPreviewLoading}
             text={slideToPayText}
           />
         </div>

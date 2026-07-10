@@ -25,6 +25,7 @@ import {
   Shield,
   MapPin,
   History,
+  PieChart,
 } from "lucide-react";
 
 const Dashboard = React.lazy(() => import("../pages/Dashboard"));
@@ -60,6 +61,7 @@ const PendingDeliveryBoys = React.lazy(
 );
 const DeliveryFunds = React.lazy(() => import("../pages/DeliveryFunds"));
 const AdminWallet = React.lazy(() => import("../pages/AdminWallet"));
+const CommissionSplitsReport = React.lazy(() => import("../pages/CommissionSplitsReport"));
 const WithdrawalRequests = React.lazy(
   () => import("../pages/WithdrawalRequests"),
 );
@@ -174,6 +176,12 @@ const navItems = [
     ],
   },
   { label: "Wallet", path: "/admin/wallet", icon: Wallet, color: "violet" },
+  {
+    label: "Commission Splits",
+    path: "/admin/commission-splits",
+    icon: PieChart,
+    color: "fuchsia",
+  },
   {
     label: "Money Requests",
     path: "/admin/withdrawals",
@@ -318,6 +326,7 @@ const AdminRoutes = () => {
         <Route path="/tracking" element={<SubadminRoute permission="Delivery Drivers"><FleetTracking /></SubadminRoute>} />
         <Route path="/delivery-funds" element={<SubadminRoute permission="Delivery Drivers"><DeliveryFunds /></SubadminRoute>} />
         <Route path="/wallet" element={<SubadminRoute permission="Wallet"><AdminWallet /></SubadminRoute>} />
+        <Route path="/commission-splits" element={<SubadminRoute permission="Wallet"><CommissionSplitsReport /></SubadminRoute>} />
         <Route path="/withdrawals" element={<SubadminRoute permission="Money Requests"><WithdrawalRequests /></SubadminRoute>} />
         <Route path="/seller-transactions" element={<SubadminRoute permission="Seller Payments"><SellerTransactions /></SubadminRoute>} />
         <Route path="/cash-collection" element={<SubadminRoute permission="Collect Cash"><CashCollection /></SubadminRoute>} />

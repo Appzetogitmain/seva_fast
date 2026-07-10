@@ -92,12 +92,12 @@ const Withdrawals = () => {
 
     const handleSubmitRequest = async (e) => {
         e.preventDefault();
-        const settled = Number(data?.balances?.settledBalance ?? 0);
+        const available = Number(data?.balances?.availableBalance ?? 0);
         const pending = Math.abs(Number(data?.balances?.pendingPayouts ?? 0));
-        const available = Math.max(0, settled - pending);
+        const withdrawable = Math.max(0, available - pending);
 
-        if (!amount || parseFloat(amount) <= 0 || parseFloat(amount) > available) {
-            toast.error(`Please enter a valid amount within your available balance (₹${available}).`);
+        if (!amount || parseFloat(amount) <= 0 || parseFloat(amount) > withdrawable) {
+            toast.error(`Please enter a valid amount within your available balance (₹${withdrawable}).`);
             return;
         }
 
@@ -123,6 +123,7 @@ const Withdrawals = () => {
 
     const balances = {
         available: Number(data.balances?.availableBalance ?? 0),
+        totalWallet: Number(data.balances?.totalWalletBalance ?? data.balances?.settledBalance ?? 0),
         onHold: Number(data.balances?.onHoldBalance ?? 0),
         pending: Math.abs(Number(data.balances?.pendingPayouts ?? 0)),
         lastWithdrawal: Math.abs(withdrawalHistory[0]?.amount ?? 0),
@@ -155,9 +156,9 @@ const Withdrawals = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {[
                     { label: 'Available Balance', value: `₹${balances.available.toLocaleString()}`, icon: Wallet, color: 'emerald', sub: 'Ready to withdraw' },
-                    { label: 'On Hold', value: `₹${balances.onHold.toLocaleString()}`, icon: Clock, color: 'blue', sub: 'Return window open' },
+                    { label: 'Total Wallet', value: `₹${balances.totalWallet.toLocaleString()}`, icon: Building2, color: 'indigo', sub: 'Available + on hold' },
+                    { label: 'On Hold', value: `₹${balances.onHold.toLocaleString()}`, icon: Clock, color: 'blue', sub: 'Return window / pending release' },
                     { label: 'Withdrawal Pending', value: `₹${balances.pending.toLocaleString()}`, icon: History, color: 'amber', sub: 'Awaiting approval' },
-                    { label: 'Last Withdrawal', value: `₹${balances.lastWithdrawal.toLocaleString()}`, icon: CheckCircle2, color: 'indigo', sub: 'Sent to bank' },
                 ].map((stat, i) => (
                     <BlurFade key={i} delay={0.2 + i * 0.1}>
                         <Card className="p-6 border-none shadow-sm ring-1 ring-slate-100 hover:ring-brand-200 transition-all bg-white group relative overflow-hidden">

@@ -146,6 +146,11 @@ const sellerSchema = new mongoose.Schema(
       ref: "Zone",
       default: null,
     },
+    onboardedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     acceptsPhotoOrders: {
       type: Boolean,
       default: false,

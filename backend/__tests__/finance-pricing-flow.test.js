@@ -350,4 +350,59 @@ describe("finance pricing flow", () => {
     );
     expect(breakdown.snapshots.handlingFeeStrategy).toBe("highest_category_fee");
   });
+
+  it("does not deduct platform allocation percentages from seller payout", async () => {
+    mockCategoryFind.mockReturnValue(
+      createQueryChain([
+        {
+          _id: "cat-1",
+          name: "Fruits",
+          adminCommissionType: "percentage",
+          adminCommissionValue: 10,
+          handlingFeeType: "fixed",
+          handlingFeeValue: 0,
+        },
+      ]),
+    );
+
+    mockGetOrCreateFinanceSettings.mockResolvedValue({
+      deliveryPricingMode: "distance_based",
+      customerBaseDeliveryFee: 30,
+      riderBasePayout: 30,
+      baseDistanceCapacityKm: 0.5,
+      incrementalKmSurcharge: 10,
+      deliveryPartnerRatePerKm: 5,
+      fixedDeliveryFee: 30,
+      handlingFeeStrategy: "highest_category_fee",
+      // High platform allocation percentages should not reduce seller payout.
+      technicalChargePercent: 5,
+      subAdminCommissionPercent: 10,
+      fieldWorkerCommissionPercent: 5,
+      directSlabCommissionPercent: 25,
+      advertiseChargePercent: 5,
+      siteCashbackPercent: 15,
+      otherMaintenancePercent: 7.5,
+      affiliateMarketingPercent: 5,
+    });
+
+    const breakdown = await generateOrderPaymentBreakdown({
+      preHydratedItems: [
+        {
+          productId: "prod-1",
+          productName: "Mango",
+          quantity: 1,
+          price: 150,
+          headerCategoryId: "cat-1",
+          sellerId: "seller-1",
+        },
+      ],
+      distanceKm: 0,
+      discountTotal: 0,
+      taxTotal: 0,
+    });
+
+    // Seller should lose only 10% product commission, not cumulative platform percentages.
+    expect(breakdown.adminProductCommissionTotal).toBe(15);
+    expect(breakdown.sellerPayoutTotal).toBe(159); // 135 product + 24 (80% of delivery fee 30)
+  });
 });

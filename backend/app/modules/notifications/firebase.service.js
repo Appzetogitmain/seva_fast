@@ -43,6 +43,21 @@ function isWebLink(value = "") {
   return /^https?:\/\//i.test(link);
 }
 
+function resolveAbsoluteLink(link = "") {
+  const raw = String(link || "").trim();
+  if (!raw) return "";
+  if (isWebLink(raw)) return raw;
+  const base = String(
+    process.env.FRONTEND_URL || process.env.WEB_APP_URL || "",
+  )
+    .trim()
+    .replace(/\/+$/, "");
+  // Never invent localhost — relative path stays in data for SW/same-origin navigation.
+  if (!base) return "";
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  return `${base}${path}`;
+}
+
 function resolveImageUrl(payload = {}, data = {}) {
   const fromData = String(
     data.imageUrl ||
@@ -65,8 +80,10 @@ export async function sendFCM(tokens = [], payload = {}) {
 
   const messaging = getMessagingClient();
   const data = toStringMap(payload.data || {});
-  const link = data.link || payload?.data?.link || "";
-  const resolvedLink = isWebLink(link) ? link : "";
+  const link = String(data.link || payload?.data?.link || "").trim();
+  const absoluteLink = resolveAbsoluteLink(link);
+  // Keep path-only in data when possible so clients navigate on current host.
+  if (link && !data.link) data.link = link;
   const title = payload.title || "";
   const body = payload.body || payload.message || "";
   const tag = data.orderId || data.eventType || "quick-commerce";
@@ -99,9 +116,10 @@ export async function sendFCM(tokens = [], payload = {}) {
           tag,
           requireInteraction: true,
           ...(image ? { image } : {}),
-          data: { link: resolvedLink || link },
+          data: { link: link || absoluteLink || "/" },
         },
-        fcmOptions: resolvedLink ? { link: resolvedLink } : undefined,
+        // Only set absolute fcmOptions when FRONTEND_URL is configured (avoid localhost).
+        fcmOptions: absoluteLink ? { link: absoluteLink } : undefined,
       },
     });
 

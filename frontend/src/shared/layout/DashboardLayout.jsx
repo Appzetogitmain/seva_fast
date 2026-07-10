@@ -332,6 +332,17 @@ const DashboardLayout = ({ children, navItems, title }) => {
             });
     };
 
+    const sellerDeliveredCount = role === 'seller'
+        ? sellerOrders.filter((o) => String(o.status || '').toLowerCase() === 'delivered').length
+        : 0;
+
+    useEffect(() => {
+        if (role !== 'seller' || !isEarningsRoute(location.pathname)) return;
+        if (!earningsFetchedRef.current) return;
+        refreshEarnings();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sellerDeliveredCount, role, location.pathname]);
+
     useEffect(() => {
         setIsSidebarOpen(false);
     }, [location.pathname]);

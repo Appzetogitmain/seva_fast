@@ -20,9 +20,12 @@ import {
 import { createFinanceAuditLog } from "../services/finance/auditLogService.js";
 import {
   financeLedgerQuerySchema,
+  financeOrderEarningsQuerySchema,
   payoutProcessSchema,
   updateDeliverySettingsSchema,
 } from "../validation/financeValidation.js";
+import { getAdminOrderEarnings } from "../services/finance/adminOrderFinanceService.js";
+import { getCommissionSplitsReport } from "../services/finance/commissionSplitsReportService.js";
 
 function validateWithJoi(schema, payload) {
   const { error, value } = schema.validate(payload, {
@@ -83,6 +86,29 @@ export const getAdminFinanceLedgerController = async (req, res) => {
     }
 
     return handleResponse(res, 200, "Finance ledger fetched", ledger);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+export const getAdminOrderEarningsController = async (req, res) => {
+  try {
+    const validated = validateWithJoi(financeOrderEarningsQuerySchema, req.query || {});
+    if (!validated.isValid) {
+      return handleResponse(res, 400, validated.message);
+    }
+    const payload = await getAdminOrderEarnings(validated.value);
+    return handleResponse(res, 200, "Order earnings fetched", payload);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+export const getCommissionSplitsReportController = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query || {};
+    const payload = await getCommissionSplitsReport({ fromDate, toDate });
+    return handleResponse(res, 200, "Commission splits report fetched", payload);
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }

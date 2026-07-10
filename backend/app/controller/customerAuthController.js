@@ -70,7 +70,12 @@ export const loginCustomer = async (req, res) => {
 
         return handleResponse(res, 200, "If the number is eligible, OTP has been sent");
     } catch (error) {
-        return handleResponse(res, error.statusCode || 500, error.message);
+        return handleResponse(
+            res,
+            error.statusCode || 500,
+            error.message,
+            error.code ? { code: error.code } : {},
+        );
     }
 };
 

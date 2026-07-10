@@ -27,49 +27,50 @@ function truncateText(text, maxLen = 140) {
   return `${value.slice(0, Math.max(0, maxLen - 3))}...`;
 }
 
-function getFrontendBaseUrl() {
-  const explicit =
-    process.env.FRONTEND_URL ||
-    process.env.WEB_APP_URL ||
-    "http://localhost:5173";
-  return String(explicit).trim().replace(/\/+$/, "");
+function buildAppPath(path) {
+  const normalized = String(path || "/").trim() || "/";
+  return normalized.startsWith("/") ? normalized : `/${normalized}`;
 }
 
 function buildOrderLink(orderId) {
   const id = String(orderId || "").trim();
-  const baseUrl = getFrontendBaseUrl();
-  if (!id) return `${baseUrl}/orders`;
-  return `${baseUrl}/orders/${encodeURIComponent(id)}`;
+  if (!id) return buildAppPath("/orders");
+  return buildAppPath(`/orders/${encodeURIComponent(id)}`);
 }
 
 function buildCustomerSupportLink(ticketId) {
-  const baseUrl = getFrontendBaseUrl();
   const id = String(ticketId || "").trim();
-  return id ? `${baseUrl}/chat?ticketId=${encodeURIComponent(id)}` : `${baseUrl}/chat`;
+  return id
+    ? buildAppPath(`/chat?ticketId=${encodeURIComponent(id)}`)
+    : buildAppPath("/chat");
 }
 
 function buildAdminSupportLink(ticketId) {
-  const baseUrl = getFrontendBaseUrl();
   const id = String(ticketId || "").trim();
   return id
-    ? `${baseUrl}/admin/support-tickets?ticketId=${encodeURIComponent(id)}`
-    : `${baseUrl}/admin/support-tickets`;
+    ? buildAppPath(`/admin/support-tickets?ticketId=${encodeURIComponent(id)}`)
+    : buildAppPath("/admin/support-tickets");
 }
 
 function buildSellerInventoryLink(productId) {
-  const baseUrl = getFrontendBaseUrl();
   const id = String(productId || "").trim();
   return id
-    ? `${baseUrl}/seller/inventory?productId=${encodeURIComponent(id)}`
-    : `${baseUrl}/seller/inventory`;
+    ? buildAppPath(`/seller/inventory?productId=${encodeURIComponent(id)}`)
+    : buildAppPath("/seller/inventory");
 }
 
 function buildAdminReturnsLink(orderId) {
-  const baseUrl = getFrontendBaseUrl();
   const id = String(orderId || "").trim();
   return id
-    ? `${baseUrl}/admin/returns?orderId=${encodeURIComponent(id)}`
-    : `${baseUrl}/admin/returns`;
+    ? buildAppPath(`/admin/returns?orderId=${encodeURIComponent(id)}`)
+    : buildAppPath("/admin/returns");
+}
+
+function buildAdminProductsLink(productId) {
+  const id = String(productId || "").trim();
+  return id
+    ? buildAppPath(`/admin/products?productId=${encodeURIComponent(id)}`)
+    : buildAppPath("/admin/products");
 }
 
 function eventDefinition(eventType) {
@@ -398,6 +399,30 @@ function eventDefinition(eventType) {
           return `Only ${currentStock} left for ${itemLabel}. Restock soon.`;
         },
       };
+    case NOTIFICATION_EVENTS.PRODUCT_UPDATED_BY_SELLER:
+      return {
+        role: NOTIFICATION_ROLES.ADMIN,
+        recipientIds: (payload) => normalizeIdList(payload.adminIds),
+        title: () => "Seller updated a product",
+        body: (payload) => {
+          const sellerName = String(payload.sellerName || "A seller").trim() || "A seller";
+          const productName = String(payload.productName || "a product").trim() || "a product";
+          return `${sellerName} updated ${productName}. Review the latest changes.`;
+        },
+      };
+    case NOTIFICATION_EVENTS.NEW_SELLER_REGISTERED:
+      return {
+        role: NOTIFICATION_ROLES.ADMIN,
+        recipientIds: (payload) => normalizeIdList(payload.adminIds),
+        title: () => "New seller registration",
+        body: (payload) => {
+          const shopName = String(payload.shopName || "").trim();
+          const sellerName = String(payload.sellerName || "A seller").trim() || "A seller";
+          return shopName
+            ? `${sellerName} registered shop "${shopName}". Review the application.`
+            : `${sellerName} submitted a new seller application.`;
+        },
+      };
     default:
       return null;
   }
@@ -430,6 +455,33 @@ function eventData(eventType, payload = {}, role) {
       eventType,
       ticketId,
       link,
+      ...(payload.data || {}),
+    };
+  }
+
+  if (eventType === NOTIFICATION_EVENTS.PRODUCT_UPDATED_BY_SELLER) {
+    const productId = String(payload.productId || "").trim() || undefined;
+    return {
+      eventType,
+      productId,
+      sellerId: String(payload.sellerId || "").trim() || undefined,
+      sellerName: String(payload.sellerName || "").trim() || undefined,
+      productName: String(payload.productName || "").trim() || undefined,
+      link: buildAdminProductsLink(productId),
+      ...(payload.data || {}),
+    };
+  }
+
+  if (eventType === NOTIFICATION_EVENTS.NEW_SELLER_REGISTERED) {
+    const sellerId = String(payload.sellerId || "").trim() || undefined;
+    return {
+      eventType,
+      sellerId,
+      sellerName: String(payload.sellerName || "").trim() || undefined,
+      shopName: String(payload.shopName || "").trim() || undefined,
+      email: String(payload.email || "").trim() || undefined,
+      phone: String(payload.phone || "").trim() || undefined,
+      link: buildAppPath("/admin/pending-sellers"),
       ...(payload.data || {}),
     };
   }

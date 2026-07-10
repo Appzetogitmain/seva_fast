@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Card from "@shared/components/ui/Card";
@@ -39,7 +39,8 @@ import { cn } from "@/lib/utils";
 import { sellerApi } from "../services/sellerApi";
 import { toast } from "sonner";
 import { useSellerOrders } from "../context/SellerOrdersContext";
-import { getSellerOrderEarning, getSellerEarningBreakdown } from "@/shared/utils/sellerOrderEarning";
+import { getSellerOrderEarning, getSellerEarningBreakdown, getCustomerOrderBill } from "@/shared/utils/sellerOrderEarning";
+import { useLockBodyScroll, preventBackdropScroll } from "@/shared/hooks/useLockBodyScroll";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -66,38 +67,30 @@ const Dashboard = () => {
     fetchDeliveryBoys();
   }, []);
 
-  useEffect(() => {
-    if (!isOrderModalOpen) return undefined;
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-    };
-  }, [isOrderModalOpen]);
+  useLockBodyScroll(isOrderModalOpen);
+
+  const fetchStats = useCallback(async (showLoader = false) => {
+    try {
+      if (showLoader) setLoading(true);
+      const statsRes = await sellerApi.getStats();
+      if (statsRes.data.success) setStatsData(statsRes.data.result);
+    } catch (error) {
+      console.error("Dashboard Fetch Error:", error);
+      toast.error("Failed to load dashboard data");
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const statsRes = await sellerApi.getStats();
-        if (cancelled) return;
-        if (statsRes.data.success) setStatsData(statsRes.data.result);
-      } catch (error) {
-        if (!cancelled) {
-          console.error("Dashboard Fetch Error:", error);
-          toast.error("Failed to load dashboard data");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchStats();
-    return () => { cancelled = true; };
-  }, []);
+    fetchStats(true);
+  }, [fetchStats]);
+
+  useEffect(() => {
+    if (!ordersLoading) {
+      fetchStats(false);
+    }
+  }, [ordersLoading, ordersFromContext?.length, fetchStats]);
 
   const safeOrders = Array.isArray(ordersFromContext) ? ordersFromContext : [];
   const loadingOrStats = loading || ordersLoading;
@@ -242,6 +235,7 @@ const Dashboard = () => {
       total: getSellerOrderEarning(order),
       sellerEarning: getSellerOrderEarning(order),
       sellerEarningBreakdown: order.sellerEarningBreakdown || null,
+      customerBill: order.customerBill || null,
       status: order.status || "pending",
       payment:
         order.payment?.method === "cash" || order.payment?.method === "cod"
@@ -551,6 +545,8 @@ const Dashboard = () => {
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-slate-900/40 backdrop-blur-md"
               onClick={() => setIsOrderModalOpen(false)}
+              onWheel={preventBackdropScroll}
+              onTouchMove={preventBackdropScroll}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -664,8 +660,16 @@ const Dashboard = () => {
                       </div>
                     )}
                   </div>
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
+                                                  <div className="space-y-3 sm:space-y-4">
+                                                    <div className="bg-slate-50 p-3 sm:p-4 rounded-3xl border border-slate-100">
+                                                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                                                        Order Amount (Customer)
+                                                      </h4>
+                                                      <p className="text-lg font-black text-slate-900">
+                                                        ₹{getCustomerOrderBill(selectedOrder).grandTotal.toFixed(2)}
+                                                      </p>
+                                                    </div>
+                                                    <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
                       <h4 className="text-[10px] font-black text-primary uppercase tracking-widest mb-3">
                         Your Earning
                       </h4>

@@ -1,12 +1,41 @@
 import Admin from "../../models/admin.js";
 import handleResponse from "../../utils/helper.js";
+import { ensureSubAdminWallet } from "../../services/finance/commissionSplitsReportService.js";
+import { OWNER_TYPE } from "../../constants/finance.js";
+import Wallet from "../../models/wallet.js";
+import { roundCurrency } from "../../utils/money.js";
 
 export const getSubadmins = async (req, res) => {
   try {
     const subadmins = await Admin.find({ role: "sub-admin" })
       .populate("assignedZones")
-      .sort({ name: 1 });
-    return handleResponse(res, 200, "Sub-admins retrieved successfully", { subadmins });
+      .sort({ name: 1 })
+      .lean();
+
+    const withWallets = await Promise.all(
+      subadmins.map(async (sa) => {
+        let wallet = await Wallet.findOne({
+          ownerType: OWNER_TYPE.SUB_ADMIN,
+          ownerId: sa._id,
+        }).lean();
+        if (!wallet) {
+          wallet = await ensureSubAdminWallet(sa._id);
+          wallet = wallet.toObject ? wallet.toObject() : wallet;
+        }
+        return {
+          ...sa,
+          wallet: {
+            availableBalance: roundCurrency(wallet?.availableBalance || 0),
+            pendingBalance: roundCurrency(wallet?.pendingBalance || 0),
+            totalCredited: roundCurrency(wallet?.totalCredited || 0),
+          },
+        };
+      }),
+    );
+
+    return handleResponse(res, 200, "Sub-admins retrieved successfully", {
+      subadmins: withWallets,
+    });
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }
@@ -35,8 +64,16 @@ export const createSubadmin = async (req, res) => {
       isVerified: true,
     });
 
+    // Create dedicated commission wallet for this panel sub-admin
+    const wallet = await ensureSubAdminWallet(subadmin._id);
+
     const sanitized = subadmin.toObject();
     delete sanitized.password;
+    sanitized.wallet = {
+      availableBalance: roundCurrency(wallet.availableBalance || 0),
+      pendingBalance: roundCurrency(wallet.pendingBalance || 0),
+      totalCredited: roundCurrency(wallet.totalCredited || 0),
+    };
 
     return handleResponse(res, 201, "Sub-admin created successfully", { subadmin: sanitized });
   } catch (error) {
@@ -69,6 +106,7 @@ export const updateSubadmin = async (req, res) => {
     if (password) subadmin.password = password;
 
     await subadmin.save();
+    await ensureSubAdminWallet(subadmin._id);
 
     const sanitized = subadmin.toObject();
     delete sanitized.password;
@@ -87,6 +125,50 @@ export const deleteSubadmin = async (req, res) => {
       return handleResponse(res, 404, "Sub-admin not found");
     }
     return handleResponse(res, 200, "Sub-admin deleted successfully");
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+export const getSubadminWalletController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const subadmin = await Admin.findOne({ _id: id, role: "sub-admin" })
+      .select("name email phone assignedZones")
+      .populate("assignedZones", "name")
+      .lean();
+    if (!subadmin) {
+      return handleResponse(res, 404, "Sub-admin not found");
+    }
+
+    const wallet = await ensureSubAdminWallet(id);
+    const Transaction = (await import("../../models/transaction.js")).default;
+    const transactions = await Transaction.find({
+      user: id,
+      userModel: "Admin",
+      type: "Commission",
+    })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    return handleResponse(res, 200, "Sub-admin wallet fetched", {
+      subadmin,
+      wallet: {
+        availableBalance: roundCurrency(wallet.availableBalance || 0),
+        pendingBalance: roundCurrency(wallet.pendingBalance || 0),
+        totalCredited: roundCurrency(wallet.totalCredited || 0),
+        totalDebited: roundCurrency(wallet.totalDebited || 0),
+      },
+      transactions: transactions.map((t) => ({
+        id: t._id,
+        amount: t.amount,
+        reference: t.reference,
+        status: t.status,
+        date: t.createdAt,
+        description: t.meta?.description || "Commission",
+      })),
+    });
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }

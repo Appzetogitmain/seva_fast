@@ -26,18 +26,22 @@ async function createFinanceAuditLog(data, { session } = {}) {
   return await FinanceAuditLog.create([data], { session });
 }
 
-export async function createPendingPayoutForOrder({
-  order,
-  payoutType,
-  beneficiaryId,
-  amount,
-  remarks = "Automatic payout creation on delivery.",
-  metadata = {},
-}) {
+export async function createPendingPayoutForOrder(
+  {
+    order,
+    payoutType,
+    beneficiaryId,
+    amount,
+    remarks = "Automatic payout creation on delivery.",
+    metadata = {},
+  },
+  { session: externalSession } = {},
+) {
   if (!order || !beneficiaryId || amount <= 0) return null;
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  const session = externalSession || (await mongoose.startSession());
+  const managedSession = !externalSession;
+  if (managedSession) session.startTransaction();
 
   try {
     const existing = await Payout.findOne({
@@ -47,7 +51,7 @@ export async function createPendingPayoutForOrder({
     }).session(session);
 
     if (existing) {
-      await session.abortTransaction();
+      if (managedSession) await session.abortTransaction();
       return existing;
     }
 
@@ -87,18 +91,32 @@ export async function createPendingPayoutForOrder({
         direction: LEDGER_DIRECTION.CREDIT,
         amount: roundCurrency(amount),
         description: `${payoutType} payout queued for order ${order.orderId}`,
+        reference: order.orderId,
       },
       { session },
     );
 
-    await session.commitTransaction();
+    if (managedSession) await session.commitTransaction();
     return payout[0];
   } catch (error) {
-    await session.abortTransaction();
+    if (managedSession) await session.abortTransaction();
     throw error;
   } finally {
-    session.endSession();
+    if (managedSession) session.endSession();
   }
+}
+
+export async function autoProcessSellerPayoutForOrder(orderId, { remarks = "" } = {}) {
+  const payout = await Payout.findOne({
+    relatedOrderIds: orderId,
+    payoutType: PAYOUT_TYPE.SELLER,
+    status: PAYOUT_STATUS.PENDING,
+  }).lean();
+
+  if (!payout) return null;
+  return processPayout(payout._id, {
+    remarks: remarks || "Auto-released to seller wallet on delivery settlement",
+  });
 }
 
 export async function processPayout(payoutId, { remarks = "", adminId = null } = {}) {

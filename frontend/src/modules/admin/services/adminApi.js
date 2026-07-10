@@ -25,6 +25,8 @@ export const adminApi = {
     updateDeliveryFinanceSettings: (data) => axiosInstance.put('/admin/settings/delivery', data),
     getFinanceSummary: () => axiosInstance.get('/admin/finance/summary'),
     getFinanceLedger: (params) => axiosInstance.get('/admin/finance/ledger', { params }),
+    getFinanceOrderEarnings: (params) => axiosInstance.get('/admin/finance/order-earnings', { params }),
+    getCommissionSplitsReport: (params) => axiosInstance.get('/admin/finance/commission-splits', { params }),
     getFinancePayouts: (params) => axiosInstance.get('/admin/finance/payouts', { params }),
     processFinancePayouts: (data) => axiosInstance.post('/admin/finance/payouts/process', data),
     exportFinanceStatement: (params) =>
@@ -83,6 +85,7 @@ export const adminApi = {
 
     // Delivery Partners
     getDeliveryPartners: (params) => axiosInstance.get('/admin/delivery-partners', { params }),
+    updateDeliveryPartner: (id, data) => axiosInstance.put(`/admin/delivery-partners/${id}`, data),
     approveDeliveryPartner: (id) => axiosInstance.patch(`/admin/delivery-partners/approve/${id}`),
     rejectDeliveryPartner: (id) => axiosInstance.delete(`/admin/delivery-partners/reject/${id}`),
     getActiveFleet: (params) => axiosInstance.get('/admin/active-fleet', { params }),
@@ -162,6 +165,7 @@ export const adminApi = {
     createSubadmin: (data) => axiosInstance.post('/admin/subadmins', data),
     updateSubadmin: (id, data) => axiosInstance.put(`/admin/subadmins/${id}`, data),
     deleteSubadmin: (id) => axiosInstance.delete(`/admin/subadmins/${id}`),
+    getSubadminWallet: (id) => axiosInstance.get(`/admin/subadmins/${id}/wallet`),
 
     // Zone Management
     getZones: (params) => axiosInstance.get('/admin/zones', { params }),

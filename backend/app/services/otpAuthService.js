@@ -115,27 +115,27 @@ export async function issueCustomerOtp({
 
   const isTestNumber = phone === "+916268423925" || phone === "+919111966732";
 
-  if (flow === "login" && (!customer || !customer.isVerified)) {
-    if (useRealSMS() && !isTestNumber) {
-      otpAuditLog("customer_otp_login_generic_response", {
+  if (flow === "login") {
+    if (!customer) {
+      otpAuditLog("customer_otp_login_account_missing", {
         phone: maskPhone(phone),
         ipAddress,
-        accountExists: !!customer,
       });
-      return { sent: true, phone };
+      const err = new Error("No account found for this number. Please sign up.");
+      err.statusCode = 404;
+      err.code = "ACCOUNT_NOT_FOUND";
+      throw err;
     }
 
-    // In mock/dev mode or for test numbers, allow login OTP issuance so local testing works end-to-end.
-    if (!customer) {
-      customer = await Customer.create({
-        name: name || "Customer",
-        phone,
-        isVerified: false,
-        referralCode: crypto.randomBytes(4).toString('hex').toUpperCase(),
+    if (!customer.isVerified) {
+      otpAuditLog("customer_otp_login_account_unverified", {
+        phone: maskPhone(phone),
+        ipAddress,
       });
-      customer = await Customer.findById(customer._id).select(
-        "+otpHash +otpExpiresAt +otpFailedAttempts +otpLockedUntil +otpLastSentAt +otpSessionVersion +otp +otpExpiry",
-      );
+      const err = new Error("Account not verified. Please complete sign up.");
+      err.statusCode = 404;
+      err.code = "ACCOUNT_NOT_FOUND";
+      throw err;
     }
   }
 

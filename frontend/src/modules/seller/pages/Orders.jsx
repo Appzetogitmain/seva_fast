@@ -38,7 +38,8 @@ import { Loader2 } from 'lucide-react';
 import Pagination from '@shared/components/ui/Pagination';
 import { DatePicker } from "@/components/ui/date-picker";
 import { onSellerOrderNew } from '@core/services/orderSocket';
-import { getSellerOrderEarning, getSellerEarningBreakdown } from '@/shared/utils/sellerOrderEarning';
+import { getSellerOrderEarning, getSellerEarningBreakdown, getCustomerOrderBill } from '@/shared/utils/sellerOrderEarning';
+import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
 
 
 const Orders = () => {
@@ -86,18 +87,7 @@ const Orders = () => {
     }, []);
 
     const isAnyModalOpen = isDetailsModalOpen || isQuickViewModalOpen;
-
-    useEffect(() => {
-        if (!isAnyModalOpen) return undefined;
-        const prevBodyOverflow = document.body.style.overflow;
-        const prevHtmlOverflow = document.documentElement.style.overflow;
-        document.body.style.overflow = 'hidden';
-        document.documentElement.style.overflow = 'hidden';
-        return () => {
-            document.body.style.overflow = prevBodyOverflow;
-            document.documentElement.style.overflow = prevHtmlOverflow;
-        };
-    }, [isAnyModalOpen]);
+    useLockBodyScroll(isAnyModalOpen);
 
     // Initial load: show full-page loader once
     useEffect(() => {
@@ -160,6 +150,7 @@ const Orders = () => {
                 total: getSellerOrderEarning(order),
                 sellerEarning: getSellerOrderEarning(order),
                 sellerEarningBreakdown: order.sellerEarningBreakdown || null,
+                customerBill: order.customerBill || null,
                 status: getLegacyStatusFromOrder(order),
                 workflowStatus: order.workflowStatus,
                 workflowVersion: order.workflowVersion,
@@ -298,8 +289,8 @@ const Orders = () => {
             return `<div style="font-family: monospace; font-size: 12px; white-space: pre;">${left}${spaces}${priceStr}</div>`;
         }).join('');
 
-        const { productEarning, deliveryShare, total: earningTotal } =
-            getSellerEarningBreakdown(order);
+        const { subtotal, deliveryFee, platformFee, gst, discount, tip, grandTotal } =
+            getCustomerOrderBill(order);
 
         const formatRow = (label, value) => {
             const spacesCount = Math.max(1, 32 - label.length - value.length);
@@ -314,9 +305,21 @@ const Orders = () => {
         };
 
         let pricingRows = '';
-        pricingRows += formatRow('Product:', `₹${productEarning.toFixed(0)}`);
-        if (deliveryShare > 0) {
-            pricingRows += formatRow('Delivery (80%):', `₹${deliveryShare.toFixed(0)}`);
+        pricingRows += formatRow('Subtotal:', `₹${subtotal.toFixed(0)}`);
+        if (deliveryFee > 0) {
+            pricingRows += formatRow('Delivery:', `₹${deliveryFee.toFixed(0)}`);
+        }
+        if (platformFee > 0) {
+            pricingRows += formatRow('Platform Fee:', `₹${platformFee.toFixed(0)}`);
+        }
+        if (gst > 0) {
+            pricingRows += formatRow('GST:', `₹${gst.toFixed(0)}`);
+        }
+        if (tip > 0) {
+            pricingRows += formatRow('Tip:', `₹${tip.toFixed(0)}`);
+        }
+        if (discount > 0) {
+            pricingRows += formatRow('Discount:', `-₹${discount.toFixed(0)}`);
         }
 
         const html = `
@@ -353,7 +356,7 @@ const Orders = () => {
             </head>
             <body>
                 <div class="text-center title">SEVA FAST</div>
-                <div class="text-center bold" style="font-size: 11px;">ORDER RECEIPT</div>
+                <div class="text-center bold" style="font-size: 11px;">CUSTOMER INVOICE</div>
                 <div class="divider"></div>
                 <div style="font-family: monospace;"><strong>Order:</strong> #${order.id}</div>
                 <div style="font-family: monospace;"><strong>Status:</strong> ${order.status.toUpperCase()}</div>
@@ -369,7 +372,7 @@ const Orders = () => {
                 <div class="divider"></div>
                 ${pricingRows}
                 <div class="divider"></div>
-                ${formatBoldRow('YOUR EARNING:', '₹' + earningTotal.toFixed(0))}
+                ${formatBoldRow('TOTAL AMOUNT:', '₹' + grandTotal.toFixed(0))}
                 <div class="divider"></div>
                 <div class="text-center" style="margin-top: 15px; font-size: 10px; font-family: monospace;">Thank you for ordering!</div>
                 <script>
@@ -409,8 +412,8 @@ const Orders = () => {
             `;
         }).join('');
 
-        const { productEarning, deliveryShare, total: earningTotal } =
-            getSellerEarningBreakdown(order);
+        const { subtotal, deliveryFee, platformFee, gst, discount, tip, grandTotal } =
+            getCustomerOrderBill(order);
 
         const html = `
             <!DOCTYPE html>
@@ -506,7 +509,7 @@ const Orders = () => {
                     <div class="header">
                         <div class="header-left">
                             <h1>SEVA FAST</h1>
-                            <p style="margin: 5px 0 0 0; color: #64748b;">Order Invoice</p>
+                            <p style="margin: 5px 0 0 0; color: #64748b;">Customer Invoice</p>
                         </div>
                         <div class="header-right">
                             <h2 style="margin: 0; color: #0f172a; font-size: 16px;">Invoice #${order.id}</h2>
@@ -545,14 +548,18 @@ const Orders = () => {
 
                     <div class="totals">
                         <div class="totals-row">
-                            <span>Product</span>
-                            <span>₹${productEarning.toFixed(2)}</span>
+                            <span>Subtotal</span>
+                            <span>₹${subtotal.toFixed(2)}</span>
                         </div>
-                        ${deliveryShare > 0 ? `<div class="totals-row"><span>Delivery (80%)</span><span>₹${deliveryShare.toFixed(2)}</span></div>` : ''}
+                        ${deliveryFee > 0 ? `<div class="totals-row"><span>Delivery</span><span>₹${deliveryFee.toFixed(2)}</span></div>` : ''}
+                        ${platformFee > 0 ? `<div class="totals-row"><span>Platform Fee</span><span>₹${platformFee.toFixed(2)}</span></div>` : ''}
+                        ${gst > 0 ? `<div class="totals-row"><span>GST</span><span>₹${gst.toFixed(2)}</span></div>` : ''}
+                        ${tip > 0 ? `<div class="totals-row"><span>Tip</span><span>₹${tip.toFixed(2)}</span></div>` : ''}
+                        ${discount > 0 ? `<div class="totals-row"><span>Discount</span><span>-₹${discount.toFixed(2)}</span></div>` : ''}
                         
                         <div class="totals-row grand-total">
-                            <span>Your Earning</span>
-                            <span>₹${earningTotal.toFixed(2)}</span>
+                            <span>Total Amount</span>
+                            <span>₹${grandTotal.toFixed(2)}</span>
                         </div>
                     </div>
                     
@@ -710,15 +717,15 @@ const Orders = () => {
                         <Card className="border-none shadow-xl ring-1 ring-slate-100 rounded-lg bg-white overflow-visible">
                             {/* Tabs */}
                             <div className="border-b border-slate-100 bg-slate-50/30 overflow-x-auto scrollbar-hide">
-                                <div className="flex px-3 sm:px-6 items-center min-w-max">
+                                <div className="flex px-2.5 sm:px-6 items-center min-w-max">
                                     {tabs.map((tab) => (
                                         <button
                                             key={tab}
                                             onClick={() => setActiveTab(tab)}
                                             className={cn(
-                                                "relative py-3 sm:py-4 px-2.5 sm:px-4 text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-300",
+                                                "relative py-3 sm:py-4 px-2 sm:px-4 text-[11px] sm:text-sm font-bold whitespace-nowrap transition-all duration-300",
                                                 activeTab === tab
-                                                    ? "text-primary scale-105"
+                                                    ? "text-primary sm:scale-105"
                                                     : "text-slate-600 hover:text-slate-700"
                                             )}
                                         >
@@ -742,12 +749,12 @@ const Orders = () => {
                                         type="text"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        placeholder="Search by Order ID or Customer Name..."
+                                        placeholder="Search order ID or customer..."
                                         className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 border-none rounded-lg text-sm font-semibold text-slate-700 placeholder:text-slate-500 focus:ring-2 focus:ring-primary/5 transition-all outline-none"
                                     />
                                 </div>
-                                <div className="flex gap-3 shrink-0 w-full lg:w-auto items-center justify-end flex-wrap">
-                                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end sm:justify-start">
+                                <div className="flex gap-2.5 shrink-0 w-full lg:w-auto items-end justify-between flex-wrap">
+                                    <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:items-center sm:gap-2 sm:w-auto">
                                         <div className="w-full sm:w-32">
                                             <DatePicker
                                                 value={startDate}
@@ -777,7 +784,7 @@ const Orders = () => {
                                         <span className="text-xs font-semibold text-slate-600 hidden sm:inline">
                                             to
                                         </span>
-                                        <div className="w-full sm:w-32 mt-2 sm:mt-0">
+                                        <div className="w-full sm:w-32">
                                             <DatePicker
                                                 value={endDate}
                                                 max={todayStr}
@@ -810,7 +817,7 @@ const Orders = () => {
                                     <button
                                         type="button"
                                         onClick={() => { setStartDate(''); setEndDate(''); setPage(1); }}
-                                        className="text-xs font-semibold text-slate-600 hover:text-slate-700"
+                                        className="text-xs font-semibold text-slate-600 hover:text-slate-700 ml-auto"
                                     >
                                         Clear dates
                                     </button>
@@ -865,7 +872,7 @@ const Orders = () => {
                                                         onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
                                                         onClick={(e) => e.stopPropagation()}
                                                         className={cn(
-                                                            "w-full min-w-[100px] text-[10px] pl-2 pr-6 py-1.5 rounded-lg font-black uppercase cursor-pointer appearance-none border outline-none",
+                                                            "w-full min-w-[112px] text-[10px] pl-2 pr-6 py-1.5 rounded-lg font-black uppercase cursor-pointer appearance-none border outline-none",
                                                             order.status === 'pending' ? "bg-amber-100 text-amber-700" :
                                                                 order.status === 'delivered' ? "bg-brand-100 text-brand-700" :
                                                                     order.status === 'cancelled' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"
@@ -878,32 +885,34 @@ const Orders = () => {
                                                         <option value="delivered">Delivered</option>
                                                         <option value="cancelled">Cancelled</option>
                                                     </select>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleThermalPrint(order);
-                                                        }}
-                                                        title="Thermal Print"
-                                                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-600"
-                                                    >
-                                                        <HiOutlinePrinter className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleNormalPrint(order);
-                                                        }}
-                                                        title="Normal Print (A4)"
-                                                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-600"
-                                                    >
-                                                        <HiOutlineDocumentText className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleViewDetails(order)}
-                                                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-600"
-                                                    >
-                                                        <HiOutlineEye className="h-4 w-4" />
-                                                    </button>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleThermalPrint(order);
+                                                            }}
+                                                            title="Thermal Print"
+                                                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
+                                                        >
+                                                            <HiOutlinePrinter className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleNormalPrint(order);
+                                                            }}
+                                                            title="Normal Print (A4)"
+                                                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
+                                                        >
+                                                            <HiOutlineDocumentText className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleViewDetails(order)}
+                                                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
+                                                        >
+                                                            <HiOutlineEye className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </motion.div>
@@ -1100,8 +1109,10 @@ const Orders = () => {
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
+                                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm touch-none"
                                     onClick={() => setIsQuickViewModalOpen(false)}
+                                    onWheel={preventBackdropScroll}
+                                    onTouchMove={preventBackdropScroll}
                                 />
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -1163,8 +1174,10 @@ const Orders = () => {
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-md"
+                                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-md touch-none"
                                     onClick={() => setIsDetailsModalOpen(false)}
+                                    onWheel={preventBackdropScroll}
+                                    onTouchMove={preventBackdropScroll}
                                 />
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -1323,6 +1336,14 @@ const Orders = () => {
                                                 )}
                                             </div>
                                             <div className="space-y-3 sm:space-y-4">
+                                                <div className="bg-slate-50 p-3 sm:p-4 rounded-3xl border border-slate-100">
+                                                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                                                        Order Amount (Customer)
+                                                    </h4>
+                                                    <p className="text-lg font-black text-slate-900">
+                                                        ₹{getCustomerOrderBill(selectedOrder).grandTotal.toFixed(2)}
+                                                    </p>
+                                                </div>
                                                 <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
                                                     <h4 className="text-xs font-black text-primary uppercase tracking-widest mb-3">Your Earning</h4>
                                                     <div className="space-y-2">

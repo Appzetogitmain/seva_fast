@@ -42,6 +42,7 @@ const ActiveDeliveryBoys = () => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
     const [viewingRider, setViewingRider] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Form states
     const [formState, setFormState] = useState({
@@ -137,11 +138,50 @@ const handleOnboardSubmit = (e) => {
     setFormState({ name: '', phone: '', email: '', vehicle: '', vehicleNum: '', location: '' });
 };
 
-const handleEditSubmit = (e) => {
+const handleEditSubmit = async (e) => {
     e.preventDefault();
-    setRiders(riders.map(r => r.id === selectedRider.id ? { ...r, ...formState } : r));
-    setIsEditModalOpen(false);
-    setSelectedRider(null);
+    if (!selectedRider?.id) return;
+
+    try {
+        setIsSaving(true);
+        const payload = {
+            name: formState.name,
+            phone: formState.phone,
+            email: formState.email,
+            vehicleType: formState.vehicle,
+            vehicleNumber: formState.vehicleNum,
+            currentArea: formState.location,
+        };
+        const res = await adminApi.updateDeliveryPartner(selectedRider.id, payload);
+        if (res.data?.success) {
+            toast.success(res.data.message || 'Driver updated successfully');
+            setRiders((prev) =>
+                prev.map((r) =>
+                    r.id === selectedRider.id
+                        ? {
+                            ...r,
+                            name: formState.name,
+                            phone: formState.phone,
+                            email: formState.email,
+                            vehicle: formState.vehicle,
+                            vehicleNum: formState.vehicleNum,
+                            location: formState.location,
+                        }
+                        : r,
+                ),
+            );
+            setIsEditModalOpen(false);
+            setSelectedRider(null);
+            fetchRiders(page);
+        } else {
+            toast.error(res.data?.message || 'Failed to update driver');
+        }
+    } catch (error) {
+        console.error('Update rider error:', error);
+        toast.error(error.response?.data?.message || 'Failed to update driver');
+    } finally {
+        setIsSaving(false);
+    }
 };
 
 const stats = [
@@ -551,8 +591,14 @@ return (
                                 </div>
                             </div>
 
-                            <button type="submit" className="w-full py-4.5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all transform active:scale-[0.98] mt-4">
-                                {isEditModalOpen ? 'SAVE CHANGES' : 'ADD RIDER'}
+                            <button
+                                type="submit"
+                                disabled={isSaving}
+                                className="w-full py-4.5 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all transform active:scale-[0.98] mt-4 disabled:opacity-60 disabled:pointer-events-none"
+                            >
+                                {isEditModalOpen
+                                    ? (isSaving ? 'SAVING...' : 'SAVE CHANGES')
+                                    : 'ADD RIDER'}
                             </button>
                         </form>
                     </motion.div>

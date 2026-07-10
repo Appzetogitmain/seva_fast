@@ -82,6 +82,8 @@ const DeliveryAuth = () => {
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(30);
 
+  const isCycleVehicle = signupVehicle === "cycle";
+
 
 
   useEffect(() => {
@@ -200,6 +202,17 @@ const DeliveryAuth = () => {
       navigate("/delivery/dashboard");
     } catch (error) {
       console.error(error);
+      if (error.response?.status === 403) {
+        toast.info("Your account is pending approval.");
+        navigate("/delivery/pending-approval", {
+          replace: true,
+          state: {
+            approvalRequired: true,
+            applicationStatus: "pending",
+          },
+        });
+        return;
+      }
       toast.error(error.response?.data?.message || "Invalid OTP");
     } finally {
       setLoading(false);
@@ -539,7 +552,9 @@ const DeliveryAuth = () => {
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Vehicle Plate Number</label>
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">
+                              {isCycleVehicle ? "Cycle Identifier (Optional)" : "Vehicle Plate Number"}
+                            </label>
                             <div className="relative">
                               <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
                               <input
@@ -547,13 +562,15 @@ const DeliveryAuth = () => {
                                 value={signupVehicleNumber}
                                 onChange={(e) => setSignupVehicleNumber(e.target.value.toUpperCase())}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
-                                placeholder="KA 05 MN 8921"
+                                placeholder={isCycleVehicle ? "HERO CYCLE / FRAME NO. (Optional)" : "KA 05 MN 8921"}
                               />
                             </div>
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Driving License Number</label>
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">
+                              {isCycleVehicle ? "Government ID Number (Optional)" : "Driving License Number"}
+                            </label>
                             <div className="relative">
                               <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
                               <input
@@ -561,7 +578,7 @@ const DeliveryAuth = () => {
                                 value={signupDLNumber}
                                 onChange={(e) => setSignupDLNumber(e.target.value.toUpperCase())}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
-                                placeholder="DL-1420110012345"
+                                placeholder={isCycleVehicle ? "AADHAAR / OTHER ID (Optional)" : "DL-1420110012345"}
                               />
                             </div>
                           </div>
@@ -575,11 +592,11 @@ const DeliveryAuth = () => {
                             </button>
                             <button
                               onClick={() => {
-                                if (!signupVehicleNumber) {
+                                if (!isCycleVehicle && !signupVehicleNumber) {
                                   toast.error("Please enter your vehicle plate number");
                                   return;
                                 }
-                                if (!signupDLNumber) {
+                                if (!isCycleVehicle && !signupDLNumber) {
                                   toast.error("Please enter your driving license number");
                                   return;
                                 }
@@ -693,7 +710,12 @@ const DeliveryAuth = () => {
                             {[
                               { label: "Aadhar Card (Front/Back)", state: aadharFile, setter: setAadharFile, id: "aadhar" },
                               { label: "PAN Card", state: panFile, setter: setPanFile, id: "pan" },
-                              { label: "Driving License", state: dlFile, setter: setDlFile, id: "dl" },
+                              {
+                                label: isCycleVehicle ? "Government ID (Optional for Cycle)" : "Driving License",
+                                state: dlFile,
+                                setter: setDlFile,
+                                id: "dl",
+                              },
                             ].map((doc) => (
                               <div key={doc.id} className="relative">
                                 <input

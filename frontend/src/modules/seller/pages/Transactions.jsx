@@ -39,15 +39,22 @@ const Transactions = () => {
 
   const stats = [
     {
-      label: "Settled Balance",
-      value: `₹${(data?.balances?.settledBalance || 0).toLocaleString()}`,
+      label: "Wallet Balance",
+      value: `₹${(data?.balances?.totalWalletBalance ?? data?.balances?.settledBalance ?? 0).toLocaleString()}`,
       icon: HiOutlineBanknotes,
       color: "text-brand-600",
       bg: "bg-brand-50",
     },
     {
-      label: "Pending Payouts",
-      value: `₹${(data?.balances?.pendingPayouts || 0).toLocaleString()}`,
+      label: "Available to Withdraw",
+      value: `₹${(data?.balances?.availableBalance ?? 0).toLocaleString()}`,
+      icon: HiOutlineCreditCard,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+    },
+    {
+      label: "On Hold (Return Window)",
+      value: `₹${(data?.balances?.onHoldBalance ?? 0).toLocaleString()}`,
       icon: HiOutlineClock,
       color: "text-amber-600",
       bg: "bg-amber-50",

@@ -27,7 +27,8 @@ import {
     Navigation,
     Store,
     Info,
-    MapPin
+    MapPin,
+    DollarSign
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@shared/components/ui/Toast';
@@ -165,6 +166,36 @@ const OrderDetail = () => {
             </div>
         );
     }
+
+    const paymentBreakdown = order.paymentBreakdown || {};
+    const commissionBreakdown = paymentBreakdown.commissionBreakdown || {};
+    const settlement = order.settlementStatus || {};
+    const customerPaid = Number(paymentBreakdown.grandTotal ?? order.pricing?.total ?? 0);
+    const sellerPayout = Number(paymentBreakdown.sellerPayoutTotal ?? 0);
+    const platformEarning = Number(paymentBreakdown.platformTotalEarning ?? 0);
+    const adminCommission = Number(paymentBreakdown.adminProductCommissionTotal ?? 0);
+    const deliveryFee = Number(paymentBreakdown.deliveryFeeCharged ?? order.pricing?.deliveryFee ?? 0);
+    const adminDeliveryShare = Number(paymentBreakdown.adminDeliveryFeeShare ?? 0);
+    const sellerDeliveryShare = Number(paymentBreakdown.sellerDeliveryFeeShare ?? 0);
+    const handlingFee = Number(paymentBreakdown.handlingFeeCharged ?? 0);
+    const tip = Number(paymentBreakdown.tipTotal ?? paymentBreakdown.riderTipAmount ?? 0);
+    const riderPayout = Number(paymentBreakdown.riderPayoutTotal ?? 0);
+    const productSubtotal = Number(paymentBreakdown.productSubtotal ?? order.pricing?.subtotal ?? 0);
+    const splitCheck = Math.round((sellerPayout + platformEarning) * 100) / 100;
+    const platformParts = [
+        { label: "Admin Commission (from products)", value: adminCommission },
+        { label: "Admin Delivery Share (20%)", value: adminDeliveryShare },
+        { label: "Handling Fee", value: handlingFee },
+        { label: "Tip (to platform)", value: tip },
+    ].filter((row) => Number(row.value) > 0);
+    const internalSplits = [
+        { label: "Affiliate Marketing", value: commissionBreakdown.affiliateMarketingAmount },
+        { label: "Sub Admin", value: commissionBreakdown.subAdminCommissionAmount },
+        { label: "Field Worker", value: commissionBreakdown.fieldWorkerCommissionAmount },
+        { label: "Technical Charge", value: commissionBreakdown.technicalChargeAmount },
+        { label: "Other Maintenance", value: commissionBreakdown.otherMaintenanceAmount },
+        { label: "Advertise", value: commissionBreakdown.advertiseChargeAmount },
+    ].filter((row) => Number(row.value) > 0);
 
     return (
         <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
@@ -431,6 +462,155 @@ const OrderDetail = () => {
                                     <h5 className="text-sm font-black text-slate-900">{order.deliveryBoy?.name || "Pending Rider Assignment"}</h5>
                                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">CONTACT: {order.deliveryBoy?.phone || "N/A"}</p>
                                 </div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Platform Finance Breakdown — hierarchical (do not sum all rows) */}
+                    <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-2xl overflow-hidden text-left">
+                        <div className="p-6 bg-gradient-to-r from-fuchsia-600 to-violet-600 text-white">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                <DollarSign className="h-4 w-4" />
+                                Platform Finance — Order #{order.orderId}
+                            </h4>
+                            <p className="text-[10px] font-bold text-white/80 mt-1 uppercase tracking-widest">
+                                Settlement: {settlement.overall || "PENDING"} · Admin credited: {settlement.adminEarningCredited ? "Yes" : "No"}
+                            </p>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            {!customerPaid && !platformEarning && !sellerPayout ? (
+                                <p className="text-xs font-bold text-slate-400 p-4">Finance breakdown available after order placement.</p>
+                            ) : (
+                                <>
+                                    <div className="rounded-2xl bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-white/70">Customer Paid (Order Total)</p>
+                                            <p className="text-[10px] font-bold text-white/50 mt-1">Only this is the order amount — do not add rows below</p>
+                                        </div>
+                                        <span className="text-2xl font-black">₹{customerPaid.toLocaleString("en-IN")}</span>
+                                    </div>
+
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                                            Money Split (= Customer Paid)
+                                        </p>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slate-50">
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Seller Payout</span>
+                                                <span className="text-sm font-black text-slate-900">₹{sellerPayout.toLocaleString("en-IN")}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-fuchsia-50 ring-1 ring-fuchsia-100">
+                                                <span className="text-[10px] font-black text-fuchsia-600 uppercase tracking-widest">Platform Earning (Admin)</span>
+                                                <span className="text-sm font-black text-fuchsia-700">₹{platformEarning.toLocaleString("en-IN")}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between px-3 py-2 text-[10px] font-bold text-slate-400">
+                                                <span>Check: Seller + Platform</span>
+                                                <span className={splitCheck === customerPaid ? "text-emerald-600" : "text-amber-600"}>
+                                                    ₹{splitCheck.toLocaleString("en-IN")} {splitCheck === customerPaid ? "= Order ✓" : "≠ Order"}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {(productSubtotal > 0 || deliveryFee > 0) && (
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                                                Customer Bill Parts (inside ₹{customerPaid.toLocaleString("en-IN")})
+                                            </p>
+                                            <div className="space-y-1.5 pl-2 border-l-2 border-slate-100">
+                                                {productSubtotal > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Products</span>
+                                                        <span>₹{productSubtotal.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {deliveryFee > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Delivery Fee</span>
+                                                        <span>₹{deliveryFee.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {handlingFee > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Handling</span>
+                                                        <span>₹{handlingFee.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {tip > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Tip</span>
+                                                        <span>₹{tip.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {platformParts.length > 0 && (
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                                                How Platform Earning ₹{platformEarning.toLocaleString("en-IN")} is made
+                                            </p>
+                                            <div className="space-y-1.5 pl-2 border-l-2 border-fuchsia-100">
+                                                {platformParts.map((row) => (
+                                                    <div key={row.label} className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>{row.label}</span>
+                                                        <span>₹{Number(row.value).toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {(sellerDeliveryShare > 0 || riderPayout > 0) && (
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                                                Other payouts (already in split above)
+                                            </p>
+                                            <div className="space-y-1.5 pl-2 border-l-2 border-slate-100">
+                                                {sellerDeliveryShare > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Seller Delivery Share (80%)</span>
+                                                        <span>₹{sellerDeliveryShare.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {riderPayout > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Rider Payout</span>
+                                                        <span>₹{riderPayout.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {internalSplits.length > 0 && (
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                                                Internal allocation (not extra charges on customer)
+                                            </p>
+                                            <div className="space-y-1.5 pl-2 border-l-2 border-amber-100">
+                                                {internalSplits.map((row) => (
+                                                    <div key={row.label} className="flex justify-between text-xs font-bold text-slate-500 px-2 py-1">
+                                                        <span>{row.label}</span>
+                                                        <span>₹{Number(row.value).toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            <div className="flex flex-wrap gap-2 pt-2 px-1">
+                                <Badge variant="secondary" className="text-[8px] font-black uppercase">
+                                    Seller payout: {settlement.sellerPayout || "PENDING"}
+                                </Badge>
+                                <Badge variant="secondary" className="text-[8px] font-black uppercase">
+                                    Rider payout: {settlement.riderPayout || "PENDING"}
+                                </Badge>
+                                <Badge variant="secondary" className="text-[8px] font-black uppercase">
+                                    Mode: {order.paymentMode || order.payment?.method || "N/A"}
+                                </Badge>
                             </div>
                         </div>
                     </Card>

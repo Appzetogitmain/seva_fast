@@ -228,7 +228,7 @@ const UserManagement = () => {
                         Sub-Admin Access Control
                         <Badge variant="primary" className="text-[10px] font-black uppercase tracking-widest">Zone RBAC</Badge>
                     </h1>
-                    <p className="ds-description mt-1">Manage sub-admins and delegate geographic area isolation permissions.</p>
+                    <p className="ds-description mt-1">Manage sub-admins, zone access, and commission wallets.</p>
                 </div>
                 <button
                     onClick={() => handleOpenModal()}
@@ -279,6 +279,7 @@ const UserManagement = () => {
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Sub-Admin Info</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Zones</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Wallet</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Permissions</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                             </tr>
@@ -286,7 +287,7 @@ const UserManagement = () => {
                         <tbody className="divide-y divide-slate-50">
                             {isLoading && (
                                 <tr>
-                                    <td colSpan="5" className="text-center py-12 text-slate-400 text-sm">
+                                    <td colSpan="6" className="text-center py-12 text-slate-400 text-sm">
                                         Loading records...
                                     </td>
                                 </tr>
@@ -327,9 +328,17 @@ const UserManagement = () => {
                                                     </Badge>
                                                 ))
                                             ) : (
-                                                <span className="text-[10px] text-slate-400 font-bold italic">No zones assigned</span>
+                                                <span className="text-[10px] text-amber-600 font-bold italic">No zones — commissions won&apos;t credit</span>
                                             )}
                                         </div>
+                                    </td>
+                                    <td className="px-6 py-6">
+                                        <p className="text-sm font-black text-emerald-700">
+                                            ₹{Number(user.wallet?.availableBalance || 0).toLocaleString('en-IN')}
+                                        </p>
+                                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                            Credited ₹{Number(user.wallet?.totalCredited || 0).toLocaleString('en-IN')}
+                                        </p>
                                     </td>
                                     <td className="px-6 py-6">
                                         <div className="flex flex-wrap gap-1.5 max-w-xs">
@@ -364,7 +373,7 @@ const UserManagement = () => {
                             ))}
                             {!isLoading && filteredUsers.length === 0 && (
                                 <tr>
-                                    <td colSpan="5" className="text-center py-16">
+                                    <td colSpan="6" className="text-center py-16">
                                         <p className="text-slate-400 font-bold text-sm">No sub-admin users found.</p>
                                     </td>
                                 </tr>

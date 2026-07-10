@@ -1,5 +1,5 @@
-import React, { lazy, Suspense } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet, Navigate } from 'react-router-dom';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { createBrowserRouter, RouterProvider, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import ProtectedRoute from '../guards/ProtectedRoute';
 import RoleGuard from '../guards/RoleGuard';
 import { UserRole } from '../constants/roles';
@@ -71,6 +71,48 @@ const PlanEnforcer = ({ children }) => {
     return children;
 };
 
+/** Handles FCM / SW notification clicks without opening localhost absolute URLs. */
+const PushNavigateBridge = () => {
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (typeof navigator === 'undefined' || !navigator.serviceWorker) return undefined;
+
+        const resolvePath = (link) => {
+            const raw = String(link || '').trim();
+            if (!raw) return '';
+            try {
+                if (/^https?:\/\//i.test(raw)) {
+                    const url = new URL(raw);
+                    return `${url.pathname}${url.search}${url.hash}` || '/';
+                }
+            } catch {
+                return '';
+            }
+            return raw.startsWith('/') ? raw : `/${raw}`;
+        };
+
+        const onMessage = (event) => {
+            if (event?.data?.type !== 'push:navigate') return;
+            const path = resolvePath(event.data.link);
+            if (!path) return;
+            navigate(path);
+        };
+
+        navigator.serviceWorker.addEventListener('message', onMessage);
+        return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+    }, [navigate]);
+
+    return null;
+};
+
+const RootLayout = () => (
+    <>
+        <PushNavigateBridge />
+        <Outlet />
+    </>
+);
+
 const CustomerLayoutWrapper = () => (
     <PlanEnforcer>
         <LocationProvider>
@@ -95,7 +137,7 @@ const CustomerLayoutWrapper = () => (
 const router = createBrowserRouter([
         {
             path: '/',
-            element: <Outlet />,
+            element: <RootLayout />,
             errorElement: <RootErrorBoundary />,
             children: [
                 {

@@ -109,6 +109,45 @@ const Topbar = ({ onMenuClick }) => {
         }
     };
 
+    const handleOpenNotification = (notif) => {
+        const raw = String(notif?.data?.link || notif?.link || "").trim();
+        let path = "";
+        if (raw) {
+            try {
+                if (/^https?:\/\//i.test(raw)) {
+                    const url = new URL(raw);
+                    path = `${url.pathname}${url.search}${url.hash}` || "";
+                } else {
+                    path = raw.startsWith("/") ? raw : `/${raw}`;
+                }
+            } catch {
+                path = "";
+            }
+        }
+
+        // Fallback by event type when link missing / old localhost-only payloads
+        if (!path || path === "/") {
+            const type = String(notif?.type || notif?.data?.eventType || "").toUpperCase();
+            const orderId = notif?.data?.orderId || "";
+            if (isAdmin && (type.includes("RETURN") || type === "RETURN_REQUESTED" || type === "RETURN_COMPLETED")) {
+                path = orderId
+                    ? `/admin/returns?orderId=${encodeURIComponent(orderId)}`
+                    : "/admin/returns";
+            } else if (isAdmin && type.includes("SELLER")) {
+                path = "/admin/pending-sellers";
+            } else if (isSeller && type.includes("RETURN")) {
+                path = orderId
+                    ? `/seller/returns?orderId=${encodeURIComponent(orderId)}`
+                    : "/seller/returns";
+            }
+        }
+
+        setShowNotifications(false);
+        if (path && path !== "/") {
+            navigate(path);
+        }
+    };
+
     const handleLogout = () => {
         requestSignOut();
     };
@@ -176,6 +215,7 @@ const Topbar = ({ onMenuClick }) => {
                                 notifications={notifications}
                                 onMarkAsRead={handleMarkAsRead}
                                 onMarkAllAsRead={handleMarkAllAsRead}
+                                onOpenNotification={handleOpenNotification}
                                 onClose={() => setShowNotifications(false)}
                             />
                         )}

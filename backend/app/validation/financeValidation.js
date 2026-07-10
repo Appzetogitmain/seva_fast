@@ -87,6 +87,15 @@ export const financeLedgerQuerySchema = Joi.object({
   toDate: Joi.date().optional(),
 });
 
+export const financeOrderEarningsQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(25),
+  search: Joi.string().allow("", null).optional(),
+  paymentMode: Joi.string().valid("ONLINE", "COD").optional(),
+  fromDate: Joi.date().optional(),
+  toDate: Joi.date().optional(),
+});
+
 export const payoutProcessSchema = Joi.object({
   payoutIds: Joi.array().items(Joi.string()).default([]),
   payoutType: Joi.string().valid("SELLER", "DELIVERY_PARTNER").optional(),

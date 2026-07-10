@@ -767,7 +767,11 @@ const DeliveryLayout = () => {
       </main>
 
       {shouldShowBottomNav && <BottomNav />}
-      <Toaster position="top-center" />
+      <Toaster
+        position="top-center"
+        offset={72}
+        mobileOffset={72}
+      />
     </div>
   );
 };

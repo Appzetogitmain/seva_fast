@@ -12,6 +12,8 @@ import {
 import { addMoney, clampMoney, roundCurrency } from "../../utils/money.js";
 
 function normalizeOwnerId(ownerType, ownerId) {
+  // Platform admin wallet is a single shared wallet (ownerId null).
+  // Sub-admin wallets are per Admin document.
   if (ownerType === OWNER_TYPE.ADMIN) return null;
   return ownerId || null;
 }

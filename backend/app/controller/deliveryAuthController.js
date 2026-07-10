@@ -245,17 +245,20 @@ export const verifyDeliveryOTP = async (req, res) => {
             return handleResponse(res, 400, "Invalid or expired OTP");
         }
 
-        // If rider registered under a seller (via invite code), keep isVerified=false
-        // so the seller can review and approve them from their dashboard.
-        // Standalone riders (no sellerId) are auto-verified immediately.
-        if (!delivery.sellerId) {
-            delivery.isVerified = true;
-            delivery.isOnline = true;
-        }
         delivery.otp = undefined;
         delivery.otpExpiry = undefined;
-        delivery.lastLogin = new Date();
+        await delivery.save();
 
+        if (!delivery.isVerified) {
+            return handleResponse(res, 403, "Your delivery partner account is pending admin approval.", {
+                isVerified: false,
+                applicationStatus: "pending",
+                requiresApproval: true,
+            });
+        }
+
+        delivery.lastLogin = new Date();
+        delivery.isOnline = true;
         await delivery.save();
 
         await recordAuthActivity({

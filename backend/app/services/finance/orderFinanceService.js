@@ -18,6 +18,7 @@ import {
   updateCashInHand,
 } from "./walletService.js";
 import { createPendingPayoutForOrder } from "./payoutService.js";
+import { resolveSellerOrderEarning } from "./pricingService.js";
 
 function toOrderIdQuery(orderOrId) {
   if (!orderOrId) return null;
@@ -171,7 +172,9 @@ export async function createPendingSellerPayout(order, { session, actorId } = {}
   if (!order?.seller) return null;
   if (order.financeFlags?.sellerPayoutQueued) return null;
 
-  const amount = roundCurrency(order.paymentBreakdown?.sellerPayoutTotal || 0);
+  const amount = roundCurrency(
+    order.paymentBreakdown?.sellerPayoutTotal || resolveSellerOrderEarning(order) || 0,
+  );
   if (amount <= 0) {
     order.settlementStatus = {
       ...(order.settlementStatus || {}),
@@ -186,7 +189,6 @@ export async function createPendingSellerPayout(order, { session, actorId } = {}
       payoutType: PAYOUT_TYPE.SELLER,
       beneficiaryId: order.seller,
       amount,
-      createdBy: actorId || null,
       metadata: { flow: "order_delivered" },
     },
     { session },
@@ -216,7 +218,8 @@ export async function releaseHeldSellerPayout(orderOrId, { actorId = null } = {}
 
     if (order.financeFlags?.sellerPayoutQueued) {
       await session.commitTransaction();
-      return null;
+      const { autoProcessSellerPayoutForOrder } = await import("./payoutService.js");
+      return autoProcessSellerPayoutForOrder(order._id);
     }
 
     const payout = await createPendingSellerPayout(order, { session, actorId });
@@ -233,6 +236,11 @@ export async function releaseHeldSellerPayout(orderOrId, { actorId = null } = {}
 
     await order.save({ session });
     await session.commitTransaction();
+
+    if (payout) {
+      const { autoProcessSellerPayoutForOrder } = await import("./payoutService.js");
+      await autoProcessSellerPayoutForOrder(order._id);
+    }
     return payout;
   } catch (error) {
     await session.abortTransaction();
@@ -240,6 +248,32 @@ export async function releaseHeldSellerPayout(orderOrId, { actorId = null } = {}
   } finally {
     session.endSession();
   }
+}
+
+export async function releaseExpiredHeldSellerPayouts({ sellerId = null } = {}) {
+  const now = new Date();
+  const query = {
+    status: "delivered",
+    "financeFlags.sellerPayoutHeld": true,
+    "financeFlags.sellerPayoutQueued": { $ne: true },
+    returnWindowExpiresAt: { $lte: now },
+  };
+  if (sellerId) query.seller = sellerId;
+
+  const orders = await Order.find(query).select("_id orderId seller").lean();
+  const released = [];
+  for (const order of orders) {
+    try {
+      const payout = await releaseHeldSellerPayout(order._id);
+      if (payout) released.push(order.orderId);
+    } catch (error) {
+      console.warn(
+        `[releaseExpiredHeldSellerPayouts] Failed for order ${order.orderId}:`,
+        error.message,
+      );
+    }
+  }
+  return released;
 }
 
 export async function createPendingRiderPayout(order, { session, actorId } = {}) {
@@ -411,38 +445,173 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
     }
   }
 
-  // 2. Sub-Admin and Field Worker Commissions
-  // Go to the onboarder of the seller (seller.onboardedBy)
+  // 2. Sub-Admin Commission → Admin panel sub-admin wallet (by seller zone)
+  //    Field Worker → seller onboarder (customer referral chain)
   const subAdminAmt = roundCurrency(commBreakdown.subAdminCommissionAmount || 0);
   const fieldWorkerAmt = roundCurrency(commBreakdown.fieldWorkerCommissionAmount || 0);
-  
+
   if ((subAdminAmt > 0 || fieldWorkerAmt > 0) && order.seller) {
     const SellerModel = (await import("../../models/seller.js")).default;
     const seller = await SellerModel.findById(order.seller).session(session);
-    
-    if (seller && seller.onboardedBy) {
-      const onboarderId = seller.onboardedBy;
-      const CustomerModel = (await import("../../models/customer.js")).default;
-      const onboarderUser = await CustomerModel.findById(onboarderId).session(session);
-      
-      if (onboarderUser) {
-        // Distribute Field Worker Commission
-        if (fieldWorkerAmt > 0) {
+
+    if (seller) {
+      // Sub-Admin: prefer zone-assigned Admin (created from admin panel)
+      if (subAdminAmt > 0) {
+        const zoneId = seller.zoneId || order.zoneId || null;
+        let creditedToPanelSubAdmin = false;
+
+        if (zoneId) {
+          const AdminModel = (await import("../../models/admin.js")).default;
+          const panelSubAdmin = await AdminModel.findOne({
+            role: "sub-admin",
+            assignedZones: zoneId,
+          }).session(session);
+
+          if (panelSubAdmin) {
+            await creditWallet({
+              ownerType: OWNER_TYPE.SUB_ADMIN,
+              ownerId: panelSubAdmin._id,
+              amount: subAdminAmt,
+              bucket: "available",
+              session,
+            });
+
+            const subAdminWallet = await getOrCreateWallet(
+              OWNER_TYPE.SUB_ADMIN,
+              panelSubAdmin._id,
+              { session },
+            );
+            await createLedgerEntry(
+              {
+                orderId: order._id,
+                walletId: subAdminWallet._id,
+                actorType: OWNER_TYPE.SUB_ADMIN,
+                actorId: panelSubAdmin._id,
+                type: LEDGER_TRANSACTION_TYPE.COMMISSION,
+                direction: LEDGER_DIRECTION.CREDIT,
+                amount: subAdminAmt,
+                paymentMode: order.paymentMode,
+                description: `Sub-admin commission for order ${order.orderId} (zone)`,
+                reference: `SA-COMM-${order.orderId}`,
+              },
+              { session },
+            );
+
+            const TransactionModel = (await import("../../models/transaction.js")).default;
+            await TransactionModel.create(
+              [
+                {
+                  user: panelSubAdmin._id,
+                  userModel: "Admin",
+                  type: "Commission",
+                  amount: subAdminAmt,
+                  status: "Settled",
+                  reference: `SA-COMM-${order.orderId}`,
+                  order: order._id,
+                  meta: {
+                    orderId: order._id,
+                    commissionPercent: commBreakdown.subAdminCommissionPercent,
+                    orderAmount: breakdown.productSubtotal,
+                    description: `Sub-Admin Commission from order ${order.orderId}`,
+                    zoneId: String(zoneId),
+                  },
+                },
+              ],
+              { session },
+            );
+            creditedToPanelSubAdmin = true;
+          }
+        }
+
+        // Fallback: referral chain (legacy customer-based sub-admin)
+        if (!creditedToPanelSubAdmin && seller.onboardedBy) {
+          const CustomerModel = (await import("../../models/customer.js")).default;
+          const onboarderUser = await CustomerModel.findById(seller.onboardedBy).session(session);
+          if (onboarderUser) {
+            let targetSubAdminId = seller.onboardedBy;
+            if (onboarderUser.referredBy) {
+              targetSubAdminId = onboarderUser.referredBy;
+            }
+
+            await creditWallet({
+              ownerType: OWNER_TYPE.CUSTOMER,
+              ownerId: targetSubAdminId,
+              amount: subAdminAmt,
+              bucket: "available",
+              session,
+            });
+
+            const subAdminWallet = await getOrCreateWallet(
+              OWNER_TYPE.CUSTOMER,
+              targetSubAdminId,
+              { session },
+            );
+            await createLedgerEntry(
+              {
+                orderId: order._id,
+                walletId: subAdminWallet._id,
+                actorType: OWNER_TYPE.CUSTOMER,
+                actorId: targetSubAdminId,
+                type: LEDGER_TRANSACTION_TYPE.COMMISSION,
+                direction: LEDGER_DIRECTION.CREDIT,
+                amount: subAdminAmt,
+                paymentMode: order.paymentMode,
+                description: `Sub-admin commission for order ${order.orderId}`,
+                reference: `SA-COMM-${order.orderId}`,
+              },
+              { session },
+            );
+
+            const TransactionModel = (await import("../../models/transaction.js")).default;
+            await TransactionModel.create(
+              [
+                {
+                  user: targetSubAdminId,
+                  userModel: "User",
+                  type: "Commission",
+                  amount: subAdminAmt,
+                  status: "Settled",
+                  reference: `SA-COMM-${order.orderId}`,
+                  order: order._id,
+                  meta: {
+                    orderId: order._id,
+                    commissionPercent: commBreakdown.subAdminCommissionPercent,
+                    orderAmount: breakdown.productSubtotal,
+                    description: `Sub-Admin Commission from order ${order.orderId}`,
+                  },
+                },
+              ],
+              { session },
+            );
+          }
+        }
+      }
+
+      // Field Worker: seller onboarder customer wallet
+      if (fieldWorkerAmt > 0 && seller.onboardedBy) {
+        const CustomerModel = (await import("../../models/customer.js")).default;
+        const onboarderUser = await CustomerModel.findById(seller.onboardedBy).session(session);
+
+        if (onboarderUser) {
           await creditWallet({
             ownerType: OWNER_TYPE.CUSTOMER,
-            ownerId: onboarderId,
+            ownerId: seller.onboardedBy,
             amount: fieldWorkerAmt,
             bucket: "available",
             session,
           });
 
-          const onboarderWallet = await getOrCreateWallet(OWNER_TYPE.CUSTOMER, onboarderId, { session });
+          const onboarderWallet = await getOrCreateWallet(
+            OWNER_TYPE.CUSTOMER,
+            seller.onboardedBy,
+            { session },
+          );
           await createLedgerEntry(
             {
               orderId: order._id,
               walletId: onboarderWallet._id,
               actorType: OWNER_TYPE.CUSTOMER,
-              actorId: onboarderId,
+              actorId: seller.onboardedBy,
               type: LEDGER_TRANSACTION_TYPE.INCENTIVE,
               direction: LEDGER_DIRECTION.CREDIT,
               amount: fieldWorkerAmt,
@@ -454,69 +623,26 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
           );
 
           const TransactionModel = (await import("../../models/transaction.js")).default;
-          await TransactionModel.create([{
-            user: onboarderId,
-            userModel: "User",
-            type: "Incentive",
-            amount: fieldWorkerAmt,
-            status: "Settled",
-            reference: `FW-COMM-${order.orderId}`,
-            meta: {
-              orderId: order._id,
-              commissionPercent: commBreakdown.fieldWorkerCommissionPercent,
-              orderAmount: breakdown.productSubtotal,
-              description: `Field Worker Commission for onboarding seller ${seller.shopName}`
-            }
-          }], { session });
-        }
-
-        // Distribute Sub-Admin Commission
-        if (subAdminAmt > 0) {
-          let targetSubAdminId = onboarderId;
-          if (onboarderUser.referredBy) {
-            targetSubAdminId = onboarderUser.referredBy;
-          }
-
-          await creditWallet({
-            ownerType: OWNER_TYPE.CUSTOMER,
-            ownerId: targetSubAdminId,
-            amount: subAdminAmt,
-            bucket: "available",
-            session,
-          });
-
-          const subAdminWallet = await getOrCreateWallet(OWNER_TYPE.CUSTOMER, targetSubAdminId, { session });
-          await createLedgerEntry(
-            {
-              orderId: order._id,
-              walletId: subAdminWallet._id,
-              actorType: OWNER_TYPE.CUSTOMER,
-              actorId: targetSubAdminId,
-              type: LEDGER_TRANSACTION_TYPE.COMMISSION,
-              direction: LEDGER_DIRECTION.CREDIT,
-              amount: subAdminAmt,
-              paymentMode: order.paymentMode,
-              description: `Sub-admin commission for order ${order.orderId}`,
-              reference: `SA-COMM-${order.orderId}`,
-            },
+          await TransactionModel.create(
+            [
+              {
+                user: seller.onboardedBy,
+                userModel: "User",
+                type: "Incentive",
+                amount: fieldWorkerAmt,
+                status: "Settled",
+                reference: `FW-COMM-${order.orderId}`,
+                order: order._id,
+                meta: {
+                  orderId: order._id,
+                  commissionPercent: commBreakdown.fieldWorkerCommissionPercent,
+                  orderAmount: breakdown.productSubtotal,
+                  description: `Field Worker Commission for onboarding seller ${seller.shopName}`,
+                },
+              },
+            ],
             { session },
           );
-
-          const TransactionModel = (await import("../../models/transaction.js")).default;
-          await TransactionModel.create([{
-            user: targetSubAdminId,
-            userModel: "User",
-            type: "Commission",
-            amount: subAdminAmt,
-            status: "Settled",
-            reference: `SA-COMM-${order.orderId}`,
-            meta: {
-              orderId: order._id,
-              commissionPercent: commBreakdown.subAdminCommissionPercent,
-              orderAmount: breakdown.productSubtotal,
-              description: `Sub-Admin Commission from order ${order.orderId}`
-            }
-          }], { session });
         }
       }
     }
@@ -786,8 +912,6 @@ export async function settleDeliveredOrder(orderOrId, { actorId = null } = {}) {
     const holdSellerPayout =
       order.returnWindowExpiresAt instanceof Date && order.returnWindowExpiresAt > now;
 
-    await createPendingSellerPayout(order, { session, actorId });
-
     if (holdSellerPayout) {
       order.financeFlags = {
         ...(order.financeFlags || {}),
@@ -797,7 +921,10 @@ export async function settleDeliveredOrder(orderOrId, { actorId = null } = {}) {
         ...(order.settlementStatus || {}),
         sellerPayout: "HOLD",
       };
+    } else {
+      await createPendingSellerPayout(order, { session, actorId });
     }
+
     await createPendingRiderPayout(order, { session, actorId });
     await creditAdminEarning(order, { session, actorId });
     await distributeSlabCommissions(order, { session, actorId });

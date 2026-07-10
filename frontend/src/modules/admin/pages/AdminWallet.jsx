@@ -22,7 +22,11 @@ import {
     BarChart3,
     ArrowDownCircle,
     ArrowUpCircle,
-    RotateCw
+    RotateCw,
+    ShoppingBag,
+    ExternalLink,
+    Receipt,
+    Store
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -45,6 +49,40 @@ const AdminWallet = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [loadingId, setLoadingId] = useState(null);
+    const [orderEarnings, setOrderEarnings] = useState({ items: [], summary: {}, total: 0, totalPages: 1 });
+    const [orderEarningsLoading, setOrderEarningsLoading] = useState(true);
+    const [orderEarningsPage, setOrderEarningsPage] = useState(1);
+    const [orderEarningsPageSize, setOrderEarningsPageSize] = useState(15);
+    const [orderEarningsSearch, setOrderEarningsSearch] = useState('');
+    const [orderPaymentFilter, setOrderPaymentFilter] = useState('all');
+    const [selectedOrderEarning, setSelectedOrderEarning] = useState(null);
+
+    const fetchOrderEarnings = async (page = 1) => {
+        try {
+            setOrderEarningsLoading(true);
+            const params = { page, limit: orderEarningsPageSize };
+            if (orderEarningsSearch.trim()) params.search = orderEarningsSearch.trim();
+            if (orderPaymentFilter !== 'all') params.paymentMode = orderPaymentFilter;
+
+            const res = await adminApi.getFinanceOrderEarnings(params);
+            if (res.data.success) {
+                const payload = res.data.result || {};
+                setOrderEarnings({
+                    items: Array.isArray(payload.items) ? payload.items : [],
+                    summary: payload.summary || {},
+                    total: payload.total || 0,
+                    totalPages: payload.totalPages || 1,
+                    page: payload.page || page,
+                });
+                if (typeof payload.page === 'number') setOrderEarningsPage(payload.page);
+            }
+        } catch (error) {
+            console.error('Order earnings fetch error:', error);
+            toast.error('Failed to load order earnings');
+        } finally {
+            setOrderEarningsLoading(false);
+        }
+    };
 
     const fetchData = async (page = 1) => {
         try {
@@ -70,7 +108,8 @@ const AdminWallet = () => {
                     recipient: entry.direction === "CREDIT" ? (entry.actorType || "SYSTEM") : "PLATFORM_WALLET",
                     date: entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : "-",
                     time: entry.createdAt ? new Date(entry.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-",
-                    notes: entry.description || entry.type,
+                    orderRef: entry.reference || entry.metadata?.orderId || "",
+                    notes: [entry.reference ? `Order #${entry.reference}` : "", entry.description || entry.type].filter(Boolean).join(" — "),
                     method: entry.paymentMode || "N/A",
                 }));
 
@@ -120,6 +159,19 @@ const AdminWallet = () => {
         fetchData(txnPage);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [txnPage]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchOrderEarnings(1);
+        }, 500);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orderEarningsPageSize, orderEarningsSearch, orderPaymentFilter]);
+
+    useEffect(() => {
+        fetchOrderEarnings(orderEarningsPage);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orderEarningsPage]);
 
     const handleUpdateStatus = async (id, status, reason = "") => {
         try {
@@ -377,6 +429,180 @@ const AdminWallet = () => {
                     </motion.div>
                 ))}
             </div>
+
+            {/* Order-wise Platform Earnings */}
+            <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-[28px] overflow-hidden">
+                <div className="p-6 border-b border-slate-100">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-fuchsia-50 text-fuchsia-600 rounded-xl">
+                                <Receipt className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h2 className="ds-h2">Order-wise Platform Earnings</h2>
+                                <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                                    Har delivered order se kitna collect hua aur platform ko kitna mila
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex bg-slate-100 p-1 rounded-xl">
+                                {['all', 'ONLINE', 'COD'].map((mode) => (
+                                    <button
+                                        key={mode}
+                                        onClick={() => setOrderPaymentFilter(mode)}
+                                        className={cn(
+                                            "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight transition-all",
+                                            orderPaymentFilter === mode ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                        )}
+                                    >
+                                        {mode === 'all' ? 'All' : mode}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="relative group">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={orderEarningsSearch}
+                                    onChange={(e) => setOrderEarningsSearch(e.target.value)}
+                                    placeholder="Search order ID..."
+                                    className="pl-9 pr-4 py-2 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-fuchsia-100 w-full sm:w-52"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+                        {[
+                            { label: 'Delivered Orders', value: orderEarnings.summary?.orderCount || 0, suffix: '' },
+                            { label: 'Customer Paid', value: orderEarnings.summary?.totalCustomerPaid || 0, prefix: '₹' },
+                            { label: 'Platform Earning', value: orderEarnings.summary?.totalPlatformEarning || 0, prefix: '₹', highlight: true },
+                            { label: 'Seller Payouts', value: orderEarnings.summary?.totalSellerPayout || 0, prefix: '₹' },
+                        ].map((item) => (
+                            <div
+                                key={item.label}
+                                className={cn(
+                                    "rounded-2xl px-4 py-3 ring-1",
+                                    item.highlight ? "bg-fuchsia-50 ring-fuchsia-100" : "bg-slate-50 ring-slate-100"
+                                )}
+                            >
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.label}</p>
+                                <p className={cn("text-lg font-black mt-1", item.highlight ? "text-fuchsia-700" : "text-slate-900")}>
+                                    {item.prefix || ''}{Number(item.value || 0).toLocaleString('en-IN')}{item.suffix || ''}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="px-6 pb-3">
+                    <p className="text-[11px] font-bold text-slate-500">
+                        Split rule: <span className="text-slate-800">Seller Payout + Platform Earning = Customer Paid</span>
+                        <span className="text-slate-400 font-semibold"> · Commission is inside Platform Earning (detail on row click)</span>
+                    </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="min-w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50/80 border-b border-slate-100">
+                                <th className="ds-table-header-cell pl-6">Order</th>
+                                <th className="ds-table-header-cell">Seller</th>
+                                <th className="ds-table-header-cell text-center">Customer Paid</th>
+                                <th className="ds-table-header-cell text-center">Seller Payout</th>
+                                <th className="ds-table-header-cell text-center">Platform Earning</th>
+                                <th className="ds-table-header-cell text-center">Mode</th>
+                                <th className="ds-table-header-cell text-right pr-6">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {orderEarningsLoading ? (
+                                <tr>
+                                    <td colSpan="7" className="px-6 py-16 text-center text-sm font-bold text-slate-400">
+                                        Loading order earnings...
+                                    </td>
+                                </tr>
+                            ) : orderEarnings.items.length === 0 ? (
+                                <tr>
+                                    <td colSpan="7" className="px-6 py-16 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <ShoppingBag className="h-10 w-10 text-slate-200" />
+                                            <p className="text-sm font-bold text-slate-400">No delivered orders found</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                orderEarnings.items.map((row) => (
+                                    <tr
+                                        key={row.orderId}
+                                        className="hover:bg-fuchsia-50/30 transition-colors cursor-pointer"
+                                        onClick={() => setSelectedOrderEarning(row)}
+                                    >
+                                        <td className="px-6 py-4">
+                                            <p className="text-sm font-black text-slate-900">#{row.orderId}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 mt-1">
+                                                {row.deliveredAt ? new Date(row.deliveredAt).toLocaleDateString('en-IN') : '-'}
+                                            </p>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <p className="text-xs font-bold text-slate-800">{row.seller?.shopName || '—'}</p>
+                                            <p className="text-[10px] text-slate-400">{row.seller?.name || ''}</p>
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            <span className="text-sm font-black text-slate-800">₹{Number(row.customerPaid || 0).toLocaleString('en-IN')}</span>
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            <span className="text-sm font-bold text-slate-700">₹{Number(row.sellerPayout || 0).toLocaleString('en-IN')}</span>
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            <span className="text-sm font-black text-fuchsia-700">₹{Number(row.platformEarning || 0).toLocaleString('en-IN')}</span>
+                                            {row.adminEarningCredited && (
+                                                <p className="text-[9px] font-black text-emerald-600 uppercase mt-1">Credited</p>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            <Badge variant={row.paymentMode === 'ONLINE' ? 'success' : 'warning'} className="text-[8px] font-black">
+                                                {row.paymentMode || 'COD'}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate(`/admin/orders/view/${row.orderId}`);
+                                                }}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase bg-slate-900 text-white hover:bg-slate-800"
+                                            >
+                                                View
+                                                <ExternalLink className="h-3 w-3" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {orderEarnings.total > 0 && (
+                    <div className="px-6 py-3 border-t border-slate-100">
+                        <Pagination
+                            page={orderEarningsPage}
+                            totalPages={orderEarnings.totalPages || 1}
+                            total={orderEarnings.total}
+                            pageSize={orderEarningsPageSize}
+                            onPageChange={setOrderEarningsPage}
+                            onPageSizeChange={(newSize) => {
+                                setOrderEarningsPageSize(newSize);
+                                setOrderEarningsPage(1);
+                            }}
+                            loading={orderEarningsLoading}
+                        />
+                    </div>
+                )}
+            </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Transaction History */}
@@ -641,6 +867,7 @@ const AdminWallet = () => {
                         <div className="space-y-3">
                             {[
                                 { label: 'Platform Revenue Report', icon: TrendingUp, path: '/admin' },
+                                { label: 'Commission Splits Report', icon: PieChart, path: '/admin/commission-splits' },
                                 { label: 'Settlement History', icon: History, path: '/admin/delivery-funds' },
                                 { label: 'Tax Statements', icon: DollarSign, path: '#' },
                             ].map((link, i) => (
@@ -722,6 +949,122 @@ const AdminWallet = () => {
                                 CLOSE
                             </button>
                         </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* Order Earning Detail Modal */}
+            <Modal
+                isOpen={!!selectedOrderEarning}
+                onClose={() => setSelectedOrderEarning(null)}
+                title={`Order #${selectedOrderEarning?.orderId || ''} — Finance Breakdown`}
+                size="md"
+            >
+                {selectedOrderEarning && (
+                    <div className="space-y-5">
+                        <div className="rounded-2xl bg-slate-900 text-white px-4 py-4 text-center">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-white/70">Customer Paid (Order Total)</p>
+                            <h4 className="text-3xl font-black mt-1">
+                                ₹{Number(selectedOrderEarning.customerPaid || 0).toLocaleString('en-IN')}
+                            </h4>
+                            <p className="text-[10px] font-bold text-white/50 mt-2 uppercase">
+                                Via {selectedOrderEarning.paymentMode} · Do not add the rows below to this total
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                                Money Split (= Customer Paid)
+                            </p>
+                            <div className="space-y-2">
+                                <div className="flex justify-between bg-slate-50 rounded-xl px-3 py-2.5">
+                                    <span className="text-xs font-bold text-slate-600">Seller Payout</span>
+                                    <span className="text-sm font-black text-slate-900">₹{Number(selectedOrderEarning.sellerPayout || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                                <div className="flex justify-between bg-fuchsia-50 ring-1 ring-fuchsia-100 rounded-xl px-3 py-2.5">
+                                    <span className="text-xs font-bold text-fuchsia-700">Platform Earning</span>
+                                    <span className="text-sm font-black text-fuchsia-700">₹{Number(selectedOrderEarning.platformEarning || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                                <div className="flex justify-between text-[10px] font-bold text-slate-400 px-1">
+                                    <span>Check: Seller + Platform</span>
+                                    <span className="text-emerald-600">
+                                        ₹{(Number(selectedOrderEarning.sellerPayout || 0) + Number(selectedOrderEarning.platformEarning || 0)).toLocaleString('en-IN')}
+                                        {Math.round((Number(selectedOrderEarning.sellerPayout || 0) + Number(selectedOrderEarning.platformEarning || 0)) * 100) / 100 === Number(selectedOrderEarning.customerPaid || 0) ? ' = Order ✓' : ''}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+                                How Platform Earning is made (inside ₹{Number(selectedOrderEarning.platformEarning || 0).toLocaleString('en-IN')})
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {[
+                                    { label: 'Admin Commission', value: selectedOrderEarning.adminCommission },
+                                    { label: 'Delivery Fee (customer)', value: selectedOrderEarning.deliveryFee },
+                                    { label: 'Handling Fee', value: selectedOrderEarning.handlingFee },
+                                    { label: 'Tip', value: selectedOrderEarning.tip },
+                                    { label: 'Rider Payout', value: selectedOrderEarning.riderPayout },
+                                ].filter((item) => Number(item.value) > 0).map((item) => (
+                                    <div key={item.label} className="bg-slate-50 rounded-xl p-3">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase">{item.label}</p>
+                                        <p className="text-sm font-black text-slate-900 mt-1">₹{Number(item.value || 0).toLocaleString('en-IN')}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-[10px] font-semibold text-slate-400 mt-2 px-1">
+                                Commission / delivery / handling are parts of the split above — not extra on top of ₹{Number(selectedOrderEarning.customerPaid || 0).toLocaleString('en-IN')}.
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Internal allocation (not extra customer charges)</p>
+                            <div className="space-y-2">
+                                {(() => {
+                                    const splits = [
+                                        { label: 'Affiliate Marketing', value: selectedOrderEarning.commissionSplits?.affiliate },
+                                        { label: 'Sub Admin', value: selectedOrderEarning.commissionSplits?.subAdmin },
+                                        { label: 'Field Worker', value: selectedOrderEarning.commissionSplits?.fieldWorker },
+                                        { label: 'Technical Charge', value: selectedOrderEarning.commissionSplits?.technical },
+                                        { label: 'Maintenance', value: selectedOrderEarning.commissionSplits?.maintenance },
+                                        { label: 'Advertise', value: selectedOrderEarning.commissionSplits?.advertise },
+                                    ].filter((s) => Number(s.value) > 0);
+                                    if (splits.length === 0) {
+                                        return <p className="text-xs font-semibold text-slate-400">No internal splits recorded for this order.</p>;
+                                    }
+                                    return splits.map((split) => (
+                                        <div key={split.label} className="flex justify-between text-xs font-bold text-slate-600 px-1">
+                                            <span>{split.label}</span>
+                                            <span>₹{Number(split.value).toLocaleString('en-IN')}</span>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 pt-2">
+                            <Badge variant="secondary" className="text-[8px] font-black uppercase">
+                                Settlement: {selectedOrderEarning.settlement?.overall || 'PENDING'}
+                            </Badge>
+                            <Badge variant={selectedOrderEarning.adminEarningCredited ? 'success' : 'warning'} className="text-[8px] font-black uppercase">
+                                Admin {selectedOrderEarning.adminEarningCredited ? 'Credited' : 'Pending'}
+                            </Badge>
+                            {selectedOrderEarning.seller?.shopName && (
+                                <Badge variant="secondary" className="text-[8px] font-black uppercase">
+                                    <Store className="h-3 w-3 inline mr-1" />
+                                    {selectedOrderEarning.seller.shopName}
+                                </Badge>
+                            )}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => navigate(`/admin/orders/view/${selectedOrderEarning.orderId}`)}
+                            className="w-full py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800"
+                        >
+                            Open Full Order Detail
+                        </button>
                     </div>
                 )}
             </Modal>

@@ -151,6 +151,10 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const updateUser = (userData) => {
+        setUser((prev) => ({ ...(prev || {}), ...(userData || {}) }));
+    };
+
     const logout = async () => {
         const storageKey = ROLE_STORAGE_KEYS[currentRole];
 
@@ -219,6 +223,7 @@ export const AuthProvider = ({ children }) => {
         isLoading,
         authData,
         login,
+        updateUser,
         logout,
         refreshUser
     // eslint-disable-next-line react-hooks/exhaustive-deps

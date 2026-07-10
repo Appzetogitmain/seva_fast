@@ -23,6 +23,9 @@ import {
   sanitizeApprovalNote,
   resolveProductApprovalStatus,
 } from "../services/productModerationService.js";
+import { getAdminIds } from "../utils/adminIds.js";
+import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
+import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 
 function buildProductListKey(queryParams) {
   const sorted = Object.keys(queryParams)
@@ -838,6 +841,34 @@ export const updateProduct = async (req, res) => {
       { $set: productData },
       { new: true, runValidators: true },
     );
+
+    if (role !== "admin" && updatedProduct) {
+      try {
+        const [adminIds, seller] = await Promise.all([
+          getAdminIds(),
+          Seller.findById(sellerId).select("shopName name").lean(),
+        ]);
+        if (adminIds.length > 0) {
+          const sellerName =
+            String(seller?.shopName || seller?.name || "").trim() || "A seller";
+          emitNotificationEvent(
+            NOTIFICATION_EVENTS.PRODUCT_UPDATED_BY_SELLER,
+            {
+              adminIds,
+              sellerId,
+              sellerName,
+              productId: updatedProduct._id?.toString?.() || String(id),
+              productName: String(updatedProduct.name || productData.name || "a product"),
+              data: {
+                approvalStatus: updatedProduct.approvalStatus,
+              },
+            },
+          );
+        }
+      } catch (notifyErr) {
+        console.error("Failed to emit seller product update notification:", notifyErr);
+      }
+    }
     
     // Enqueue search indexing asynchronously
     await enqueueProductIndex(id);

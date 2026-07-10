@@ -1,8 +1,11 @@
 import Transaction from "../models/transaction.js";
+import Order from "../models/order.js";
 import {
   handleCodOrderFinance,
   settleDeliveredOrder,
+  releaseExpiredHeldSellerPayouts,
 } from "./finance/orderFinanceService.js";
+import { autoProcessSellerPayoutForOrder } from "./finance/payoutService.js";
 import { processOrderLevelCommissions } from "./finance/commissionService.js";
 import { resolveSellerOrderEarning } from "./finance/pricingService.js";
 
@@ -20,6 +23,26 @@ export async function applyDeliveredSettlement(order, orderIdString) {
     });
   }
 
+  if (settled.seller) {
+    await releaseExpiredHeldSellerPayouts({ sellerId: settled.seller });
+  }
+
+  let sellerOnHold =
+    settled.settlementStatus?.sellerPayout === "HOLD" ||
+    Boolean(settled.financeFlags?.sellerPayoutHeld);
+
+  if (!sellerOnHold && settled.financeFlags?.sellerPayoutQueued) {
+    await autoProcessSellerPayoutForOrder(settled._id);
+    const refreshed = await Order.findById(settled._id).lean();
+    if (refreshed) {
+      settled.settlementStatus = refreshed.settlementStatus;
+      settled.financeFlags = refreshed.financeFlags;
+      sellerOnHold = false;
+    }
+  }
+
+  const sellerTxnStatus = sellerOnHold ? "Pending" : "Settled";
+
   // Legacy transaction compatibility for existing seller/rider dashboards.
   const sellerEarning = Math.round(resolveSellerOrderEarning(settled));
   if (settled.seller && sellerEarning > 0) {
@@ -28,7 +51,7 @@ export async function applyDeliveredSettlement(order, orderIdString) {
       {
         $set: {
           amount: sellerEarning,
-          status: "Settled",
+          status: sellerTxnStatus,
           type: "Order Payment",
         },
         $setOnInsert: {
@@ -44,7 +67,7 @@ export async function applyDeliveredSettlement(order, orderIdString) {
   } else {
     await Transaction.findOneAndUpdate(
       { reference: orderIdString, userModel: "Seller" },
-      { status: "Settled" },
+      { status: sellerTxnStatus },
     );
   }
 

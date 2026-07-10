@@ -96,6 +96,48 @@ export const rejectDeliveryPartner = async (req, res) => {
   }
 };
 
+export const updateDeliveryPartner = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      phone,
+      email,
+      vehicleType,
+      vehicleNumber,
+      currentArea,
+      isOnline,
+    } = req.body || {};
+
+    const query = { _id: id };
+    if (req.user.role === "seller") {
+      query.sellerId = req.user.id;
+    }
+
+    const rider = await Delivery.findOne(query);
+    if (!rider) {
+      return handleResponse(res, 404, "Rider not found");
+    }
+
+    if (name !== undefined) rider.name = String(name).trim();
+    if (phone !== undefined) rider.phone = String(phone).trim();
+    if (email !== undefined) rider.email = String(email).trim();
+    if (vehicleType !== undefined) rider.vehicleType = vehicleType;
+    if (vehicleNumber !== undefined) rider.vehicleNumber = vehicleNumber;
+    if (currentArea !== undefined) rider.currentArea = currentArea;
+    if (typeof isOnline === "boolean") rider.isOnline = isOnline;
+
+    await rider.save();
+
+    return handleResponse(res, 200, "Delivery partner updated successfully", rider);
+  } catch (error) {
+    if (error?.code === 11000) {
+      return handleResponse(res, 409, "Phone or email already in use");
+    }
+    return handleResponse(res, 500, error.message);
+  }
+};
+
 export const getActiveFleet = async (req, res) => {
   try {
     const { page, limit, skip } = getPagination(req, {

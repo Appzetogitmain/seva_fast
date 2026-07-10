@@ -40,13 +40,13 @@ const Earnings = () => {
 
   React.useEffect(() => {
     if (data?.balances != null && withdrawAmount === "") {
-      const settled = Number(data.balances?.settledBalance ?? 0);
-      setWithdrawAmount(settled > 0 ? String(settled) : "");
+      const available = Number(data.balances?.availableBalance ?? data.balances?.settledBalance ?? 0);
+      setWithdrawAmount(available > 0 ? String(available) : "");
     }
   }, [data?.balances]);
 
   const handleWithdraw = () => {
-    const totalBalance = Number(data?.balances?.settledBalance ?? 0);
+    const totalBalance = Number(data?.balances?.availableBalance ?? data?.balances?.settledBalance ?? 0);
     const amount = parseFloat(withdrawAmount);
     if (isNaN(amount) || amount <= 0 || amount > totalBalance) {
       alert(
@@ -166,7 +166,7 @@ const Earnings = () => {
                     Available to Withdraw
                   </p>
                   <p className="text-xs font-black text-slate-900">
-                    ₹{Number(data?.balances?.settledBalance ?? 0).toLocaleString()}
+                    ₹{Number(data?.balances?.availableBalance ?? data?.balances?.settledBalance ?? 0).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -256,7 +256,7 @@ const Earnings = () => {
               <p className="text-sm text-slate-600 font-medium mb-8">
                 Available Balance:{" "}
                 <span className="text-brand-600 font-bold">
-                  ₹{Number(data?.balances?.settledBalance ?? 0).toLocaleString()}
+                  ₹{Number(data?.balances?.totalWalletBalance ?? data?.balances?.settledBalance ?? 0).toLocaleString()}
                 </span>
               </p>
 

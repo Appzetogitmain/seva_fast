@@ -8,6 +8,9 @@ import {
 } from "../services/sellerVerificationService.js";
 import { uploadToCloudinary } from "../services/mediaService.js";
 import { recordAuthActivity } from "../services/authActivityService.js";
+import { getAdminIds } from "../utils/adminIds.js";
+import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
+import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 
 /* ===============================
    Utils
@@ -235,6 +238,25 @@ export const signupSeller = async (req, res) => {
         }
 
         seller = await Seller.create(sellerData);
+
+        try {
+            const adminIds = await getAdminIds();
+            if (adminIds.length > 0) {
+                emitNotificationEvent(NOTIFICATION_EVENTS.NEW_SELLER_REGISTERED, {
+                    adminIds,
+                    sellerId: seller._id?.toString?.(),
+                    sellerName: seller.name,
+                    shopName: seller.shopName,
+                    email: seller.email,
+                    phone: seller.phone,
+                    data: {
+                        applicationStatus: seller.applicationStatus || "pending",
+                    },
+                });
+            }
+        } catch (notifyErr) {
+            console.error("Failed to emit new seller registration notification:", notifyErr);
+        }
 
         if (rewardAmount > 0 && referrerUser) {
             const Transaction = (await import("../models/transaction.js")).default;

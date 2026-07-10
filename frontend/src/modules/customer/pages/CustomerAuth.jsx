@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@core/context/AuthContext';
 import { useSettings } from '@core/context/SettingsContext';
 import {
@@ -81,12 +81,27 @@ const CustomerAuth = () => {
     const appName = settings?.appName || 'App';
     const logoUrl = settings?.logoUrl || '';
     const navigate = useNavigate();
+    const location = useLocation();
+    const isSignupRoute = location.pathname === '/signup';
 
     const [formData, setFormData] = useState({
-        phone: '',
+        phone: location.state?.phone || '',
         otp: '',
         name: '',
     });
+
+    useEffect(() => {
+        setIsLogin(!isSignupRoute);
+    }, [isSignupRoute]);
+
+    useEffect(() => {
+        if (location.state?.phone) {
+            setFormData((prev) => ({
+                ...prev,
+                phone: location.state.phone,
+            }));
+        }
+    }, [location.state?.phone]);
 
     const activeCategory = CATEGORIES[carouselIndex];
 
@@ -143,6 +158,23 @@ const CustomerAuth = () => {
             setTimer(60);
         } catch (error) {
             console.error('SMS OTP send error:', error);
+            const status = error?.response?.status;
+            const errorCode = error?.response?.data?.result?.code;
+
+            if (
+                isLogin &&
+                (status === 404 || errorCode === 'ACCOUNT_NOT_FOUND')
+            ) {
+                toast.info('No account found for this number. Please sign up.');
+                setShowOtp(false);
+                setIsLogin(false);
+                navigate('/signup', {
+                    replace: true,
+                    state: { phone: formData.phone },
+                });
+                return;
+            }
+
             toast.error(error?.response?.data?.message || 'Failed to send OTP. Please check your number.');
         } finally {
             setIsLoading(false);
@@ -352,14 +384,24 @@ const CustomerAuth = () => {
                                     {/* App Style Tab Switcher */}
                                     <div className="flex bg-gray-50 rounded-2xl p-1.5 border border-gray-100">
                                         <button
-                                            onClick={() => setIsLogin(true)}
+                                            type="button"
+                                            onClick={() => {
+                                                setIsLogin(true);
+                                                setShowOtp(false);
+                                                navigate('/login', { replace: true });
+                                            }}
                                             className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${isLogin ? 'bg-white shadow-sm' : 'text-gray-400'}`}
                                             style={{ color: isLogin ? activeCategory.theme : undefined }}
                                         >
                                             Login
                                         </button>
                                         <button
-                                            onClick={() => setIsLogin(false)}
+                                            type="button"
+                                            onClick={() => {
+                                                setIsLogin(false);
+                                                setShowOtp(false);
+                                                navigate('/signup', { replace: true });
+                                            }}
                                             className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${!isLogin ? 'bg-white shadow-sm' : 'text-gray-400'}`}
                                             style={{ color: !isLogin ? activeCategory.theme : undefined }}
                                         >
@@ -448,7 +490,7 @@ const CustomerAuth = () => {
                                             </button>
                                             <span className="text-[8px] text-gray-300">•</span>
                                             <button 
-                                                onClick={() => navigate('/privacy-policy')}
+                                                onClick={() => navigate('/privacy')}
                                                 className="text-[10px] font-black uppercase tracking-widest hover:text-gray-900 transition-colors"
                                                 style={{ color: activeCategory.theme }}
                                             >

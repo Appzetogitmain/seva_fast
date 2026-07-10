@@ -9,6 +9,7 @@ import {
   sellerOrderEarningAmount,
   sellerOrderRevenueAmount,
 } from "../utils/sellerRevenue.js";
+import { releaseExpiredHeldSellerPayouts } from "../services/finance/orderFinanceService.js";
 
 /* ===============================
    GET SELLER DASHBOARD STATS
@@ -313,22 +314,25 @@ export const getSellerEarnings = async (req, res) => {
         const sellerId = req.user.id;
         const sellerOid = new mongoose.Types.ObjectId(sellerId);
 
+        await releaseExpiredHeldSellerPayouts({ sellerId });
+
         const transactions = await Transaction.find({ user: sellerId, userModel: 'Seller' })
             .sort({ createdAt: -1 })
             .populate("order", "orderId");
 
-        const settledBalance = transactions
-            .filter(t => t.status === 'Settled')
-            .reduce((acc, t) => acc + t.amount, 0);
+        const pendingOrderEarnings = transactions
+            .filter((t) => t.type === "Order Payment" && t.status === "Pending")
+            .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
         const pendingPayouts = transactions
             .filter(t => t.type === 'Withdrawal' && (t.status === 'Pending' || t.status === 'Processing'))
             .reduce((acc, t) => acc + Math.abs(t.amount), 0);
 
-        // Fetch wallet for live pending balance (money on hold due to return window)
         const wallet = await Wallet.findOne({ ownerType: 'SELLER', ownerId: sellerId });
-        const onHoldBalance = wallet ? wallet.pendingBalance : 0;
-        const liveAvailableBalance = wallet ? wallet.availableBalance : settledBalance;
+        const availableBalance = Number(wallet?.availableBalance || 0);
+        const onHoldBalance = Number(wallet?.pendingBalance || 0);
+        const totalWalletBalance = availableBalance + onHoldBalance;
+        const withdrawableBalance = Math.max(0, availableBalance);
 
         // Total revenue = sum of delivered order amounts only
         const [orderRevenueAgg] = await Order.aggregate([
@@ -383,10 +387,12 @@ export const getSellerEarnings = async (req, res) => {
 
         return handleResponse(res, 200, "Earnings fetched successfully", {
             balances: {
-                settledBalance: settledBalance,
+                settledBalance: totalWalletBalance,
                 pendingPayouts: pendingPayouts,
-                onHoldBalance: onHoldBalance, // New field
-                availableBalance: liveAvailableBalance, // New field for clarity
+                onHoldBalance,
+                availableBalance: withdrawableBalance,
+                pendingOrderEarnings,
+                totalWalletBalance,
                 totalRevenue: totalRevenue,
                 totalWithdrawn: totalWithdrawn
             },

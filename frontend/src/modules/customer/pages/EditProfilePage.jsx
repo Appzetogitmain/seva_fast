@@ -8,7 +8,7 @@ import { customerApi } from '../services/customerApi';
 
 const EditProfilePage = () => {
     const navigate = useNavigate();
-    const { user, login } = useAuth();
+    const { user, updateUser } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         name: user?.name || '',
@@ -28,8 +28,8 @@ const EditProfilePage = () => {
             const response = await customerApi.updateProfile(formData);
             const updatedUser = response.data.result;
 
-            // Update local auth state
-            login({ ...user, ...updatedUser });
+            // Update in-memory auth user so profile screen reflects changes instantly.
+            updateUser(updatedUser);
 
             toast.success('Profile updated successfully!');
             navigate('/profile');

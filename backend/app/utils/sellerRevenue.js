@@ -15,7 +15,28 @@ export function sellerDeliveredOrderMatch(sellerId) {
 
 export function sellerOrderRevenueAmount() {
   return {
-    $ifNull: ["$pricing.total", 0],
+    $ifNull: [
+      "$pricing.total",
+      {
+        $ifNull: [
+          "$paymentBreakdown.grandTotal",
+          {
+            $sum: {
+              $map: {
+                input: { $ifNull: ["$items", []] },
+                as: "item",
+                in: {
+                  $multiply: [
+                    { $ifNull: ["$$item.price", 0] },
+                    { $ifNull: ["$$item.quantity", 0] },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
   };
 }
 
