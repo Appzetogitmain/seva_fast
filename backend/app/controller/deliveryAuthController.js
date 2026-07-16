@@ -7,6 +7,8 @@ import { generateOTP } from "../utils/otp.js";
 import { uploadToCloudinary } from "../services/mediaService.js";
 import { __testables as otpTestables } from "../modules/otp/otp.service.js";
 import { recordAuthActivity } from "../services/authActivityService.js";
+import { notify } from "../modules/notifications/notification.service.js";
+import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 
 const DELIVERY_TEST_NUMBERS = new Set(["6268423925", "9111966732", "8888888888"]);
 const DELIVERY_TEST_OTP = "123456";
@@ -247,7 +249,27 @@ export const verifyDeliveryOTP = async (req, res) => {
 
         delivery.otp = undefined;
         delivery.otpExpiry = undefined;
+        const isNewSignup = !delivery.isVerified && !delivery.lastLogin; // rudimentary check if it's a new unverified signup
         await delivery.save();
+
+        if (isNewSignup) {
+            try {
+                const Admin = mongoose.model("Admin");
+                const admins = await Admin.find({}, "_id");
+                const adminIds = admins.map(a => a._id);
+                if (adminIds.length > 0) {
+                    await notify(NOTIFICATION_EVENTS.NEW_DELIVERY_REGISTERED, {
+                        adminIds,
+                        deliveryId: delivery._id,
+                        deliveryName: delivery.name,
+                        email: delivery.email,
+                        phone: delivery.phone,
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to notify admins of new delivery registration", err);
+            }
+        }
 
         if (!delivery.isVerified) {
             return handleResponse(res, 403, "Your delivery partner account is pending admin approval.", {

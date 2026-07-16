@@ -100,7 +100,7 @@ const LocationDrawer = ({ isOpen, onClose }) => {
     resetAutocompleteSession();
   }, [isOpen, resetAutocompleteSession]);
 
-  // Lock body scroll when drawer is open
+  // Lock body scroll and intercept back button when drawer is open
   React.useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -114,7 +114,7 @@ const LocationDrawer = ({ isOpen, onClose }) => {
       document.body.style.overflow = "";
       document.body.style.paddingRight = "";
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   const handleSelectCurrentLocation = (e) => {
     e.preventDefault();

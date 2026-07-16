@@ -51,7 +51,7 @@ const PendingDeliveryBoys = () => {
                 avatar: r.profileImage,
                 appliedDate: new Date(r.createdAt).toLocaleDateString(),
                 location: r.currentArea || 'Unknown',
-                vehicle: r.vehicleType,
+                vehicle: r.vehicleType ? r.vehicleType.charAt(0).toUpperCase() + r.vehicleType.slice(1) : 'Bike',
                 documents: Object.keys(r.documents || {}).filter(key => r.documents[key]),
                 documentUrls: r.documents || {},
                 status: r.isVerified ? 'approved' : 'pending_review',

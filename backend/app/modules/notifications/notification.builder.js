@@ -423,6 +423,30 @@ function eventDefinition(eventType) {
             : `${sellerName} submitted a new seller application.`;
         },
       };
+    case NOTIFICATION_EVENTS.NEW_DELIVERY_REGISTERED:
+      return {
+        role: NOTIFICATION_ROLES.ADMIN,
+        recipientIds: (payload) => normalizeIdList(payload.adminIds),
+        title: () => "New Delivery Partner Registration",
+        body: (payload) => {
+          const deliveryName = String(payload.deliveryName || "A delivery partner").trim() || "A delivery partner";
+          return `${deliveryName} submitted a new delivery partner application.`;
+        },
+      };
+    case NOTIFICATION_EVENTS.DELIVERY_APPROVED:
+      return {
+        role: NOTIFICATION_ROLES.DELIVERY,
+        recipientIds: (payload) => normalizeIdList(payload.deliveryId),
+        title: () => "Application Approved! 🎉",
+        body: () => "Your delivery partner application has been approved. You can now start receiving orders.",
+      };
+    case NOTIFICATION_EVENTS.DELIVERY_REJECTED:
+      return {
+        role: NOTIFICATION_ROLES.DELIVERY,
+        recipientIds: (payload) => normalizeIdList(payload.deliveryId),
+        title: () => "Application Update",
+        body: () => "Your delivery partner application has been reviewed and unfortunately rejected at this time.",
+      };
     default:
       return null;
   }
@@ -472,19 +496,42 @@ function eventData(eventType, payload = {}, role) {
     };
   }
 
-  if (eventType === NOTIFICATION_EVENTS.NEW_SELLER_REGISTERED) {
-    const sellerId = String(payload.sellerId || "").trim() || undefined;
-    return {
-      eventType,
-      sellerId,
-      sellerName: String(payload.sellerName || "").trim() || undefined,
-      shopName: String(payload.shopName || "").trim() || undefined,
-      email: String(payload.email || "").trim() || undefined,
-      phone: String(payload.phone || "").trim() || undefined,
-      link: buildAppPath("/admin/pending-sellers"),
-      ...(payload.data || {}),
-    };
-  }
+    if (eventType === NOTIFICATION_EVENTS.NEW_SELLER_REGISTERED) {
+      const sellerId = String(payload.sellerId || "").trim() || undefined;
+      return {
+        eventType,
+        sellerId,
+        sellerName: String(payload.sellerName || "").trim() || undefined,
+        shopName: String(payload.shopName || "").trim() || undefined,
+        email: String(payload.email || "").trim() || undefined,
+        phone: String(payload.phone || "").trim() || undefined,
+        link: buildAppPath("/admin/pending-sellers"),
+        ...(payload.data || {}),
+      };
+    }
+
+    if (eventType === NOTIFICATION_EVENTS.NEW_DELIVERY_REGISTERED) {
+      const deliveryId = String(payload.deliveryId || "").trim() || undefined;
+      return {
+        eventType,
+        deliveryId,
+        deliveryName: String(payload.deliveryName || "").trim() || undefined,
+        email: String(payload.email || "").trim() || undefined,
+        phone: String(payload.phone || "").trim() || undefined,
+        link: buildAppPath("/admin/pending-riders"),
+        ...(payload.data || {}),
+      };
+    }
+
+    if (eventType === NOTIFICATION_EVENTS.DELIVERY_APPROVED || eventType === NOTIFICATION_EVENTS.DELIVERY_REJECTED) {
+      const deliveryId = String(payload.deliveryId || "").trim() || undefined;
+      return {
+        eventType,
+        deliveryId,
+        link: buildAppPath("/delivery"),
+        ...(payload.data || {}),
+      };
+    }
 
   const orderId = String(payload.orderId || "").trim() || undefined;
   const checkoutGroupId = String(payload.checkoutGroupId || "").trim() || undefined;

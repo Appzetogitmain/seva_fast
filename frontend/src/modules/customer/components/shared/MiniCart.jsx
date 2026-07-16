@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 
 const MiniCart = () => {
-    const { cart, cartCount } = useCart();
+    const { cart, cartCount, cartTotal } = useCart();
     const location = useLocation();
 
     // Show up to 2 product images
@@ -67,8 +67,8 @@ const MiniCart = () => {
 
                             {/* Text Section */}
                             <div className="flex-1 flex flex-col justify-center min-w-0">
-                                <h4 className="text-[12px] font-black leading-tight truncate">View cart</h4>
-                                <p className="text-[9px] opacity-90 font-bold leading-tight">{cartCount} {cartCount === 1 ? 'item' : 'items'}</p>
+                                <h4 className="text-[13px] font-black leading-tight truncate">₹{cartTotal}</h4>
+                                <p className="text-[10px] opacity-90 font-bold leading-tight uppercase tracking-wider">{cartCount} {cartCount === 1 ? 'item' : 'items'} • View Cart</p>
                             </div>
 
                             {/* Arrow Icon in circle */}

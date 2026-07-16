@@ -220,12 +220,11 @@ const OtpInput = ({ orderId, isReturn = false, isReturnDrop = false, onSuccess, 
   const isComplete = otp.every((digit) => digit !== "");
 
   const otpBoxClass = (digit) =>
-    `w-full h-12 text-center text-xl font-bold font-mono border-2 rounded-xl transition-all duration-200 outline-none focus:outline-none focus:ring-2 focus:ring-offset-0 ${
-      error
-        ? "border-red-300 bg-red-50 text-red-900 focus:border-red-500 focus:ring-red-500"
-        : digit
-          ? "border-primary bg-primary/10 text-slate-900 focus:border-primary focus:ring-primary"
-          : "border-gray-300 bg-white text-gray-900 focus:border-brand-500 focus:ring-brand-500"
+    `w-full h-12 text-center text-xl font-bold font-mono border-2 rounded-xl transition-all duration-200 outline-none focus:outline-none focus:ring-2 focus:ring-offset-0 ${error
+      ? "border-red-300 bg-red-50 text-red-900 focus:border-red-500 focus:ring-red-500"
+      : digit
+        ? "border-primary bg-primary/10 text-slate-900 focus:border-primary focus:ring-primary"
+        : "border-gray-300 bg-white text-gray-900 focus:border-brand-500 focus:ring-brand-500"
     } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`;
 
   return (
@@ -304,8 +303,8 @@ const OtpInput = ({ orderId, isReturn = false, isReturnDrop = false, onSuccess, 
         onClick={handleSubmit}
         disabled={!isComplete || isLoading || isGenerating}
         className={`w-full h-12 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2 outline-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-0 ${!isComplete || isLoading || isGenerating
-            ? "bg-gray-200 text-gray-600 cursor-not-allowed"
-            : "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 shadow-md hover:shadow-lg"
+          ? "bg-gray-200 text-gray-600 cursor-not-allowed"
+          : "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 shadow-md hover:shadow-lg"
           }`}
       >
         {isLoading ? (
