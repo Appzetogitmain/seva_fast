@@ -20,6 +20,7 @@ import { sellerApi } from "../services/sellerApi";
 import { useToast } from "@shared/components/ui/Toast";
 import { Loader2 } from "lucide-react";
 import Pagination from "@shared/components/ui/Pagination";
+import { formatDate, formatTime } from "@shared/utils/formatDate";
 
 const DeliveryTracking = () => {
   const [deliveries, setDeliveries] = useState([]);
@@ -89,14 +90,10 @@ const DeliveryTracking = () => {
               rating: 0,
             },
             location: order.status === 'delivered' && order.updatedAt
-              ? `Delivered at ${new Date(order.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+              ? `Delivered at ${formatTime(order.updatedAt)}`
               : "In Progress",
-            orderDate: order.createdAt
-              ? new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-              : "",
-            startTime: order.createdAt
-              ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              : "",
+            orderDate: formatDate(order.createdAt, ""),
+            startTime: formatTime(order.createdAt, ""),
             estimatedDelivery: "20-30 mins",
             customerName: order.customer?.name || "Customer",
             address: order.address

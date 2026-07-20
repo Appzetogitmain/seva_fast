@@ -38,8 +38,10 @@ import {
 import { cn } from "@/lib/utils";
 import { sellerApi } from "../services/sellerApi";
 import { toast } from "sonner";
+import { formatDate } from "@shared/utils/formatDate";
 import { useSellerOrders } from "../context/SellerOrdersContext";
 import { getSellerOrderEarning, getSellerEarningBreakdown, getCustomerOrderBill } from "@/shared/utils/sellerOrderEarning";
+import { getLegacyStatusFromOrder } from "@/shared/utils/orderStatus";
 import { useLockBodyScroll, preventBackdropScroll } from "@/shared/hooks/useLockBodyScroll";
 
 const Dashboard = () => {
@@ -236,7 +238,8 @@ const Dashboard = () => {
       sellerEarning: getSellerOrderEarning(order),
       sellerEarningBreakdown: order.sellerEarningBreakdown || null,
       customerBill: order.customerBill || null,
-      status: order.status || "pending",
+      status: getLegacyStatusFromOrder(order),
+      workflowStatus: order.workflowStatus,
       payment:
         order.payment?.method === "cash" || order.payment?.method === "cod"
           ? "Cash on Delivery"
@@ -246,22 +249,36 @@ const Dashboard = () => {
   };
 
   const handleStatusUpdate = async (orderId, newStatus) => {
+    const normalizedStatus = String(newStatus || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "_");
+    const mappedStatus =
+      normalizedStatus === "processing" || normalizedStatus === "process"
+        ? "confirmed"
+        : normalizedStatus;
+
     try {
       await sellerApi.updateOrderStatus(orderId, {
-        status: newStatus.toLowerCase(),
+        status: mappedStatus,
       });
-      toast.success(`Order status updated to ${newStatus}`);
+      toast.success(`Order status updated to ${mappedStatus.replace(/_/g, " ")}`);
       setSelectedOrder((prev) =>
-        prev && prev.id === orderId ? { ...prev, status: newStatus } : prev
+        prev && prev.id === orderId ? { ...prev, status: mappedStatus } : prev
       );
       if (typeof refreshOrders === "function") refreshOrders();
     } catch (error) {
       console.error("Failed to update status:", error);
-      toast.error("Failed to update status");
+      toast.error(error?.response?.data?.message || "Failed to update status");
     }
   };
 
   const handleAssignDeliveryBoy = async (orderId, deliveryBoyId) => {
+    const status = String(selectedOrder?.status || "").toLowerCase();
+    if (status !== "packed" && status !== "out_for_delivery") {
+      toast.error("Mark order as Packed before assigning a delivery partner");
+      return;
+    }
     try {
       await sellerApi.updateOrderStatus(orderId, { deliveryBoyId });
       toast.success("Delivery partner assigned successfully");
@@ -507,7 +524,7 @@ const Dashboard = () => {
                     </div>
                   </td>
                   <td className="py-4 px-4 align-middle">
-                    <span className="text-sm text-slate-600">{new Date(order.createdAt).toLocaleDateString()}</span>
+                    <span className="text-sm text-slate-600">{formatDate(order.createdAt)}</span>
                   </td>
                   <td className="py-4 px-4 align-middle">
                     <span className="text-sm font-semibold text-slate-900">₹{getSellerOrderEarning(order).toLocaleString('en-IN')}</span>
@@ -611,7 +628,9 @@ const Dashboard = () => {
                         </p>
                       </div>
                     </div>
-                    {selectedOrder.status.toLowerCase() !== 'pending' && selectedOrder.status.toLowerCase() !== 'cancelled' && (
+                    {["packed", "out_for_delivery", "delivered"].includes(
+                      String(selectedOrder.status || "").toLowerCase(),
+                    ) ? (
                       <div>
                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                           <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
@@ -626,22 +645,26 @@ const Dashboard = () => {
                                 </div>
                                 <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Assigned</span>
                               </div>
-                              <div className="h-px bg-slate-200 my-1" />
-                              <div className="relative">
-                                <select
-                                  value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}
-                                  onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
-                                  className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
-                                >
-                                  <option value="">Change Rider...</option>
-                                  {deliveryBoys.map(boy => (
-                                    <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
-                                  ))}
-                                </select>
-                                <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
-                              </div>
+                              {String(selectedOrder.status || "").toLowerCase() === "packed" && (
+                                <>
+                                  <div className="h-px bg-slate-200 my-1" />
+                                  <div className="relative">
+                                    <select
+                                      value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}
+                                      onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
+                                      className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
+                                    >
+                                      <option value="">Change Rider...</option>
+                                      {deliveryBoys.map(boy => (
+                                        <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
+                                      ))}
+                                    </select>
+                                    <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                  </div>
+                                </>
+                              )}
                             </div>
-                          ) : (
+                          ) : String(selectedOrder.status || "").toLowerCase() === "packed" ? (
                             <div className="relative">
                               <select
                                 value=""
@@ -655,10 +678,25 @@ const Dashboard = () => {
                               </select>
                               <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
                             </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-500 font-medium">
+                              No delivery partner assigned.
+                            </p>
                           )}
                         </div>
                       </div>
-                    )}
+                    ) : String(selectedOrder.status || "").toLowerCase() === "confirmed" ? (
+                      <div>
+                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
+                        </h4>
+                        <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 shadow-sm">
+                          <p className="text-[11px] text-amber-700 font-semibold">
+                            Mark order as <span className="font-black">Packed</span> to assign a delivery partner.
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                                                   <div className="space-y-3 sm:space-y-4">
                                                     <div className="bg-slate-50 p-3 sm:p-4 rounded-3xl border border-slate-100">

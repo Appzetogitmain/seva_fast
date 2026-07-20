@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { adminApi } from '../services/adminApi';
+import { formatDate } from '@shared/utils/formatDate';
 
 const ZoneManagement = () => {
     const { showToast } = useToast();
@@ -202,7 +203,7 @@ const ZoneManagement = () => {
                                                 <span className="text-sm font-black text-slate-900 tracking-wide">{zone.name}</span>
                                                 <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1">
                                                     <HiOutlineClock className="h-3.5 w-3.5 text-slate-400" />
-                                                    Created: {new Date(zone.createdAt).toLocaleDateString()}
+                                                    Created: {formatDate(zone.createdAt)}
                                                 </p>
                                             </div>
                                         </div>

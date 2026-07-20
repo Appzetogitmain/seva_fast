@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { exportToCSV } from "@/lib/exportUtils";
 import { useSellerEarnings } from "../context/SellerEarningsContext";
+import { formatDate } from "@shared/utils/formatDate";
 
 const Earnings = () => {
   const navigate = useNavigate();
@@ -93,7 +94,7 @@ const Earnings = () => {
                   type: txn.type ?? "",
                   amount: `₹${Number(txn.amount ?? 0).toLocaleString()}`,
                   status: txn.status ?? "",
-                  date: txn.date ?? (txn.createdAt ? new Date(txn.createdAt).toLocaleDateString() : ""),
+                  date: formatDate(txn.createdAt || txn.date, ""),
                   customer: txn.customer ?? "",
                   ref: txn.ref ?? "",
                 }));

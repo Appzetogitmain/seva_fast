@@ -1,3 +1,5 @@
+import { formatDate, formatTime } from "../../../utils/formatDate.js";
+
 const SELLER_DOC_LABELS = {
   tradeLicense: "Trade License",
   gstCertificate: "GST Certificate",
@@ -68,15 +70,8 @@ export function formatSellerApplication(seller) {
     email: seller.email || "",
     phone: seller.phone || "",
     category: seller.category || "General",
-    applicationDate: createdAt.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }),
-    receivedAt: createdAt.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    applicationDate: formatDate(createdAt),
+    receivedAt: formatTime(createdAt),
     status:
       seller.applicationStatus ||
       (seller.isVerified ? "approved" : "pending"),

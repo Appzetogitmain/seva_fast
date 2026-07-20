@@ -227,13 +227,23 @@ export const getDeliveryCodCashSummary = async (req, res) => {
             .lean();
 
         const normalized = orders.map((order) => {
-            const codMarkedCollected = Boolean(order.financeFlags?.codMarkedCollected);
+            const flags = order.financeFlags || {};
+            const codMarkedCollected = Boolean(flags.codMarkedCollected);
+            const codCashWithRider = Boolean(flags.codCashWithRider);
+            const codCashWithSeller = Boolean(flags.codCashWithSeller);
+            const codOnlinePaid = Boolean(flags.codOnlinePaid);
+            const collectMethod = flags.codCollectMethod || "none";
             const gross = roundCurrency(order.paymentBreakdown?.grandTotal ?? order.pricing?.total ?? 0);
             const riderCommission = roundCurrency(order.paymentBreakdown?.riderPayoutTotal ?? 0);
 
             const estimatedNet = roundCurrency(Math.max(gross - riderCommission, 0));
             const pendingNet = roundCurrency(order.paymentBreakdown?.codPendingAmount ?? 0);
-            const contribution = codMarkedCollected ? pendingNet : estimatedNet;
+            const contribution =
+                codCashWithRider && pendingNet > 0
+                    ? pendingNet
+                    : !codMarkedCollected && !codOnlinePaid && collectMethod !== "online_qr"
+                      ? estimatedNet
+                      : 0;
 
             return {
                 orderId: order.orderId,
@@ -242,6 +252,10 @@ export const getDeliveryCodCashSummary = async (req, res) => {
                 deliveredAt: order.deliveredAt || null,
                 createdAt: order.createdAt || null,
                 codMarkedCollected,
+                codCashWithRider,
+                codCashWithSeller,
+                codOnlinePaid,
+                collectMethod,
                 amountGross: gross,
                 riderCommission,
                 amountNetExpected: estimatedNet,
@@ -254,18 +268,24 @@ export const getDeliveryCodCashSummary = async (req, res) => {
             normalized.reduce((sum, row) => sum + Number(row.systemFloatContribution || 0), 0),
         );
 
-        const toRemit = normalized
-            .filter((row) => row.codMarkedCollected && Number(row.amountNetPending || 0) > 0)
+        const toHandoff = normalized
+            .filter((row) => row.codCashWithRider && Number(row.amountNetPending || 0) > 0)
             .slice(0, 50);
 
         const toCollect = normalized
-            .filter((row) => !row.codMarkedCollected && Number(row.amountNetExpected || 0) > 0)
+            .filter(
+                (row) =>
+                    !row.codMarkedCollected &&
+                    !row.codOnlinePaid &&
+                    Number(row.amountNetExpected || 0) > 0,
+            )
             .slice(0, 50);
 
         return handleResponse(res, 200, "COD cash summary fetched", {
             systemFloatCOD,
             cashInHand: roundCurrency(wallet?.cashInHand || 0),
-            toRemit,
+            toHandoff,
+            toRemit: toHandoff,
             toCollect,
         });
     } catch (error) {
@@ -274,7 +294,7 @@ export const getDeliveryCodCashSummary = async (req, res) => {
 };
 
 /* ===============================
-   SUBMIT DELIVERY COD CASH
+   HANDOFF DELIVERY COD CASH TO SELLERS
 ================================ */
 export const submitDeliveryCodCashToAdmin = async (req, res) => {
     try {
@@ -292,7 +312,7 @@ export const submitDeliveryCodCashToAdmin = async (req, res) => {
             paymentMode: "COD",
             status: { $ne: "cancelled" },
             orderStatus: { $ne: "cancelled" },
-            "financeFlags.codMarkedCollected": true,
+            "financeFlags.codCashWithRider": true,
             "paymentBreakdown.codPendingAmount": { $gt: 0 },
         })
             .select("orderId paymentBreakdown.codPendingAmount")
@@ -303,7 +323,7 @@ export const submitDeliveryCodCashToAdmin = async (req, res) => {
             return handleResponse(
                 res,
                 400,
-                "No collected COD cash is ready to submit yet. Mark customer cash as collected first.",
+                "No COD cash ready to hand over. Collect cash from customer first.",
             );
         }
 
@@ -320,7 +340,7 @@ export const submitDeliveryCodCashToAdmin = async (req, res) => {
                 : roundCurrency(requestedRaw);
 
         if (requestedAmount != null && (!Number.isFinite(Number(requestedRaw)) || requestedAmount <= 0)) {
-            return handleResponse(res, 400, "Enter a valid amount to submit");
+            return handleResponse(res, 400, "Enter a valid amount to hand over");
         }
 
         const amountToSubmit = requestedAmount == null ? totalAvailable : requestedAmount;
@@ -328,16 +348,20 @@ export const submitDeliveryCodCashToAdmin = async (req, res) => {
             return handleResponse(
                 res,
                 400,
-                "No collected COD cash is ready to submit yet. Mark customer cash as collected first.",
+                "No COD cash ready to hand over. Collect cash from customer first.",
             );
         }
         if (amountToSubmit > totalAvailable) {
             return handleResponse(
                 res,
                 400,
-                `You can submit up to ${String.fromCharCode(8377)}${totalAvailable.toLocaleString()}`,
+                `You can hand over up to ${String.fromCharCode(8377)}${totalAvailable.toLocaleString()}`,
             );
         }
+
+        const { handoffCodCashToSeller } = await import(
+            "../services/finance/orderFinanceService.js"
+        );
 
         const settledOrders = [];
         let totalSubmitted = 0;
@@ -346,26 +370,18 @@ export const submitDeliveryCodCashToAdmin = async (req, res) => {
         for (const order of orders) {
             const amount = roundCurrency(order?.paymentBreakdown?.codPendingAmount || 0);
             if (amount <= 0 || remaining <= 0) continue;
-            const settleAmount = roundCurrency(Math.min(amount, remaining));
+            // Handoff is always full pending for an order (float move).
+            if (amount > remaining + 0.001) break;
 
-            await reconcileCodCash(
-                order._id,
-                settleAmount,
-                deliveryBoyId,
-                {
-                    actorId: req.user?.id || null,
-                    metadata: {
-                        source: "delivery_cod_cash_page",
-                        initiatedBy: "delivery_partner",
-                    },
-                },
-            );
+            await handoffCodCashToSeller(order._id, {
+                actorId: req.user?.id || null,
+            });
 
-            totalSubmitted = roundCurrency(totalSubmitted + settleAmount);
-            remaining = roundCurrency(remaining - settleAmount);
+            totalSubmitted = roundCurrency(totalSubmitted + amount);
+            remaining = roundCurrency(remaining - amount);
             settledOrders.push({
                 orderId: order.orderId,
-                amount: settleAmount,
+                amount,
             });
         }
 
@@ -373,7 +389,7 @@ export const submitDeliveryCodCashToAdmin = async (req, res) => {
             return handleResponse(
                 res,
                 400,
-                "No collected COD cash is ready to submit yet. Mark customer cash as collected first.",
+                "No COD cash ready to hand over. Collect cash from customer first.",
             );
         }
 
@@ -383,9 +399,9 @@ export const submitDeliveryCodCashToAdmin = async (req, res) => {
             type: "Cash Settlement",
             amount: -Math.abs(totalSubmitted),
             status: "Settled",
-            reference: `CSH-SET-${deliveryBoyId}-${Date.now()}`,
+            reference: `CSH-HO-${deliveryBoyId}-${Date.now()}`,
             meta: {
-                source: "delivery_cod_cash_page",
+                source: "delivery_cod_handoff_to_seller",
                 orders: settledOrders.map((item) => item.orderId),
             },
         });
@@ -397,7 +413,7 @@ export const submitDeliveryCodCashToAdmin = async (req, res) => {
             .select("cashInHand")
             .lean();
 
-        return handleResponse(res, 200, "COD cash submitted to admin successfully", {
+        return handleResponse(res, 200, "COD cash handed over to seller(s)", {
             totalSubmitted,
             orderCount: settledOrders.length,
             orders: settledOrders,

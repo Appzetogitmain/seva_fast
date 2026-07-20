@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatDateTime } from '@shared/utils/formatDate';
 
 const SellerTransactions = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -72,13 +73,7 @@ const SellerTransactions = () => {
                 const mapped = data.map(t => ({
                     id: t.reference || t._id,
                     orderId: t.order?.orderId || null,
-                    date: new Date(t.createdAt).toLocaleString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    }),
+                    date: formatDateTime(t.createdAt),
                     seller: t.user?.shopName || t.user?.name || 'Unknown',
                     type: t.type === 'Seller Earning' ? 'sale' :
                         (t.type === 'Withdrawal' || t.type === 'Payout') ? 'payout' :
@@ -542,7 +537,7 @@ const SellerTransactions = () => {
                                             doc.line(margin, y - 8, pageWidth - margin, y - 8);
                                             doc.setFontSize(8);
                                             doc.setTextColor(120, 120, 120);
-                                            doc.text(`Generated on ${new Date().toLocaleString()} • Voucher ID: ${safeId}`, pageWidth / 2, y, { align: 'center' });
+                                            doc.text(`Generated on ${formatDateTime(new Date())} • Voucher ID: ${safeId}`, pageWidth / 2, y, { align: 'center' });
                                             doc.setTextColor(0, 0, 0);
 
                                             doc.save(`transaction-voucher-${safeId}.pdf`);

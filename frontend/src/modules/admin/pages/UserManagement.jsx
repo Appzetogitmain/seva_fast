@@ -38,6 +38,7 @@ const ALL_PERMISSIONS = [
     "FAQs",
     "Orders",
     "Fees & Charges",
+    "Legal Documents",
     "Settings",
     "Subscription Plans",
     "Login Activity",

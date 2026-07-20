@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import Pagination from '@shared/components/ui/Pagination';
 import { adminApi } from '../services/adminApi';
 import { toast } from 'sonner';
+import { formatDate } from '@shared/utils/formatDate';
 
 const getTreeStats = (tree) => {
     let total = 0;
@@ -476,7 +477,7 @@ const ReferralsAndSubscriptions = () => {
                                                         <div className="flex items-center gap-1">
                                                             <Clock className="h-3 w-3 text-slate-400" />
                                                             <span className="text-[10px] font-bold text-slate-500 uppercase">
-                                                                Valid till: {new Date(cust.planExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                Valid till: {formatDate(cust.planExpiry)}
                                                             </span>
                                                         </div>
                                                     </div>

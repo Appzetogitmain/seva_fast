@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { exportToCSV } from "@/lib/exportUtils";
 import { useSellerEarnings } from "../context/SellerEarningsContext";
 import Pagination from "@shared/components/ui/Pagination";
+import { formatDate, formatTime, formatDateTime } from "@shared/utils/formatDate";
 
 const Transactions = () => {
   const { earningsData: data, earningsLoading: loading } = useSellerEarnings();
@@ -111,19 +112,8 @@ const Transactions = () => {
         type: txn.type ?? "",
         amount: `₹${Math.abs(Number(txn.amount ?? 0)).toLocaleString()}`,
         status: txn.status ?? "",
-        date:
-          txn.date ??
-          (txn.createdAt
-            ? new Date(txn.createdAt).toLocaleDateString()
-            : ""),
-        time:
-          txn.time ??
-          (txn.createdAt
-            ? new Date(txn.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : ""),
+        date: formatDate(txn.createdAt || txn.date, ""),
+        time: formatTime(txn.createdAt, "") || txn.time || "",
         customer: txn.customer ?? "",
         ref: txn.ref ?? "",
       };
@@ -176,8 +166,8 @@ const Transactions = () => {
                     type: txn.type ?? "",
                     amount: `₹${Number(txn.amount ?? 0).toLocaleString()}`,
                     status: txn.status ?? "",
-                    date: txn.date ?? (txn.createdAt ? new Date(txn.createdAt).toLocaleDateString() : ""),
-                    time: txn.time ?? (txn.createdAt ? new Date(txn.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""),
+                    date: formatDate(txn.createdAt || txn.date, ""),
+                    time: formatTime(txn.createdAt, "") || txn.time || "",
                     customer: txn.customer ?? "",
                     ref: txn.ref ?? "",
                   }));
@@ -344,7 +334,7 @@ const Transactions = () => {
                             {txn.ref ?? "—"}
                           </Badge>
                           <span className="text-[10px] sm:text-xs text-slate-600 font-bold uppercase tracking-tighter">
-                            {txn.date ?? (txn.createdAt ? new Date(txn.createdAt).toLocaleDateString() : "—")} • {txn.time ?? (txn.createdAt ? new Date(txn.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—")}
+                            {formatDate(txn.createdAt || txn.date)} • {formatTime(txn.createdAt, "") || txn.time || "—"}
                           </span>
                         </div>
                       </td>
@@ -471,11 +461,13 @@ const Transactions = () => {
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-600 font-bold">Date & Time</span>
                 <span className="text-slate-900 font-black">
-                  {selectedTxn.date && selectedTxn.time
-                    ? `${selectedTxn.date} at ${selectedTxn.time}`
-                    : selectedTxn.createdAt
-                      ? `${new Date(selectedTxn.createdAt).toLocaleDateString()} at ${new Date(selectedTxn.createdAt).toLocaleTimeString()}`
-                      : "—"}
+                  {selectedTxn.createdAt
+                    ? formatDateTime(selectedTxn.createdAt)
+                    : selectedTxn.date && selectedTxn.time
+                      ? `${formatDate(selectedTxn.date)} ${selectedTxn.time}`
+                      : selectedTxn.date
+                        ? formatDate(selectedTxn.date)
+                        : "—"}
                 </span>
               </div>
             </div>

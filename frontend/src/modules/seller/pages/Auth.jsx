@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@core/context/AuthContext";
@@ -48,6 +48,119 @@ const REQUIRED_DOCUMENT_CONFIG = [
   { id: "idProof", label: "ID Proof" },
 ];
 
+/** 6-box OTP entry that stays fully visible inside the seller signup card */
+function SellerOtpPanel({
+  channelLabel,
+  destination,
+  otp,
+  onOtpChange,
+  onConfirm,
+  onResend,
+  isVerifying,
+  isSending,
+}) {
+  const panelRef = useRef(null);
+  const inputsRef = useRef([]);
+  const digits = Array.from({ length: 6 }, (_, i) => otp[i] || "");
+
+  useEffect(() => {
+    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const t = setTimeout(() => inputsRef.current[0]?.focus(), 120);
+    return () => clearTimeout(t);
+  }, []);
+
+  const setDigitAt = (index, raw) => {
+    const val = String(raw || "").replace(/\D/g, "").slice(-1);
+    const next = digits.map((d, i) => (i === index ? val : d));
+    onOtpChange(next.join(""));
+    if (val && index < 5) {
+      inputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 6);
+    if (!pasted) return;
+    onOtpChange(pasted);
+    const focusIdx = Math.min(Math.max(pasted.length - 1, 0), 5);
+    inputsRef.current[focusIdx]?.focus();
+  };
+
+  return (
+    <div
+      ref={panelRef}
+      className="w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 sm:p-4 space-y-3"
+    >
+      <div className="space-y-0.5">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+          Enter {channelLabel} OTP
+        </p>
+        <p className="text-xs font-semibold text-slate-600 truncate">
+          Sent to <span className="text-slate-900 font-bold">{destination}</span>
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+        {digits.map((digit, i) => (
+          <input
+            key={i}
+            ref={(el) => {
+              inputsRef.current[i] = el;
+            }}
+            type="tel"
+            inputMode="numeric"
+            autoComplete={i === 0 ? "one-time-code" : "off"}
+            maxLength={1}
+            value={digit}
+            onPaste={handlePaste}
+            onChange={(e) => setDigitAt(i, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Backspace" && !digits[i] && i > 0) {
+                e.preventDefault();
+                inputsRef.current[i - 1]?.focus();
+                setDigitAt(i - 1, "");
+              } else if (e.key === "ArrowLeft" && i > 0) {
+                inputsRef.current[i - 1]?.focus();
+              } else if (e.key === "ArrowRight" && i < 5) {
+                inputsRef.current[i + 1]?.focus();
+              } else if (e.key === "Enter" && otp.length === 6) {
+                onConfirm();
+              }
+            }}
+            className="w-9 h-11 sm:w-11 sm:h-12 flex-1 max-w-[3rem] min-w-0 rounded-lg border-2 border-slate-200 bg-white text-center text-base sm:text-lg font-black text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all"
+          />
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={isVerifying || otp.length !== 6}
+          className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 text-white py-3 text-[11px] font-black uppercase tracking-wider hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        >
+          {isVerifying ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            "Confirm OTP"
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={isSending}
+          className="sm:w-auto shrink-0 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-wider text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all"
+        >
+          {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Resend"}
+        </button>
+      </div>
+    </div>
+  );
+}
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -418,7 +531,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#fcfaff] p-6 font-['Outfit'] overflow-hidden relative">
+    <div className="flex min-h-dvh items-center justify-center bg-[#fcfaff] p-4 sm:p-6 font-['Outfit'] overflow-x-hidden overflow-y-auto relative">
       {/* Elegant Ambient Background */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] bg-slate-100/50 rounded-full blur-[120px]" />
@@ -428,9 +541,9 @@ const Auth = () => {
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative z-10 w-full max-w-[1000px] min-h-[600px] max-h-[90vh] bg-white rounded-lg shadow-[0_50px_120px_rgba(0,0,0,0.04)] border border-white flex flex-col md:flex-row overflow-hidden">
+        className="relative z-10 w-full max-w-[1000px] h-[85dvh] md:h-[min(720px,90dvh)] my-4 sm:my-6 bg-white rounded-lg shadow-[0_50px_120px_rgba(0,0,0,0.04)] border border-white flex flex-col md:flex-row overflow-hidden min-h-0">
         {/* Visual Side Panel */}
-        <div className="hidden md:flex w-[45%] bg-linear-to-br from-slate-900 via-slate-950 to-black relative flex-col items-center justify-center p-10 overflow-hidden">
+        <div className="hidden md:flex w-[45%] min-w-0 shrink-0 bg-linear-to-br from-slate-900 via-slate-950 to-black relative flex-col items-center justify-center p-10 overflow-hidden">
           {/* Abstract Decorative Circles */}
           <div className="absolute inset-0 opacity-20">
             <div className="absolute top-0 left-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
@@ -475,11 +588,26 @@ const Auth = () => {
           </div>
         </div>
 
-        {/* Form Content Side */}
+        {/* Form Content Side — min-w-0 so flex child can shrink; scroll stays inside the card */}
         <div
-          className="w-full md:w-[55%] min-h-0 p-8 pt-12 md:p-12 md:pt-16 flex flex-col justify-center bg-white overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar relative"
+          className="w-full md:w-[55%] min-w-0 min-h-0 flex-1 flex flex-col bg-white overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar relative"
           onWheelCapture={handlePanelWheel}
           style={{ WebkitOverflowScrolling: "touch" }}>
+          {/* Mobile logo — desktop uses top-right badge below */}
+          <div className="flex md:hidden items-center justify-center pt-5 pb-1 shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={`${appName} logo`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Store size={24} className="text-slate-700" />
+              )}
+            </div>
+          </div>
+
           <div className="hidden md:flex absolute top-8 right-8 z-20">
             <div className="w-20 h-20 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
               {logoUrl ? (
@@ -493,6 +621,7 @@ const Auth = () => {
               )}
             </div>
           </div>
+          <div className="w-full min-w-0 my-auto p-5 sm:p-8 md:p-12 md:pt-16">
           <AnimatePresence mode="wait">
             <motion.div
               key={isLogin ? "login" : `signup-step-${signupStep}`}
@@ -500,20 +629,20 @@ const Auth = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-              className="space-y-8 py-4 md:py-6">
-              <div className="space-y-4">
+              className="w-full min-w-0 space-y-5 sm:space-y-8 py-2 sm:py-4 md:py-6">
+              <div className="space-y-3 sm:space-y-4 pr-0 md:pr-24 text-center md:text-left">
                 <span className="inline-block px-4 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200">
                   {isLogin
                     ? "Welcome Back"
                     : `New Partnership - Step ${signupStep} of 3`}
                 </span>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tighter">
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tighter">
                   Seller{" "}
                   <span className="text-slate-900">
                     {isLogin ? "Login" : "Signup"}
                   </span>
                 </h1>
-                <p className="text-slate-600 font-medium text-base leading-relaxed">
+                <p className="text-slate-600 font-medium text-sm sm:text-base leading-relaxed">
                   {isLogin
                     ? "Access your unified seller dashboard and manage orders."
                     : signupStep === 1
@@ -524,14 +653,14 @@ const Auth = () => {
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 min-w-0">
                 {/* LOGIN OR SIGNUP STEP 1 */}
                 {(isLogin || signupStep === 1) && (
                   <>
                     {!isLogin && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="relative group">
-                          <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
+                      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                        <div className="relative group min-w-0">
+                          <div className="absolute left-4 sm:left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
                             <User size={18} />
                           </div>
                           <input
@@ -539,13 +668,13 @@ const Auth = () => {
                             name="name"
                             required
                             placeholder="Owner Name"
-                            className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                            className="w-full min-w-0 pl-11 sm:pl-12 pr-3 sm:pr-4 py-3.5 sm:py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
                             value={formData.name}
                             onChange={handleChange}
                           />
                         </div>
-                        <div className="relative group">
-                          <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
+                        <div className="relative group min-w-0">
+                          <div className="absolute left-4 sm:left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
                             <Store size={18} />
                           </div>
                           <input
@@ -553,7 +682,7 @@ const Auth = () => {
                             name="shopName"
                             required
                             placeholder="Shop / Business Name"
-                            className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                            className="w-full min-w-0 pl-11 sm:pl-12 pr-3 sm:pr-4 py-3.5 sm:py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
                             value={formData.shopName}
                             onChange={handleChange}
                           />
@@ -561,21 +690,23 @@ const Auth = () => {
                       </div>
                     )}
 
-                    <div className="relative group">
-                      <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
-                        <Mail size={18} />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="relative group flex-1 min-w-0 overflow-hidden">
+                        <div className="absolute left-4 sm:left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors pointer-events-none">
+                          <Mail size={18} />
+                        </div>
+                        <input
+                          type="email"
+                          name="email"
+                          required
+                          inputMode="email"
+                          autoComplete="email"
+                          placeholder={isLogin ? "Enter your email" : "Enter your business email"}
+                          className="w-full min-w-0 pl-11 sm:pl-12 pr-3 py-3.5 sm:py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                          value={formData.email}
+                          onChange={handleChange}
+                        />
                       </div>
-                      <input
-                        type="email"
-                        name="email"
-                        required
-                        inputMode="email"
-                        autoComplete="email"
-                        placeholder="Business Email"
-                        className="w-full pl-12 pr-28 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
-                        value={formData.email}
-                        onChange={handleChange}
-                      />
                       {!isLogin && (
                         <button
                           type="button"
@@ -585,7 +716,7 @@ const Auth = () => {
                             verifications.email.status === "verified" ||
                             !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email || "")
                           }
-                          className={`absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${verifications.email.status === "verified"
+                          className={`shrink-0 px-2.5 sm:px-3 py-2.5 rounded-md text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all ${verifications.email.status === "verified"
                             ? "bg-brand-100 text-brand-700 cursor-default"
                             : "bg-slate-900 text-white hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
                             }`}>
@@ -602,52 +733,43 @@ const Auth = () => {
                       )}
                     </div>
                     {!isLogin && verifications.email.isOtpVisible && verifications.email.status !== "verified" && (
-                      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={6}
-                          placeholder="Enter email OTP"
-                          value={verifications.email.otp}
-                          onChange={(e) =>
-                            updateVerificationState("email", {
-                              otp: e.target.value.replace(/\D/g, "").slice(0, 6),
-                            })
-                          }
-                          className="flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none placeholder:text-slate-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleVerifyOtp("email")}
-                          disabled={verifications.email.isVerifying || verifications.email.otp.length !== 6}
-                          className="rounded-md bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-50"
-                        >
-                          {verifications.email.isVerifying ? "Checking..." : "Confirm OTP"}
-                        </button>
-                      </div>
+                      <SellerOtpPanel
+                        channelLabel="email"
+                        destination={formData.email}
+                        otp={verifications.email.otp}
+                        onOtpChange={(value) =>
+                          updateVerificationState("email", { otp: value.slice(0, 6) })
+                        }
+                        onConfirm={() => handleVerifyOtp("email")}
+                        onResend={() => handleSendVerificationOtp("email")}
+                        isVerifying={verifications.email.isVerifying}
+                        isSending={verifications.email.isSending}
+                      />
                     )}
                     {!isLogin && verifications.email.status === "verified" && (
                       <div className="flex items-center gap-2 text-[11px] font-bold text-brand-600">
-                        <CheckCircle className="h-4 w-4" />
+                        <CheckCircle className="h-4 w-4 shrink-0" />
                         <span>Email verified successfully.</span>
                       </div>
                     )}
 
                     {!isLogin && (
                       <>
-                        <div className="relative group">
-                          <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
-                            <Phone size={18} />
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="relative group flex-1 min-w-0 overflow-hidden">
+                            <div className="absolute left-4 sm:left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors pointer-events-none">
+                              <Phone size={18} />
+                            </div>
+                            <input
+                              type="tel"
+                              name="phone"
+                              required
+                              placeholder="Contact Number"
+                              className="w-full min-w-0 pl-11 sm:pl-12 pr-3 py-3.5 sm:py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                              value={formData.phone}
+                              onChange={handleChange}
+                            />
                           </div>
-                          <input
-                            type="tel"
-                            name="phone"
-                            required
-                            placeholder="Contact Number"
-                            className="w-full pl-12 pr-28 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
-                            value={formData.phone}
-                            onChange={handleChange}
-                          />
                           <button
                             type="button"
                             onClick={() => handleSendVerificationOtp("phone")}
@@ -656,7 +778,7 @@ const Auth = () => {
                               verifications.phone.status === "verified" ||
                               !/^[0-9]{10}$/.test(formData.phone || "")
                             }
-                            className={`absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${verifications.phone.status === "verified"
+                            className={`shrink-0 px-2.5 sm:px-3 py-2.5 rounded-md text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all ${verifications.phone.status === "verified"
                               ? "bg-brand-100 text-brand-700 cursor-default"
                               : "bg-slate-900 text-white hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
                               }`}>
@@ -672,33 +794,22 @@ const Auth = () => {
                           </button>
                         </div>
                         {verifications.phone.isOtpVisible && verifications.phone.status !== "verified" && (
-                          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              maxLength={6}
-                              placeholder="Enter phone OTP"
-                              value={verifications.phone.otp}
-                              onChange={(e) =>
-                                updateVerificationState("phone", {
-                                  otp: e.target.value.replace(/\D/g, "").slice(0, 6),
-                                })
-                              }
-                              className="flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none placeholder:text-slate-400"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleVerifyOtp("phone")}
-                              disabled={verifications.phone.isVerifying || verifications.phone.otp.length !== 6}
-                              className="rounded-md bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-50"
-                            >
-                              {verifications.phone.isVerifying ? "Checking..." : "Confirm OTP"}
-                            </button>
-                          </div>
+                          <SellerOtpPanel
+                            channelLabel="phone"
+                            destination={`+91 ${formData.phone}`}
+                            otp={verifications.phone.otp}
+                            onOtpChange={(value) =>
+                              updateVerificationState("phone", { otp: value.slice(0, 6) })
+                            }
+                            onConfirm={() => handleVerifyOtp("phone")}
+                            onResend={() => handleSendVerificationOtp("phone")}
+                            isVerifying={verifications.phone.isVerifying}
+                            isSending={verifications.phone.isSending}
+                          />
                         )}
                         {verifications.phone.status === "verified" && (
                           <div className="flex items-center gap-2 text-[11px] font-bold text-brand-600">
-                            <CheckCircle className="h-4 w-4" />
+                            <CheckCircle className="h-4 w-4 shrink-0" />
                             <span>Phone number verified successfully.</span>
                           </div>
                         )}
@@ -946,6 +1057,26 @@ const Auth = () => {
                     />
                   </button>
                 </div>
+
+                <p className="text-center text-[10px] text-slate-400 font-semibold pt-1 leading-relaxed">
+                  By continuing, you agree to our{" "}
+                  <button
+                    type="button"
+                    onClick={() => navigate("/terms?for=seller")}
+                    className="text-slate-800 font-black hover:underline"
+                  >
+                    Terms &amp; Conditions
+                  </button>{" "}
+                  and{" "}
+                  <button
+                    type="button"
+                    onClick={() => navigate("/privacy?for=seller")}
+                    className="text-slate-800 font-black hover:underline"
+                  >
+                    Privacy Policy
+                  </button>
+                  .
+                </p>
               </form>
 
               <div className="pt-1 border-t border-slate-50 flex flex-col items-center gap-1">
@@ -967,11 +1098,12 @@ const Auth = () => {
               </div>
             </motion.div>
           </AnimatePresence>
+          </div>
         </div>
       </motion.div>
 
       {/* Bottom Tagline */}
-      <div className="absolute bottom-6 flex items-center gap-4 text-slate-300 text-[10px] font-black uppercase tracking-[6px]">
+      <div className="hidden sm:flex absolute bottom-4 left-0 right-0 justify-center items-center gap-4 text-slate-300 text-[10px] font-black uppercase tracking-[6px] pointer-events-none">
         Empowering Business Digitalization
       </div>
 

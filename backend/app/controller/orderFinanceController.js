@@ -2,22 +2,56 @@ import Order from "../models/order.js";
 import handleResponse from "../utils/helper.js";
 import {
   checkoutPreviewSchema,
+  codChooseMethodSchema,
+  codHandoffToSellerSchema,
   codMarkCollectedSchema,
+  codOnlinePaidSchema,
   codReconcileSchema,
   createFinanceOrderSchema,
   deliveredSchema,
   verifyOnlinePaymentSchema,
 } from "../validation/financeValidation.js";
 import {
-  handleCodOrderFinance,
+  chooseCodCollectMethod,
+  handoffCodCashToSeller,
+  markCodCashCollectedByRider,
+  markCodOnlinePaid,
   reconcileCodCash,
 } from "../services/finance/orderFinanceService.js";
-import { applyDeliveredSettlement } from "../services/orderSettlement.js";
+import {
+  applyDeliveredSettlement,
+  finalizeCodAfterAdminCredit,
+  getAdminCodPaymentQrSettings,
+} from "../services/orderSettlement.js";
 import { placeOrderAtomic } from "../services/orderPlacementService.js";
 import { orderMatchQueryFromRouteParam } from "../utils/orderLookup.js";
 import { verifyClientPaymentCallback } from "../services/paymentService.js";
 import { buildCheckoutPricingSnapshot } from "../services/checkoutPricingService.js";
 import { WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
+
+function assertAssignedDeliveryPartner(req, order) {
+  if (
+    req.user?.role === "delivery" &&
+    order.deliveryBoy &&
+    String(order.deliveryBoy) !== String(req.user.id)
+  ) {
+    const err = new Error("Only assigned delivery partner can perform this action");
+    err.statusCode = 403;
+    throw err;
+  }
+}
+
+function roundCurrency(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function getCodNetAmountFromOrder(order) {
+  const gross = roundCurrency(
+    order.paymentBreakdown?.grandTotal || order.pricing?.total || 0,
+  );
+  const rider = roundCurrency(order.paymentBreakdown?.riderPayoutTotal || 0);
+  return roundCurrency(Math.max(gross - rider, 0));
+}
 
 function validateWithJoi(schema, payload) {
   const { error, value } = schema.validate(payload, {
@@ -220,30 +254,149 @@ export const markCodCollectedAfterDelivery = async (req, res) => {
       return handleResponse(res, 400, "COD collection is allowed only after delivery");
     }
 
-    if (
-      req.user?.role === "delivery" &&
-      order.deliveryBoy &&
-      String(order.deliveryBoy) !== String(req.user.id)
-    ) {
-      return handleResponse(res, 403, "Only assigned delivery partner can mark COD collection");
-    }
+    assertAssignedDeliveryPartner(req, order);
 
     const deliveryPartnerId =
       payload.deliveryPartnerId ||
       order.deliveryBoy ||
       (req.user?.role === "delivery" ? req.user.id : null);
 
-    if (order.financeFlags?.codMarkedCollected) {
+    if (order.financeFlags?.codMarkedCollected || order.financeFlags?.codCashWithRider) {
       return handleResponse(res, 200, "COD amount already marked as collected", order);
     }
 
-    const updated = await handleCodOrderFinance(order._id, {
-      amount: payload.amount,
+    const updated = await markCodCashCollectedByRider(order._id, {
       deliveryPartnerId,
       actorId: req.user?.id || null,
     });
 
-    return handleResponse(res, 200, "COD amount marked as collected", updated);
+    return handleResponse(res, 200, "COD cash collected by rider", updated);
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
+  }
+};
+
+export const chooseCodCollectMethodController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const payload = validateWithJoi(codChooseMethodSchema, req.body || {});
+    const orderKey = orderMatchQueryFromRouteParam(id);
+    if (!orderKey) {
+      return handleResponse(res, 404, "Order not found");
+    }
+    const order = await Order.findOne(orderKey)
+      .select("_id deliveryBoy paymentMode status orderStatus financeFlags")
+      .lean();
+    if (!order) {
+      return handleResponse(res, 404, "Order not found");
+    }
+    assertAssignedDeliveryPartner(req, order);
+
+    const updated = await chooseCodCollectMethod(order._id, payload.method, {
+      actorId: req.user?.id || null,
+    });
+    return handleResponse(res, 200, "COD collect method saved", updated);
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
+  }
+};
+
+export const getCodPaymentQrController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orderKey = orderMatchQueryFromRouteParam(id);
+    if (!orderKey) {
+      return handleResponse(res, 404, "Order not found");
+    }
+    const order = await Order.findOne(orderKey)
+      .select(
+        "_id orderId deliveryBoy paymentMode status orderStatus financeFlags paymentBreakdown pricing",
+      )
+      .lean();
+    if (!order) {
+      return handleResponse(res, 404, "Order not found");
+    }
+    assertAssignedDeliveryPartner(req, order);
+
+    const isDelivered =
+      order.status === "delivered" || order.orderStatus === "delivered";
+    if (!isDelivered) {
+      return handleResponse(res, 400, "Order must be delivered first");
+    }
+
+    const qrSettings = await getAdminCodPaymentQrSettings();
+    if (!qrSettings.qrUrl && !qrSettings.upiId) {
+      return handleResponse(
+        res,
+        400,
+        "Admin payment QR is not configured yet. Ask admin to upload QR in settings.",
+      );
+    }
+
+    return handleResponse(res, 200, "COD payment QR fetched", {
+      orderId: order.orderId,
+      amountDue: getCodNetAmountFromOrder(order),
+      amountGross: roundCurrency(
+        order.paymentBreakdown?.grandTotal || order.pricing?.total || 0,
+      ),
+      riderPayout: roundCurrency(order.paymentBreakdown?.riderPayoutTotal || 0),
+      collectMethod: order.financeFlags?.codCollectMethod || "none",
+      alreadyPaid: Boolean(
+        order.financeFlags?.codOnlinePaid || order.financeFlags?.codCashRemittedToAdmin,
+      ),
+      ...qrSettings,
+    });
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
+  }
+};
+
+export const markCodOnlinePaidController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    validateWithJoi(codOnlinePaidSchema, req.body || {});
+    const orderKey = orderMatchQueryFromRouteParam(id);
+    if (!orderKey) {
+      return handleResponse(res, 404, "Order not found");
+    }
+    const order = await Order.findOne(orderKey)
+      .select("_id orderId deliveryBoy paymentMode status orderStatus financeFlags")
+      .lean();
+    if (!order) {
+      return handleResponse(res, 404, "Order not found");
+    }
+    assertAssignedDeliveryPartner(req, order);
+
+    const paid = await markCodOnlinePaid(order._id, {
+      actorId: req.user?.id || null,
+    });
+    const settled = await finalizeCodAfterAdminCredit(paid._id, paid.orderId);
+    return handleResponse(res, 200, "COD marked paid via admin QR", settled);
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
+  }
+};
+
+export const handoffCodCashToSellerController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    validateWithJoi(codHandoffToSellerSchema, req.body || {});
+    const orderKey = orderMatchQueryFromRouteParam(id);
+    if (!orderKey) {
+      return handleResponse(res, 404, "Order not found");
+    }
+    const order = await Order.findOne(orderKey)
+      .select("_id deliveryBoy paymentMode financeFlags")
+      .lean();
+    if (!order) {
+      return handleResponse(res, 404, "Order not found");
+    }
+    assertAssignedDeliveryPartner(req, order);
+
+    const updated = await handoffCodCashToSeller(order._id, {
+      actorId: req.user?.id || null,
+    });
+    return handleResponse(res, 200, "COD cash handed over to seller", updated);
   } catch (error) {
     return handleResponse(res, error.statusCode || 500, error.message);
   }
@@ -288,22 +441,6 @@ export const markOrderDeliveredAndSettle = async (req, res) => {
     }
 
     const updated = await applyDeliveredSettlement(order, order.orderId);
-
-    // For COD orders, "delivery" implies cash is collected by the assigned delivery partner.
-    // This updates System Float (COD) as: grandTotal - riderPayoutTotal.
-    if (
-      updated?.paymentMode === "COD" &&
-      updated?.deliveryBoy &&
-      !updated?.financeFlags?.codMarkedCollected
-    ) {
-      const deliveryPartnerId = updated.deliveryBoy;
-      const updatedWithCod = await handleCodOrderFinance(updated._id, {
-        deliveryPartnerId,
-        actorId: req.user?.id || null,
-      });
-      return handleResponse(res, 200, "Order delivered and COD cash collected", updatedWithCod);
-    }
-
     return handleResponse(res, 200, "Order delivered and settlement queued", updated);
   } catch (error) {
     return handleResponse(res, error.statusCode || 500, error.message);
@@ -323,13 +460,7 @@ export const reconcileCodCashSubmission = async (req, res) => {
       return handleResponse(res, 404, "Order not found");
     }
 
-    if (
-      req.user?.role === "delivery" &&
-      order.deliveryBoy &&
-      String(order.deliveryBoy) !== String(req.user.id)
-    ) {
-      return handleResponse(res, 403, "Only assigned delivery partner can reconcile COD cash");
-    }
+    assertAssignedDeliveryPartner(req, order);
 
     const deliveryPartnerId =
       payload.deliveryPartnerId ||

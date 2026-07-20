@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { adminApi } from '../services/adminApi';
 import { toast } from 'sonner';
+import { formatDate } from '@shared/utils/formatDate';
 
 const groupLabels = {
     platform: 'Platform Splits',
@@ -261,7 +262,7 @@ const CommissionSplitsReport = () => {
                                 <div className="text-right">
                                     <p className="text-sm font-black text-emerald-700">+₹{Number(txn.amount || 0).toLocaleString('en-IN')}</p>
                                     <p className="text-[10px] font-bold text-slate-400">
-                                        {txn.date ? new Date(txn.date).toLocaleDateString('en-IN') : ''}
+                                        {txn.date ? formatDate(txn.date) : ''}
                                     </p>
                                 </div>
                             </div>

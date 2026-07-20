@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ArrowUpRight, ArrowDownLeft, ReceiptIndianRupee } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
+import { formatDate, formatTime } from '@shared/utils/formatDate';
 
 const OrderTransactionsPage = () => {
     const navigate = useNavigate();
@@ -98,11 +99,7 @@ const OrderTransactionsPage = () => {
                                                 </p>
                                                 {createdAt && (
                                                     <p className="text-[11px] text-slate-500 mt-0.5">
-                                                        {createdAt.toLocaleDateString()},{' '}
-                                                        {createdAt.toLocaleTimeString([], {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                        })}
+                                                        {formatDate(createdAt)}, {formatTime(createdAt)}
                                                     </p>
                                                 )}
                                             </div>

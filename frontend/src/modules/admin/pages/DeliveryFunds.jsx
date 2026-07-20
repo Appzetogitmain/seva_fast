@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '@shared/components/ui/Pagination';
 import { adminApi } from '../services/adminApi';
 import { toast } from 'sonner';
+import { formatDateTime } from '@shared/utils/formatDate';
 
 const DeliveryFunds = () => {
     const [transfers, setTransfers] = useState([]);
@@ -59,7 +60,7 @@ const DeliveryFunds = () => {
                 status: tx.status?.toLowerCase() || 'pending',
                 paymentMethod: 'Bank Transfer',
                 accountInfo: tx.user?.documents?.bankDetails || 'No details',
-                dateTime: new Date(tx.createdAt || tx.date).toLocaleString(),
+                dateTime: formatDateTime(tx.createdAt || tx.date),
                 referenceId: tx.reference,
                 type: tx.type
             }));

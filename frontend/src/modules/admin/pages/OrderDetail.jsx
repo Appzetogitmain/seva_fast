@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@shared/components/ui/Toast';
+import { formatDate, formatTime } from '@shared/utils/formatDate';
 
 const OrderDetail = () => {
     const { orderId } = useParams();
@@ -232,7 +233,7 @@ const OrderDetail = () => {
                         </div>
                         <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-widest flex items-center gap-2">
                             <Calendar className="h-3.5 w-3.5" />
-                            {new Date(order.createdAt).toLocaleDateString()} • <Clock className="h-3.5 w-3.5 ml-1" /> {new Date(order.createdAt).toLocaleTimeString()}
+                            {formatDate(order.createdAt)} • <Clock className="h-3.5 w-3.5 ml-1" /> {formatTime(order.createdAt)}
                         </p>
                     </div>
                 </div>
@@ -348,7 +349,7 @@ const OrderDetail = () => {
                                         <h4 className="text-xs font-black uppercase tracking-tight text-slate-900">
                                             Status: {order.status.replace(/_/g, ' ')}
                                         </h4>
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase">{new Date(order.updatedAt).toLocaleTimeString()}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">{formatTime(order.updatedAt)}</span>
                                     </div>
                                     <p className="text-[11px] font-bold text-slate-400 leading-relaxed italic">"System verified current logistical state as {order.status}."</p>
                                 </div>
@@ -694,7 +695,7 @@ const OrderDetail = () => {
                                 </td>
                                 <td width="50%" align="right" style={{ verticalAlign: "bottom" }}>
                                     <div style={{ fontSize: "12px", fontWeight: "700", marginBottom: "4px" }}>Reference: <span style={{ color: "#2563eb" }}>#{order.orderId}</span></div>
-                                    <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700" }}>Issued: {new Date(order.createdAt).toLocaleDateString()}</div>
+                                    <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700" }}>Issued: {formatDate(order.createdAt)}</div>
                                 </td>
                             </tr>
                         </table>

@@ -24,6 +24,7 @@ import { sellerApi } from "../services/sellerApi";
 import { toast } from "sonner";
 import { useSellerEarnings } from "../context/SellerEarningsContext";
 import Pagination from "@shared/components/ui/Pagination";
+import { formatDate, formatTime } from "@shared/utils/formatDate";
 
 const Withdrawals = () => {
     const { earningsData: data, earningsLoading: loading, refreshEarnings } = useSellerEarnings();
@@ -72,8 +73,8 @@ const Withdrawals = () => {
         lines.push('Withdrawal Receipt');
         lines.push(`ID,${id}`);
         lines.push(`Status,${item.status ?? ''}`);
-        lines.push(`Date,${item.date ?? ''}`);
-        lines.push(`Time,${item.time ?? ''}`);
+        lines.push(`Date,${formatDate(item.createdAt || item.date, "")}`);
+        lines.push(`Time,${formatTime(item.createdAt, "") || item.time || ""}`);
         lines.push(`Amount,₹${Math.abs(item.amount ?? 0).toLocaleString()}`);
         lines.push(`Method,${item.customer ?? 'Bank Transfer'}`);
         if (item.reason) {
@@ -227,7 +228,7 @@ const Withdrawals = () => {
                                     <tr key={item.id || item.ref || item.reference || `wd-${idx}`} className="group hover:bg-slate-50/50 transition-all">
                                         <td className="px-8 py-5">
                                             <p className="text-sm font-black text-slate-900">{item.id}</p>
-                                            <p className="text-xs font-bold text-slate-600 mt-0.5 uppercase tracking-tighter">{item.date} • {item.time}</p>
+                                            <p className="text-xs font-bold text-slate-600 mt-0.5 uppercase tracking-tighter">{formatDate(item.createdAt || item.date)} • {formatTime(item.createdAt, "") || item.time || ""}</p>
                                         </td>
                                         <td className="px-8 py-5">
                                             <p className="text-sm font-black text-slate-900">₹{Math.abs(item.amount).toLocaleString()}</p>

@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
 import { toast } from "sonner";
+import { formatTime } from "@shared/utils/formatDate";
 import { deliveryApi } from "../services/deliveryApi";
 import { Loader2 } from "lucide-react";
 import DeliveryTrackingMap from "../components/DeliveryTrackingMap";
@@ -132,11 +133,7 @@ const distanceMeters = (from, to) => {
   return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const formatArrivalTime = (arrivalMs) =>
-  new Date(arrivalMs).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+const formatArrivalTime = (arrivalMs) => formatTime(arrivalMs);
 
 const formatArrivingIn = (minutes) => {
   if (!Number.isFinite(minutes) || minutes < 0) return "Soon";
@@ -578,6 +575,110 @@ const OrderDetails = () => {
     (step >= 4 ||
       String(order?.status || "").toLowerCase() === "delivered" ||
       String(order?.workflowStatus || "").toUpperCase() === "DELIVERED");
+
+  const isCodOrder = useMemo(() => {
+    if (!order) return false;
+    const mode = String(order.paymentMode || "").toUpperCase();
+    const method = String(order.payment?.method || "").toLowerCase();
+    return mode === "COD" || method === "cod" || method === "cash";
+  }, [order]);
+
+  const [codBusy, setCodBusy] = useState(false);
+  const [codQr, setCodQr] = useState(null);
+
+  const codFlags = order?.financeFlags || {};
+  const codNeedsAction =
+    isOrderDelivered &&
+    isCodOrder &&
+    !codFlags.codOnlinePaid &&
+    !codFlags.codCashRemittedToAdmin;
+
+  const refreshCodQr = async () => {
+    try {
+      const res = await deliveryApi.getCodPaymentQr(order.orderId || orderId);
+      setCodQr(res.data?.result || null);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to load payment QR");
+      setCodQr(null);
+    }
+  };
+
+  const handleChooseCodMethod = async (method) => {
+    if (codBusy) return;
+    try {
+      setCodBusy(true);
+      const res = await deliveryApi.chooseCodCollectMethod(order.orderId || orderId, { method });
+      const updated = res.data?.result;
+      if (updated) setOrder((prev) => ({ ...prev, ...updated }));
+      if (method === "online_qr") {
+        await refreshCodQr();
+        toast.success("Show admin QR to customer");
+      } else {
+        toast.success("Cash selected — collect from customer");
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to save collect method");
+    } finally {
+      setCodBusy(false);
+    }
+  };
+
+  const handleMarkOnlinePaid = async () => {
+    if (codBusy) return;
+    try {
+      setCodBusy(true);
+      const res = await deliveryApi.markCodOnlinePaid(order.orderId || orderId);
+      const updated = res.data?.result;
+      if (updated) setOrder((prev) => ({ ...prev, ...updated }));
+      toast.success("Marked paid — wallets will settle");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to mark paid");
+    } finally {
+      setCodBusy(false);
+    }
+  };
+
+  const handleMarkCashCollected = async () => {
+    if (codBusy) return;
+    try {
+      setCodBusy(true);
+      const res = await deliveryApi.markCodCashCollected(order.orderId || orderId);
+      const updated = res.data?.result;
+      if (updated) setOrder((prev) => ({ ...prev, ...updated }));
+      toast.success("Cash collected — hand over to seller later");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to mark cash collected");
+    } finally {
+      setCodBusy(false);
+    }
+  };
+
+  const handleHandoffToSeller = async () => {
+    if (codBusy) return;
+    try {
+      setCodBusy(true);
+      const res = await deliveryApi.handoffCodCashToSeller(order.orderId || orderId);
+      const updated = res.data?.result;
+      if (updated) setOrder((prev) => ({ ...prev, ...updated }));
+      toast.success("Cash handed over to seller");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to hand over cash");
+    } finally {
+      setCodBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      codNeedsAction &&
+      codFlags.codCollectMethod === "online_qr" &&
+      !codFlags.codOnlinePaid &&
+      !codQr
+    ) {
+      refreshCodQr();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codNeedsAction, codFlags.codCollectMethod, order?.orderId]);
 
   const showPickupCard =
     !isReturnWaitAccept &&
@@ -1130,6 +1231,94 @@ const OrderDetails = () => {
                 onError={handleOtpValidationError}
                 onCancel={() => setShowDropOtpInput(false)}
               />
+            </Card>
+          </motion.div>
+        )}
+
+        {/* COD dual collect: Online QR or Cash */}
+        {codNeedsAction && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <Card className="p-6 rounded-3xl shadow-sm border border-orange-100 bg-orange-50/30">
+              <h3 className="font-bold text-lg text-gray-900 mb-1">Collect COD Payment</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Choose how the customer will pay. Wallets settle only after admin receives money.
+              </p>
+
+              {(!codFlags.codCollectMethod || codFlags.codCollectMethod === "none") && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Button
+                    disabled={codBusy}
+                    onClick={() => handleChooseCodMethod("online_qr")}
+                    className="w-full"
+                  >
+                    Pay Online (Admin QR)
+                  </Button>
+                  <Button
+                    disabled={codBusy}
+                    variant="outline"
+                    onClick={() => handleChooseCodMethod("cash")}
+                    className="w-full"
+                  >
+                    Collect Cash
+                  </Button>
+                </div>
+              )}
+
+              {codFlags.codCollectMethod === "online_qr" && !codFlags.codOnlinePaid && (
+                <div className="space-y-4">
+                  {!codQr && (
+                    <Button disabled={codBusy} variant="outline" onClick={refreshCodQr} className="w-full">
+                      Load Admin QR
+                    </Button>
+                  )}
+                  {codQr && (
+                    <div className="rounded-2xl bg-white border border-orange-100 p-4 text-center space-y-3">
+                      {codQr.qrUrl ? (
+                        <img
+                          src={codQr.qrUrl}
+                          alt="Admin payment QR"
+                          className="mx-auto h-48 w-48 object-contain"
+                        />
+                      ) : null}
+                      <p className="text-2xl font-black text-gray-900">
+                        ₹{Number(codQr.amountDue || 0).toLocaleString()}
+                      </p>
+                      {codQr.upiId ? (
+                        <p className="text-xs text-gray-500">
+                          UPI: <span className="font-bold text-gray-800">{codQr.upiId}</span>
+                          {codQr.upiName ? ` (${codQr.upiName})` : ""}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                  <Button disabled={codBusy} onClick={handleMarkOnlinePaid} className="w-full">
+                    {codBusy ? "Saving..." : "Mark as Paid"}
+                  </Button>
+                </div>
+              )}
+
+              {codFlags.codCollectMethod === "cash" && !codFlags.codCashWithRider && !codFlags.codCashWithSeller && (
+                <Button disabled={codBusy} onClick={handleMarkCashCollected} className="w-full">
+                  {codBusy ? "Saving..." : "Mark Cash Collected"}
+                </Button>
+              )}
+
+              {codFlags.codCashWithRider && !codFlags.codCashWithSeller && (
+                <div className="space-y-3">
+                  <p className="text-sm text-orange-800 font-medium">
+                    Cash is with you. Hand it over to the seller when you return.
+                  </p>
+                  <Button disabled={codBusy} onClick={handleHandoffToSeller} className="w-full">
+                    {codBusy ? "Saving..." : "Hand Over to Seller"}
+                  </Button>
+                </div>
+              )}
+
+              {codFlags.codCashWithSeller && (
+                <p className="text-sm text-green-700 font-medium">
+                  Cash handed to seller. Seller will remit to admin.
+                </p>
+              )}
             </Card>
           </motion.div>
         )}

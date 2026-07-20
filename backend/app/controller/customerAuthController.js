@@ -49,9 +49,14 @@ export const signupCustomer = async (req, res) => {
             ipAddress: req.ip,
         });
 
-        return handleResponse(res, 200, "If the number is eligible, OTP has been sent");
+        return handleResponse(res, 200, "OTP sent successfully");
     } catch (error) {
-        return handleResponse(res, error.statusCode || 500, error.message);
+        return handleResponse(
+            res,
+            error.statusCode || 500,
+            error.message,
+            error.code ? { code: error.code } : {},
+        );
     }
 };
 

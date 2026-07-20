@@ -67,6 +67,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
     const shownReturnOrderIdsRef = useRef(new Set());
     const isFirstLoadRef = useRef(true);
     const newOrderAlertRef = useRef(null);
+    const acceptInFlightRef = useRef(false);
     const newReturnAlertRef = useRef(null);
     const fetchOrdersRef = useRef(null);
     const isOrdersFetchInFlightRef = useRef(false);
@@ -74,6 +75,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
     const orderRingtoneRef = useRef(null);
     const ringtoneRetryTimerRef = useRef(null);
     const ringtoneUnlockHandlerRef = useRef(null);
+    const isAdminApp = role === 'admin' || role === 'sub-admin';
 
     const getOrderRingtone = () => {
         if (!orderRingtoneRef.current) {
@@ -347,14 +349,43 @@ const DashboardLayout = ({ children, navItems, title }) => {
         setIsSidebarOpen(false);
     }, [location.pathname]);
 
+    // Admin: document scroll + visible right scrollbar; reset to top on route change
+    useEffect(() => {
+        if (!isAdminApp) return undefined;
+        const html = document.documentElement;
+        const body = document.body;
+        html.classList.add('admin-app-scroll');
+        body.classList.add('admin-app-scroll');
+        return () => {
+            html.classList.remove('admin-app-scroll');
+            body.classList.remove('admin-app-scroll');
+        };
+    }, [isAdminApp]);
+
+    useEffect(() => {
+        if (!isAdminApp) return;
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+    }, [location.pathname, isAdminApp]);
+
     // Timer: driven by server expiry (sellerPendingExpiresAt), not a local 60s from modal open
     useEffect(() => {
         if (!newOrderAlert) return undefined;
 
         const left = secondsLeftUntilSellerExpiry(newOrderAlert);
         if (left <= 0) {
+            const expiredOrderId = newOrderAlert.orderId;
             setNewOrderAlert(null);
             toast.error("This order has already expired — you can no longer accept it.");
+            if (expiredOrderId && !acceptInFlightRef.current) {
+                sellerApi
+                    .updateOrderStatus(expiredOrderId, { status: 'cancelled' })
+                    .catch(() => { })
+                    .finally(() => {
+                        if (fetchOrdersRef.current) fetchOrdersRef.current();
+                    });
+            }
             return undefined;
         }
 
@@ -366,8 +397,20 @@ const DashboardLayout = ({ children, navItems, title }) => {
             setTimeLeft(next);
             if (next <= 0) {
                 clearInterval(timer);
+                const expiredOrderId = newOrderAlertRef.current?.orderId;
                 setNewOrderAlert(null);
+                // Don't cancel/toast timeout if accept is already in flight — that race
+                // previously left orders looking "timed out" but marked confirmed.
+                if (acceptInFlightRef.current) return;
                 toast.error("Order timed out!");
+                if (expiredOrderId) {
+                    sellerApi
+                        .updateOrderStatus(expiredOrderId, { status: 'cancelled' })
+                        .catch(() => { })
+                        .finally(() => {
+                            if (fetchOrdersRef.current) fetchOrdersRef.current();
+                        });
+                }
             }
         }, 1000);
 
@@ -375,11 +418,14 @@ const DashboardLayout = ({ children, navItems, title }) => {
     }, [newOrderAlert]);
 
     const handleAcceptOrder = async (orderId) => {
+        if (acceptInFlightRef.current) return;
+        acceptInFlightRef.current = true;
         try {
             await sellerApi.updateOrderStatus(orderId, { status: 'confirmed' });
             toast.success(`Order #${orderId} Accepted!`);
             stopOrderRingtone();
             setNewOrderAlert(null);
+            if (fetchOrdersRef.current) fetchOrdersRef.current();
         } catch (error) {
             const msg =
                 error?.response?.data?.message ||
@@ -387,13 +433,17 @@ const DashboardLayout = ({ children, navItems, title }) => {
             const normalizedMsg = String(msg).toLowerCase();
             if (
                 normalizedMsg.includes('not available') ||
-                normalizedMsg.includes('expired')
+                normalizedMsg.includes('expired') ||
+                normalizedMsg.includes('cancelled') ||
+                normalizedMsg.includes('timeout')
             ) {
                 stopOrderRingtone();
                 setNewOrderAlert(null);
                 if (fetchOrdersRef.current) fetchOrdersRef.current();
             }
             toast.error(msg);
+        } finally {
+            acceptInFlightRef.current = false;
         }
     };
 
@@ -423,9 +473,9 @@ const DashboardLayout = ({ children, navItems, title }) => {
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
             />
-            <div className={cn("transition-all duration-300", (role === "admin" || role === "seller") ? "pl-0 md:pl-72" : "pl-72")}>
+            <div className={cn("transition-all duration-300", (role === "admin" || role === "seller" || role === "sub-admin") ? "pl-0 md:pl-72" : "pl-72")}>
                 <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
-                <main className={cn("p-4 md:p-6 min-h-screen", (role === "admin" || role === "seller") ? "pt-20 md:pt-6 pb-24 md:pb-6" : "pt-20")}>
+                <main className={cn("p-4 md:p-6 min-h-screen", (role === "admin" || role === "seller" || role === "sub-admin") ? "pt-20 md:pt-6 pb-24 md:pb-6" : "pt-20")}>
                     <div className="w-full pb-12">
                         <SellerOrdersContext.Provider
                             value={{

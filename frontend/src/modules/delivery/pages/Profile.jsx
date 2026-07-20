@@ -24,6 +24,7 @@ import { useSettings } from "@core/context/SettingsContext";
 import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 import axiosInstance from '@core/api/axios';
 import { useEffect } from 'react';
+import { formatDate } from '@shared/utils/formatDate';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -55,14 +56,7 @@ const Profile = () => {
     fetchStats();
   }, []);
 
-  const getJoinedDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const month = months[date.getMonth()];
-    const year = String(date.getFullYear()).slice(-2);
-    return `${month} '${year}`;
-  };
+  const getJoinedDate = (dateString) => formatDate(dateString, "N/A");
 
   const menuItems = [
     {
@@ -108,6 +102,13 @@ const Profile = () => {
       sub: "Emergency contacts, App permissions",
       color: "text-red-600 bg-red-50",
       path: "/delivery/profile/safety-privacy",
+    },
+    {
+      icon: FileText,
+      label: "Terms & Conditions",
+      sub: "Platform terms and policies",
+      color: "text-indigo-600 bg-indigo-50",
+      path: "/terms?for=delivery",
     },
     {
       icon: Settings,

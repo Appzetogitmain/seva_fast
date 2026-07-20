@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
 import { deliveryApi } from "../services/deliveryApi";
+import { formatDate } from "@shared/utils/formatDate";
 
 const Earnings = () => {
   const [activeTab, setActiveTab] = useState("weekly");
@@ -304,7 +305,7 @@ const Earnings = () => {
                     <div>
                       <p className="font-bold text-gray-900">{txn.type}</p>
                       <p className="text-xs text-gray-500">
-                        {txn.date || new Date(txn.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} • {txn.id || (txn._id ? txn._id.toString().slice(-6).toUpperCase() : 'N/A')}
+                        {txn.date || formatDate(txn.createdAt)} • {txn.id || (txn._id ? txn._id.toString().slice(-6).toUpperCase() : 'N/A')}
                       </p>
                     </div>
                   </div>

@@ -31,6 +31,7 @@ import {
 import { cn } from '@/lib/utils';
 import Modal from '@shared/components/ui/Modal';
 import { useToast } from '@shared/components/ui/Toast';
+import { formatDate, formatDateTime } from '@shared/utils/formatDate';
 
 const CustomerDetail = () => {
     const { id } = useParams();
@@ -230,7 +231,7 @@ const CustomerDetail = () => {
                             <div>
                                 <h3 className="text-3xl font-black text-slate-900">{customer.name}</h3>
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                    Customer since {new Date(customer.joinedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    Customer since {formatDate(customer.joinedDate)}
                                 </p>
                             </div>
 
@@ -298,7 +299,7 @@ const CustomerDetail = () => {
                             <div>
                                 <p className="text-xs font-bold text-slate-700">Last Order placed</p>
                                 <p className="text-[10px] font-semibold text-slate-400">
-                                    {customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Never'}
+                                    {customer.lastOrderDate ? formatDateTime(customer.lastOrderDate) : 'Never'}
                                 </p>
                             </div>
                         </div>
@@ -396,7 +397,7 @@ const CustomerDetail = () => {
                                             </td>
                                             <td className="py-5">
                                                 <p className="text-[10px] font-black text-slate-400 uppercase">
-                                                    {new Date(order.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                    {formatDateTime(order.date)}
                                                 </p>
                                             </td>
                                             <td className="py-5 text-center">

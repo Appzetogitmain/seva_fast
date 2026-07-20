@@ -4,6 +4,7 @@ import { Package, ChevronRight, Clock, CheckCircle, Loader2, ChevronLeft } from 
 import { customerApi } from '../services/customerApi';
 import { getOrderStatusLabel, getLegacyStatusFromOrder } from '@/shared/utils/orderStatus';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
+import { formatDate, formatTime } from '@shared/utils/formatDate';
 
 const OrdersPage = () => {
     const navigate = useNavigate();
@@ -104,15 +105,9 @@ const OrdersPage = () => {
                                             Order #{order.orderId.slice(-6)}
                                         </h3>
                                         <p className="mt-0.5 text-[11px] text-slate-500 font-medium leading-tight">
-                                            {new Date(order.createdAt).toLocaleDateString('en-IN', {
-                                                day: 'numeric',
-                                                month: 'short',
-                                            })}{' '}
+                                            {formatDate(order.createdAt)}{' '}
                                             <span className="mx-1 text-slate-400">•</span>
-                                            {new Date(order.createdAt).toLocaleTimeString('en-IN', {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                            })}
+                                            {formatTime(order.createdAt)}
                                         </p>
                                     </div>
                                 </div>

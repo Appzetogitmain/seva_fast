@@ -28,6 +28,7 @@ import {
     getLegacyStatusFromOrder,
     adminRouteMatchesOrder,
 } from '@/shared/utils/orderStatus';
+import { formatDateTime } from '@shared/utils/formatDate';
 
 const formatOrderIdDisplay = (orderId) => {
     const id = String(orderId || '').replace(/^#/, '').trim();
@@ -117,7 +118,7 @@ const OrdersList = () => {
                     workflowStatus: o.workflowStatus,
                     workflowVersion: o.workflowVersion,
                     returnStatus: o.returnStatus,
-                    date: new Date(o.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+                    date: formatDateTime(o.createdAt),
                     payment: o.payment?.method === 'cod' ? 'COD' : 'Digital',
                 }));
                 setOrders(formatted);

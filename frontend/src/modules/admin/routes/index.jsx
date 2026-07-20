@@ -26,6 +26,7 @@ import {
   MapPin,
   History,
   PieChart,
+  FileText,
 } from "lucide-react";
 
 const Dashboard = React.lazy(() => import("../pages/Dashboard"));
@@ -83,7 +84,6 @@ const OrderDetail = React.lazy(() => import("../pages/OrderDetail"));
 const Returns = React.lazy(() => import("../pages/Returns"));
 const SellerDetail = React.lazy(() => import("../pages/SellerDetail"));
 const SupportTickets = React.lazy(() => import("../pages/SupportTickets"));
-const ReviewModeration = React.lazy(() => import("../pages/ReviewModeration"));
 const FleetTracking = React.lazy(() => import("../pages/FleetTracking"));
 const CouponManagement = React.lazy(() => import("../pages/CouponManagement"));
 const ContentManager = React.lazy(() => import("../pages/ContentManager"));
@@ -101,6 +101,7 @@ const ShopByStoreManagement = React.lazy(
   () => import("../pages/ShopByStoreManagement"),
 );
 const AdminSettings = React.lazy(() => import("../pages/AdminSettings"));
+const AdminLegalDocuments = React.lazy(() => import("../pages/AdminLegalDocuments"));
 const EnvSettings = React.lazy(() => import("../pages/EnvSettings"));
 const AuthActivityLogs = React.lazy(() => import("../pages/AuthActivityLogs"));
 const AdminProfile = React.lazy(() => import("../pages/AdminProfile"));
@@ -147,12 +148,9 @@ const navItems = [
   },
   {
     label: "Customer Support",
+    path: "/admin/support-tickets",
     icon: Receipt,
     color: "emerald",
-    children: [
-      { label: "Help Tickets", path: "/admin/support-tickets" },
-      { label: "Review Content", path: "/admin/moderation" },
-    ],
   },
   {
     label: "Sellers",
@@ -237,6 +235,12 @@ const navItems = [
     color: "red",
   },
   {
+    label: "Legal Documents",
+    path: "/admin/legal-documents",
+    icon: FileText,
+    color: "indigo",
+  },
+  {
     label: "Settings",
     path: "/admin/settings",
     icon: Settings,
@@ -308,7 +312,7 @@ const AdminRoutes = () => {
         <Route path="/sellers/active" element={<SubadminRoute permission="Sellers"><ActiveSellers /></SubadminRoute>} />
         <Route path="/sellers/active/:id" element={<SubadminRoute permission="Sellers"><SellerDetail /></SubadminRoute>} />
         <Route path="/support-tickets" element={<SubadminRoute permission="Customer Support"><SupportTickets /></SubadminRoute>} />
-        <Route path="/moderation" element={<SubadminRoute permission="Customer Support"><ReviewModeration /></SubadminRoute>} />
+        <Route path="/moderation" element={<Navigate to="/admin/support-tickets" replace />} />
         <Route path="/experience-studio" element={<SubadminRoute permission="Marketing Tools"><ContentManager /></SubadminRoute>} />
         <Route path="/hero-categories" element={<SubadminRoute permission="Marketing Tools"><HeroCategoriesPerPage /></SubadminRoute>} />
         <Route path="/notifications" element={<SubadminRoute permission="Marketing Tools"><NotificationComposer /></SubadminRoute>} />
@@ -338,6 +342,7 @@ const AdminRoutes = () => {
         <Route path="/orders/view/:orderId" element={<SubadminRoute permission="Orders"><OrderDetail /></SubadminRoute>} />
         <Route path="/returns" element={<SubadminRoute permission="Orders"><Returns /></SubadminRoute>} />
         <Route path="/billing" element={<SubadminRoute permission="Fees & Charges"><BillingCharges /></SubadminRoute>} />
+        <Route path="/legal-documents" element={<SubadminRoute permission="Legal Documents"><AdminLegalDocuments /></SubadminRoute>} />
         <Route path="/settings" element={<SubadminRoute permission="Settings"><AdminSettings /></SubadminRoute>} />
         <Route path="/env" element={<SubadminRoute permission="System Settings"><EnvSettings /></SubadminRoute>} />
         <Route path="/login-activity" element={<SubadminRoute permission="Login Activity"><AuthActivityLogs /></SubadminRoute>} />

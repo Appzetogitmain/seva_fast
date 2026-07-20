@@ -80,9 +80,6 @@ export const adminApi = {
     getAuthActivityLogs: (params) => axiosInstance.get('/admin/auth-activity', { params }),
 
     // Reviews
-    getPendingReviews: (params) => axiosInstance.get('/reviews/admin/pending', { params }),
-    updateReviewStatus: (id, status) => axiosInstance.patch(`/reviews/admin/status/${id}`, { status }),
-
     // Delivery Partners
     getDeliveryPartners: (params) => axiosInstance.get('/admin/delivery-partners', { params }),
     updateDeliveryPartner: (id, data) => axiosInstance.put(`/admin/delivery-partners/${id}`, data),

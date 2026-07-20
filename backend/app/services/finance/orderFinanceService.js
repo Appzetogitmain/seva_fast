@@ -56,6 +56,33 @@ async function findOrderForUpdate(orderOrId, session) {
   return order;
 }
 
+function isCodOrder(order) {
+  const mode = String(order?.paymentMode || "").toUpperCase();
+  const method = String(order?.payment?.method || "").toLowerCase();
+  return mode === "COD" || method === "cod" || method === "cash";
+}
+
+function isOrderDelivered(order) {
+  const status = String(order?.status || "").toLowerCase();
+  const orderStatus = String(order?.orderStatus || "").toLowerCase();
+  const workflow = String(order?.workflowStatus || "").toUpperCase();
+  return (
+    status === "delivered" ||
+    orderStatus === "delivered" ||
+    workflow === "DELIVERED" ||
+    Boolean(order?.deliveredAt)
+  );
+}
+
+/** COD: no seller/rider/commission wallet movement until the order is delivered. */
+function assertCodWalletEligible(order, actionLabel = "wallet update") {
+  if (isCodOrder(order) && !isOrderDelivered(order)) {
+    throw new Error(
+      `COD ${actionLabel} is blocked until the order is delivered`,
+    );
+  }
+}
+
 function computeOverallSettlement(order) {
   const settlement = order.settlementStatus || {};
   const sellerDone = settlement.sellerPayout === "COMPLETED";
@@ -171,6 +198,7 @@ export function freezeFinancialSnapshot(order, breakdown) {
 export async function createPendingSellerPayout(order, { session, actorId } = {}) {
   if (!order?.seller) return null;
   if (order.financeFlags?.sellerPayoutQueued) return null;
+  assertCodWalletEligible(order, "seller payout");
 
   const amount = roundCurrency(
     order.paymentBreakdown?.sellerPayoutTotal || resolveSellerOrderEarning(order) || 0,
@@ -285,6 +313,7 @@ export async function createPendingRiderPayout(order, { session, actorId } = {})
     return null;
   }
   if (order.financeFlags?.riderPayoutQueued) return null;
+  assertCodWalletEligible(order, "rider payout");
 
   const amount = roundCurrency(order.paymentBreakdown?.riderPayoutTotal || 0);
   if (amount <= 0) {
@@ -390,6 +419,7 @@ export async function creditAdminEarning(order, { session, actorId } = {}) {
 
 export async function distributeSlabCommissions(order, { session, actorId } = {}) {
   if (order.financeFlags?.slabCommissionsDistributed) return;
+  assertCodWalletEligible(order, "commission distribution");
 
   const breakdown = order.paymentBreakdown || {};
   const commBreakdown = breakdown.commissionBreakdown || {};
@@ -887,6 +917,9 @@ export async function settleDeliveredOrder(orderOrId, { actorId = null } = {}) {
       order.deliveredAt = new Date();
     }
 
+    // Mark delivered first so COD wallet eligibility checks pass for this settlement.
+    assertCodWalletEligible(order, "settlement");
+
     if (!order.returnEligibleAt || !order.returnWindowExpiresAt) {
       const { eligibleAt, windowExpiresAt } = computeReturnWindowDates(order.deliveredAt);
       order.returnEligibleAt = order.returnEligibleAt || eligibleAt;
@@ -904,6 +937,30 @@ export async function settleDeliveredOrder(orderOrId, { actorId = null } = {}) {
     }
 
     if (order.financeFlags?.deliveredSettlementApplied) {
+      await session.commitTransaction();
+      return order;
+    }
+
+    // COD: defer seller/rider/commission wallet credits until admin receives money
+    // (QR paid or seller remittance). Delivery only marks status + return window.
+    if (isCodOrder(order) && !order.financeFlags?.codOnlinePaid && !order.financeFlags?.codCashRemittedToAdmin) {
+      order.financeFlags = {
+        ...(order.financeFlags || {}),
+        codWalletsPending: true,
+      };
+      if (
+        !order.paymentStatus ||
+        order.paymentStatus === ORDER_PAYMENT_STATUS.CREATED
+      ) {
+        order.paymentStatus = ORDER_PAYMENT_STATUS.PENDING_CASH_COLLECTION;
+      }
+      order.settlementStatus = {
+        ...(order.settlementStatus || {}),
+        overall: ORDER_SETTLEMENT_STATUS.PENDING,
+        sellerPayout: "PENDING",
+        riderPayout: order.deliveryBoy ? "PENDING" : "NOT_APPLICABLE",
+      };
+      await order.save({ session });
       await session.commitTransaction();
       return order;
     }
@@ -932,6 +989,7 @@ export async function settleDeliveredOrder(orderOrId, { actorId = null } = {}) {
     order.financeFlags = {
       ...(order.financeFlags || {}),
       deliveredSettlementApplied: true,
+      codWalletsPending: false,
     };
 
     order.settlementStatus = computeOverallSettlement(order);
@@ -1173,6 +1231,425 @@ export async function reverseOrderFinanceOnCancellation(
       },
       { session },
     );
+
+    await order.save({ session });
+    await session.commitTransaction();
+    return order;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
+function getCodNetAmount(order) {
+  const gross = roundCurrency(
+    order.paymentBreakdown?.grandTotal || order.pricing?.total || 0,
+  );
+  const rider = roundCurrency(order.paymentBreakdown?.riderPayoutTotal || 0);
+  return roundCurrency(Math.max(gross - rider, 0));
+}
+
+export async function chooseCodCollectMethod(
+  orderOrId,
+  method,
+  { actorId = null } = {},
+) {
+  const normalized = String(method || "").toLowerCase();
+  if (!["online_qr", "cash"].includes(normalized)) {
+    throw new Error("Collect method must be online_qr or cash");
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const order = await findOrderForUpdate(orderOrId, session);
+    if (!isCodOrder(order)) {
+      throw new Error("Collect method is only for COD orders");
+    }
+    if (!isOrderDelivered(order)) {
+      throw new Error("Order must be delivered before choosing collect method");
+    }
+    if (order.financeFlags?.codOnlinePaid || order.financeFlags?.codCashRemittedToAdmin) {
+      throw new Error("COD payment already completed for this order");
+    }
+
+    order.financeFlags = {
+      ...(order.financeFlags || {}),
+      codCollectMethod: normalized,
+    };
+    await order.save({ session });
+    await createFinanceAuditLog(
+      {
+        action: "COD_COLLECT_METHOD_CHOSEN",
+        actorType: OWNER_TYPE.DELIVERY_PARTNER,
+        actorId: actorId || order.deliveryBoy || null,
+        orderId: order._id,
+        metadata: { method: normalized },
+      },
+      { session },
+    );
+    await session.commitTransaction();
+    return order;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
+export async function markCodOnlinePaid(orderOrId, { actorId = null } = {}) {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const order = await findOrderForUpdate(orderOrId, session);
+    if (!isCodOrder(order)) {
+      throw new Error("Online QR payment is only for COD orders");
+    }
+    if (!isOrderDelivered(order)) {
+      throw new Error("Order must be delivered first");
+    }
+    if (order.financeFlags?.codOnlinePaid || order.financeFlags?.codCashRemittedToAdmin) {
+      await session.commitTransaction();
+      return order;
+    }
+
+    const net = getCodNetAmount(order);
+    if (net <= 0) {
+      throw new Error("COD amount must be greater than 0");
+    }
+
+    const credit = await creditWallet({
+      ownerType: OWNER_TYPE.ADMIN,
+      ownerId: null,
+      amount: net,
+      bucket: "available",
+      session,
+    });
+
+    await createLedgerEntry(
+      {
+        orderId: order._id,
+        walletId: credit.wallet._id,
+        actorType: OWNER_TYPE.ADMIN,
+        actorId: null,
+        type: LEDGER_TRANSACTION_TYPE.COD_REMITTED,
+        direction: LEDGER_DIRECTION.CREDIT,
+        amount: net,
+        paymentMode: "COD",
+        description: "COD paid online via admin QR",
+        reference: `COD-QR-${order.orderId}`,
+        balanceBefore: credit.before,
+        balanceAfter: credit.after,
+      },
+      { session },
+    );
+
+    order.paymentBreakdown = {
+      ...(order.paymentBreakdown || {}),
+      codCollectedAmount: net,
+      codRemittedAmount: net,
+      codPendingAmount: 0,
+    };
+    order.paymentStatus = ORDER_PAYMENT_STATUS.COD_RECONCILED;
+    order.payment = {
+      ...(order.payment || {}),
+      method: "upi",
+      status: "completed",
+    };
+    order.financeFlags = {
+      ...(order.financeFlags || {}),
+      codCollectMethod: "online_qr",
+      codOnlinePaid: true,
+      codMarkedCollected: true,
+      codCashRemittedToAdmin: true,
+    };
+
+    await createFinanceAuditLog(
+      {
+        action: "COD_ONLINE_QR_PAID",
+        actorType: OWNER_TYPE.DELIVERY_PARTNER,
+        actorId: actorId || order.deliveryBoy || null,
+        orderId: order._id,
+        metadata: { amountNet: net },
+      },
+      { session },
+    );
+
+    await order.save({ session });
+    await session.commitTransaction();
+    return order;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
+export async function markCodCashCollectedByRider(
+  orderOrId,
+  { actorId = null, deliveryPartnerId = null } = {},
+) {
+  const updated = await handleCodOrderFinance(orderOrId, {
+    deliveryPartnerId,
+    actorId,
+  });
+
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const order = await findOrderForUpdate(updated._id, session);
+    order.financeFlags = {
+      ...(order.financeFlags || {}),
+      codCollectMethod: "cash",
+      codCashWithRider: true,
+      codCashWithSeller: false,
+    };
+    await order.save({ session });
+    await session.commitTransaction();
+    return order;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
+export async function handoffCodCashToSeller(orderOrId, { actorId = null } = {}) {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const order = await findOrderForUpdate(orderOrId, session);
+    if (!isCodOrder(order)) {
+      throw new Error("Cash handoff is only for COD orders");
+    }
+    if (!order.financeFlags?.codCashWithRider || !order.financeFlags?.codMarkedCollected) {
+      throw new Error("Rider must collect cash before handing over to seller");
+    }
+    if (order.financeFlags?.codCashWithSeller) {
+      await session.commitTransaction();
+      return order;
+    }
+    if (!order.seller) {
+      throw new Error("Seller is required for cash handoff");
+    }
+    const partnerId = order.deliveryBoy;
+    if (!partnerId) {
+      throw new Error("Delivery partner is required for cash handoff");
+    }
+
+    const pending = roundCurrency(order.paymentBreakdown?.codPendingAmount || 0);
+    if (pending <= 0) {
+      throw new Error("No pending COD cash to hand over");
+    }
+
+    await updateCashInHand({
+      ownerType: OWNER_TYPE.DELIVERY_PARTNER,
+      ownerId: partnerId,
+      deltaAmount: -pending,
+      session,
+    });
+    await updateCashInHand({
+      ownerType: OWNER_TYPE.SELLER,
+      ownerId: order.seller,
+      deltaAmount: pending,
+      session,
+    });
+
+    order.financeFlags = {
+      ...(order.financeFlags || {}),
+      codCashWithRider: false,
+      codCashWithSeller: true,
+    };
+
+    await createFinanceAuditLog(
+      {
+        action: "COD_CASH_HANDOFF_TO_SELLER",
+        actorType: OWNER_TYPE.DELIVERY_PARTNER,
+        actorId: actorId || partnerId,
+        orderId: order._id,
+        metadata: { amount: pending, sellerId: String(order.seller) },
+      },
+      { session },
+    );
+
+    await order.save({ session });
+    await session.commitTransaction();
+    return order;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
+export async function sellerRemitCodCash(
+  orderOrId,
+  amount,
+  { actorId = null } = {},
+) {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const order = await findOrderForUpdate(orderOrId, session);
+    if (!isCodOrder(order)) {
+      throw new Error("Seller remittance is only for COD orders");
+    }
+    if (!order.financeFlags?.codCashWithSeller) {
+      throw new Error("Cash must be with seller before remitting to admin");
+    }
+    if (!order.seller) {
+      throw new Error("Seller is required");
+    }
+
+    const requested = roundCurrency(amount || order.paymentBreakdown?.codPendingAmount || 0);
+    const pending = roundCurrency(order.paymentBreakdown?.codPendingAmount || 0);
+    if (requested <= 0) {
+      throw new Error("Remittance amount must be greater than 0");
+    }
+    if (requested > pending) {
+      throw new Error("Remittance amount exceeds pending COD cash");
+    }
+
+    await updateCashInHand({
+      ownerType: OWNER_TYPE.SELLER,
+      ownerId: order.seller,
+      deltaAmount: -requested,
+      session,
+    });
+
+    const adminCredit = await creditWallet({
+      ownerType: OWNER_TYPE.ADMIN,
+      ownerId: null,
+      amount: requested,
+      bucket: "available",
+      session,
+    });
+
+    await createLedgerEntry(
+      {
+        orderId: order._id,
+        walletId: adminCredit.wallet._id,
+        actorType: OWNER_TYPE.SELLER,
+        actorId: order.seller,
+        type: LEDGER_TRANSACTION_TYPE.COD_REMITTED,
+        direction: LEDGER_DIRECTION.CREDIT,
+        amount: requested,
+        paymentMode: "COD",
+        description: "COD remitted by seller to admin",
+        reference: `COD-SELLER-${order.orderId}`,
+        balanceBefore: adminCredit.before,
+        balanceAfter: adminCredit.after,
+      },
+      { session },
+    );
+
+    const remitted = roundCurrency(
+      (order.paymentBreakdown?.codRemittedAmount || 0) + requested,
+    );
+    const collected = roundCurrency(order.paymentBreakdown?.codCollectedAmount || 0);
+    order.paymentBreakdown = {
+      ...(order.paymentBreakdown || {}),
+      codRemittedAmount: remitted,
+      codPendingAmount: roundCurrency(Math.max(collected - remitted, 0)),
+    };
+
+    const fullyRemitted = order.paymentBreakdown.codPendingAmount <= 0;
+    if (fullyRemitted) {
+      order.paymentStatus = ORDER_PAYMENT_STATUS.COD_RECONCILED;
+      order.financeFlags = {
+        ...(order.financeFlags || {}),
+        codCashRemittedToAdmin: true,
+        codCashWithSeller: false,
+      };
+    } else {
+      order.paymentStatus = ORDER_PAYMENT_STATUS.PARTIALLY_REMITTED;
+    }
+
+    await createFinanceAuditLog(
+      {
+        action: "COD_SELLER_REMITTED",
+        actorType: OWNER_TYPE.SELLER,
+        actorId: actorId || order.seller,
+        orderId: order._id,
+        metadata: { amount: requested, fullyRemitted },
+      },
+      { session },
+    );
+
+    await order.save({ session });
+    await session.commitTransaction();
+    return order;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
+/**
+ * After admin receives COD money (QR or seller remit), credit seller/rider/commissions.
+ */
+export async function settleCodWalletsAfterAdminCredit(
+  orderOrId,
+  { actorId = null } = {},
+) {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const order = await findOrderForUpdate(orderOrId, session);
+
+    if (!isCodOrder(order)) {
+      await session.commitTransaction();
+      return order;
+    }
+    if (!isOrderDelivered(order)) {
+      throw new Error("Order must be delivered before wallet settlement");
+    }
+    if (
+      !order.financeFlags?.codOnlinePaid &&
+      !order.financeFlags?.codCashRemittedToAdmin
+    ) {
+      throw new Error("Admin must receive COD payment before wallet settlement");
+    }
+    if (order.financeFlags?.deliveredSettlementApplied) {
+      await session.commitTransaction();
+      return order;
+    }
+
+    const now = new Date();
+    const holdSellerPayout =
+      order.returnWindowExpiresAt instanceof Date && order.returnWindowExpiresAt > now;
+
+    if (holdSellerPayout) {
+      order.financeFlags = {
+        ...(order.financeFlags || {}),
+        sellerPayoutHeld: true,
+      };
+      order.settlementStatus = {
+        ...(order.settlementStatus || {}),
+        sellerPayout: "HOLD",
+      };
+    } else {
+      await createPendingSellerPayout(order, { session, actorId });
+    }
+
+    await createPendingRiderPayout(order, { session, actorId });
+    await creditAdminEarning(order, { session, actorId });
+    await distributeSlabCommissions(order, { session, actorId });
+
+    order.financeFlags = {
+      ...(order.financeFlags || {}),
+      deliveredSettlementApplied: true,
+      codWalletsPending: false,
+    };
+    order.settlementStatus = computeOverallSettlement(order);
 
     await order.save({ session });
     await session.commitTransaction();

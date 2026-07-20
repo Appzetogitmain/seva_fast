@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import Pagination from '@shared/components/ui/Pagination';
 import { adminApi } from '../services/adminApi';
+import { formatDate } from '@shared/utils/formatDate';
 
 const ActiveDeliveryBoys = () => {
     const location = useLocation();
@@ -75,7 +76,7 @@ const ActiveDeliveryBoys = () => {
                 todayEarnings: 0, // Mock earnings
                 location: r.currentArea || 'Unknown',
                 lastSync: 'Now',
-                joinDate: new Date(r.createdAt).toLocaleDateString()
+                joinDate: formatDate(r.createdAt)
             }));
 
             setRiders(mappedRiders);
@@ -131,7 +132,7 @@ const handleOnboardSubmit = (e) => {
         totalOrders: 0,
         todayEarnings: 0,
         lastSync: 'Just now',
-        joinDate: new Date().toLocaleDateString()
+        joinDate: formatDate(new Date())
     };
     setRiders([newRider, ...riders]);
     setIsOnboardModalOpen(false);

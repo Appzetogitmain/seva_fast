@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   User,
@@ -21,6 +22,7 @@ import Button from "@shared/components/ui/Button";
 import MapPicker from "../../../shared/components/MapPicker";
 
 const SellerProfile = () => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -488,6 +490,24 @@ const SellerProfile = () => {
             </div>
           </Card>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
+        <button
+          type="button"
+          onClick={() => navigate("/terms?for=seller")}
+          className="hover:text-slate-900 underline-offset-2 hover:underline"
+        >
+          Terms &amp; Conditions
+        </button>
+        <span className="text-slate-300">•</span>
+        <button
+          type="button"
+          onClick={() => navigate("/privacy?for=seller")}
+          className="hover:text-slate-900 underline-offset-2 hover:underline"
+        >
+          Privacy Policy
+        </button>
       </div>
 
       {isMapOpen && (

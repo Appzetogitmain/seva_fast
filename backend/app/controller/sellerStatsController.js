@@ -10,6 +10,7 @@ import {
   sellerOrderRevenueAmount,
 } from "../utils/sellerRevenue.js";
 import { releaseExpiredHeldSellerPayouts } from "../services/finance/orderFinanceService.js";
+import { formatDate, formatTime } from "../utils/formatDate.js";
 
 /* ===============================
    GET SELLER DASHBOARD STATS
@@ -402,8 +403,8 @@ export const getSellerEarnings = async (req, res) => {
                 type: t.type,
                 amount: t.amount,
                 status: t.status,
-                date: t.createdAt.toISOString().split('T')[0],
-                time: t.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                date: formatDate(t.createdAt),
+                time: formatTime(t.createdAt),
                 customer: t.type === 'Withdrawal' ? 'Bank Transfer' : 'Customer',
                 ref: t.order ? `#${t.order.orderId}` : t.reference || t._id
             }))

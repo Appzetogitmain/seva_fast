@@ -99,7 +99,7 @@ function parseImageList(input) {
   return single ? [single] : [];
 }
 
-function applyMediaFields(productData) {
+function applyMediaFields(productData, { promoteGalleryToMain = true } = {}) {
   const explicitMainImage = normalizeUrl(productData.mainImage || productData.mainImageUrl);
   const galleryImages = parseImageList(productData.galleryImages);
   const genericImages = parseImageList(productData.images);
@@ -107,18 +107,112 @@ function applyMediaFields(productData) {
   const mergedGallery = [...galleryImages, ...genericImages].filter(Boolean);
   if (explicitMainImage) {
     productData.mainImage = explicitMainImage;
-  } else if (mergedGallery.length > 0) {
+  } else if (promoteGalleryToMain && mergedGallery.length > 0) {
     productData.mainImage = mergedGallery[0];
     mergedGallery.shift();
   } else {
+    // Update path: do not overwrite cover with a gallery upload.
     delete productData.mainImage;
   }
 
-  if (mergedGallery.length > 0) {
+  if (
+    mergedGallery.length > 0 ||
+    Array.isArray(productData.galleryImages) ||
+    Object.prototype.hasOwnProperty.call(productData, "galleryImages")
+  ) {
     productData.galleryImages = mergedGallery;
-  } else if (!Array.isArray(productData.galleryImages)) {
-    productData.galleryImages = [];
   }
+}
+
+/** @returns {string|null} error message when stock is invalid */
+function validateNonNegativeStockFields(productData) {
+  if (Object.prototype.hasOwnProperty.call(productData, "stock")) {
+    const stockNum = Number(productData.stock);
+    if (!Number.isFinite(stockNum) || stockNum < 0) {
+      return "Stock cannot be negative";
+    }
+    productData.stock = Math.floor(stockNum);
+  }
+  if (Array.isArray(productData.variants)) {
+    for (const variant of productData.variants) {
+      if (variant?.stock === undefined || variant?.stock === null || variant?.stock === "") {
+        continue;
+      }
+      const vs = Number(variant.stock);
+      if (!Number.isFinite(vs) || vs < 0) {
+        return "Variant stock cannot be negative";
+      }
+      variant.stock = Math.floor(vs);
+    }
+  }
+  return null;
+}
+
+/** Mongo filter: stock > 0 and stock <= lowStockAlert (default 5). */
+function buildLowStockMongoFilter() {
+  return {
+    $expr: {
+      $and: [
+        {
+          $gt: [
+            {
+              $convert: {
+                input: "$stock",
+                to: "double",
+                onError: 0,
+                onNull: 0,
+              },
+            },
+            0,
+          ],
+        },
+        {
+          $lte: [
+            {
+              $convert: {
+                input: "$stock",
+                to: "double",
+                onError: 0,
+                onNull: 0,
+              },
+            },
+            {
+              $let: {
+                vars: {
+                  rawThreshold: {
+                    $convert: {
+                      input: "$lowStockAlert",
+                      to: "double",
+                      onError: 0,
+                      onNull: 0,
+                    },
+                  },
+                },
+                in: {
+                  $cond: [{ $gt: ["$$rawThreshold", 0] }, "$$rawThreshold", 5],
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+function applyStockStatusFilter(query, stockStatus) {
+  const normalized = String(stockStatus || "").trim().toLowerCase();
+  if (!normalized || normalized === "all") return query;
+  if (normalized === "out" || normalized === "out_of_stock") {
+    return { ...query, stock: 0 };
+  }
+  if (normalized === "low" || normalized === "low_stock") {
+    return { $and: [query, buildLowStockMongoFilter()] };
+  }
+  if (normalized === "in") {
+    return { ...query, stock: { $gt: 0 } };
+  }
+  return query;
 }
 
 const RESTRICTED_MODERATION_FIELDS = [
@@ -659,7 +753,14 @@ export const createProduct = async (req, res) => {
             ? variant.sku
             : makeProductSku(productData.name, idx + 1),
       }));
+      productData.stock = productData.variants.reduce(
+        (sum, variant) => sum + (Number(variant?.stock) || 0),
+        0,
+      );
     }
+
+    const stockError = validateNonNegativeStockFields(productData);
+    if (stockError) return handleResponse(res, 400, stockError);
 
     let moderationUpdate = {};
     let successMessage = "Product created successfully";
@@ -724,10 +825,18 @@ export const updateProduct = async (req, res) => {
       delete productData.sellerId;
     }
 
+    // Admin bypasses sellerId check
+    const query = role === "admin" ? { _id: id } : { _id: id, sellerId };
+    const product = await Product.findOne(query);
+
+    if (!product) {
+      return handleResponse(res, 404, "Product not found or unauthorized");
+    }
+
     // Handle multipart files (mainImage and galleryImages)
     const files = req.files || [];
+    const galleryUrls = [];
     if (files.length > 0) {
-      const galleryUrls = [];
       for (const file of files) {
         try {
           if (file.fieldname === "mainImage") {
@@ -747,10 +856,33 @@ export const updateProduct = async (req, res) => {
           console.error("Cloudinary upload failed during update:", err);
         }
       }
-      if (galleryUrls.length > 0) {
-        productData.galleryImages = galleryUrls;
-      }
     }
+
+    // Keep existing remote gallery URLs from client + append newly uploaded files.
+    // Prevents "add then delete gallery photo" from replacing the cover image.
+    const hasExistingGalleryField = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "existingGalleryImages",
+    );
+    if (hasExistingGalleryField || galleryUrls.length > 0) {
+      let kept = [];
+      if (hasExistingGalleryField) {
+        const raw = req.body.existingGalleryImages;
+        try {
+          kept = parseImageList(typeof raw === "string" ? JSON.parse(raw) : raw);
+        } catch {
+          kept = parseImageList(raw);
+        }
+        kept = kept.filter((url) => /^https?:\/\//i.test(url));
+      } else {
+        // Legacy clients: preserve current gallery when only uploading new files
+        kept = Array.isArray(product.galleryImages)
+          ? product.galleryImages.filter(Boolean)
+          : [];
+      }
+      productData.galleryImages = [...kept, ...galleryUrls];
+    }
+    delete productData.existingGalleryImages;
 
     // Parse JSON fields
     if (typeof productData.variants === "string") {
@@ -766,14 +898,6 @@ export const updateProduct = async (req, res) => {
       } catch (e) {
         // Not JSON, keep as is
       }
-    }
-
-    // Admin bypasses sellerId check
-    const query = role === "admin" ? { _id: id } : { _id: id, sellerId };
-    const product = await Product.findOne(query);
-
-    if (!product) {
-      return handleResponse(res, 404, "Product not found or unauthorized");
     }
 
     if (productData.name) {
@@ -796,7 +920,7 @@ export const updateProduct = async (req, res) => {
       productData.sku = product.sku || makeProductSku(skuBaseName, 1);
     }
 
-    applyMediaFields(productData);
+    applyMediaFields(productData, { promoteGalleryToMain: false });
 
     if (typeof productData.tags === "string") {
       productData.tags = productData.tags.split(",").map((tag) => tag.trim());
@@ -818,7 +942,15 @@ export const updateProduct = async (req, res) => {
             ? variant.sku
             : makeProductSku(skuBaseName, idx + 1),
       }));
+      // Keep top-level stock aligned with variant totals for list/status badges.
+      productData.stock = productData.variants.reduce(
+        (sum, variant) => sum + (Number(variant?.stock) || 0),
+        0,
+      );
     }
+
+    const stockError = validateNonNegativeStockFields(productData);
+    if (stockError) return handleResponse(res, 400, stockError);
 
     let moderationUpdate = {};
     let successMessage = "Product updated successfully";
@@ -1022,6 +1154,7 @@ export const getModerationProducts = async (req, res) => {
       header,
       headerId,
       sort = "newest",
+      stockStatus = "all",
     } = req.query;
     const { page, limit, skip } = getPagination(req, {
       defaultLimit: 25,
@@ -1078,6 +1211,7 @@ export const getModerationProducts = async (req, res) => {
     if (Object.keys(approvalFilter).length > 0) {
       moderatedQuery = { $and: [moderatedQuery, approvalFilter] };
     }
+    moderatedQuery = applyStockStatusFilter(moderatedQuery, stockStatus);
 
     const sortMap = {
       newest: { createdAt: -1 },
@@ -1086,10 +1220,21 @@ export const getModerationProducts = async (req, res) => {
       "name-desc": { name: -1, createdAt: -1 },
       "price-asc": { price: 1, createdAt: -1 },
       "price-desc": { price: -1, createdAt: -1 },
+      "stock-asc": { stock: 1, createdAt: -1 },
+      "stock-desc": { stock: -1, createdAt: -1 },
     };
     const sortQuery = sortMap[String(sort || "newest").toLowerCase()] || sortMap.newest;
 
-    const [items, total, allCount, pendingCount, approvedCount, rejectedCount] =
+    const [
+      items,
+      total,
+      allCount,
+      pendingCount,
+      approvedCount,
+      rejectedCount,
+      lowStockCount,
+      outOfStockCount,
+    ] =
       await Promise.all([
         Product.find(moderatedQuery)
           .select(
@@ -1120,6 +1265,10 @@ export const getModerationProducts = async (req, res) => {
           ...baseQuery,
           approvalStatus: PRODUCT_APPROVAL_STATUS.REJECTED,
         }),
+        Product.countDocuments({
+          $and: [baseQuery, buildLowStockMongoFilter()],
+        }),
+        Product.countDocuments({ ...baseQuery, stock: 0 }),
       ]);
 
     return handleResponse(res, 200, "Moderation products fetched", {
@@ -1133,6 +1282,8 @@ export const getModerationProducts = async (req, res) => {
         pending: pendingCount,
         approved: approvedCount,
         rejected: rejectedCount,
+        lowStock: lowStockCount,
+        outOfStock: outOfStockCount,
       },
     });
   } catch (error) {

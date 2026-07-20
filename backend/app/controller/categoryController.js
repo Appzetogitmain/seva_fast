@@ -46,6 +46,80 @@ async function validateParentForType(type, parentId) {
   }
 }
 
+const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+
+const HEADER_COLOR_LABELS = {
+  headerColor: "Header Background",
+  headerFontColor: "Title/Text Color",
+  headerIconColor: "Active Tab / Icon Color",
+};
+
+function validateHeaderHexColors(payload, { requireAll = false } = {}) {
+  for (const [key, label] of Object.entries(HEADER_COLOR_LABELS)) {
+    if (!Object.prototype.hasOwnProperty.call(payload, key)) {
+      if (requireAll) {
+        return `${label} hex color is required`;
+      }
+      continue;
+    }
+    const raw = payload[key];
+    if (raw == null || String(raw).trim() === "") {
+      return `${label} hex color is required`;
+    }
+    const value = String(raw).trim();
+    if (!HEX_COLOR_RE.test(value)) {
+      return `Invalid hex for ${label}: "${value}". Use #RGB or #RRGGBB (e.g. #FF1E1E)`;
+    }
+    payload[key] = value.toUpperCase();
+  }
+  return null;
+}
+
+const CATEGORY_NAME_RE = /^[a-zA-Z0-9\s-]+$/;
+
+function validateCategoryName(payload) {
+  if (!Object.prototype.hasOwnProperty.call(payload, "name")) return null;
+  const name = String(payload.name ?? "").trim();
+  if (!name) return "Category name is required";
+  if (!CATEGORY_NAME_RE.test(name)) {
+    return "Category name cannot contain special characters. Use letters, numbers, spaces, or hyphens only.";
+  }
+  payload.name = name;
+  return null;
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Case-insensitive duplicate name check within the same category type.
+ * @returns {Promise<string|null>} error message or null
+ */
+async function assertUniqueCategoryName({ name, type, excludeId = null }) {
+  const trimmed = String(name || "").trim();
+  if (!trimmed || !type) return null;
+
+  const query = {
+    type,
+    name: { $regex: `^${escapeRegex(trimmed)}$`, $options: "i" },
+  };
+  if (excludeId) {
+    query._id = { $ne: excludeId };
+  }
+
+  const duplicate = await Category.findOne(query).select("_id name").lean();
+  if (!duplicate) return null;
+
+  if (type === "header") {
+    return "This header category already exists";
+  }
+  if (type === "category") {
+    return "This category already exists";
+  }
+  return "This subcategory already exists";
+}
+
 /* ===============================
    GET ALL CATEGORIES (Hierarchy)
  ================================ */
@@ -186,16 +260,39 @@ export const createCategory = async (req, res) => {
       return handleResponse(res, 400, `The category type is invalid: ${type}`);
     }
 
+    const nameError = validateCategoryName(categoryData);
+    if (nameError) return handleResponse(res, 400, nameError);
+
+    if (type === "header") {
+      const hexError = validateHeaderHexColors(categoryData, { requireAll: true });
+      if (hexError) return handleResponse(res, 400, hexError);
+    } else {
+      const hexError = validateHeaderHexColors(categoryData);
+      if (hexError) return handleResponse(res, 400, hexError);
+    }
+
     const parentOk = await validateParentForType(type, categoryData.parentId);
     if (!parentOk) {
       if (type === "category") return handleResponse(res, 400, "Level 2 Category must be linked to a Level 1 Header category");
       if (type === "subcategory") return handleResponse(res, 400, "Level 3 Subcategory must be linked to a Level 2 Category");
     }
 
+    const duplicateNameError = await assertUniqueCategoryName({
+      name: categoryData.name,
+      type,
+    });
+    if (duplicateNameError) return handleResponse(res, 400, duplicateNameError);
+
     // Final sanity check for unique slug to prevent catch block late failure
     const existing = await Category.findOne({ slug: categoryData.slug }).lean();
     if (existing) {
-        return handleResponse(res, 400, "The URL Slug already exists; please use a unique name");
+        return handleResponse(
+          res,
+          400,
+          type === "header"
+            ? "This header category already exists"
+            : "The URL Slug already exists; please use a unique name",
+        );
     }
 
     const category = await Category.create(categoryData);
@@ -206,7 +303,16 @@ export const createCategory = async (req, res) => {
 
     return handleResponse(res, 201, "Category created successfully", category);
   } catch (error) {
-    if (error.code === 11000) return handleResponse(res, 400, "Duplicate record found; Slug must be unique");
+    if (error.code === 11000) {
+      const t = String(req.body?.type || "").trim();
+      return handleResponse(
+        res,
+        400,
+        t === "header"
+          ? "This header category already exists"
+          : "Duplicate record found; name or slug must be unique",
+      );
+    }
     if (error?.name === "ValidationError" || error?.name === "CastError") return handleResponse(res, 400, error.message);
     return handleResponse(res, 500, `Category operation failed: ${error.message}`);
   }
@@ -266,11 +372,44 @@ export const updateCategory = async (req, res) => {
 
     const type = String(categoryData.type || existing.type || "").trim();
     const parentToValidate = hasParentId ? categoryData.parentId : existing.parentId;
+
+    const nameError = validateCategoryName(categoryData);
+    if (nameError) return handleResponse(res, 400, nameError);
+
+    const colorHexError = validateHeaderHexColors(categoryData);
+    if (colorHexError) return handleResponse(res, 400, colorHexError);
     
     const parentOk = await validateParentForType(type, parentToValidate);
     if (!parentOk) {
       if (type === "category") return handleResponse(res, 400, "Level 2 Category must be linked to a Level 1 Header category");
       if (type === "subcategory") return handleResponse(res, 400, "Level 3 Subcategory must be linked to a Level 2 Category");
+    }
+
+    if (Object.prototype.hasOwnProperty.call(categoryData, "name")) {
+      const duplicateNameError = await assertUniqueCategoryName({
+        name: categoryData.name,
+        type,
+        excludeId: id,
+      });
+      if (duplicateNameError) return handleResponse(res, 400, duplicateNameError);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(categoryData, "slug")) {
+      const slugClash = await Category.findOne({
+        slug: categoryData.slug,
+        _id: { $ne: id },
+      })
+        .select("_id")
+        .lean();
+      if (slugClash) {
+        return handleResponse(
+          res,
+          400,
+          type === "header"
+            ? "This header category already exists"
+            : "The URL Slug already exists; please use a unique name",
+        );
+      }
     }
 
     const updatedCategory = await Category.findByIdAndUpdate(
@@ -290,7 +429,16 @@ export const updateCategory = async (req, res) => {
 
     return handleResponse(res, 200, "Category updated successfully", updatedCategory);
   } catch (error) {
-    if (error.code === 11000) return handleResponse(res, 400, "Slug already exists");
+    if (error.code === 11000) {
+      const t = String(req.body?.type || "").trim();
+      return handleResponse(
+        res,
+        400,
+        t === "header" || !t
+          ? "This header category already exists"
+          : "Duplicate record found; name or slug must be unique",
+      );
+    }
     if (error?.name === "ValidationError" || error?.name === "CastError") return handleResponse(res, 400, error.message);
     return handleResponse(res, 500, `Category operation failed: ${error.message}`);
   }

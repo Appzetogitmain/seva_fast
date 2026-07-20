@@ -26,9 +26,11 @@ const couponSchema = new mongoose.Schema(
         discountValue: {
             type: Number,
             required: true,
+            min: 0,
         },
         maxDiscount: {
             type: Number,
+            min: 0,
         },
         // High level coupon strategy
         couponType: {
@@ -47,10 +49,12 @@ const couponSchema = new mongoose.Schema(
         minOrderValue: {
             type: Number,
             default: 0,
+            min: 0,
         },
         minItems: {
             type: Number,
             default: 0,
+            min: 0,
         },
         applicableCategories: [
             {
@@ -61,13 +65,16 @@ const couponSchema = new mongoose.Schema(
         // Monthly volume (for future analytics‑based rules)
         monthlyVolumeThreshold: {
             type: Number,
+            min: 0,
         },
         usageLimit: {
             type: Number,
+            min: 0,
         },
         perUserLimit: {
             type: Number,
             default: 1,
+            min: 1,
         },
         usedCount: {
             type: Number,

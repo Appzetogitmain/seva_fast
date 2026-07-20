@@ -1,26 +1,55 @@
 import Transaction from "../models/transaction.js";
 import Order from "../models/order.js";
+import Setting from "../models/setting.js";
 import {
   handleCodOrderFinance,
   settleDeliveredOrder,
   releaseExpiredHeldSellerPayouts,
+  settleCodWalletsAfterAdminCredit,
 } from "./finance/orderFinanceService.js";
 import { autoProcessSellerPayoutForOrder } from "./finance/payoutService.js";
 import { processOrderLevelCommissions } from "./finance/commissionService.js";
 import { resolveSellerOrderEarning } from "./finance/pricingService.js";
 
+function isCodOrder(order) {
+  const mode = String(order?.paymentMode || "").toUpperCase();
+  const method = String(order?.payment?.method || "").toLowerCase();
+  return mode === "COD" || method === "cod" || method === "cash";
+}
+
 /**
  * Financial side effects when order becomes delivered (mirrors orderController).
+ * COD: defers wallet credits until admin receives money (QR paid / seller remit).
  */
 export async function applyDeliveredSettlement(order, orderIdString) {
   const settled = await settleDeliveredOrder(order._id);
+  const cod = isCodOrder(settled);
 
-  const method = (order.payment?.method || "").toLowerCase();
-  const isCod = settled.paymentMode === "COD" || method === "cash" || method === "cod";
-  if (isCod && settled.deliveryBoy && !settled.financeFlags?.codMarkedCollected) {
-    await handleCodOrderFinance(settled._id, {
-      deliveryPartnerId: settled.deliveryBoy,
-    });
+  // COD cash is no longer auto-collected on OTP — rider must choose Online QR or Cash.
+  if (cod) {
+    // Keep legacy seller txn as Pending until admin credit settles wallets.
+    const sellerEarning = Math.round(resolveSellerOrderEarning(settled));
+    if (settled.seller && sellerEarning > 0) {
+      await Transaction.findOneAndUpdate(
+        { reference: orderIdString, userModel: "Seller" },
+        {
+          $set: {
+            amount: sellerEarning,
+            status: "Pending",
+            type: "Order Payment",
+          },
+          $setOnInsert: {
+            user: settled.seller,
+            userModel: "Seller",
+            order: settled._id,
+            type: "Order Payment",
+            reference: orderIdString,
+          },
+        },
+        { upsert: true, new: true },
+      );
+    }
+    return settled;
   }
 
   if (settled.seller) {
@@ -43,7 +72,6 @@ export async function applyDeliveredSettlement(order, orderIdString) {
 
   const sellerTxnStatus = sellerOnHold ? "Pending" : "Settled";
 
-  // Legacy transaction compatibility for existing seller/rider dashboards.
   const sellerEarning = Math.round(resolveSellerOrderEarning(settled));
   if (settled.seller && sellerEarning > 0) {
     await Transaction.findOneAndUpdate(
@@ -97,27 +125,8 @@ export async function applyDeliveredSettlement(order, orderIdString) {
       },
       { upsert: true, new: true },
     );
-
-    if (isCod) {
-      await Transaction.findOneAndUpdate(
-        { reference: `CASH-COL-${orderIdString}` },
-        {
-          $setOnInsert: {
-            user: settled.deliveryBoy,
-            userModel: "Delivery",
-            order: settled._id,
-            type: "Cash Collection",
-            amount: settled.paymentBreakdown?.grandTotal || settled.pricing?.total || 0,
-            status: "Settled",
-            reference: `CASH-COL-${orderIdString}`,
-          },
-        },
-        { upsert: true, new: true },
-      );
-    }
   }
 
-  // Credit plan cashback to customer wallet (subscription required)
   let estimatedCashback = Number(settled.paymentBreakdown?.estimatedCashback || 0);
   if (estimatedCashback > 0 && settled.customer && !settled.financeFlags?.cashbackCredited) {
     const User = (await import("../models/customer.js")).default;
@@ -141,7 +150,7 @@ export async function applyDeliveredSettlement(order, orderIdString) {
     if (estimatedCashback > 0 && user) {
       user.walletBalance = (user.walletBalance || 0) + estimatedCashback;
       await user.save();
-      
+
       await Transaction.findOneAndUpdate(
         { reference: `CASHBACK-${orderIdString}` },
         {
@@ -157,24 +166,117 @@ export async function applyDeliveredSettlement(order, orderIdString) {
         },
         { upsert: true, new: true },
       );
-      
+
       settled.financeFlags = {
-         ...(settled.financeFlags || {}),
-         cashbackCredited: true
+        ...(settled.financeFlags || {}),
+        cashbackCredited: true,
       };
       await settled.save();
     }
   }
 
-  // Process multi-level referral commissions
   if (!settled.financeFlags?.levelCommissionCredited) {
     await processOrderLevelCommissions(settled);
     settled.financeFlags = {
-       ...(settled.financeFlags || {}),
-       levelCommissionCredited: true
+      ...(settled.financeFlags || {}),
+      levelCommissionCredited: true,
     };
     await settled.save();
   }
 
   return settled;
+}
+
+/**
+ * After COD admin credit: finish wallet settlement + legacy txns / cashback / levels.
+ */
+export async function finalizeCodAfterAdminCredit(orderOrId, orderIdString) {
+  const settled = await settleCodWalletsAfterAdminCredit(orderOrId);
+
+  if (settled.seller) {
+    await releaseExpiredHeldSellerPayouts({ sellerId: settled.seller });
+  }
+
+  let sellerOnHold =
+    settled.settlementStatus?.sellerPayout === "HOLD" ||
+    Boolean(settled.financeFlags?.sellerPayoutHeld);
+
+  if (!sellerOnHold && settled.financeFlags?.sellerPayoutQueued) {
+    await autoProcessSellerPayoutForOrder(settled._id);
+  }
+
+  const refreshed = await Order.findById(settled._id);
+  if (!refreshed) return settled;
+
+  const sellerTxnStatus =
+    refreshed.settlementStatus?.sellerPayout === "HOLD" ||
+    refreshed.financeFlags?.sellerPayoutHeld
+      ? "Pending"
+      : "Settled";
+
+  const sellerEarning = Math.round(resolveSellerOrderEarning(refreshed));
+  const ref = orderIdString || refreshed.orderId;
+  if (refreshed.seller && sellerEarning > 0) {
+    await Transaction.findOneAndUpdate(
+      { reference: ref, userModel: "Seller" },
+      {
+        $set: {
+          amount: sellerEarning,
+          status: sellerTxnStatus,
+          type: "Order Payment",
+        },
+        $setOnInsert: {
+          user: refreshed.seller,
+          userModel: "Seller",
+          order: refreshed._id,
+          type: "Order Payment",
+          reference: ref,
+        },
+      },
+      { upsert: true, new: true },
+    );
+  }
+
+  if (refreshed.deliveryBoy) {
+    const deliveryEarning = Math.round(refreshed.paymentBreakdown?.riderPayoutTotal || 0);
+    await Transaction.findOneAndUpdate(
+      { reference: `DEL-ERN-${ref}` },
+      {
+        $set: {
+          amount: deliveryEarning,
+          status: "Settled",
+        },
+        $setOnInsert: {
+          user: refreshed.deliveryBoy,
+          userModel: "Delivery",
+          order: refreshed._id,
+          type: "Delivery Earning",
+          reference: `DEL-ERN-${ref}`,
+        },
+      },
+      { upsert: true, new: true },
+    );
+  }
+
+  if (!refreshed.financeFlags?.levelCommissionCredited) {
+    await processOrderLevelCommissions(refreshed);
+    refreshed.financeFlags = {
+      ...(refreshed.financeFlags || {}),
+      levelCommissionCredited: true,
+    };
+    await refreshed.save();
+  }
+
+  return refreshed;
+}
+
+export async function getAdminCodPaymentQrSettings() {
+  const settings = await Setting.findOne({})
+    .select("adminPaymentQrUrl adminUpiId adminUpiName appName")
+    .lean();
+  return {
+    qrUrl: settings?.adminPaymentQrUrl || "",
+    upiId: settings?.adminUpiId || "",
+    upiName: settings?.adminUpiName || settings?.appName || "Admin",
+  };
 }

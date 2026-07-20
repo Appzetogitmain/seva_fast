@@ -299,6 +299,7 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
     updated.orderId,
     {
       workflowStatus: updated.workflowStatus,
+      status: updated.status || legacyStatusFromWorkflow(updated.workflowStatus),
       deliverySearchExpiresAt: updated.deliverySearchExpiresAt,
     },
     updated.customer?._id || updated.customer,
@@ -320,24 +321,42 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
 
 /**
  * Seller rejects: SELLER_PENDING -> CANCELLED + compensation.
+ * Allowed even after sellerPendingExpiresAt so the client can cancel on UI timeout
+ * (system job may lag by a few seconds).
  */
 export async function sellerRejectAtomic(sellerId, orderId) {
   orderId = await requireCanonicalOrderId(orderId);
   const now = new Date();
+  const pending = await Order.findOne({
+    orderId,
+    seller: sellerId,
+    workflowVersion: { $gte: 2 },
+    workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
+  }).select("sellerPendingExpiresAt");
+
+  if (!pending) {
+    const err = new Error("Order not available to reject");
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const expired =
+    pending.sellerPendingExpiresAt &&
+    pending.sellerPendingExpiresAt.getTime() <= now.getTime();
+
   const order = await Order.findOneAndUpdate(
     {
       orderId,
       seller: sellerId,
       workflowVersion: { $gte: 2 },
       workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
-      sellerPendingExpiresAt: { $gt: now },
     },
     {
       $set: {
         workflowStatus: WORKFLOW_STATUS.CANCELLED,
         status: "cancelled",
-        cancelledBy: "seller",
-        cancelReason: "Rejected by seller",
+        cancelledBy: expired ? "system" : "seller",
+        cancelReason: expired ? "Seller timeout (60s)" : "Rejected by seller",
       },
       $unset: { expiresAt: 1 },
     },
@@ -353,15 +372,24 @@ export async function sellerRejectAtomic(sellerId, orderId) {
   await removeSellerTimeoutJob(orderId);
   await compensateOrderCancellation(order, orderId);
 
-  emitOrderStatusUpdate(order.orderId, {
-    workflowStatus: WORKFLOW_STATUS.CANCELLED,
-  }, order.customer, order.seller, order._id);
+  emitOrderStatusUpdate(
+    order.orderId,
+    {
+      workflowStatus: WORKFLOW_STATUS.CANCELLED,
+      status: "cancelled",
+    },
+    order.customer,
+    order.seller,
+    order._id,
+  );
   emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
     orderId: order.orderId,
     customerId: order.customer,
     userId: order.customer,
     sellerId: order.seller,
-    customerMessage: "Your order was cancelled by the seller.",
+    customerMessage: expired
+      ? "Your order was cancelled because seller did not accept in time."
+      : "Your order was cancelled by the seller.",
     sellerMessage: `Order #${order.orderId} was cancelled.`,
   });
   return order;
@@ -548,7 +576,13 @@ export async function processSellerTimeoutJob({ orderId }) {
 
   await compensateOrderCancellation(updated, orderId);
 
-  emitOrderStatusUpdate(orderId, { workflowStatus: WORKFLOW_STATUS.CANCELLED }, updated.customer, updated.seller, updated._id);
+  emitOrderStatusUpdate(
+    orderId,
+    { workflowStatus: WORKFLOW_STATUS.CANCELLED, status: "cancelled" },
+    updated.customer,
+    updated.seller,
+    updated._id,
+  );
   emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
     orderId: updated.orderId,
     customerId: updated.customer,
@@ -635,7 +669,13 @@ export async function processDeliveryTimeoutJob({ orderId, attempt }) {
   } catch (retractErr) {
     console.warn("[deliveryTimeoutJob] retract broadcast failed:", retractErr.message);
   }
-  emitOrderStatusUpdate(orderId, { workflowStatus: WORKFLOW_STATUS.CANCELLED }, updated.customer, updated.seller, updated._id);
+  emitOrderStatusUpdate(
+    orderId,
+    { workflowStatus: WORKFLOW_STATUS.CANCELLED, status: "cancelled" },
+    updated.customer,
+    updated.seller,
+    updated._id,
+  );
   emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
     orderId: updated.orderId,
     customerId: updated.customer,

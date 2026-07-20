@@ -1,6 +1,7 @@
 import Delivery from "../../models/delivery.js";
 import Transaction from "../../models/transaction.js";
 import Notification from "../../models/notification.js";
+import { formatTime } from "../../utils/formatDate.js";
 
 export async function getDeliveryCashBalancesData({ page, limit, skip }) {
   const ridersPipeline = [
@@ -221,10 +222,7 @@ export async function getRiderCashDetailsData(riderId) {
   return transactions.map((transaction) => ({
     id: transaction.order?.orderId || transaction.reference || "N/A",
     amount: transaction.amount,
-    time: new Date(transaction.createdAt).toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    time: formatTime(transaction.createdAt),
     date: transaction.createdAt,
   }));
 }

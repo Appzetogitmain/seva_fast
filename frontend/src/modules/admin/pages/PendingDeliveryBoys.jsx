@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { adminApi } from '../services/adminApi';
+import { formatDate } from '@shared/utils/formatDate';
 
 const PendingDeliveryBoys = () => {
     const [pendingRiders, setPendingRiders] = useState([]);
@@ -49,7 +50,7 @@ const PendingDeliveryBoys = () => {
                 phone: r.phone,
                 email: r.email,
                 avatar: r.profileImage,
-                appliedDate: new Date(r.createdAt).toLocaleDateString(),
+                appliedDate: formatDate(r.createdAt),
                 location: r.currentArea || 'Unknown',
                 vehicle: r.vehicleType,
                 documents: Object.keys(r.documents || {}).filter(key => r.documents[key]),

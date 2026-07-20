@@ -39,6 +39,21 @@ export async function createPendingPayoutForOrder(
 ) {
   if (!order || !beneficiaryId || amount <= 0) return null;
 
+  const paymentMode = String(order.paymentMode || "").toUpperCase();
+  const method = String(order.payment?.method || "").toLowerCase();
+  const isCod = paymentMode === "COD" || method === "cod" || method === "cash";
+  const status = String(order.status || "").toLowerCase();
+  const orderStatus = String(order.orderStatus || "").toLowerCase();
+  const workflow = String(order.workflowStatus || "").toUpperCase();
+  const delivered =
+    status === "delivered" ||
+    orderStatus === "delivered" ||
+    workflow === "DELIVERED" ||
+    Boolean(order.deliveredAt);
+  if (isCod && !delivered) {
+    throw new Error("COD payouts cannot be queued before delivery");
+  }
+
   const session = externalSession || (await mongoose.startSession());
   const managedSession = !externalSession;
   if (managedSession) session.startTransaction();

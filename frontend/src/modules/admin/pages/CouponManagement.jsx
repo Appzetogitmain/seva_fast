@@ -21,6 +21,24 @@ import {
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { adminApi } from '../services/adminApi';
+import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
+import { formatDate } from '@shared/utils/formatDate';
+
+function getCouponDisplayStatus(coupon, now = new Date()) {
+    const till = coupon?.validTill ? new Date(coupon.validTill) : null;
+    const from = coupon?.validFrom ? new Date(coupon.validFrom) : null;
+
+    if (till && till < now) {
+        return { label: 'expired', variant: 'error' };
+    }
+    if (!coupon?.isActive) {
+        return { label: 'inactive', variant: 'gray' };
+    }
+    if (from && from > now) {
+        return { label: 'scheduled', variant: 'warning' };
+    }
+    return { label: 'active', variant: 'success' };
+}
 
 const CouponManagement = () => {
     const { showToast } = useToast();
@@ -48,6 +66,44 @@ const CouponManagement = () => {
         validTill: '',
         description: '',
     });
+
+    /** Keep numeric promo fields within [min, max] — never negative. */
+    const handleNonNegativeChange = (field, raw, min = 0, max = Infinity) => {
+        if (raw === '') {
+            setFormData((prev) => ({ ...prev, [field]: '' }));
+            return;
+        }
+        const cleaned = String(raw).replace(/[eE+\-]/g, '');
+        if (cleaned === '' || cleaned === '.') {
+            setFormData((prev) => ({ ...prev, [field]: cleaned }));
+            return;
+        }
+        const num = Number(cleaned);
+        if (!Number.isFinite(num)) return;
+        const clamped = Math.min(max, Math.max(min, num));
+        setFormData((prev) => ({ ...prev, [field]: String(clamped) }));
+    };
+
+    const blockNegativeKeys = (e) => {
+        if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
+            e.preventDefault();
+        }
+    };
+
+    const handleDiscountTypeChange = (nextType) => {
+        setFormData((prev) => {
+            const next = { ...prev, discountType: nextType };
+            if (nextType === 'percentage' && prev.discountValue !== '') {
+                const num = Number(prev.discountValue);
+                if (Number.isFinite(num) && num > 100) {
+                    next.discountValue = '100';
+                }
+            }
+            return next;
+        });
+    };
+
+    useLockBodyScroll(Boolean(deleteTarget));
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -137,13 +193,38 @@ const CouponManagement = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            const discountValue = Number(formData.discountValue);
+            const minOrderValue = formData.minOrderValue ? Number(formData.minOrderValue) : 0;
+            const maxDiscount = formData.maxDiscount ? Number(formData.maxDiscount) : undefined;
+            const usageLimit = formData.usageLimit ? Number(formData.usageLimit) : undefined;
+            const perUserLimit = formData.perUserLimit ? Number(formData.perUserLimit) : 1;
+
+            if (!Number.isFinite(discountValue) || discountValue < 0) {
+                return showToast('Discount value cannot be negative', 'error');
+            }
+            if (!Number.isFinite(minOrderValue) || minOrderValue < 0) {
+                return showToast('Min order cannot be negative', 'error');
+            }
+            if (maxDiscount !== undefined && (!Number.isFinite(maxDiscount) || maxDiscount < 0)) {
+                return showToast('Max discount cannot be negative', 'error');
+            }
+            if (usageLimit !== undefined && (!Number.isFinite(usageLimit) || usageLimit < 0)) {
+                return showToast('Total uses cannot be negative', 'error');
+            }
+            if (!Number.isFinite(perUserLimit) || perUserLimit < 1) {
+                return showToast('Per user limit must be at least 1', 'error');
+            }
+            if (formData.discountType === 'percentage' && discountValue > 100) {
+                return showToast('Percentage discount cannot exceed 100', 'error');
+            }
+
             const payload = {
                 ...formData,
-                discountValue: Number(formData.discountValue),
-                minOrderValue: formData.minOrderValue ? Number(formData.minOrderValue) : 0,
-                maxDiscount: formData.maxDiscount ? Number(formData.maxDiscount) : undefined,
-                usageLimit: formData.usageLimit ? Number(formData.usageLimit) : undefined,
-                perUserLimit: formData.perUserLimit ? Number(formData.perUserLimit) : 1,
+                discountValue,
+                minOrderValue,
+                maxDiscount,
+                usageLimit,
+                perUserLimit,
                 validFrom: formData.validFrom,
                 validTill: formData.validTill,
             };
@@ -168,13 +249,17 @@ const CouponManagement = () => {
     };
 
     const handleDelete = async (id) => {
+        if (!id) {
+            showToast('Coupon id missing', 'error');
+            return;
+        }
         try {
             await adminApi.deleteCoupon(id);
-            setCoupons(coupons.filter(c => c._id !== id));
+            setCoupons((prev) => prev.filter((c) => String(c._id) !== String(id)));
             setDeleteTarget(null);
             showToast('Coupon removed', 'warning');
         } catch (error) {
-            showToast('Failed to delete coupon', 'error');
+            showToast(error.response?.data?.message || 'Failed to delete coupon', 'error');
         }
     };
 
@@ -298,6 +383,9 @@ const CouponManagement = () => {
                                             {c.minOrderValue > 0 && (
                                                 <p className="text-[10px] font-bold text-slate-400">Min. Order: ₹{c.minOrderValue}</p>
                                             )}
+                                            <p className="text-[10px] font-bold text-slate-400">
+                                                Per user: {c.perUserLimit || 1} use{(c.perUserLimit || 1) > 1 ? 's' : ''}
+                                            </p>
                                             <p className="text-[10px] font-bold text-slate-400 capitalize">Type: {c.couponType?.replace(/_/g, ' ') || 'generic'}</p>
                                         </div>
                                     </td>
@@ -305,12 +393,20 @@ const CouponManagement = () => {
                                         <div className="space-y-2">
                                             <div className="flex justify-between items-end">
                                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Redeemed</span>
-                                                <span className="text-xs font-black text-slate-900">{c.usedCount || 0}{c.usageLimit ? `/${c.usageLimit}` : ''}</span>
+                                                <span className="text-xs font-black text-slate-900">
+                                                    {c.usedCount || 0}{c.usageLimit ? `/${c.usageLimit}` : ''}
+                                                </span>
                                             </div>
                                             <div className="h-1.5 w-32 bg-slate-100 rounded-full overflow-hidden">
                                                 <div
                                                     className="h-full bg-brand-500 rounded-full transition-all duration-1000"
-                                                    style={{ width: c.usageLimit ? `${((c.usedCount || 0) / c.usageLimit) * 100}%` : '0%' }}
+                                                    style={{
+                                                        width: c.usageLimit
+                                                            ? `${Math.min(100, ((c.usedCount || 0) / c.usageLimit) * 100)}%`
+                                                            : (c.usedCount || 0) > 0
+                                                                ? '100%'
+                                                                : '0%',
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -319,14 +415,19 @@ const CouponManagement = () => {
                                         <div className="flex items-center gap-2 text-slate-500">
                                             <HiOutlineCalendarDays className="h-4 w-4" />
                                             <span className="text-[10px] font-bold uppercase tracking-tighter">
-                                                {c.validFrom ? new Date(c.validFrom).toLocaleDateString() : '—'} - {c.validTill ? new Date(c.validTill).toLocaleDateString() : '—'}
+                                                {c.validFrom ? formatDate(c.validFrom) : '—'} - {c.validTill ? formatDate(c.validTill) : '—'}
                                             </span>
                                         </div>
                                     </td>
                                     <td className="px-4 py-6 text-center">
-                                        <Badge variant={c.isActive ? 'success' : 'secondary'} className="text-[9px] font-black uppercase">
-                                            {c.isActive ? 'active' : 'inactive'}
-                                        </Badge>
+                                        {(() => {
+                                            const status = getCouponDisplayStatus(c);
+                                            return (
+                                                <Badge variant={status.variant} className="text-[9px] font-black uppercase">
+                                                    {status.label}
+                                                </Badge>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="px-4 py-6">
                                         <div className="flex items-center justify-end gap-2">
@@ -364,7 +465,11 @@ const CouponManagement = () => {
             {/* Delete confirmation dialog */}
             <AnimatePresence>
                 {deleteTarget && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                        onWheel={preventBackdropScroll}
+                        onTouchMove={preventBackdropScroll}
+                    >
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
@@ -388,7 +493,7 @@ const CouponManagement = () => {
                                         Cancel
                                     </button>
                                     <button
-                                        onClick={() => handleDelete(deleteTarget.id)}
+                                        onClick={() => handleDelete(deleteTarget._id)}
                                         className="px-4 py-2.5 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors"
                                     >
                                         Delete
@@ -422,7 +527,7 @@ const CouponManagement = () => {
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Discount Kind</label>
                             <select
                                 value={formData.discountType}
-                                onChange={(e) => setFormData({ ...formData, discountType: e.target.value })}
+                                onChange={(e) => handleDiscountTypeChange(e.target.value)}
                                 className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
                             >
                                 <option value="percentage">Percentage (%)</option>
@@ -457,9 +562,20 @@ const CouponManagement = () => {
                             <input
                                 required
                                 type="number"
+                                min={0}
+                                max={formData.discountType === 'percentage' ? 100 : undefined}
+                                step="any"
+                                onKeyDown={blockNegativeKeys}
                                 onWheel={(e) => e.target.blur()}
                                 value={formData.discountValue}
-                                onChange={(e) => setFormData({ ...formData, discountValue: e.target.value })}
+                                onChange={(e) =>
+                                    handleNonNegativeChange(
+                                        'discountValue',
+                                        e.target.value,
+                                        0,
+                                        formData.discountType === 'percentage' ? 100 : Infinity
+                                    )
+                                }
                                 className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
                             />
                         </div>
@@ -468,9 +584,12 @@ const CouponManagement = () => {
                             <input
                                 required
                                 type="number"
+                                min={0}
+                                step="any"
+                                onKeyDown={blockNegativeKeys}
                                 onWheel={(e) => e.target.blur()}
                                 value={formData.minOrderValue}
-                                onChange={(e) => setFormData({ ...formData, minOrderValue: e.target.value })}
+                                onChange={(e) => handleNonNegativeChange('minOrderValue', e.target.value, 0)}
                                 className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
                             />
                         </div>
@@ -481,9 +600,12 @@ const CouponManagement = () => {
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Max Discount (optional)</label>
                             <input
                                 type="number"
+                                min={0}
+                                step="any"
+                                onKeyDown={blockNegativeKeys}
                                 onWheel={(e) => e.target.blur()}
                                 value={formData.maxDiscount}
-                                onChange={(e) => setFormData({ ...formData, maxDiscount: e.target.value })}
+                                onChange={(e) => handleNonNegativeChange('maxDiscount', e.target.value, 0)}
                                 className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
                             />
                         </div>
@@ -491,9 +613,12 @@ const CouponManagement = () => {
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Uses (optional)</label>
                             <input
                                 type="number"
+                                min={0}
+                                step="1"
+                                onKeyDown={blockNegativeKeys}
                                 onWheel={(e) => e.target.blur()}
                                 value={formData.usageLimit}
-                                onChange={(e) => setFormData({ ...formData, usageLimit: e.target.value })}
+                                onChange={(e) => handleNonNegativeChange('usageLimit', e.target.value, 0)}
                                 className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
                             />
                         </div>
@@ -505,9 +630,11 @@ const CouponManagement = () => {
                             <input
                                 type="number"
                                 min={1}
+                                step="1"
+                                onKeyDown={blockNegativeKeys}
                                 onWheel={(e) => e.target.blur()}
                                 value={formData.perUserLimit}
-                                onChange={(e) => setFormData({ ...formData, perUserLimit: e.target.value })}
+                                onChange={(e) => handleNonNegativeChange('perUserLimit', e.target.value, 1)}
                                 className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
                             />
                         </div>

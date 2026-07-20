@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
     User, MapPin, Package, CreditCard, Wallet, ChevronRight, ChevronDown,
     LogOut, ShieldCheck, Heart, HelpCircle, Info, Edit2, ChevronLeft, Bell,
-    Share2, Copy, Sparkles, Camera, X, Users, Briefcase
+    Share2, Copy, Sparkles, Camera, X, Users, Briefcase, FileText
 } from 'lucide-react';
 import { useAuth } from '@core/context/AuthContext';
 import { useSettings } from '@core/context/SettingsContext';
@@ -17,6 +17,7 @@ import {
     ensureFcmTokenRegistered,
     startForegroundPushListener
 } from '@core/firebase/pushClient';
+import { formatDate } from '@shared/utils/formatDate';
 
 const TEST_PUSH_STATUS_POLL_INTERVAL_MS = 1500;
 const TEST_PUSH_STATUS_MAX_ATTEMPTS = 20;
@@ -292,7 +293,7 @@ const ProfilePage = () => {
                                         Valid Thru
                                     </p>
                                     <div className="text-sm font-bold font-mono tracking-[0.14em] text-white drop-shadow-sm">
-                                        {user?.currentPlan && user?.planExpiry ? new Date(user.planExpiry).toLocaleDateString('en-US', { month: '2-digit', year: '2-digit' }).replace('/', ' / ') : 'N / A'}
+                                        {user?.currentPlan && user?.planExpiry ? formatDate(user.planExpiry) : 'N / A'}
                                     </div>
                                 </div>
                             </div>
@@ -472,6 +473,13 @@ const ProfilePage = () => {
                                 path="/privacy"
                                 color="#a855f7"
                                 bg="rgba(168,85,247,0.08)"
+                            />
+                            <MenuItem
+                                icon={FileText}
+                                label="Terms & Conditions"
+                                path="/terms"
+                                color="#0ea5e9"
+                                bg="rgba(14,165,233,0.08)"
                             />
                             <MenuItem
                                 icon={Info}

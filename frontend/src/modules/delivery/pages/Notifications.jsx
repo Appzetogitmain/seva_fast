@@ -18,6 +18,7 @@ import {
   isDeliveryOrderNotification,
 } from "../utils/deliveryOrderNavigation";
 import { toast } from "sonner";
+import { formatDate, formatTime } from "@shared/utils/formatDate";
 import {
   getOrderSocket,
   onDeliveryBroadcastWithdrawn,
@@ -173,7 +174,7 @@ const Notifications = () => {
                         </p>
                         <div className="flex items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider">
                           <Clock size={10} className="mr-1" />
-                          {new Date(notification.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}, {new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatDate(notification.createdAt)}, {formatTime(notification.createdAt)}
                         </div>
                       </div>
                     </div>

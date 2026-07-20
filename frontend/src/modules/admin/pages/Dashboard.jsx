@@ -29,6 +29,7 @@ import {
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { formatDate, formatTime, formatDateTime, isSameCalendarDay } from '@shared/utils/formatDate';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -66,22 +67,15 @@ const AdminDashboard = () => {
     const overview = statsData?.overview || {};
     const formatLastUpdated = (value) => {
         if (!value) return 'Last Update: --';
-        const now = new Date();
         const updated = new Date(value);
-        const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const updatedDate = new Date(updated.getFullYear(), updated.getMonth(), updated.getDate());
-        const dayDiff = Math.round((nowDate - updatedDate) / (1000 * 60 * 60 * 24));
-
-        let dayLabel = updated.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-        if (dayDiff === 0) dayLabel = 'Today';
-        if (dayDiff === 1) dayLabel = 'Yesterday';
-
-        const timeLabel = updated.toLocaleTimeString('en-IN', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-        });
-        return `Last Update: ${dayLabel}, ${timeLabel}`;
+        let dayLabel = formatDate(updated);
+        if (isSameCalendarDay(updated)) dayLabel = 'Today';
+        else {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (isSameCalendarDay(updated, yesterday)) dayLabel = 'Yesterday';
+        }
+        return `Last Update: ${dayLabel}, ${formatTime(updated)}`;
     };
 
     const formatOrderDateTime = (order) => {
@@ -89,14 +83,7 @@ const AdminDashboard = () => {
         if (!raw || raw === 'Recently') return '--';
         const date = new Date(raw);
         if (Number.isNaN(date.getTime())) return String(raw);
-        return date.toLocaleString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-        });
+        return formatDateTime(date);
     };
 
     const stats = [

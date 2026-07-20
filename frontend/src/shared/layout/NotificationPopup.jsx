@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { HiOutlineBell, HiOutlineCheckCircle, HiOutlineExclamationCircle, HiOutlineClock } from 'react-icons/hi2';
 import { cn } from '@/lib/utils';
 import Button from '@shared/components/ui/Button';
+import { formatDate } from '@shared/utils/formatDate';
 
 const NotificationPopup = ({ notifications, onMarkAsRead, onMarkAllAsRead, onClose, onOpenNotification }) => {
     return (
@@ -71,7 +72,7 @@ const NotificationPopup = ({ notifications, onMarkAsRead, onMarkAllAsRead, onClo
                                                     {notif.title}
                                                 </p>
                                                 <span className="text-[9px] font-bold text-slate-400">
-                                                    {new Date(notif.createdAt).toLocaleDateString()}
+                                                    {formatDate(notif.createdAt)}
                                                 </span>
                                             </div>
                                             <p className="text-[11px] text-slate-500 font-medium leading-relaxed line-clamp-2">

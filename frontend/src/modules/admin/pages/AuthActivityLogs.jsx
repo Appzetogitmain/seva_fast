@@ -14,6 +14,7 @@ import {
   Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@shared/utils/formatDate";
 
 const ROLE_OPTIONS = [
   { value: "all", label: "All Roles" },
@@ -37,18 +38,6 @@ const ROLE_BADGE_VARIANT = {
   admin: "gray",
   "sub-admin": "gray",
 };
-
-function formatDateTime(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
 
 function shortenUserAgent(userAgent = "") {
   const text = String(userAgent || "").trim();

@@ -83,7 +83,7 @@ describe("getAdminFinanceSummary", () => {
     expect(mockPayoutAggregate).toHaveBeenCalledTimes(1);
   });
 
-  it("builds systemFloatCOD pipeline using pending when collected and estimate when not collected", async () => {
+  it("builds systemFloatCOD pipeline only for delivered COD orders", async () => {
     mockOrderAggregate
       .mockResolvedValueOnce([{ _id: null, amount: 0 }])
       .mockResolvedValueOnce([{ _id: null, amount: 0 }])
@@ -94,10 +94,19 @@ describe("getAdminFinanceSummary", () => {
 
     await getAdminFinanceSummary();
 
-    const pipeline = mockOrderAggregate.mock.calls[3]?.[0];
-    expect(Array.isArray(pipeline)).toBe(true);
-    expect(JSON.stringify(pipeline)).toContain("codPendingAmount");
-    expect(JSON.stringify(pipeline)).toContain("riderPayoutTotal");
-    expect(JSON.stringify(pipeline)).toContain("codMarkedCollected");
+    const floatPipeline = mockOrderAggregate.mock.calls[3]?.[0];
+    expect(Array.isArray(floatPipeline)).toBe(true);
+    const floatMatch = JSON.stringify(floatPipeline);
+    expect(floatMatch).toContain('"paymentMode":"COD"');
+    expect(floatMatch).toContain('"status":"delivered"');
+    expect(floatMatch).toContain("codPendingAmount");
+    expect(floatMatch).toContain("riderPayoutTotal");
+    expect(floatMatch).toContain("codMarkedCollected");
+
+    const grossPipeline = mockOrderAggregate.mock.calls[4]?.[0];
+    const grossMatch = JSON.stringify(grossPipeline);
+    expect(grossMatch).toContain('"paymentMode":"COD"');
+    expect(grossMatch).toContain('"status":"delivered"');
+    expect(grossMatch).toContain('"paymentMode":"ONLINE"');
   });
 });

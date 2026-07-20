@@ -110,4 +110,27 @@ describe("Phase 0 OTP hardening", () => {
     expect(customer.otpHash).not.toBe("1234");
     expect(customer.save).toHaveBeenCalled();
   });
+
+  it("blocks signup when a verified account already exists", async () => {
+    const customer = buildCustomer({
+      phone: "+919876543214",
+      isVerified: true,
+      otpLastSentAt: new Date(Date.now() - 120 * 1000),
+    });
+    mockFindOneSelect(customer);
+
+    await expect(
+      issueCustomerOtp({
+        name: "Existing User",
+        rawPhone: "9876543214",
+        flow: "signup",
+        ipAddress: "127.0.0.1",
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: "ACCOUNT_ALREADY_EXISTS",
+    });
+
+    expect(customer.save).not.toHaveBeenCalled();
+  });
 });

@@ -21,7 +21,7 @@ const CodCash = () => {
     systemFloatCOD: 0,
     cashInHand: 0,
     toCollect: [],
-    toRemit: [],
+    toHandoff: [],
   });
 
   const fetchSummary = async () => {
@@ -30,8 +30,12 @@ const CodCash = () => {
       const res = await deliveryApi.getCodCashSummary();
       if (res.data.success && res.data.result) {
         const result = res.data.result;
-        const nextToRemit = Array.isArray(result.toRemit) ? result.toRemit : [];
-        const nextPayable = nextToRemit.reduce(
+        const nextToHandoff = Array.isArray(result.toHandoff)
+          ? result.toHandoff
+          : Array.isArray(result.toRemit)
+            ? result.toRemit
+            : [];
+        const nextPayable = nextToHandoff.reduce(
           (sum, row) => sum + safeMoney(row.amountNetPending),
           0,
         );
@@ -39,7 +43,7 @@ const CodCash = () => {
           systemFloatCOD: safeMoney(result.systemFloatCOD),
           cashInHand: safeMoney(result.cashInHand),
           toCollect: Array.isArray(result.toCollect) ? result.toCollect : [],
-          toRemit: nextToRemit,
+          toHandoff: nextToHandoff,
         });
         setPayAmount(nextPayable > 0 ? String(nextPayable) : "");
       }
@@ -67,21 +71,23 @@ const CodCash = () => {
 
   const pendingOrdersCount =
     (Array.isArray(data.toCollect) ? data.toCollect.length : 0) +
-    (Array.isArray(data.toRemit) ? data.toRemit.length : 0);
-  const payableNowAmount = (Array.isArray(data.toRemit) ? data.toRemit : []).reduce(
+    (Array.isArray(data.toHandoff) ? data.toHandoff.length : 0);
+  const payableNowAmount = (Array.isArray(data.toHandoff) ? data.toHandoff : []).reduce(
     (sum, row) => sum + safeMoney(row.amountNetPending),
     0,
   );
   const enteredPayAmount = safeMoney(payAmount);
 
-  const handlePayNow = async () => {
+  const handleHandoffNow = async () => {
     if (paying) return;
     if (enteredPayAmount <= 0) {
-      toast.error("Enter an amount to pay");
+      toast.error("Enter an amount to hand over");
       return;
     }
     if (enteredPayAmount > payableNowAmount) {
-      toast.error(`You can pay up to ${RUPEE}${safeMoney(payableNowAmount).toLocaleString()}`);
+      toast.error(
+        `You can hand over up to ${RUPEE}${safeMoney(payableNowAmount).toLocaleString()}`,
+      );
       return;
     }
 
@@ -92,11 +98,11 @@ const CodCash = () => {
       });
       const result = res.data?.result || {};
       toast.success(
-        `Submitted ${RUPEE}${safeMoney(result.totalSubmitted).toLocaleString()} to admin`,
+        `Handed over ${RUPEE}${safeMoney(result.totalSubmitted).toLocaleString()} to seller(s)`,
       );
       await fetchSummary();
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Failed to submit COD cash");
+      toast.error(error?.response?.data?.message || "Failed to hand over COD cash");
     } finally {
       setPaying(false);
     }
@@ -109,7 +115,7 @@ const CodCash = () => {
           <div>
             <h1 className="ds-h2 text-gray-900">COD Cash</h1>
             <p className="text-xs text-gray-500 mt-1">
-              Simple view of what you should collect and what you should submit.
+              Collect from customer, then hand cash over to the seller.
             </p>
           </div>
           <Button
@@ -135,15 +141,14 @@ const CodCash = () => {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                  Cash To Submit
+                  Cash To Hand Over
                 </p>
                 <p className="text-3xl font-extrabold text-gray-900">
                   {RUPEE}
                   {safeMoney(data.systemFloatCOD).toLocaleString()}
                 </p>
                 <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  This is the platform money you are holding for COD orders.
-                  It is calculated after your delivery commission.
+                  Platform COD cash you are holding. Hand it to the seller — they remit to admin.
                 </p>
               </div>
               <div className="p-3 rounded-xl bg-orange-50 text-orange-600">
@@ -153,47 +158,35 @@ const CodCash = () => {
 
             <div className="grid grid-cols-2 gap-3 mt-4">
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-3">
-                <p className="text-[11px] font-bold text-gray-500 uppercase">
-                  Cash In Hand
-                </p>
+                <p className="text-[11px] font-bold text-gray-500 uppercase">Cash In Hand</p>
                 <p className="text-lg font-bold text-gray-900">
                   {RUPEE}
                   {safeMoney(data.cashInHand).toLocaleString()}
                 </p>
               </div>
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-3">
-                <p className="text-[11px] font-bold text-gray-500 uppercase">
-                  Pending Orders
-                </p>
+                <p className="text-[11px] font-bold text-gray-500 uppercase">Pending Orders</p>
                 <p className="text-lg font-bold text-gray-900">{pendingOrdersCount}</p>
               </div>
             </div>
 
             <div className="mt-4 rounded-xl bg-orange-50 border border-orange-100 p-4">
               <div className="flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-bold text-orange-700 uppercase">
-                      Ready To Pay Now
-                    </p>
-                    <p className="text-xl font-extrabold text-gray-900 mt-1">
-                      {RUPEE}
-                      {safeMoney(payableNowAmount).toLocaleString()}
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Only cash from collected orders can be paid now.
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-[11px] font-bold text-orange-700 uppercase">
+                    Ready To Hand Over
+                  </p>
+                  <p className="text-xl font-extrabold text-gray-900 mt-1">
+                    {RUPEE}
+                    {safeMoney(payableNowAmount).toLocaleString()}
+                  </p>
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-bold text-orange-700 uppercase">
-                    Enter Amount
-                  </p>
                   <div className="mt-2 flex items-center gap-3">
                     <div className="flex-1 rounded-xl border border-orange-200 bg-white px-4 py-3">
                       <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">
-                        Amount To Pay
+                        Amount
                       </label>
                       <div className="flex items-center gap-2">
                         <span className="text-lg font-bold text-gray-900">{RUPEE}</span>
@@ -210,20 +203,16 @@ const CodCash = () => {
                       </div>
                     </div>
                     <Button
-                      onClick={handlePayNow}
+                      onClick={handleHandoffNow}
                       disabled={paying || enteredPayAmount <= 0}
                       className="shrink-0"
                     >
-                      {paying ? "Paying..." : "Pay Admin"}
+                      {paying ? "Saving..." : "To Seller"}
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-600 mt-2">
-                    Max you can pay right now: {RUPEE}
-                    {safeMoney(payableNowAmount).toLocaleString()}
-                  </p>
                   {payableNowAmount <= 0 && (
-                    <p className="text-xs text-orange-700 mt-1">
-                      You can pay after COD cash is marked as collected.
+                    <p className="text-xs text-orange-700 mt-2">
+                      Collect cash on the order page first, then hand over here.
                     </p>
                   )}
                 </div>
@@ -236,7 +225,7 @@ const CodCash = () => {
           <Card className="p-6">
             <h3 className="font-bold text-gray-900 mb-1">To Collect From Customer</h3>
             <p className="text-xs text-gray-500 mb-4">
-              These COD orders are not marked as collected yet.
+              Open the order and choose Cash or Online QR.
             </p>
 
             <div className="space-y-2">
@@ -270,20 +259,20 @@ const CodCash = () => {
 
         <motion.div variants={itemVariants}>
           <Card className="p-6">
-            <h3 className="font-bold text-gray-900 mb-1">To Submit To Platform</h3>
+            <h3 className="font-bold text-gray-900 mb-1">Hand Over To Seller</h3>
             <p className="text-xs text-gray-500 mb-4">
-              These orders are marked collected. Submit the net cash shown here.
+              Cash collected and still with you.
             </p>
 
             <div className="space-y-2">
-              {(Array.isArray(data.toRemit) ? data.toRemit : []).slice(0, 20).map((row) => (
+              {(Array.isArray(data.toHandoff) ? data.toHandoff : []).slice(0, 20).map((row) => (
                 <div
-                  key={`remit-${row.orderId}`}
+                  key={`handoff-${row.orderId}`}
                   className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-3"
                 >
                   <div>
                     <p className="text-sm font-bold text-gray-900">Order #{row.orderId}</p>
-                    <p className="text-xs text-gray-500">Submit to platform (net)</p>
+                    <p className="text-xs text-gray-500">Hand to seller (net)</p>
                   </div>
                   <p className="text-sm font-extrabold text-gray-900">
                     {RUPEE}
@@ -292,9 +281,9 @@ const CodCash = () => {
                 </div>
               ))}
 
-              {(!Array.isArray(data.toRemit) || data.toRemit.length === 0) && (
+              {(!Array.isArray(data.toHandoff) || data.toHandoff.length === 0) && (
                 <div className="rounded-xl border border-dashed border-gray-200 p-4 text-center text-sm text-gray-400">
-                  Nothing to submit right now.
+                  Nothing to hand over right now.
                 </div>
               )}
             </div>

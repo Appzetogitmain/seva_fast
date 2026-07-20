@@ -337,6 +337,72 @@ body {
   font-weight: 600;
 }
 
+/* Admin: native document scroll (touchpad/mouse) + always-visible right scrollbar */
+html.admin-app-scroll {
+  overflow-x: hidden;
+  overflow-y: scroll;
+  height: auto;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+body.admin-app-scroll {
+  overflow-x: hidden;
+  overflow-y: visible;
+  height: auto;
+  min-height: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+html.admin-app-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+html.admin-app-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+html.admin-app-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 8px;
+  border: 2px solid #f1f5f9;
+}
+
+html.admin-app-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Kept for any nested admin panels that opt in */
+.admin-page-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.admin-page-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.admin-page-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.admin-page-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 8px;
+  border: 2px solid #f1f5f9;
+}
+
+.admin-page-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 .admin-h4 {
   font-size: 0.875rem;
   line-height: 1.25rem;

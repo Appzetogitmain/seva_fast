@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Card from "@shared/components/ui/Card";
 import Badge from "@shared/components/ui/Badge";
 import Button from "@shared/components/ui/Button";
@@ -16,9 +17,11 @@ import { MagicCard } from "@/components/ui/magic-card";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Loader2, X } from "lucide-react";
+import { formatDateTime } from "@shared/utils/formatDate";
 
 const Returns = () => {
   const { showToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("All");
@@ -112,6 +115,27 @@ const Returns = () => {
   useEffect(() => {
     fetchReturns();
   }, []);
+
+  // Deep-link from notification: /admin/returns?orderId=...
+  useEffect(() => {
+    const orderId = String(searchParams.get("orderId") || "").trim();
+    if (!orderId || loading || !returns.length) return;
+
+    const match = returns.find(
+      (r) =>
+        String(r.orderId || "").trim() === orderId ||
+        String(r._id || "").trim() === orderId,
+    );
+    if (!match) return;
+
+    setSelectedReturn(match);
+    setIsDetailsOpen(true);
+    setActiveTab("All");
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("orderId");
+    setSearchParams(next, { replace: true });
+  }, [loading, returns, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!isDetailsOpen && !actionModal.open) return undefined;
@@ -349,12 +373,7 @@ const Returns = () => {
                           <p className="text-xs font-semibold text-slate-600 mt-0.5 flex items-center gap-1">
                             <HiOutlineCalendarDays className="h-3 w-3 shrink-0" />
                             {ret.returnRequestedAt
-                              ? new Date(ret.returnRequestedAt).toLocaleString("en-IN", {
-                                day: "2-digit",
-                                month: "short",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
+                              ? formatDateTime(ret.returnRequestedAt)
                               : "N/A"}
                           </p>
                           <p className="text-xs font-bold text-slate-800 mt-1">
@@ -564,7 +583,7 @@ const Returns = () => {
                     )}
                     {selectedReturn.returnQcAt && (
                       <p className="text-[10px] font-medium text-slate-500">
-                        Reviewed on: {new Date(selectedReturn.returnQcAt).toLocaleString()}
+                        Reviewed on: {formatDateTime(selectedReturn.returnQcAt)}
                       </p>
                     )}
                   </div>

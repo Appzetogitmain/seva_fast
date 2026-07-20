@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
 import { deliveryApi } from "../../services/deliveryApi";
+import { formatDate } from "@shared/utils/formatDate";
 
 const Withdrawals = () => {
     const navigate = useNavigate();
@@ -208,7 +209,7 @@ const Withdrawals = () => {
                                         <div>
                                             <p className="font-bold text-gray-900">₹{Math.abs(item.amount).toLocaleString()}</p>
                                             <p className="text-[10px] font-medium text-gray-400 mt-0.5">
-                                                {new Date(item.date).toLocaleDateString()} • {item.id}
+                                                {formatDate(item.date)} • {item.id}
                                             </p>
                                         </div>
                                     </div>

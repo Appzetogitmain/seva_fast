@@ -11,6 +11,16 @@ export const deliveryApi = {
   getEarnings: () => axiosInstance.get("/delivery/earnings"),
   getCodCashSummary: () => axiosInstance.get("/delivery/cod/summary"),
   payCodCashToAdmin: (data) => axiosInstance.post("/delivery/cod/pay", data),
+  chooseCodCollectMethod: (orderId, data) =>
+    axiosInstance.post(`/orders/${encodeURIComponent(String(orderId))}/cod/choose-method`, data),
+  getCodPaymentQr: (orderId) =>
+    axiosInstance.get(`/orders/${encodeURIComponent(String(orderId))}/cod/payment-qr`),
+  markCodOnlinePaid: (orderId, data = {}) =>
+    axiosInstance.post(`/orders/${encodeURIComponent(String(orderId))}/cod/mark-online-paid`, data),
+  markCodCashCollected: (orderId, data = {}) =>
+    axiosInstance.post(`/orders/${encodeURIComponent(String(orderId))}/cod/mark-collected`, data),
+  handoffCodCashToSeller: (orderId, data = {}) =>
+    axiosInstance.post(`/orders/${encodeURIComponent(String(orderId))}/cod/handoff-to-seller`, data),
   getWalletSummary: () => axiosInstance.get("/delivery/wallet/summary"),
   getOrderHistory: (params, config = {}) =>
     axiosInstance.get("/delivery/order-history", { params, ...config }),

@@ -211,3 +211,209 @@ export const updateSellerProfile = async (req, res) => {
     return handleResponse(res, 500, error.message);
   }
 };
+
+function roundCurrency(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+/* ===============================
+   SELLER COD CASH SUMMARY
+================================ */
+export const getSellerCodCashSummary = async (req, res) => {
+  try {
+    const sellerId = req.user?.id ?? req.user?._id;
+    if (!sellerId) {
+      return handleResponse(res, 401, "Unauthorized");
+    }
+
+    const Order = (await import("../models/order.js")).default;
+    const Wallet = (await import("../models/wallet.js")).default;
+
+    const wallet = await Wallet.findOne({
+      ownerType: "SELLER",
+      ownerId: sellerId,
+    })
+      .select("cashInHand")
+      .lean();
+
+    const orders = await Order.find({
+      seller: sellerId,
+      paymentMode: "COD",
+      status: { $ne: "cancelled" },
+      orderStatus: { $ne: "cancelled" },
+      "financeFlags.codCashWithSeller": true,
+      "paymentBreakdown.codPendingAmount": { $gt: 0 },
+    })
+      .select(
+        "orderId status orderStatus deliveredAt createdAt financeFlags paymentBreakdown pricing deliveryBoy",
+      )
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    const pendingOrders = orders.map((order) => {
+      const gross = roundCurrency(
+        order.paymentBreakdown?.grandTotal ?? order.pricing?.total ?? 0,
+      );
+      const riderCommission = roundCurrency(
+        order.paymentBreakdown?.riderPayoutTotal ?? 0,
+      );
+      const pendingNet = roundCurrency(
+        order.paymentBreakdown?.codPendingAmount ?? 0,
+      );
+      return {
+        orderId: order.orderId,
+        status: order.status,
+        deliveredAt: order.deliveredAt || null,
+        createdAt: order.createdAt || null,
+        amountGross: gross,
+        riderCommission,
+        amountNetPending: pendingNet,
+      };
+    });
+
+    const totalPending = roundCurrency(
+      pendingOrders.reduce((sum, row) => sum + Number(row.amountNetPending || 0), 0),
+    );
+
+    return handleResponse(res, 200, "Seller COD cash summary fetched", {
+      cashInHand: roundCurrency(wallet?.cashInHand || 0),
+      totalPending,
+      pendingOrders,
+    });
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+/* ===============================
+   SELLER REMIT COD CASH TO ADMIN
+================================ */
+export const submitSellerCodCashToAdmin = async (req, res) => {
+  try {
+    const sellerId = req.user?.id ?? req.user?._id;
+    if (!sellerId) {
+      return handleResponse(res, 401, "Unauthorized");
+    }
+
+    const Order = (await import("../models/order.js")).default;
+    const Wallet = (await import("../models/wallet.js")).default;
+    const { sellerCodPaySchema } = await import(
+      "../validation/financeValidation.js"
+    );
+    const { sellerRemitCodCash } = await import(
+      "../services/finance/orderFinanceService.js"
+    );
+    const { finalizeCodAfterAdminCredit } = await import(
+      "../services/orderSettlement.js"
+    );
+
+    const { error, value: payload } = sellerCodPaySchema.validate(req.body || {}, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+    if (error) {
+      return handleResponse(
+        res,
+        400,
+        error.details.map((item) => item.message).join("; "),
+      );
+    }
+
+    const query = {
+      seller: sellerId,
+      paymentMode: "COD",
+      status: { $ne: "cancelled" },
+      orderStatus: { $ne: "cancelled" },
+      "financeFlags.codCashWithSeller": true,
+      "paymentBreakdown.codPendingAmount": { $gt: 0 },
+    };
+    if (payload.orderId) {
+      query.orderId = payload.orderId;
+    }
+
+    const orders = await Order.find(query)
+      .select("orderId paymentBreakdown.codPendingAmount")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    if (!orders.length) {
+      return handleResponse(res, 400, "No COD cash pending with seller to remit");
+    }
+
+    const totalAvailable = roundCurrency(
+      orders.reduce(
+        (sum, order) => sum + Number(order?.paymentBreakdown?.codPendingAmount || 0),
+        0,
+      ),
+    );
+    const amountToSubmit =
+      payload.amount == null ? totalAvailable : roundCurrency(payload.amount);
+
+    if (amountToSubmit <= 0) {
+      return handleResponse(res, 400, "Enter a valid amount to remit");
+    }
+    if (amountToSubmit > totalAvailable) {
+      return handleResponse(
+        res,
+        400,
+        `You can remit up to ${String.fromCharCode(8377)}${totalAvailable.toLocaleString()}`,
+      );
+    }
+
+    const settledOrders = [];
+    let totalSubmitted = 0;
+    let remaining = amountToSubmit;
+
+    for (const order of orders) {
+      const pending = roundCurrency(order?.paymentBreakdown?.codPendingAmount || 0);
+      if (pending <= 0 || remaining <= 0) continue;
+      const settleAmount = roundCurrency(Math.min(pending, remaining));
+
+      const remitted = await sellerRemitCodCash(order._id, settleAmount, {
+        actorId: sellerId,
+      });
+      await finalizeCodAfterAdminCredit(remitted._id, remitted.orderId);
+
+      totalSubmitted = roundCurrency(totalSubmitted + settleAmount);
+      remaining = roundCurrency(remaining - settleAmount);
+      settledOrders.push({
+        orderId: order.orderId,
+        amount: settleAmount,
+      });
+    }
+
+    if (totalSubmitted <= 0) {
+      return handleResponse(res, 400, "No COD cash was remitted");
+    }
+
+    await Transaction.create({
+      user: sellerId,
+      userModel: "Seller",
+      type: "Cash Settlement",
+      amount: -Math.abs(totalSubmitted),
+      status: "Settled",
+      reference: `CSH-SELLER-${sellerId}-${Date.now()}`,
+      meta: {
+        source: "seller_cod_cash_page",
+        orders: settledOrders.map((item) => item.orderId),
+      },
+    });
+
+    const wallet = await Wallet.findOne({
+      ownerType: "SELLER",
+      ownerId: sellerId,
+    })
+      .select("cashInHand")
+      .lean();
+
+    return handleResponse(res, 200, "COD cash remitted to admin successfully", {
+      totalSubmitted,
+      orderCount: settledOrders.length,
+      orders: settledOrders,
+      cashInHand: roundCurrency(wallet?.cashInHand || 0),
+    });
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
+  }
+};

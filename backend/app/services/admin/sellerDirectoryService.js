@@ -1,6 +1,7 @@
 import Seller from "../../models/seller.js";
 import Order from "../../models/order.js";
 import Product from "../../models/product.js";
+import { formatDate } from "../../utils/formatDate.js";
 import {
   computeMapBounds,
   computeMapCenter,
@@ -424,19 +425,9 @@ export async function getActiveSellersData({
       status: seller.isVerified && seller.isActive ? "active" : "inactive",
       verificationStatus: seller.isVerified ? "verified" : "unverified",
       joinedAt,
-      joinedDate: new Date(joinedAt).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
+      joinedDate: formatDate(joinedAt),
       lastOrderAt: orderStats.lastOrderAt || null,
-      lastOrderLabel: orderStats.lastOrderAt
-        ? new Date(orderStats.lastOrderAt).toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          })
-        : "No orders yet",
+      lastOrderLabel: formatDate(orderStats.lastOrderAt, "No orders yet"),
       totalOrders,
       deliveredOrders,
       pendingOrders,

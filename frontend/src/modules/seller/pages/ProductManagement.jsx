@@ -148,6 +148,15 @@ const ProductManagement = () => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
   };
 
+  const getEffectiveProductStock = (product) => {
+    const variants = Array.isArray(product?.variants) ? product.variants : [];
+    if (variants.length > 0) {
+      return variants.reduce((sum, v) => sum + (Number(v?.stock) || 0), 0);
+    }
+    const top = Number(product?.stock);
+    return Number.isFinite(top) ? top : 0;
+  };
+
   const handleModalScrollWheel = (event) => {
     const container = event.currentTarget;
     if (container.scrollHeight <= container.clientHeight) return;
@@ -244,8 +253,11 @@ const ProductManagement = () => {
       let matchesStatus = filterStatus === "All";
       if (filterStatus === "Active") matchesStatus = p.status === "active";
       if (filterStatus === "Low Stock")
-        matchesStatus = p.stock > 0 && p.stock <= resolveLowStockThreshold(p);
-      if (filterStatus === "Out of Stock") matchesStatus = p.stock === 0;
+        matchesStatus = (() => {
+          const stock = getEffectiveProductStock(p);
+          return stock > 0 && stock <= resolveLowStockThreshold(p);
+        })();
+      if (filterStatus === "Out of Stock") matchesStatus = getEffectiveProductStock(p) === 0;
 
       let matchesPrice = true;
       const effectivePrice = Number(p.salePrice ?? p.price ?? 0);
@@ -288,10 +300,13 @@ const ProductManagement = () => {
         (typeof total === "number" ? total : safeProducts.length),
       lowStock:
         summaryStats?.lowStock ??
-        safeProducts.filter((p) => p.stock > 0 && p.stock <= resolveLowStockThreshold(p)).length,
+        safeProducts.filter((p) => {
+          const stock = getEffectiveProductStock(p);
+          return stock > 0 && stock <= resolveLowStockThreshold(p);
+        }).length,
       outOfStock:
         summaryStats?.outOfStock ??
-        safeProducts.filter((p) => p.stock === 0).length,
+        safeProducts.filter((p) => getEffectiveProductStock(p) === 0).length,
       active:
         summaryStats?.active ??
         safeProducts.filter((p) => p.status === "active").length,
@@ -317,6 +332,19 @@ const ProductManagement = () => {
         return;
       }
 
+      const mainStock = Number(formData.stock);
+      if (!Number.isFinite(mainStock) || mainStock < 0) {
+        toast.error("Stock cannot be negative");
+        return;
+      }
+      const negativeVariant = (formData.variants || []).find((v) => {
+        const s = Number(v.stock);
+        return v.stock !== "" && v.stock != null && (!Number.isFinite(s) || s < 0);
+      });
+      if (negativeVariant) {
+        toast.error("Variant stock cannot be negative");
+        return;
+      }
       if (formData.deliveryType === "scheduled") {
         const parsedWeight = parseFloat(formData.weightVal);
         if (!formData.weightVal || Number.isNaN(parsedWeight) || parsedWeight <= 0) {
@@ -346,6 +374,10 @@ const ProductManagement = () => {
       if (formData.mainImageFile) {
         data.append("mainImage", formData.mainImageFile);
       }
+      const keptGalleryUrls = (formData.galleryImages || []).filter(
+        (url) => typeof url === "string" && /^https?:\/\//i.test(url),
+      );
+      data.append("existingGalleryImages", JSON.stringify(keptGalleryUrls));
       if (formData.galleryFiles && formData.galleryFiles.length > 0) {
         formData.galleryFiles.forEach((file) => data.append("galleryImages", file));
       }
@@ -1336,11 +1368,30 @@ const ProductManagement = () => {
                             </div>
                             <div className="space-y-1">
                               <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest ml-1">Stock</label>
-                              <input type="number" value={v.stock} onChange={e => {
-                                const news = [...formData.variants];
-                                news[i].stock = e.target.value;
-                                setFormData({ ...formData, variants: news });
-                              }} placeholder="Stock" className="w-full bg-white px-3 py-2 rounded-xl text-xs ring-1 ring-slate-100 outline-none" />
+                              <input
+                                type="number"
+                                min={0}
+                                step={1}
+                                inputMode="numeric"
+                                value={v.stock}
+                                onKeyDown={(e) => {
+                                  if (['-', '+', 'e', 'E', '.'].includes(e.key)) e.preventDefault();
+                                }}
+                                onChange={e => {
+                                  const news = [...formData.variants];
+                                  const raw = e.target.value;
+                                  if (raw === '') {
+                                    news[i].stock = '';
+                                  } else {
+                                    const n = Number(raw);
+                                    news[i].stock = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+                                  }
+                                  const nextStock = i === 0 ? news[i].stock : formData.stock;
+                                  setFormData({ ...formData, variants: news, stock: nextStock });
+                                }}
+                                placeholder="Stock"
+                                className="w-full bg-white px-3 py-2 rounded-xl text-xs ring-1 ring-slate-100 outline-none"
+                              />
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="flex-1 space-y-1">

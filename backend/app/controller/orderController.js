@@ -53,6 +53,7 @@ import {
   retractDeliveryBroadcastForOrder,
   emitToSeller,
   emitToDelivery,
+  emitOrderStatusUpdate,
 } from "../services/orderSocketEmitter.js";
 import * as walletService from "../services/finance/walletService.js";
 import { OWNER_TYPE } from "../constants/finance.js";
@@ -903,8 +904,49 @@ export const updateOrderStatus = async (req, res) => {
 
     const canonicalOrderId = order.orderId;
 
-    if (order.workflowVersion >= 2 && role === "seller") {
-      if (status === "confirmed") {
+    // Normalize aliases from older seller UI labels
+    let nextStatus = status ? String(status).toLowerCase().trim() : undefined;
+    if (nextStatus === "processing" || nextStatus === "process") {
+      nextStatus = "confirmed";
+    }
+
+    const currentLegacyStatus = String(order.status || "").toLowerCase();
+    const currentWorkflow = String(order.workflowStatus || "").toUpperCase();
+    const isFinalized =
+      currentLegacyStatus === "cancelled" ||
+      currentLegacyStatus === "delivered" ||
+      currentWorkflow === WORKFLOW_STATUS.CANCELLED ||
+      currentWorkflow === WORKFLOW_STATUS.DELIVERED;
+
+    // Never revive timed-out / cancelled / delivered orders via a late status update.
+    if (
+      nextStatus &&
+      isFinalized &&
+      nextStatus !== currentLegacyStatus &&
+      !(
+        currentLegacyStatus === "cancelled" &&
+        nextStatus === "cancelled"
+      )
+    ) {
+      return handleResponse(
+        res,
+        409,
+        currentLegacyStatus === "cancelled" ||
+          currentWorkflow === WORKFLOW_STATUS.CANCELLED
+          ? "Order was cancelled (timeout or rejection) and cannot be confirmed"
+          : "Order is already finalized and cannot be updated",
+      );
+    }
+
+    // V2 seller accept/reject only while still awaiting seller action.
+    // For later transitions (packed / out_for_delivery / etc.) use normal update path.
+    if (order.workflowVersion >= 2 && role === "seller" && nextStatus) {
+      const awaitingSeller =
+        !isFinalized &&
+        (order.workflowStatus === WORKFLOW_STATUS.SELLER_PENDING ||
+          order.status === "pending");
+
+      if (nextStatus === "confirmed" && awaitingSeller) {
         try {
           const updated = await sellerAcceptAtomic(userId, canonicalOrderId);
           return handleResponse(res, 200, "Order accepted", updated);
@@ -912,13 +954,23 @@ export const updateOrderStatus = async (req, res) => {
           return handleResponse(res, e.statusCode || 500, e.message);
         }
       }
-      if (status === "cancelled") {
+      if (nextStatus === "cancelled" && awaitingSeller) {
         try {
           const updated = await sellerRejectAtomic(userId, canonicalOrderId);
           return handleResponse(res, 200, "Order rejected", updated);
         } catch (e) {
           return handleResponse(res, e.statusCode || 500, e.message);
         }
+      }
+      // If seller re-selects current confirmed status after accept, treat as success (no-op).
+      if (
+        nextStatus === "confirmed" &&
+        !awaitingSeller &&
+        ["confirmed", "packed", "out_for_delivery", "delivered"].includes(
+          currentLegacyStatus,
+        )
+      ) {
+        return handleResponse(res, 200, "Order already accepted", order);
       }
     }
 
@@ -939,8 +991,8 @@ export const updateOrderStatus = async (req, res) => {
     // -----------------------------
 
     const oldStatus = order.status;
-    if (status) {
-      if (status === "packed" && order.deliveryType === "scheduled") {
+    if (nextStatus) {
+      if (nextStatus === "packed" && order.deliveryType === "scheduled") {
         try {
           const populatedOrder = await Order.findById(order._id)
             .populate("customer", "name phone email")
@@ -961,13 +1013,23 @@ export const updateOrderStatus = async (req, res) => {
           return handleResponse(res, 400, `Shiprocket Shipment Creation Failed: ${shiprocketError.message}`);
         }
       }
-      order.status = status;
-      order.orderStatus = status;
+      order.status = nextStatus;
+      order.orderStatus = nextStatus;
       if (order.workflowVersion >= 2) {
-        order.workflowStatus = workflowFromLegacyStatus(status);
+        order.workflowStatus = workflowFromLegacyStatus(nextStatus);
       }
     }
     if (deliveryBoyId && String(order.deliveryBoy || "") !== String(deliveryBoyId)) {
+      const effectiveStatus = String(nextStatus || order.status || "").toLowerCase();
+      const canAssignAtStatus = ["packed", "out_for_delivery"].includes(effectiveStatus);
+      if (!canAssignAtStatus) {
+        return handleResponse(
+          res,
+          400,
+          "Delivery partner can only be assigned after the order is packed.",
+        );
+      }
+
       if (typeof Delivery.findById === "function") {
         const rider = await Delivery.findById(deliveryBoyId);
         if (rider && !rider.isVerified) {
@@ -991,12 +1053,25 @@ export const updateOrderStatus = async (req, res) => {
     if (deliveryBoyId) {
       order.deliveryBoy = deliveryBoyId;
       order.deliverySearchExpiresAt = new Date(Date.now() + 60000);
+      order.assignedAt = order.assignedAt || new Date();
+      order.deliveryRiderStep = order.deliveryRiderStep || 1;
 
-      if (order.workflowVersion >= 2 && order.workflowStatus === WORKFLOW_STATUS.DELIVERY_SEARCH) {
-        order.workflowStatus = WORKFLOW_STATUS.DELIVERY_ASSIGNED;
-        order.status = legacyStatusFromWorkflow(WORKFLOW_STATUS.DELIVERY_ASSIGNED);
-        order.assignedAt = new Date();
-        order.deliveryRiderStep = order.deliveryRiderStep || 1;
+      if (order.workflowVersion >= 2) {
+        // Keep customer/seller-facing status as packed when assigning at pack time.
+        // Only map workflow to DELIVERY_ASSIGNED so the rider receives the order.
+        const assignableWorkflows = new Set([
+          WORKFLOW_STATUS.DELIVERY_SEARCH,
+          WORKFLOW_STATUS.SELLER_ACCEPTED,
+          WORKFLOW_STATUS.PICKUP_READY,
+          WORKFLOW_STATUS.DELIVERY_ASSIGNED,
+        ]);
+        if (assignableWorkflows.has(order.workflowStatus) || nextStatus === "packed") {
+          order.workflowStatus = WORKFLOW_STATUS.DELIVERY_ASSIGNED;
+          if (nextStatus === "packed" || order.status === "packed") {
+            order.status = "packed";
+            order.orderStatus = "packed";
+          }
+        }
       }
       
       if (Array.isArray(order.skippedBy)) {
@@ -1059,14 +1134,14 @@ export const updateOrderStatus = async (req, res) => {
       isAssignedDeliveryBoy &&
       role === "delivery" &&
       order.workflowVersion < 2 &&
-      status
+      nextStatus
     ) {
-      if (status === "packed") order.deliveryRiderStep = 2;
-      else if (status === "out_for_delivery") order.deliveryRiderStep = 3;
+      if (nextStatus === "packed") order.deliveryRiderStep = 2;
+      else if (nextStatus === "out_for_delivery") order.deliveryRiderStep = 3;
     }
 
     // Handle Cancellation (Stock Reversal & Transaction Update)
-    if (status === "cancelled" && oldStatus !== "cancelled") {
+    if (nextStatus === "cancelled" && oldStatus !== "cancelled") {
       if (order.deliveryType === "scheduled" && order.shipmentDetails?.shipmentId) {
         try {
           await cancelShiprocketOrder(order.orderId);
@@ -1111,7 +1186,7 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     // Handle Confirmation/Delivery (Settle Transaction for Demo)
-    if (status === "delivered" && oldStatus !== "delivered") {
+    if (nextStatus === "delivered" && oldStatus !== "delivered") {
       order.deliveredAt = new Date();
 
       // Important: persist deliveryBoy/status first so settlement can correctly:
@@ -1129,6 +1204,16 @@ export const updateOrderStatus = async (req, res) => {
       });
 
       const refreshed = await Order.findById(order._id);
+      emitOrderStatusUpdate(
+        canonicalOrderId,
+        {
+          status: refreshed?.status || order.status,
+          workflowStatus: refreshed?.workflowStatus || order.workflowStatus,
+        },
+        order.customer,
+        order.seller,
+        order._id,
+      );
       return handleResponse(res, 200, "Order status updated", refreshed || order);
     }
 
@@ -1140,7 +1225,7 @@ export const updateOrderStatus = async (req, res) => {
       console.warn("[updateOrderStatus] cache invalidation failed:", cacheErr.message);
     }
 
-    if (status === "confirmed" && role === "seller") {
+    if (nextStatus === "confirmed" && role === "seller") {
       // This order is now 'Automatic' for delivery partners
       emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CONFIRMED, {
         orderId: canonicalOrderId,
@@ -1150,7 +1235,7 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
-    if (status === "packed") {
+    if (nextStatus === "packed") {
       emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_PACKED, {
         orderId: canonicalOrderId,
         customerId: order.customer,
@@ -1167,7 +1252,7 @@ export const updateOrderStatus = async (req, res) => {
       }
     }
 
-    if (status === "out_for_delivery") {
+    if (nextStatus === "out_for_delivery") {
       emitNotificationEvent(NOTIFICATION_EVENTS.OUT_FOR_DELIVERY, {
         orderId: canonicalOrderId,
         customerId: order.customer,
@@ -1175,6 +1260,20 @@ export const updateOrderStatus = async (req, res) => {
         sellerId: order.seller,
         deliveryId: order.deliveryBoy,
       });
+    }
+
+    if (nextStatus || deliveryBoyId) {
+      emitOrderStatusUpdate(
+        canonicalOrderId,
+        {
+          status: order.status,
+          workflowStatus: order.workflowStatus,
+          deliveryBoyId: order.deliveryBoy || null,
+        },
+        order.customer,
+        order.seller,
+        order._id,
+      );
     }
 
     return handleResponse(res, 200, "Order status updated", order);

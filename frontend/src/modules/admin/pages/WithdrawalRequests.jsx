@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Pagination from '@shared/components/ui/Pagination';
 import { adminApi } from "../services/adminApi";
 import { toast } from "sonner";
+import { formatDate, formatDateTime } from '@shared/utils/formatDate';
 
 const WithdrawalRequests = () => {
     const [activeTab, setActiveTab] = useState('sellers');
@@ -284,7 +285,7 @@ const WithdrawalRequests = () => {
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{req.user?.phone}</span>
                                                         <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{new Date(req.createdAt).toLocaleDateString()}</span>
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{formatDate(req.createdAt)}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -387,7 +388,7 @@ const WithdrawalRequests = () => {
                                     <Badge variant={selectedRequest.status === 'Pending' ? 'warning' : 'success'}>
                                         {selectedRequest.status.toUpperCase()}
                                     </Badge>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Requested on {new Date(selectedRequest.createdAt).toLocaleString()}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Requested on {formatDateTime(selectedRequest.createdAt)}</span>
                                 </div>
                             </div>
                         </div>

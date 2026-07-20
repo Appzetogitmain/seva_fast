@@ -4,7 +4,7 @@ import CheckoutGroup from "../models/checkoutGroup.js";
 import Order from "../models/order.js";
 import User from "../models/customer.js";
 import Transaction from "../models/transaction.js";
-import Coupon from "../models/coupon.js";
+import { assertCouponUsable, syncCouponUsedCount } from "./couponUsageService.js";
 import { WORKFLOW_STATUS, DEFAULT_SELLER_TIMEOUT_MS } from "../constants/orderWorkflow.js";
 import { ORDER_PAYMENT_STATUS } from "../constants/finance.js";
 import { freezeFinancialSnapshot } from "./finance/orderFinanceService.js";
@@ -336,11 +336,12 @@ export async function placeOrderAtomic({
     const couponId = normalizedPayload.couponId || null;
     let couponCode = null;
     if (couponId) {
-      const couponDoc = await Coupon.findById(couponId)
-        .session(session)
-        .select("code")
-        .lean();
-      couponCode = couponDoc?.code || null;
+      const couponDoc = await assertCouponUsable({
+        couponId,
+        customerId,
+        session,
+      });
+      couponCode = couponDoc?.code ? String(couponDoc.code).toUpperCase() : null;
     }
 
     // 1. Fetch user and validate wallet
@@ -611,9 +612,9 @@ export async function placeOrderAtomic({
       });
     }
 
-    // Increment coupon usedCount after successful order placement (outside transaction — best effort)
+    // Sync coupon usedCount from real checkout redemptions (multi-seller = 1)
     if (couponId) {
-      Coupon.findByIdAndUpdate(couponId, { $inc: { usedCount: 1 } }).catch(() => {});
+      syncCouponUsedCount(couponId, couponCode).catch(() => {});
     }
 
     const resultPayload = buildResultPayload({

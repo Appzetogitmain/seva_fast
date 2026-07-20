@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { adminApi } from "../services/adminApi";
+import { formatDate, formatTime } from "@shared/utils/formatDate";
 
 const SORT_OPTIONS = [
   { value: "recent", label: "Newest first" },
@@ -72,19 +73,9 @@ const normalizeSeller = (seller) => {
     avgOrderValue: safeNumber(seller.avgOrderValue),
     fulfillmentRate: safeNumber(seller.fulfillmentRate),
     serviceRadius: safeNumber(seller.serviceRadius) || 5,
-    joinedDate: joinedAt
-      ? new Date(joinedAt).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : "N/A",
+    joinedDate: joinedAt ? formatDate(joinedAt) : "N/A",
     lastOrderLabel: seller.lastOrderAt
-      ? new Date(seller.lastOrderAt).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
+      ? formatDate(seller.lastOrderAt)
       : "No orders yet",
     location: seller.location || "Location not set",
     avatar:
@@ -267,10 +258,7 @@ const ActiveSellers = () => {
             <HiOutlineClock className="h-4 w-4 text-slate-500" />
             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
               {lastSyncAt
-                ? `Synced ${lastSyncAt.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}`
+                ? `Synced ${formatTime(lastSyncAt)}`
                 : "Sync pending"}
             </span>
           </div>

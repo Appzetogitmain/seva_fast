@@ -2,22 +2,9 @@ import User from "../../models/customer.js";
 import Seller from "../../models/seller.js";
 import Order from "../../models/order.js";
 import Product from "../../models/product.js";
+import { formatDate, formatDateTime } from "../../utils/formatDate.js";
 
 const DASHBOARD_CATEGORY_COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444"];
-
-const formatOrderDateTime = (value) => {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--";
-  return date.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
 
 export async function getAdminDashboardStats(assignedZones) {
   const hasZones = Array.isArray(assignedZones) && assignedZones.length > 0;
@@ -77,7 +64,7 @@ export async function getAdminDashboardStats(assignedZones) {
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
     revenueHistory.push({
-      name: d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+      name: formatDate(d),
       revenue: revenueMap.get(dateStr) || 0,
       fullDate: dateStr
     });
@@ -165,7 +152,7 @@ export async function getAdminDashboardStats(assignedZones) {
             : "warning",
       amount: `\u20B9${order.pricing.total}`,
       createdAt: order.createdAt,
-      time: formatOrderDateTime(order.createdAt),
+      time: formatDateTime(order.createdAt),
     })),
     categoryData: categoryData.map((category, index) => ({
       ...category,

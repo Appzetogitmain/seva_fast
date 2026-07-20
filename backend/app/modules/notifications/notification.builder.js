@@ -66,6 +66,13 @@ function buildAdminReturnsLink(orderId) {
     : buildAppPath("/admin/returns");
 }
 
+function buildSellerReturnsLink(orderId) {
+  const id = String(orderId || "").trim();
+  return id
+    ? buildAppPath(`/seller/returns?orderId=${encodeURIComponent(id)}`)
+    : buildAppPath("/seller/returns");
+}
+
 function buildAdminProductsLink(productId) {
   const id = String(productId || "").trim();
   return id
@@ -493,7 +500,11 @@ function eventData(eventType, payload = {}, role) {
     (eventType === NOTIFICATION_EVENTS.RETURN_REQUESTED ||
       eventType === NOTIFICATION_EVENTS.RETURN_COMPLETED)
       ? buildAdminReturnsLink(orderId)
-      : buildOrderLink(orderId);
+      : role === NOTIFICATION_ROLES.SELLER &&
+          (eventType === NOTIFICATION_EVENTS.RETURN_REQUESTED ||
+            eventType === NOTIFICATION_EVENTS.RETURN_COMPLETED)
+        ? buildSellerReturnsLink(orderId)
+        : buildOrderLink(orderId);
   return {
     eventType,
     orderId,

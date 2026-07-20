@@ -11,6 +11,7 @@ import { useLocation as useAppLocation } from '../context/LocationContext';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 import { useSettings } from '@core/context/SettingsContext';
 import Lottie from 'lottie-react';
+import { formatDate } from '@shared/utils/formatDate';
 
 const ProductDetailPage = () => {
     const { id } = useParams();
@@ -178,6 +179,12 @@ const ProductDetailPage = () => {
     const cartItem = cart.find(item => item.id === product.id);
     const quantity = cartItem ? cartItem.quantity : 0;
     const isWishlisted = isInWishlist(product.id);
+    const parsedReturnMins = parseInt(import.meta.env.VITE_RETURN_WINDOW_MINUTES || String(24 * 60), 10);
+    const returnMins = Number.isFinite(parsedReturnMins) && parsedReturnMins > 0 ? parsedReturnMins : 24 * 60;
+    const returnWindowShort =
+        returnMins >= 60 && returnMins % 60 === 0
+            ? `${returnMins / 60}h`
+            : `${returnMins} mins`;
 
     return (
         <div className="relative z-10 py-8 w-full max-w-[1920px] mx-auto px-4 md:px-[50px] animate-in fade-in duration-700 mt-24">
@@ -289,6 +296,9 @@ const ProductDetailPage = () => {
                             <span className="text-sm font-bold text-slate-400 flex items-center justify-center sm:justify-start gap-1">
                                 <Clock size={14} /> Delivered in 10-15 mins
                             </span>
+                            <span className="text-sm font-bold text-slate-400 flex items-center justify-center sm:justify-start gap-1">
+                                Easy returns within {returnWindowShort} of delivery
+                            </span>
                         </div>
                     </div>
 
@@ -392,7 +402,7 @@ const ProductDetailPage = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(review.createdAt).toLocaleDateString()}</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{formatDate(review.createdAt)}</span>
                                         </div>
                                         <p className="text-slate-600 font-medium leading-relaxed">{review.comment}</p>
                                     </div>

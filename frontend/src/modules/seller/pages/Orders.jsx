@@ -37,9 +37,10 @@ import { getLegacyStatusFromOrder } from '@/shared/utils/orderStatus';
 import { Loader2 } from 'lucide-react';
 import Pagination from '@shared/components/ui/Pagination';
 import { DatePicker } from "@/components/ui/date-picker";
-import { onSellerOrderNew } from '@core/services/orderSocket';
+import { onSellerOrderNew, onOrderStatusUpdate } from '@core/services/orderSocket';
 import { getSellerOrderEarning, getSellerEarningBreakdown, getCustomerOrderBill } from '@/shared/utils/sellerOrderEarning';
 import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
+import { formatDate, formatTime } from '@shared/utils/formatDate';
 
 
 const Orders = () => {
@@ -104,15 +105,53 @@ const Orders = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, startDate, endDate]);
 
-    // Socket listener for new orders
+    // Socket listener for new orders + live status updates
     useEffect(() => {
         const getToken = () => localStorage.getItem('auth_seller');
-        const unSub = onSellerOrderNew(getToken, (payload) => {
+        const unSubNew = onSellerOrderNew(getToken, () => {
             showToast("New order received!", "info");
             fetchOrders(page, false);
         });
+        const unSubStatus = onOrderStatusUpdate(getToken, (payload) => {
+            const orderId = payload?.orderId;
+            const ws = String(payload?.workflowStatus || "").toUpperCase();
+            let nextStatus = String(payload?.status || "").toLowerCase();
+            if (!nextStatus && ws) {
+                if (ws === "CANCELLED") nextStatus = "cancelled";
+                else if (ws === "DELIVERY_SEARCH" || ws === "SELLER_ACCEPTED" || ws === "DELIVERY_ASSIGNED") {
+                    nextStatus = "confirmed";
+                } else if (ws === "PICKUP_READY") nextStatus = "packed";
+                else if (ws === "OUT_FOR_DELIVERY") nextStatus = "out_for_delivery";
+                else if (ws === "DELIVERED") nextStatus = "delivered";
+                else if (ws === "SELLER_PENDING" || ws === "CREATED") nextStatus = "pending";
+            }
+            if (orderId && nextStatus) {
+                setOrders((prev) =>
+                    prev.map((o) =>
+                        o.id === orderId || o._id === orderId
+                            ? {
+                                ...o,
+                                status: nextStatus,
+                                workflowStatus: payload?.workflowStatus || o.workflowStatus,
+                            }
+                            : o,
+                    ),
+                );
+                setSelectedOrder((prev) =>
+                    prev && (prev.id === orderId || prev._id === orderId)
+                        ? {
+                            ...prev,
+                            status: nextStatus,
+                            workflowStatus: payload?.workflowStatus || prev.workflowStatus,
+                        }
+                        : prev,
+                );
+            }
+            fetchOrders(page, false);
+        });
         return () => {
-            if (typeof unSub === 'function') unSub();
+            if (typeof unSubNew === 'function') unSubNew();
+            if (typeof unSubStatus === 'function') unSubStatus();
         };
     }, [page, startDate, endDate]);
 
@@ -154,12 +193,8 @@ const Orders = () => {
                 status: getLegacyStatusFromOrder(order),
                 workflowStatus: order.workflowStatus,
                 workflowVersion: order.workflowVersion,
-                date: order.createdAt
-                    ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                    : '',
-                time: order.createdAt
-                    ? new Date(order.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-                    : '',
+                date: formatDate(order.createdAt, ''),
+                time: formatTime(order.createdAt, ''),
                 address: order.address
                     ? `${order.address.address || ''}, ${order.address.city || ''}`.trim()
                     : '',
@@ -582,21 +617,49 @@ const Orders = () => {
     };
 
     const handleStatusUpdate = async (orderId, newStatus) => {
+        const normalizedStatus = String(newStatus || "")
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, "_");
+        const mappedStatus =
+            normalizedStatus === "processing" || normalizedStatus === "process"
+                ? "confirmed"
+                : normalizedStatus;
+
+        const previousOrders = orders;
+        const previousSelected = selectedOrder;
+
+        // Optimistic UI update so status changes instantly without waiting for refresh.
+        setOrders((prev) =>
+            prev.map((o) => (o.id === orderId ? { ...o, status: mappedStatus } : o)),
+        );
+        if (selectedOrder && selectedOrder.id === orderId) {
+            setSelectedOrder({ ...selectedOrder, status: mappedStatus });
+        }
+
         try {
-            await sellerApi.updateOrderStatus(orderId, { status: newStatus.toLowerCase() });
-            showToast(`Order status updated to ${newStatus}`, "success");
-            fetchOrders(); // Refresh orders
-            if (selectedOrder && selectedOrder.id === orderId) {
-                setSelectedOrder({ ...selectedOrder, status: newStatus });
-            }
+            await sellerApi.updateOrderStatus(orderId, { status: mappedStatus });
+            showToast(`Order status updated to ${mappedStatus.replace(/_/g, " ")}`, "success");
+            fetchOrders(page, false);
         } catch (error) {
             console.error("Failed to update status:", error);
-            showToast("Failed to update status", "error");
+            setOrders(previousOrders);
+            setSelectedOrder(previousSelected);
+            showToast(
+                error?.response?.data?.message || "Failed to update status",
+                "error",
+            );
         }
     };
 
     const handleAssignDeliveryBoy = async (orderId, deliveryBoyId) => {
         if (!deliveryBoyId) return;
+        const current = orders.find((o) => o.id === orderId) || selectedOrder;
+        const status = String(current?.status || "").toLowerCase();
+        if (status !== "packed" && status !== "out_for_delivery") {
+            showToast("Mark order as Packed before assigning a delivery partner", "error");
+            return;
+        }
         try {
             await sellerApi.updateOrderStatus(orderId, { deliveryBoyId });
             showToast("Delivery partner assigned successfully", "success");
@@ -1028,12 +1091,12 @@ const Orders = () => {
                                                             >
                                                                 <HiOutlineEye className="h-4 w-4" />
                                                             </button>
-                                                            {order.status === 'Pending' && (
+                                                            {order.status === 'pending' && (
                                                                 <>
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            handleStatusUpdate(order.id, 'Processing');
+                                                                            handleStatusUpdate(order.id, 'confirmed');
                                                                         }}
                                                                         className="p-1.5 hover:bg-brand-50 hover:text-brand-600 rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
                                                                     >
@@ -1042,7 +1105,7 @@ const Orders = () => {
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            handleStatusUpdate(order.id, 'Cancelled');
+                                                                            handleStatusUpdate(order.id, 'cancelled');
                                                                         }}
                                                                         className="p-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
                                                                     >
@@ -1256,7 +1319,9 @@ const Orders = () => {
                                                         <p className="text-xs font-semibold text-slate-600 mt-0.5">{selectedOrder.customer.phone}</p>
                                                     </div>
                                                 </div>
-                                                {selectedOrder.status.toLowerCase() !== 'pending' && selectedOrder.status.toLowerCase() !== 'cancelled' && (
+                                                {["packed", "out_for_delivery", "delivered"].includes(
+                                                    String(selectedOrder.status || "").toLowerCase(),
+                                                ) ? (
                                                     <div>
                                                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                                                             <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
@@ -1271,27 +1336,31 @@ const Orders = () => {
                                                                         </div>
                                                                         <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Assigned</span>
                                                                     </div>
-                                                                    <div className="h-px bg-slate-200 my-1" />
-                                                                    <div className="relative">
-                                                                        <select
-                                                                            value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}
-                                                                            onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
-                                                                            className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
-                                                                        >
-                                                                            <option value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}>
-                                                                                {selectedOrder.deliveryBoy.name} ({selectedOrder.deliveryBoy.phone})
-                                                                            </option>
-                                                                            <option value="" disabled>Change Rider...</option>
-                                                                            {deliveryBoys
-                                                                                .filter(boy => (boy._id || boy.id) !== (selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id))
-                                                                                .map(boy => (
-                                                                                    <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
-                                                                                ))}
-                                                                        </select>
-                                                                        <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
-                                                                    </div>
+                                                                    {String(selectedOrder.status || "").toLowerCase() === "packed" && (
+                                                                        <>
+                                                                            <div className="h-px bg-slate-200 my-1" />
+                                                                            <div className="relative">
+                                                                                <select
+                                                                                    value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}
+                                                                                    onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
+                                                                                    className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
+                                                                                >
+                                                                                    <option value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}>
+                                                                                        {selectedOrder.deliveryBoy.name} ({selectedOrder.deliveryBoy.phone})
+                                                                                    </option>
+                                                                                    <option value="" disabled>Change Rider...</option>
+                                                                                    {deliveryBoys
+                                                                                        .filter(boy => (boy._id || boy.id) !== (selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id))
+                                                                                        .map(boy => (
+                                                                                            <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
+                                                                                        ))}
+                                                                                </select>
+                                                                                <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                                                            </div>
+                                                                        </>
+                                                                    )}
                                                                 </div>
-                                                            ) : (
+                                                            ) : String(selectedOrder.status || "").toLowerCase() === "packed" ? (
                                                                 <div className="relative">
                                                                     <select
                                                                         value=""
@@ -1309,10 +1378,25 @@ const Orders = () => {
                                                                     </select>
                                                                     <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
                                                                 </div>
+                                                            ) : (
+                                                                <p className="text-[11px] text-slate-500 font-medium">
+                                                                    No delivery partner assigned.
+                                                                </p>
                                                             )}
                                                         </div>
                                                     </div>
-                                                )}
+                                                ) : selectedOrder.status.toLowerCase() === "confirmed" ? (
+                                                    <div>
+                                                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                            <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
+                                                        </h4>
+                                                        <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 shadow-sm">
+                                                            <p className="text-[11px] text-amber-700 font-semibold">
+                                                                Mark order as <span className="font-black">Packed</span> to assign a delivery partner.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ) : null}
                                                 {selectedOrder.deliveryType === "scheduled" && (
                                                     <div>
                                                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">

@@ -32,6 +32,7 @@ const DeliveryTracking = React.lazy(() => import("../pages/DeliveryTracking"));
 const Profile = React.lazy(() => import("../pages/Profile"));
 const Withdrawals = React.lazy(() => import("../pages/Withdrawals"));
 const CustomOrders = React.lazy(() => import("../pages/CustomOrders"));
+const CodCash = React.lazy(() => import("../pages/CodCash"));
 
 const ActiveDeliveryBoys = React.lazy(
   () => import("../../admin/pages/ActiveDeliveryBoys"),
@@ -78,6 +79,11 @@ const navItems = [
   {
     label: "Earnings",
     path: "/seller/earnings",
+    icon: HiOutlineCurrencyDollar,
+  },
+  {
+    label: "COD Cash",
+    path: "/seller/cod-cash",
     icon: HiOutlineCurrencyDollar,
   },
   { label: "Profile", path: "/seller/profile", icon: HiOutlineUser },
@@ -156,6 +162,7 @@ const SellerRoutes = () => {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/earnings" element={<Earnings />} />
+        <Route path="/cod-cash" element={<CodCash />} />
         <Route path="/withdrawals" element={<Withdrawals />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/" replace />} />

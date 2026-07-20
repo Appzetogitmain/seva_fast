@@ -5,10 +5,10 @@ import {
     sendSellerSignupOtp,
     verifySellerSignupOtp,
 } from "../controller/sellerAuthController.js";
-import { getSellerProfile, updateSellerProfile, requestWithdrawal, getNearbySellers } from "../controller/sellerController.js";
+import { getSellerProfile, updateSellerProfile, requestWithdrawal, getNearbySellers, getSellerCodCashSummary, submitSellerCodCashToAdmin } from "../controller/sellerController.js";
 import { getSellerStats, getSellerEarnings } from "../controller/sellerStatsController.js";
 import { getSellerWalletSummaryController } from "../controller/adminFinanceController.js";
-import { verifyToken, allowRoles } from "../middleware/authMiddleware.js";
+import { verifyToken, allowRoles, requireApprovedSeller } from "../middleware/authMiddleware.js";
 import {
     authRouteRateLimiter,
     createContentLengthGuard,
@@ -66,5 +66,20 @@ router.get("/stats", verifyToken, allowRoles("seller"), getSellerStats);
 router.get("/earnings", verifyToken, allowRoles("seller"), getSellerEarnings);
 router.get("/wallet/summary", verifyToken, allowRoles("seller"), getSellerWalletSummaryController);
 router.post("/request-withdrawal", verifyToken, allowRoles("seller"), requestWithdrawal);
+
+router.get(
+  "/cod/summary",
+  verifyToken,
+  allowRoles("seller"),
+  requireApprovedSeller,
+  getSellerCodCashSummary,
+);
+router.post(
+  "/cod/pay",
+  verifyToken,
+  allowRoles("seller"),
+  requireApprovedSeller,
+  submitSellerCodCashToAdmin,
+);
 
 export default router;

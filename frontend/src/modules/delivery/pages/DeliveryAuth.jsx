@@ -800,9 +800,21 @@ const DeliveryAuth = () => {
 
                       <p className="text-center text-xs text-gray-400 font-semibold pt-1">
                         By joining, you agree to our{" "}
-                        <span className="text-brand-500 font-bold cursor-pointer hover:underline">Terms</span>{" "}
+                        <button
+                          type="button"
+                          onClick={() => navigate("/terms?for=delivery")}
+                          className="text-brand-500 font-bold cursor-pointer hover:underline"
+                        >
+                          Terms
+                        </button>{" "}
                         &amp;{" "}
-                        <span className="text-brand-500 font-bold cursor-pointer hover:underline">Privacy Policy</span>
+                        <button
+                          type="button"
+                          onClick={() => navigate("/privacy?for=delivery")}
+                          className="text-brand-500 font-bold cursor-pointer hover:underline"
+                        >
+                          Privacy Policy
+                        </button>
                       </p>
                     </div>
                   )}
@@ -912,8 +924,28 @@ const DeliveryAuth = () => {
                     />
                     <label htmlFor="terms" className="text-xs text-gray-500 leading-relaxed cursor-pointer">
                       I confirm my phone number is correct and I agree to the{" "}
-                      <span className="text-brand-600 font-bold">Terms of Service</span> &amp;{" "}
-                      <span className="text-brand-600 font-bold">Privacy Policy</span>.
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate("/terms?for=delivery");
+                        }}
+                        className="text-brand-600 font-bold hover:underline"
+                      >
+                        Terms of Service
+                      </button>{" "}
+                      &amp;{" "}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate("/privacy?for=delivery");
+                        }}
+                        className="text-brand-600 font-bold hover:underline"
+                      >
+                        Privacy Policy
+                      </button>
+                      .
                     </label>
                   </div>
 

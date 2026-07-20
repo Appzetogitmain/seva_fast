@@ -3,6 +3,7 @@ import Notification from "../../models/notification.js";
 import Delivery from "../../models/delivery.js";
 import { getAdminFinanceSummary } from "../finance/walletService.js";
 import { getLedgerEntries } from "../finance/ledgerService.js";
+import { formatDate, formatTime } from "../../utils/formatDate.js";
 
 export async function getAdminWalletOverview({ page, limit }) {
   const stats = await getAdminFinanceSummary();
@@ -17,11 +18,8 @@ export async function getAdminWalletOverview({ page, limit }) {
     status: entry.status,
     sender: entry.direction === "DEBIT" ? entry.actorType : "System/Order",
     recipient: entry.direction === "CREDIT" ? entry.actorType : "Platform Wallet",
-    date: new Date(entry.createdAt).toLocaleDateString(),
-    time: new Date(entry.createdAt).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    date: formatDate(entry.createdAt),
+    time: formatTime(entry.createdAt),
     notes: entry.description || entry.type,
     method: entry.paymentMode || "N/A",
   }));

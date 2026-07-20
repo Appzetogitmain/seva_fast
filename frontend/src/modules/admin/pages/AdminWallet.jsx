@@ -35,6 +35,7 @@ import Modal from '@shared/components/ui/Modal';
 import Pagination from '@shared/components/ui/Pagination';
 import { adminApi } from "../services/adminApi";
 import { toast } from "sonner";
+import { formatDate, formatTime } from '@shared/utils/formatDate';
 
 const AdminWallet = () => {
     const navigate = useNavigate();
@@ -106,8 +107,8 @@ const AdminWallet = () => {
                     status: entry.status || "COMPLETED",
                     sender: entry.direction === "DEBIT" ? (entry.actorType || "SYSTEM") : "SYSTEM",
                     recipient: entry.direction === "CREDIT" ? (entry.actorType || "SYSTEM") : "PLATFORM_WALLET",
-                    date: entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : "-",
-                    time: entry.createdAt ? new Date(entry.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-",
+                    date: entry.createdAt ? formatDate(entry.createdAt) : "-",
+                    time: entry.createdAt ? formatTime(entry.createdAt) : "-",
                     orderRef: entry.reference || entry.metadata?.orderId || "",
                     notes: [entry.reference ? `Order #${entry.reference}` : "", entry.description || entry.type].filter(Boolean).join(" — "),
                     method: entry.paymentMode || "N/A",
@@ -542,7 +543,7 @@ const AdminWallet = () => {
                                         <td className="px-6 py-4">
                                             <p className="text-sm font-black text-slate-900">#{row.orderId}</p>
                                             <p className="text-[10px] font-bold text-slate-400 mt-1">
-                                                {row.deliveredAt ? new Date(row.deliveredAt).toLocaleDateString('en-IN') : '-'}
+                                                {row.deliveredAt ? formatDate(row.deliveredAt) : '-'}
                                             </p>
                                         </td>
                                         <td className="px-4 py-4">

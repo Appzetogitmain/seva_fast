@@ -26,6 +26,7 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import { MagicCard } from '@/components/ui/magic-card';
 import { sellerApi } from '../services/sellerApi';
 import { toast } from 'sonner';
+import { formatDate, formatTime } from '@shared/utils/formatDate';
 
 const StockManagement = () => {
     const navigate = useNavigate();
@@ -429,7 +430,7 @@ const StockManagement = () => {
                                         </div>
                                         <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-slate-600">
                                             <HiOutlineCalendarDays className="h-3.5 w-3.5" />
-                                            {new Date(log.createdAt).toLocaleDateString()} • {new Date(log.createdAt).toLocaleTimeString()}
+                                            {formatDate(log.createdAt)} • {formatTime(log.createdAt)}
                                         </div>
                                     </div>
                                 </div>

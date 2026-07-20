@@ -48,6 +48,44 @@ const settingSchema = new mongoose.Schema(
         companyName: String,
         taxId: String,
         address: String,
+        termsAndConditions: {
+            type: String,
+            default: "",
+        },
+        privacyPolicy: {
+            type: String,
+            default: "",
+        },
+        sellerTermsAndConditions: {
+            type: String,
+            default: "",
+        },
+        sellerPrivacyPolicy: {
+            type: String,
+            default: "",
+        },
+        deliveryTermsAndConditions: {
+            type: String,
+            default: "",
+        },
+        deliveryPrivacyPolicy: {
+            type: String,
+            default: "",
+        },
+
+        // COD Online QR collection (shown to customer by delivery partner)
+        adminPaymentQrUrl: {
+            type: String,
+            default: "",
+        },
+        adminUpiId: {
+            type: String,
+            default: "",
+        },
+        adminUpiName: {
+            type: String,
+            default: "",
+        },
 
         // Social
         facebook: String,

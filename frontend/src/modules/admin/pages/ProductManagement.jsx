@@ -40,12 +40,15 @@ const ProductManagement = () => {
     const [filterCategory, setFilterCategory] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all'); // Added filterStatus
     const [filterApprovalStatus, setFilterApprovalStatus] = useState('all');
+    const [filterStockStatus, setFilterStockStatus] = useState('all'); // all | low | out
     const [sortBy, setSortBy] = useState('newest');
     const [moderationCounts, setModerationCounts] = useState({
         all: 0,
         pending: 0,
         approved: 0,
         rejected: 0,
+        lowStock: 0,
+        outOfStock: 0,
     });
     const [moderatingActionId, setModeratingActionId] = useState('');
 
@@ -78,6 +81,7 @@ const ProductManagement = () => {
         brand: '',
         mainImage: null,
         galleryImages: [],
+        galleryFiles: [],
         variants: [
             { id: Date.now(), name: 'Default', price: '', salePrice: '', stock: '', sku: '' }
         ]
@@ -105,6 +109,7 @@ const ProductManagement = () => {
             if (filterCategory !== 'all') params.category = filterCategory;
             if (filterStatus !== 'all') params.status = filterStatus;
             if (filterApprovalStatus !== 'all') params.approvalStatus = filterApprovalStatus;
+            if (filterStockStatus !== 'all') params.stockStatus = filterStockStatus;
             if (sortBy) params.sort = sortBy;
 
             const response = await adminApi.getProductModerationList(params);
@@ -119,6 +124,8 @@ const ProductManagement = () => {
                     pending: Number(payload?.counts?.pending || 0),
                     approved: Number(payload?.counts?.approved || 0),
                     rejected: Number(payload?.counts?.rejected || 0),
+                    lowStock: Number(payload?.counts?.lowStock || 0),
+                    outOfStock: Number(payload?.counts?.outOfStock || 0),
                 });
             }
         } catch (error) {
@@ -137,15 +144,34 @@ const ProductManagement = () => {
             fetchProducts(1);
         }, 500); // Debounce search
         return () => clearTimeout(timer);
-    }, [searchTerm, filterCategory, filterStatus, filterApprovalStatus, sortBy, pageSize]);
+    }, [searchTerm, filterCategory, filterStatus, filterApprovalStatus, filterStockStatus, sortBy, pageSize]);
 
     const handleSave = async () => {
         if (!editingItem) {
             return toast.error('Only product editing is allowed for admins');
         }
 
-        if (!formData.name || !formData.price || !formData.stock || !formData.header || !formData.categoryId) {
+        if (!formData.name || !formData.price || !formData.header || !formData.categoryId) {
             return toast.error('Please fill all required fields, including Main Group and Specific Category');
+        }
+
+        const variants = Array.isArray(formData.variants) ? formData.variants : [];
+        const syncedStock = variants.length > 0
+            ? variants.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+            : Number(formData.stock);
+
+        if (variants.length === 0 && (formData.stock === '' || formData.stock == null)) {
+            return toast.error('Please fill all required fields, including Main Group and Specific Category');
+        }
+        if (!Number.isFinite(Number(syncedStock)) || Number(syncedStock) < 0) {
+            return toast.error('Stock cannot be negative');
+        }
+        const negativeVariant = variants.find((v) => {
+            const s = Number(v.stock);
+            return v.stock !== '' && v.stock != null && (!Number.isFinite(s) || s < 0);
+        });
+        if (negativeVariant) {
+            return toast.error('Variant stock cannot be negative');
         }
 
         setIsSaving(true);
@@ -157,7 +183,7 @@ const ProductManagement = () => {
             data.append('description', formData.description);
             data.append('price', Number(formData.price));
             data.append('salePrice', Number(formData.salePrice) || 0);
-            data.append('stock', Number(formData.stock));
+            data.append('stock', Number(syncedStock) || 0);
             data.append('lowStockAlert', Number(formData.lowStockAlert) || 5);
             data.append('unit', formData.unit);
             data.append('headerId', formData.header);
@@ -173,6 +199,11 @@ const ProductManagement = () => {
             if (formData.mainImageFile) {
                 data.append('mainImage', formData.mainImageFile);
             }
+            // Kept remote gallery URLs (after any deletes) + only remaining new files
+            const keptGalleryUrls = (formData.galleryImages || []).filter(
+                (url) => typeof url === 'string' && /^https?:\/\//i.test(url),
+            );
+            data.append('existingGalleryImages', JSON.stringify(keptGalleryUrls));
             if (formData.galleryFiles && formData.galleryFiles.length > 0) {
                 formData.galleryFiles.forEach((file) => data.append('galleryImages', file));
             }
@@ -284,6 +315,24 @@ const ProductManagement = () => {
         });
     };
 
+    const removeGalleryImageAt = (index) => {
+        const images = formData.galleryImages || [];
+        const files = formData.galleryFiles || [];
+        // New File objects are always appended after existing remote URLs.
+        const existingCount = Math.max(0, images.length - files.length);
+        const nextImages = images.filter((_, i) => i !== index);
+        let nextFiles = files;
+        if (index >= existingCount) {
+            const fileIndex = index - existingCount;
+            nextFiles = files.filter((_, i) => i !== fileIndex);
+        }
+        setFormData({
+            ...formData,
+            galleryImages: nextImages,
+            galleryFiles: nextFiles,
+        });
+    };
+
     const openModal = (item = null) => {
         if (item) {
             setFormData({
@@ -293,7 +342,9 @@ const ProductManagement = () => {
                 description: item.description || '',
                 price: item.price || '',
                 salePrice: item.salePrice || item.discountPrice || '',
-                stock: item.stock || '',
+                stock: Array.isArray(item.variants) && item.variants.length > 0
+                    ? item.variants.reduce((sum, v) => sum + (Number(v?.stock) || 0), 0)
+                    : (item.stock || ''),
                 lowStockAlert: item.lowStockAlert || 5,
                 unit: item.unit || 'packet',
                 header: item.headerId?._id || item.headerId || '',
@@ -305,7 +356,9 @@ const ProductManagement = () => {
                 weight: item.weight || '',
                 brand: item.brand || '',
                 mainImage: item.mainImage || null,
+                mainImageFile: null,
                 galleryImages: item.galleryImages || item.images || [],
+                galleryFiles: [],
                 variants: (item.variants && item.variants.length > 0) ? item.variants.map(v => ({ ...v, id: v._id || Date.now() })) : [
                     {
                         id: Date.now(),
@@ -324,7 +377,7 @@ const ProductManagement = () => {
                 salePrice: '', stock: '', lowStockAlert: 5, unit: 'packet',
                 header: '', categoryId: '', subcategoryId: '', status: 'active',
                 isFeatured: false, tags: '', weight: '', brand: '',
-                mainImage: null, galleryImages: [],
+                mainImage: null, mainImageFile: null, galleryImages: [], galleryFiles: [],
                 variants: [
                     { id: Date.now(), name: 'Default', price: '', salePrice: '', stock: '', sku: '' }
                 ]
@@ -336,16 +389,32 @@ const ProductManagement = () => {
     };
 
     const productsList = Array.isArray(products) ? products : [];
-    const stats = useMemo(() => ({
-        total: total,
-        lowStock: productsList.filter(p => p.stock > 0 && p.stock <= 10).length,
-        outOfStock: productsList.filter(p => p.stock === 0).length,
-        active: productsList.filter(p => p.status === 'active').length
-    }), [productsList, total]);
 
-    const StatusBadge = ({ status, stock }) => {
+    const resolveLowStockThreshold = (product) => {
+        const parsed = Number(product?.lowStockAlert);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
+    };
+
+    /** Prefer sum of variant stocks when variants exist — top-level stock can be stale. */
+    const getEffectiveProductStock = (product) => {
+        const variants = Array.isArray(product?.variants) ? product.variants : [];
+        if (variants.length > 0) {
+            return variants.reduce((sum, v) => sum + (Number(v?.stock) || 0), 0);
+        }
+        const top = Number(product?.stock);
+        return Number.isFinite(top) ? top : 0;
+    };
+
+    const stats = useMemo(() => ({
+        total: moderationCounts.all || total,
+        lowStock: moderationCounts.lowStock,
+        outOfStock: moderationCounts.outOfStock,
+        active: productsList.filter(p => p.status === 'active').length,
+    }), [moderationCounts, productsList, total]);
+
+    const StatusBadge = ({ status, stock, lowStockAlert = 5 }) => {
         if (stock === 0) return <Badge variant="error" className="text-[10px] px-1.5 py-0">Out of Stock</Badge>;
-        if (stock <= 10) return <Badge variant="warning" className="text-[10px] px-1.5 py-0">Low Stock</Badge>;
+        if (stock > 0 && stock <= lowStockAlert) return <Badge variant="warning" className="text-[10px] px-1.5 py-0">Low Stock</Badge>;
         if (status === 'active') return <Badge variant="success" className="text-[10px] px-1.5 py-0">Active</Badge>;
         return <Badge variant="gray" className="text-[10px] px-1.5 py-0">Draft</Badge>;
     };
@@ -374,26 +443,62 @@ const ProductManagement = () => {
                 </div>
             </div>
 
-            {/* Quick Stats */}
+            {/* Quick Stats — click Low/Out to filter the list */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'All Items', val: stats.total, icon: HiOutlineCube, color: 'text-brand-600', bg: 'bg-brand-50' },
-                    { label: 'Active Items', val: stats.active, icon: HiOutlineCheckCircle, color: 'text-brand-600', bg: 'bg-brand-50' },
-                    { label: 'Low Stock', val: stats.lowStock, icon: HiOutlineExclamationCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
-                    { label: 'Out of Stock', val: stats.outOfStock, icon: HiOutlineArchiveBox, color: 'text-rose-600', bg: 'bg-rose-50' }
-                ].map((stat, i) => (
-                    <Card key={i} className="border-none shadow-sm ring-1 ring-slate-100 p-4 relative overflow-hidden group">
-                        <div className="flex items-center gap-3">
-                            <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300", stat.bg, stat.color)}>
-                                <stat.icon className="h-5 w-5" />
+                    { key: 'all', label: 'All Items', val: stats.total, icon: HiOutlineCube, color: 'text-brand-600', bg: 'bg-brand-50', stockFilter: 'all', clearOnly: true },
+                    { key: 'active', label: 'Active Items', val: stats.active, icon: HiOutlineCheckCircle, color: 'text-brand-600', bg: 'bg-brand-50', stockFilter: null },
+                    { key: 'low', label: 'Low Stock', val: stats.lowStock, icon: HiOutlineExclamationCircle, color: 'text-amber-600', bg: 'bg-amber-50', stockFilter: 'low' },
+                    { key: 'out', label: 'Out of Stock', val: stats.outOfStock, icon: HiOutlineArchiveBox, color: 'text-rose-600', bg: 'bg-rose-50', stockFilter: 'out' },
+                ].map((stat) => {
+                    const isClickable = stat.stockFilter !== null;
+                    const isActive = !stat.clearOnly && isClickable && filterStockStatus === stat.stockFilter;
+                    return (
+                        <Card
+                            key={stat.key}
+                            role={isClickable ? 'button' : undefined}
+                            tabIndex={isClickable ? 0 : undefined}
+                            onClick={() => {
+                                if (!isClickable) return;
+                                if (stat.clearOnly) {
+                                    setFilterStockStatus('all');
+                                    return;
+                                }
+                                setFilterStockStatus((prev) =>
+                                    prev === stat.stockFilter ? 'all' : stat.stockFilter
+                                );
+                            }}
+                            onKeyDown={(e) => {
+                                if (!isClickable) return;
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    if (stat.clearOnly) {
+                                        setFilterStockStatus('all');
+                                        return;
+                                    }
+                                    setFilterStockStatus((prev) =>
+                                        prev === stat.stockFilter ? 'all' : stat.stockFilter
+                                    );
+                                }
+                            }}
+                            className={cn(
+                                "border-none shadow-sm ring-1 p-4 relative overflow-hidden group transition-all",
+                                isClickable && "cursor-pointer hover:shadow-md",
+                                isActive ? "ring-2 ring-offset-1 ring-slate-900" : "ring-slate-100"
+                            )}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300", stat.bg, stat.color)}>
+                                    <stat.icon className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <p className="ds-label">{stat.label}</p>
+                                    <h4 className="ds-stat-medium">{stat.val}</h4>
+                                </div>
                             </div>
-                            <div>
-                                <p className="ds-label">{stat.label}</p>
-                                <h4 className="ds-stat-medium">{stat.val}</h4>
-                            </div>
-                        </div>
-                    </Card>
-                ))}
+                        </Card>
+                    );
+                })}
             </div>
 
             <Card className="border-none shadow-sm ring-1 ring-slate-100 p-3 bg-white/60 backdrop-blur-xl">
@@ -423,66 +528,93 @@ const ProductManagement = () => {
 
             {/* Toolbox */}
             <Card className="border-none shadow-sm ring-1 ring-slate-100 p-3 bg-white/60 backdrop-blur-xl">
-                <div className="flex flex-col lg:flex-row gap-3 items-center">
-                    <div className="relative flex-1 group w-full">
-                        <HiOutlineMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-all" />
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search by name, SKU or slug..."
-                            className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 border-none rounded-xl text-xs font-semibold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/5 transition-all outline-none"
-                        />
-                    </div>
-                    <div className="flex gap-2 shrink-0 w-full lg:w-auto">
-                        <select
-                            value={filterCategory}
-                            onChange={(e) => setFilterCategory(e.target.value)}
-                            className="flex-1 lg:flex-none px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary/5 outline-none appearance-none cursor-pointer"
-                        >
-                            <option value="all">All Categories</option>
-                            {categories.map(h => (
-                                <optgroup key={h._id} label={h.name}>
-                                    <option value={h._id}>All {h.name}</option>
-                                    {(h.children || []).map(c => (
-                                        <option key={c._id} value={c._id}>{c.name}</option>
-                                    ))}
-                                </optgroup>
-                            ))}
-                        </select>
-                        <button
-                            onClick={() => {
-                                const nextStatus = filterStatus === 'all' ? 'active' : filterStatus === 'active' ? 'inactive' : 'all';
-                                setFilterStatus(nextStatus);
-                            }}
-                            className={cn(
-                                "flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
-                                filterStatus === 'active' ? "bg-brand-500 text-primary-foreground shadow-md shadow-brand-100" :
-                                    filterStatus === 'inactive' ? "bg-amber-500 text-white shadow-md shadow-amber-100" :
-                                        "bg-white ring-1 ring-slate-200 text-slate-600 hover:bg-slate-50"
-                            )}
+                <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap gap-2">
+                        {[
+                            { key: 'all', label: 'Show All', activeClass: 'bg-slate-900 text-white' },
+                            { key: 'active', label: 'Show Live', activeClass: 'bg-emerald-600 text-white' },
+                            { key: 'inactive', label: 'Show Draft', activeClass: 'bg-amber-600 text-white' },
+                        ].map((item) => (
+                            <button
+                                key={item.key}
+                                type="button"
+                                onClick={() => setFilterStatus(item.key)}
+                                className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all whitespace-nowrap",
+                                    filterStatus === item.key
+                                        ? cn(item.activeClass, "shadow-md")
+                                        : "bg-white ring-1 ring-slate-200 text-slate-700 hover:bg-slate-50"
+                                )}
                             >
-                            <HiOutlineFunnel className="h-4 w-4" />
-                            <span>
-                                {filterStatus === 'active' ? 'ONLY LIVE' :
-                                    filterStatus === 'inactive' ? 'ONLY DRAFT' :
-                                        'SHOW ALL'}
-                            </span>
-                        </button>
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="flex-1 lg:flex-none px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary/5 outline-none appearance-none cursor-pointer"
-                        >
-                            <option value="newest">Newest first</option>
-                            <option value="oldest">Oldest first</option>
-                            <option value="name-asc">Name A-Z</option>
-                            <option value="name-desc">Name Z-A</option>
-                            <option value="price-asc">Price Low-High</option>
-                            <option value="price-desc">Price High-Low</option>
-                            <option value="stock-asc">Stock Low-High</option>
-                            <option value="stock-desc">Stock High-Low</option>
-                        </select>
+                                <HiOutlineFunnel className="h-3.5 w-3.5 shrink-0" />
+                                <span>{item.label}</span>
+                            </button>
+                        ))}
+                        <span className="hidden sm:inline-block w-px self-stretch bg-slate-200 mx-0.5" aria-hidden />
+                        {[
+                            { key: 'low', label: 'Low Stock', count: moderationCounts.lowStock, activeClass: 'bg-amber-600 text-white' },
+                            { key: 'out', label: 'Out of Stock', count: moderationCounts.outOfStock, activeClass: 'bg-rose-600 text-white' },
+                        ].map((item) => (
+                            <button
+                                key={item.key}
+                                type="button"
+                                onClick={() =>
+                                    setFilterStockStatus((prev) => (prev === item.key ? 'all' : item.key))
+                                }
+                                className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all whitespace-nowrap",
+                                    filterStockStatus === item.key
+                                        ? cn(item.activeClass, "shadow-md")
+                                        : "bg-white ring-1 ring-slate-200 text-slate-700 hover:bg-slate-50"
+                                )}
+                            >
+                                <HiOutlineFunnel className="h-3.5 w-3.5 shrink-0" />
+                                <span>{item.label} ({item.count})</span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+                        <div className="relative flex-1 group w-full min-w-0">
+                            <HiOutlineMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-all" />
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search by name, SKU or slug..."
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 border-none rounded-xl text-xs font-semibold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/5 transition-all outline-none"
+                            />
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full lg:w-auto">
+                            <select
+                                value={filterCategory}
+                                onChange={(e) => setFilterCategory(e.target.value)}
+                                className="w-full sm:flex-1 lg:w-auto min-w-0 px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary/5 outline-none appearance-none cursor-pointer"
+                            >
+                                <option value="all">All Categories</option>
+                                {categories.map(h => (
+                                    <optgroup key={h._id} label={h.name}>
+                                        <option value={h._id}>All {h.name}</option>
+                                        {(h.children || []).map(c => (
+                                            <option key={c._id} value={c._id}>{c.name}</option>
+                                        ))}
+                                    </optgroup>
+                                ))}
+                            </select>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="w-full sm:flex-1 lg:w-auto min-w-0 px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary/5 outline-none appearance-none cursor-pointer"
+                            >
+                                <option value="newest">Newest first</option>
+                                <option value="oldest">Oldest first</option>
+                                <option value="name-asc">Name A-Z</option>
+                                <option value="name-desc">Name Z-A</option>
+                                <option value="price-asc">Price Low-High</option>
+                                <option value="price-desc">Price High-Low</option>
+                                <option value="stock-asc">Stock Low-High</option>
+                                <option value="stock-desc">Stock High-Low</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </Card>
@@ -606,7 +738,11 @@ const ProductManagement = () => {
                                     {/* Status Column */}
                                     <td className="px-4 py-5 text-center align-middle whitespace-nowrap">
                                         <div className="flex flex-col items-center gap-1">
-                                            <StatusBadge status={p.status} stock={p.stock} />
+                                            <StatusBadge
+                                                status={p.status}
+                                                stock={getEffectiveProductStock(p)}
+                                                lowStockAlert={resolveLowStockThreshold(p)}
+                                            />
                                             <ApprovalBadge approvalStatus={p.approvalStatus} />
                                         </div>
                                     </td>
@@ -614,22 +750,26 @@ const ProductManagement = () => {
                                     {/* Actions Column */}
                                     <td className="px-4 py-5 text-center align-middle">
                                         <div className="flex items-center justify-center gap-2">
-                                            <button
-                                                onClick={() => handleModerationAction(p, 'approve')}
-                                                disabled={moderatingActionId === `approve:${p._id}`}
-                                                className="flex h-9 w-9 shrink-0 items-center justify-center hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all text-slate-400 shadow-sm ring-1 ring-slate-100 disabled:opacity-60"
-                                                title="Approve product"
-                                            >
-                                                <HiOutlineCheckCircle className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleModerationAction(p, 'reject')}
-                                                disabled={moderatingActionId === `reject:${p._id}`}
-                                                className="flex h-9 w-9 shrink-0 items-center justify-center hover:bg-amber-50 hover:text-amber-600 rounded-xl transition-all text-slate-400 shadow-sm ring-1 ring-slate-100 disabled:opacity-60"
-                                                title="Reject product"
-                                            >
-                                                <HiOutlineXMark className="h-4 w-4" />
-                                            </button>
+                                            {String(p.approvalStatus || "approved").toLowerCase() !== "approved" && (
+                                                <button
+                                                    onClick={() => handleModerationAction(p, 'approve')}
+                                                    disabled={moderatingActionId === `approve:${p._id}`}
+                                                    className="flex h-9 w-9 shrink-0 items-center justify-center hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all text-slate-400 shadow-sm ring-1 ring-slate-100 disabled:opacity-60"
+                                                    title="Approve product"
+                                                >
+                                                    <HiOutlineCheckCircle className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                            {String(p.approvalStatus || "approved").toLowerCase() !== "rejected" && (
+                                                <button
+                                                    onClick={() => handleModerationAction(p, 'reject')}
+                                                    disabled={moderatingActionId === `reject:${p._id}`}
+                                                    className="flex h-9 w-9 shrink-0 items-center justify-center hover:bg-amber-50 hover:text-amber-600 rounded-xl transition-all text-slate-400 shadow-sm ring-1 ring-slate-100 disabled:opacity-60"
+                                                    title="Reject product"
+                                                >
+                                                    <HiOutlineXMark className="h-4 w-4" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => openModal(p)}
                                                 className="flex h-9 w-9 shrink-0 items-center justify-center hover:bg-white hover:text-primary rounded-xl transition-all text-slate-400 shadow-sm ring-1 ring-slate-100"
@@ -923,11 +1063,25 @@ const ProductManagement = () => {
                                                                 <label className="ml-1 text-[8px] font-bold uppercase tracking-widest text-slate-400">Stock</label>
                                                                 <input
                                                                     type="number"
+                                                                    min={0}
+                                                                    step={1}
+                                                                    inputMode="numeric"
                                                                     value={v.stock}
+                                                                    onKeyDown={(e) => {
+                                                                        if (['-', '+', 'e', 'E', '.'].includes(e.key)) e.preventDefault();
+                                                                    }}
                                                                     onChange={e => {
                                                                         const news = [...formData.variants];
-                                                                        news[i].stock = e.target.value;
-                                                                        setFormData({ ...formData, variants: news });
+                                                                        const raw = e.target.value;
+                                                                        if (raw === '') {
+                                                                            news[i].stock = '';
+                                                                        } else {
+                                                                            const n = Number(raw);
+                                                                            news[i].stock = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+                                                                        }
+                                                                        // Keep product-level stock in sync with first variant when present
+                                                                        const nextStock = i === 0 ? news[i].stock : formData.stock;
+                                                                        setFormData({ ...formData, variants: news, stock: nextStock });
                                                                     }}
                                                                     placeholder="50"
                                                                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none ring-0 focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
@@ -1009,10 +1163,7 @@ const ProductManagement = () => {
                                                                 <img src={image} alt={`Gallery ${index + 1}`} className="h-full w-full object-cover" />
                                                                 <button
                                                                     type="button"
-                                                                    onClick={() => setFormData({
-                                                                        ...formData,
-                                                                        galleryImages: formData.galleryImages.filter((_, i) => i !== index)
-                                                                    })}
+                                                                    onClick={() => removeGalleryImageAt(index)}
                                                                     className="absolute top-2 right-2 p-2 rounded-full bg-white/90 text-rose-500 shadow-md opacity-0 group-hover:opacity-100 transition-all"
                                                                 >
                                                                     <HiOutlineTrash className="h-4 w-4" />

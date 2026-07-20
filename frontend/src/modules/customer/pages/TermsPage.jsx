@@ -1,16 +1,29 @@
 import React from 'react';
 import { ChevronLeft, ScrollText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettings } from '@core/context/SettingsContext';
+import {
+    getLegalAudienceLabel,
+    getLegalContent,
+    isHtmlLegalContent,
+    normalizeLegalAudience,
+    splitLegalParagraphs,
+} from '@/shared/utils/legalContent';
+import { formatDate } from '@shared/utils/formatDate';
 
 const TermsPage = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { settings } = useSettings();
+    const audience = normalizeLegalAudience(searchParams.get('for') || searchParams.get('audience'));
+    const audienceLabel = getLegalAudienceLabel(audience);
     const appName = settings?.appName || 'App';
     const companyName = settings?.companyName || appName;
+    const adminTerms = getLegalContent(settings, audience, 'terms');
+    const updatedAt = settings?.updatedAt ? formatDate(settings.updatedAt, null) : null;
+
     return (
         <div className="min-h-screen bg-slate-50 font-sans pb-10">
-            {/* Header */}
             <div className="bg-white sticky top-0 z-30 px-4 py-3 flex items-center gap-1 shadow-sm">
                 <button
                     onClick={() => navigate(-1)}
@@ -28,40 +41,37 @@ const TermsPage = () => {
                             <ScrollText size={24} />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-slate-800">Terms of Use</h2>
-                            <p className="text-xs text-slate-500 font-medium">Last updated: Oct 2025</p>
+                            <h2 className="text-xl font-bold text-slate-800">{audienceLabel} Terms of Use</h2>
+                            <p className="text-xs text-slate-500 font-medium">
+                                {updatedAt ? `Last updated: ${updatedAt}` : `Published by ${companyName}`}
+                            </p>
                         </div>
                     </div>
 
                     <div className="prose prose-slate prose-sm max-w-none text-slate-600 space-y-4">
-                        <p>
-                            Welcome to {appName}. By accessing or using our mobile application and services, you agree to be bound by these Terms and Conditions.
-                        </p>
-
-                        <h3 className="text-slate-800 font-bold text-base mt-6">1. Acceptance of Terms</h3>
-                        <p>
-                            By creating an account or using our services, you agree to comply with these terms. If you do not agree, you may not use our services.
-                        </p>
-
-                        <h3 className="text-slate-800 font-bold text-base mt-6">2. Use of Service</h3>
-                        <p>
-                            You must be at least 18 years old to use our services. You agree to provide accurate information during registration and to keep your account secure.
-                        </p>
-
-                        <h3 className="text-slate-800 font-bold text-base mt-6">3. Orders and Payments</h3>
-                        <p>
-                            All orders are subject to availability. Prices are subject to change without notice. We reserve the right to cancel orders at our discretion.
-                        </p>
-
-                        <h3 className="text-slate-800 font-bold text-base mt-6">4. Intellectual Property</h3>
-                        <p>
-                            All content, trademarks, and data on this app are the property of {companyName} and are protected by law.
-                        </p>
-
-                        <h3 className="text-slate-800 font-bold text-base mt-6">5. Termination</h3>
-                        <p>
-                            We reserve the right to end or suspend your account at any time for violation of these terms.
-                        </p>
+                        {adminTerms ? (
+                            isHtmlLegalContent(adminTerms) ? (
+                                <div
+                                    className="whitespace-pre-wrap leading-relaxed [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-bold [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                                    dangerouslySetInnerHTML={{ __html: adminTerms }}
+                                />
+                            ) : (
+                                splitLegalParagraphs(adminTerms).map((para, idx) => (
+                                    <p key={idx} className="whitespace-pre-wrap leading-relaxed">
+                                        {para}
+                                    </p>
+                                ))
+                            )
+                        ) : (
+                            <>
+                                <p>
+                                    Welcome to {appName}. By accessing or using our {audienceLabel.toLowerCase()} services, you agree to be bound by these Terms and Conditions.
+                                </p>
+                                <p className="text-slate-400 italic">
+                                    Detailed {audienceLabel.toLowerCase()} terms have not been published by the admin yet. Please check back later or contact support.
+                                </p>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -70,4 +80,3 @@ const TermsPage = () => {
 };
 
 export default TermsPage;
-

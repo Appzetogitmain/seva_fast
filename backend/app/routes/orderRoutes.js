@@ -23,7 +23,11 @@ import {
 } from "../controller/orderController.js";
 import {
   createOrderWithFinancialSnapshot,
+  chooseCodCollectMethodController,
+  getCodPaymentQrController,
+  handoffCodCashToSellerController,
   markCodCollectedAfterDelivery,
+  markCodOnlinePaidController,
   markOrderDeliveredAndSettle,
   previewCheckoutFinance,
   reconcileCodCashSubmission,
@@ -83,6 +87,34 @@ router.post(
   allowRoles("delivery", "admin"),
   requireApprovedDelivery,
   markCodCollectedAfterDelivery,
+);
+router.post(
+  "/:id/cod/choose-method",
+  verifyToken,
+  allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
+  chooseCodCollectMethodController,
+);
+router.get(
+  "/:id/cod/payment-qr",
+  verifyToken,
+  allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
+  getCodPaymentQrController,
+);
+router.post(
+  "/:id/cod/mark-online-paid",
+  verifyToken,
+  allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
+  markCodOnlinePaidController,
+);
+router.post(
+  "/:id/cod/handoff-to-seller",
+  verifyToken,
+  allowRoles("delivery", "admin"),
+  requireApprovedDelivery,
+  handoffCodCashToSellerController,
 );
 router.post(
   "/:id/delivered",

@@ -124,7 +124,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       >
         <CalendarIcon className="mr-2 h-3.5 w-3.5 text-slate-400" />
         {value && selectedDate
-          ? format(selectedDate, "dd MMM yyyy")
+          ? format(selectedDate, "dd/MM/yyyy")
           : placeholder}
       </Button>
       {open && (

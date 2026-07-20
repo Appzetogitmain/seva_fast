@@ -1,6 +1,34 @@
 import Coupon from "../models/coupon.js";
 import handleResponse from "../utils/helper.js";
 import Order from "../models/order.js";
+import {
+    countCouponRedemptions,
+    getCouponRedemptionCounts,
+    resolveUsedCount,
+} from "../services/couponUsageService.js";
+
+function sanitizeCouponNumericFields(data) {
+    const fieldsMinZero = ["discountValue", "minOrderValue", "maxDiscount", "usageLimit", "minItems", "monthlyVolumeThreshold"];
+    for (const key of fieldsMinZero) {
+        if (data[key] === undefined || data[key] === null || data[key] === "") continue;
+        const num = Number(data[key]);
+        if (!Number.isFinite(num) || num < 0) {
+            return { _error: `${key} cannot be negative` };
+        }
+        data[key] = num;
+    }
+    if (data.perUserLimit !== undefined && data.perUserLimit !== null && data.perUserLimit !== "") {
+        const perUser = Number(data.perUserLimit);
+        if (!Number.isFinite(perUser) || perUser < 1) {
+            return { _error: "perUserLimit must be at least 1" };
+        }
+        data.perUserLimit = perUser;
+    }
+    if (data.discountType === "percentage" && Number(data.discountValue) > 100) {
+        return { _error: "Percentage discount cannot exceed 100" };
+    }
+    return data;
+}
 
 export const listCoupons = async (req, res) => {
     try {
@@ -13,20 +41,40 @@ export const listCoupons = async (req, res) => {
             query.validFrom = { $lte: now };
             query.validTill = { $gte: now };
         } else if (status === "expired") {
-            query.$or = [{ isActive: false }, { validTill: { $lt: new Date() } }];
+            query.validTill = { $lt: new Date() };
         }
 
         if (search) {
             const term = search.trim();
-            query.$or = [
+            const searchOr = [
                 { code: { $regex: term, $options: "i" } },
                 { title: { $regex: term, $options: "i" } },
                 { description: { $regex: term, $options: "i" } },
             ];
+            // Combine with existing filters without wiping status conditions
+            query.$and = [...(query.$and || []), { $or: searchOr }];
         }
 
         const coupons = await Coupon.find(query).sort({ createdAt: -1 }).lean();
-        return handleResponse(res, 200, "Coupons fetched successfully", coupons);
+        const counts = await getCouponRedemptionCounts(coupons);
+        const withUsage = coupons.map((coupon) => ({
+            ...coupon,
+            usedCount: resolveUsedCount(coupon, counts),
+        }));
+
+        // Keep stored usedCount in sync with real checkout redemptions
+        await Promise.all(
+            withUsage
+                .filter((coupon, index) => Number(coupon.usedCount) !== Number(coupons[index].usedCount || 0))
+                .map((coupon) =>
+                    Coupon.updateOne(
+                        { _id: coupon._id },
+                        { $set: { usedCount: coupon.usedCount } }
+                    ).catch(() => null)
+                )
+        );
+
+        return handleResponse(res, 200, "Coupons fetched successfully", withUsage);
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }
@@ -34,7 +82,10 @@ export const listCoupons = async (req, res) => {
 
 export const createCoupon = async (req, res) => {
     try {
-        const data = { ...req.body };
+        const data = sanitizeCouponNumericFields({ ...req.body });
+        if (data._error) {
+            return handleResponse(res, 400, data._error);
+        }
         const coupon = await Coupon.create(data);
         return handleResponse(res, 201, "Coupon created successfully", coupon);
     } catch (error) {
@@ -48,7 +99,10 @@ export const createCoupon = async (req, res) => {
 export const updateCoupon = async (req, res) => {
     try {
         const { id } = req.params;
-        const data = { ...req.body };
+        const data = sanitizeCouponNumericFields({ ...req.body });
+        if (data._error) {
+            return handleResponse(res, 400, data._error);
+        }
         const coupon = await Coupon.findByIdAndUpdate(id, data, {
             new: true,
             runValidators: true,
@@ -65,7 +119,13 @@ export const updateCoupon = async (req, res) => {
 export const deleteCoupon = async (req, res) => {
     try {
         const { id } = req.params;
-        await Coupon.findByIdAndDelete(id);
+        if (!id || id === "undefined" || id === "null") {
+            return handleResponse(res, 400, "Valid coupon id is required");
+        }
+        const coupon = await Coupon.findByIdAndDelete(id);
+        if (!coupon) {
+            return handleResponse(res, 404, "Coupon not found");
+        }
         return handleResponse(res, 200, "Coupon deleted successfully");
     } catch (error) {
         return handleResponse(res, 500, error.message);
@@ -91,12 +151,13 @@ export const validateCoupon = async (req, res) => {
             return handleResponse(res, 400, "This coupon is not active");
         }
 
-        // Usage limits (overall)
-        if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+        // Usage limits (overall) — count checkout groups, not raw order rows
+        const totalUsed = await countCouponRedemptions({ coupon });
+        if (coupon.usageLimit && totalUsed >= coupon.usageLimit) {
             return handleResponse(res, 400, "This coupon has reached its usage limit");
         }
 
-        // Per-user limit & monthly volume – basic implementation
+        // Per-user limit & monthly volume
         let userUsageCount = 0;
         let monthlyVolume = 0;
         if (customerId) {
@@ -104,6 +165,7 @@ export const validateCoupon = async (req, res) => {
             const userOrders = await Order.find({
                 customer: customerId,
                 createdAt: { $gte: monthStart, $lte: now },
+                status: { $nin: ["cancelled", "declined"] },
             }).lean();
 
             monthlyVolume = userOrders.reduce(
@@ -111,13 +173,22 @@ export const validateCoupon = async (req, res) => {
                 0
             );
 
-            // We are not storing coupon reference on order yet, so this is a soft check.
-            // Once couponId gets stored on orders, we can count exact usages.
-            userUsageCount = 0;
+            userUsageCount = await countCouponRedemptions({
+                coupon,
+                customerId,
+            });
         }
 
-        if (coupon.perUserLimit && userUsageCount >= coupon.perUserLimit) {
-            return handleResponse(res, 400, "You have already used this coupon");
+        if (coupon.perUserLimit && customerId && userUsageCount >= coupon.perUserLimit) {
+            return handleResponse(
+                res,
+                400,
+                `You can use this coupon only ${coupon.perUserLimit} time${coupon.perUserLimit > 1 ? "s" : ""}`
+            );
+        }
+
+        if (!customerId && coupon.perUserLimit) {
+            // Soft warning path: still allow preview, but frontend should send customerId when logged in
         }
 
         if (
@@ -202,6 +273,10 @@ export const validateCoupon = async (req, res) => {
             code: coupon.code,
             discountAmount,
             freeDelivery,
+            usedCount: totalUsed,
+            usageLimit: coupon.usageLimit || null,
+            perUserLimit: coupon.perUserLimit || null,
+            userUsageCount,
         });
     } catch (error) {
         return handleResponse(res, 500, error.message);

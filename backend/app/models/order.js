@@ -260,10 +260,24 @@ const orderSchema = new mongoose.Schema(
       codMarkedCollected: { type: Boolean, default: false },
       deliveredSettlementApplied: { type: Boolean, default: false },
       sellerPayoutQueued: { type: Boolean, default: false },
+      sellerPayoutHeld: { type: Boolean, default: false },
       riderPayoutQueued: { type: Boolean, default: false },
       adminEarningCredited: { type: Boolean, default: false },
       cashbackCredited: { type: Boolean, default: false },
       levelCommissionCredited: { type: Boolean, default: false },
+      slabCommissionsDistributed: { type: Boolean, default: false },
+      // COD dual collect flow
+      codCollectMethod: {
+        type: String,
+        enum: ["none", "online_qr", "cash"],
+        default: "none",
+      },
+      codOnlinePaid: { type: Boolean, default: false },
+      codCashWithRider: { type: Boolean, default: false },
+      codCashWithSeller: { type: Boolean, default: false },
+      codCashRemittedToAdmin: { type: Boolean, default: false },
+      codWalletsPending: { type: Boolean, default: false },
+      returnPickupCommissionPaid: { type: Boolean, default: false },
     },
     status: {
       type: String,
@@ -487,6 +501,8 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.index({ status: 1, seller: 1, deliveryBoy: 1, createdAt: -1 });
 orderSchema.index({ customer: 1, status: 1, createdAt: -1 });
+orderSchema.index({ couponId: 1, status: 1, customer: 1 });
+orderSchema.index({ couponCode: 1, status: 1, customer: 1 });
 orderSchema.index({ status: 1, expiresAt: 1 });
 orderSchema.index({ seller: 1, returnStatus: 1, returnRequestedAt: -1 });
 orderSchema.index({ workflowStatus: 1, sellerPendingExpiresAt: 1 });

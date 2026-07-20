@@ -175,6 +175,23 @@ const CustomerAuth = () => {
                 return;
             }
 
+            if (
+                !isLogin &&
+                (status === 409 || errorCode === 'ACCOUNT_ALREADY_EXISTS')
+            ) {
+                toast.error(
+                    error?.response?.data?.message ||
+                        'An account already exists with this number. Please login.',
+                );
+                setShowOtp(false);
+                setIsLogin(true);
+                navigate('/login', {
+                    replace: true,
+                    state: { phone: formData.phone },
+                });
+                return;
+            }
+
             toast.error(error?.response?.data?.message || 'Failed to send OTP. Please check your number.');
         } finally {
             setIsLoading(false);

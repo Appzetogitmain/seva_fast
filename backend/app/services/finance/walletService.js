@@ -211,17 +211,14 @@ export async function getAdminFinanceSummary() {
         { $match: { status: { $in: [PAYOUT_STATUS.PENDING, PAYOUT_STATUS.PROCESSING] } } },
         { $group: { _id: "$payoutType", amount: { $sum: "$amount" } } },
       ]),
-      // System Float (COD) should reflect "cash owed to the system" for COD orders, even before delivery.
-      // - After cash is marked collected, we use the persisted `codPendingAmount` (net of remittances).
-      // - Before collection, we estimate float from the order snapshot as: grandTotal - riderPayoutTotal.
-      // This matches the admin UI expectation: show exposure as soon as a COD order is placed,
-      // and reduce to 0 once the rider remits full amount.
+      // System Float (COD): only after delivery. Undelivered COD must not move any wallet/float numbers.
+      // - After cash is marked collected, use persisted `codPendingAmount` (net of remittances).
+      // - After delivery but before collection, estimate: grandTotal - riderPayoutTotal.
       Order.aggregate([
         {
           $match: {
             paymentMode: "COD",
-            status: { $ne: "cancelled" },
-            orderStatus: { $ne: "cancelled" },
+            status: "delivered",
           },
         },
         {
@@ -255,14 +252,24 @@ export async function getAdminFinanceSummary() {
           },
         },
       ]),
-      // Total Platform Earning card (UI label: "Total money collected") should reflect total checkout
-      // value placed by customers across COD + ONLINE orders (regardless of remittance/capture).
-      // This updates immediately on order placement.
+      // Total money collected / available-balance base:
+      // - ONLINE: only paid/captured orders
+      // - COD: only delivered orders (no wallet impact before delivery)
       Order.aggregate([
         {
           $match: {
             status: { $ne: "cancelled" },
             orderStatus: { $ne: "cancelled" },
+            $or: [
+              {
+                paymentMode: "ONLINE",
+                paymentStatus: ORDER_PAYMENT_STATUS.PAID,
+              },
+              {
+                paymentMode: "COD",
+                status: "delivered",
+              },
+            ],
           },
         },
         {
@@ -284,10 +291,8 @@ export async function getAdminFinanceSummary() {
     pendingPayouts.find((row) => row._id === PAYOUT_TYPE.DELIVERY_PARTNER)?.amount || 0;
 
   const totalPlatformEarning = roundCurrency(platformGross[0]?.amount || 0);
-  // "Available Balance" in the admin wallet UI is treated as a business-level net balance:
-  // total checkout value placed by customers minus pending payout liabilities.
-  // This makes the number update immediately on order placement (COD + ONLINE) and
-  // automatically decreases as seller/rider payout requests are queued.
+  // Available Balance = recognized checkout value minus pending payout liabilities.
+  // COD is recognized only after delivery, so undelivered COD cannot inflate this.
   const availableBalanceVirtual = roundCurrency(
     Math.max(
       totalPlatformEarning - roundCurrency(sellerPendingPayouts) - roundCurrency(riderPendingPayouts),

@@ -139,6 +139,17 @@ export async function issueCustomerOtp({
     }
   }
 
+  if (flow === "signup" && customer?.isVerified) {
+    otpAuditLog("customer_otp_signup_account_exists", {
+      phone: maskPhone(phone),
+      ipAddress,
+    });
+    const err = new Error("An account already exists with this number. Please login.");
+    err.statusCode = 409;
+    err.code = "ACCOUNT_ALREADY_EXISTS";
+    throw err;
+  }
+
   if (!customer) {
     let referredBy = null;
     if (referralCode) {

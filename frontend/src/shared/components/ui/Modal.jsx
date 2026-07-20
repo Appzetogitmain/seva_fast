@@ -8,8 +8,11 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
+import { useLockBodyScroll } from '@/shared/hooks/useLockBodyScroll';
 
 const Modal = ({ isOpen, onClose, title, children, footer, size = 'md' }) => {
+    useLockBodyScroll(Boolean(isOpen));
+
     const sizes = {
         sm: 'sm:max-w-md',
         md: 'sm:max-w-lg',
@@ -46,4 +49,3 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'md' }) => {
 };
 
 export default Modal;
-

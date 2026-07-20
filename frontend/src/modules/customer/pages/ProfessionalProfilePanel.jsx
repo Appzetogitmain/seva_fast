@@ -23,6 +23,7 @@ import {
     Upload
 } from 'lucide-react';
 import { useSettings } from '@core/context/SettingsContext';
+import { formatDate } from '@shared/utils/formatDate';
 
 const ProfessionalProfilePanel = () => {
     const { showToast } = useToast();
@@ -775,7 +776,7 @@ const ProfessionalProfilePanel = () => {
                                     <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ad Subscription Status</span>
                                     <h3 className="text-lg font-black text-slate-900 capitalize">{ad.paymentStatus}</h3>
                                     {ad.expiresAt && ad.paymentStatus === 'paid' && (
-                                        <p className="text-xs font-semibold text-slate-400">Expires on: {new Date(ad.expiresAt).toLocaleDateString()}</p>
+                                        <p className="text-xs font-semibold text-slate-400">Expires on: {formatDate(ad.expiresAt)}</p>
                                     )}
                                 </div>
                             </div>

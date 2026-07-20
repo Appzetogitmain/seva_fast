@@ -42,8 +42,10 @@ const AdminSettings = () => {
     const [activeTab, setActiveTab] = useState('general');
     const [logoUploading, setLogoUploading] = useState(false);
     const [faviconUploading, setFaviconUploading] = useState(false);
+    const [qrUploading, setQrUploading] = useState(false);
     const logoInputRef = useRef(null);
     const faviconInputRef = useRef(null);
+    const qrInputRef = useRef(null);
 
     const [settings, setSettings] = useState({
         appName: '',
@@ -84,6 +86,9 @@ const AdminSettings = () => {
         platformAdListingFee: 999,
         professionalAdValidityDays: 30,
         professionalAdSearchRadiusKm: 15,
+        adminPaymentQrUrl: '',
+        adminUpiId: '',
+        adminUpiName: '',
     });
 
     useEffect(() => {
@@ -209,9 +214,36 @@ const AdminSettings = () => {
         }
     };
 
+    const handlePaymentQrUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select an image file (PNG, JPG, etc.)', 'error');
+            return;
+        }
+        setQrUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('image', file);
+            const res = await adminApi.uploadSettingsImage(fd, 'payment-qr');
+            const url = res.data?.result?.url || res.data?.url;
+            if (url) {
+                handleInputChange('adminPaymentQrUrl', url);
+                showToast('Payment QR uploaded. Click Save Changes to apply.', 'success');
+            } else throw new Error('No URL returned');
+        } catch (err) {
+            console.error(err);
+            showToast(err.response?.data?.message || 'Failed to upload payment QR', 'error');
+        } finally {
+            setQrUploading(false);
+            e.target.value = '';
+        }
+    };
+
     const tabs = [
         { id: 'general', label: 'General', icon: Settings },
         { id: 'branding', label: 'Branding', icon: Globe },
+        { id: 'payments', label: 'COD Payments', icon: CreditCard },
         { id: 'legal', label: 'Legal & Contact', icon: Building2 },
         { id: 'pricing', label: 'Advertising Pricing', icon: CreditCard },
         { id: 'social', label: 'Social & Apps', icon: Share2 },
@@ -528,6 +560,78 @@ const AdminSettings = () => {
                         </Card>
                     )}
 
+                    {/* COD Payment QR */}
+                    {activeTab === 'payments' && (
+                        <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
+                            <div className="p-6 border-b border-slate-50 bg-slate-50/30">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
+                                    Admin COD Payment QR
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Riders show this QR when customer pays COD online via UPI.
+                                </p>
+                            </div>
+                            <div className="p-8 space-y-6">
+                                <input type="file" ref={qrInputRef} accept="image/*" className="hidden" onChange={handlePaymentQrUpload} />
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Payment QR Image</label>
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => !qrUploading && qrInputRef.current?.click()}
+                                        onKeyDown={(e) => e.key === 'Enter' && !qrUploading && qrInputRef.current?.click()}
+                                        className={cn(
+                                            "h-56 w-full max-w-sm rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all group overflow-hidden cursor-pointer",
+                                            settings.adminPaymentQrUrl ? "border-slate-200 bg-slate-50/50" : "border-slate-200 hover:border-brand-500/50 hover:bg-brand-50/10"
+                                        )}
+                                    >
+                                        {qrUploading ? (
+                                            <Loader2 className="h-10 w-10 text-brand-600 animate-spin" />
+                                        ) : settings.adminPaymentQrUrl ? (
+                                            <img src={settings.adminPaymentQrUrl} alt="Admin payment QR" className="h-full w-full object-contain p-4" />
+                                        ) : (
+                                            <>
+                                                <Upload className="h-8 w-8 text-slate-300 group-hover:text-brand-500" />
+                                                <span className="text-xs font-bold text-slate-400">Upload QR Code</span>
+                                            </>
+                                        )}
+                                    </div>
+                                    {settings.adminPaymentQrUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleInputChange('adminPaymentQrUrl', '')}
+                                            className="text-xs font-bold text-red-500 flex items-center gap-1"
+                                        >
+                                            <X className="h-3 w-3" /> Remove QR
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">UPI ID</label>
+                                        <input
+                                            type="text"
+                                            value={settings.adminUpiId || ''}
+                                            onChange={(e) => handleInputChange('adminUpiId', e.target.value)}
+                                            placeholder="admin@upi"
+                                            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-brand-200"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">UPI Display Name</label>
+                                        <input
+                                            type="text"
+                                            value={settings.adminUpiName || ''}
+                                            onChange={(e) => handleInputChange('adminUpiName', e.target.value)}
+                                            placeholder="Platform Admin"
+                                            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-brand-200"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+
                     {/* Legal Settings */}
                     {activeTab === 'legal' && (
                         <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
@@ -573,7 +677,7 @@ const AdminSettings = () => {
                                     </div>
                                 </div>
 
-                                {/* Return delivery commission input moved to Fees & Charges → Delivery Fee Settings */}
+                                {/* Legal documents moved to sidebar → Legal Documents */}
                             </div>
                         </Card>
                     )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axiosInstance from "@core/api/axios";
 import { toast } from "sonner";
 import { HiOutlinePhotograph, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineClock } from "react-icons/hi";
+import { formatDate } from "@shared/utils/formatDate";
 
 const CustomOrders = () => {
     const [orders, setOrders] = useState([]);
@@ -106,7 +107,7 @@ const CustomOrders = () => {
                                 )}
                                 
                                 <p className="text-xs text-gray-400 mb-4 text-right">
-                                    Received: {new Date(order.createdAt).toLocaleDateString()}
+                                    Received: {formatDate(order.createdAt)}
                                 </p>
 
                                 <div className="grid grid-cols-2 gap-2">

@@ -19,6 +19,37 @@ import { toast } from "sonner";
 import IconSelector from "@shared/components/IconSelector";
 import Pagination from "@shared/components/ui/Pagination";
 import { getIconSvg } from "@shared/constants/categoryIcons";
+import { useLockBodyScroll, preventBackdropScroll } from "@/shared/hooks/useLockBodyScroll";
+
+const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+
+const isValidHexColor = (value) => HEX_COLOR_RE.test(String(value || "").trim());
+
+/** Letters, numbers, spaces, and hyphens only — no special characters. */
+const CATEGORY_NAME_RE = /^[a-zA-Z0-9\s-]+$/;
+
+const isValidCategoryName = (value) => {
+  const name = String(value || "").trim();
+  if (!name) return false;
+  return CATEGORY_NAME_RE.test(name);
+};
+
+/** Native <input type="color"> only accepts #rrggbb — expand #rgb when valid. */
+const toColorInputValue = (value, fallback) => {
+  const raw = String(value || "").trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(raw)) return raw;
+  if (/^#[0-9A-Fa-f]{3}$/.test(raw)) {
+    const [, r, g, b] = raw;
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return fallback;
+};
+
+const HEADER_COLOR_FIELDS = [
+  { key: "headerColor", label: "Header Background" },
+  { key: "headerFontColor", label: "Title/Text Color" },
+  { key: "headerIconColor", label: "Active Tab / Icon Color" },
+];
 
 // MUI icon library (shared with customer app & icon selector)
 import HomeIcon from "@mui/icons-material/Home";
@@ -84,7 +115,12 @@ const HeaderCategories = () => {
 
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [colorErrors, setColorErrors] = useState({});
+  const [nameError, setNameError] = useState("");
   const fileInputRef = useRef(null);
+
+  const isAnyModalOpen = isAddModalOpen || isDeleteModalOpen || isIconSelectorOpen;
+  useLockBodyScroll(isAnyModalOpen);
 
   // Map our icon ids to MUI icon components so admin UI
   // previews the same icons used in the customer app.
@@ -172,10 +208,74 @@ const HeaderCategories = () => {
     }
   };
 
+  const handleNameChange = (value) => {
+    setFormData((prev) => ({
+      ...prev,
+      name: value,
+      slug: makeSlug(value),
+    }));
+    const trimmed = String(value || "").trim();
+    if (!trimmed) {
+      setNameError("Name is required");
+    } else if (!isValidCategoryName(trimmed)) {
+      setNameError("Name cannot contain special characters. Use letters, numbers, spaces, or hyphens only.");
+    } else {
+      setNameError("");
+    }
+  };
+
+  const setColorField = (key, value) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+    setColorErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      if (isValidHexColor(value)) delete next[key];
+      else next[key] = "Enter a valid hex color (e.g. #FF1E1E or #F00)";
+      return next;
+    });
+  };
+
+  const validateHeaderColors = () => {
+    const nextErrors = {};
+    for (const { key, label } of HEADER_COLOR_FIELDS) {
+      const value = String(formData[key] || "").trim();
+      if (!value) {
+        nextErrors[key] = `${label} is required`;
+      } else if (!isValidHexColor(value)) {
+        nextErrors[key] = `Invalid hex for ${label}. Use #RGB or #RRGGBB`;
+      }
+    }
+    setColorErrors(nextErrors);
+    return nextErrors;
+  };
+
   const handleSave = async () => {
-    if (!formData.name || !formData.slug) {
+    const trimmedName = String(formData.name || "").trim();
+    if (!trimmedName || !formData.slug) {
+      if (!trimmedName) setNameError("Name is required");
       toast.error("Name and slug are required");
       return;
+    }
+    if (!isValidCategoryName(trimmedName)) {
+      const msg =
+        "Name cannot contain special characters. Use letters, numbers, spaces, or hyphens only.";
+      setNameError(msg);
+      toast.error(msg);
+      return;
+    }
+    setNameError("");
+
+    const hexErrors = validateHeaderColors();
+    if (Object.keys(hexErrors).length > 0) {
+      const first = Object.values(hexErrors)[0];
+      toast.error(first || "Please fix invalid hex color codes");
+      return;
+    }
+
+    // Normalize to uppercase #RRGGBB / #RGB for consistent storage
+    const normalizedColors = {};
+    for (const { key } of HEADER_COLOR_FIELDS) {
+      normalizedColors[key] = String(formData[key]).trim().toUpperCase();
     }
 
     setIsSaving(true);
@@ -187,6 +287,10 @@ const HeaderCategories = () => {
         if (key === "type") return;
         if (key === "adminCommission" || key === "handlingFees") {
           data.append(key, formData[key] === "" ? "0" : String(formData[key]));
+          return;
+        }
+        if (normalizedColors[key]) {
+          data.append(key, normalizedColors[key]);
           return;
         }
         data.append(key, formData[key]);
@@ -207,10 +311,22 @@ const HeaderCategories = () => {
       }
       setIsAddModalOpen(false);
       setEditingItem(null);
+      setColorErrors({});
       fetchCategories(page);
     } catch (error) {
       console.error(error);
-      toast.error(editingItem ? "Failed to update" : "Failed to create");
+      const msg =
+        error?.response?.data?.message ||
+        (editingItem ? "Failed to update" : "Failed to create");
+      const normalized = String(msg).toLowerCase();
+      if (
+        normalized.includes("already exist") ||
+        normalized.includes("slug already") ||
+        normalized.includes("duplicate")
+      ) {
+        setNameError(msg);
+      }
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
@@ -232,6 +348,8 @@ const HeaderCategories = () => {
 
   const openAddModal = () => {
     setEditingItem(null);
+    setColorErrors({});
+    setNameError("");
     setFormData({
       name: "",
       slug: "",
@@ -253,6 +371,8 @@ const HeaderCategories = () => {
 
   const openEditModal = (item) => {
     setEditingItem(item);
+    setColorErrors({});
+    setNameError("");
     setFormData({
       name: item.name,
       slug: item.slug,
@@ -457,14 +577,22 @@ const HeaderCategories = () => {
         </div>
       </Card>
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal — z above Topbar (z-200) so navbar is covered */}
       <AnimatePresence>
         {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onWheel={preventBackdropScroll}
+            onTouchMove={preventBackdropScroll}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setIsAddModalOpen(false);
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
               className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
               <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
                 <h2 className="text-lg font-bold text-gray-900">
@@ -566,28 +694,27 @@ const HeaderCategories = () => {
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
-                        value={formData.headerColor || "#FF1E1E"}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            headerColor: e.target.value,
-                          })
-                        }
+                        value={toColorInputValue(formData.headerColor, "#FF1E1E")}
+                        onChange={(e) => setColorField("headerColor", e.target.value)}
                         className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer bg-transparent p-0 overflow-hidden shrink-0"
                       />
                       <input
                         type="text"
-                        value={formData.headerColor || "#FF1E1E"}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            headerColor: e.target.value,
-                          })
-                        }
-                        className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        value={formData.headerColor || ""}
+                        onChange={(e) => setColorField("headerColor", e.target.value)}
+                        className={cn(
+                          "flex-1 px-3 py-2 rounded-lg border text-xs font-mono focus:outline-none focus:ring-2",
+                          colorErrors.headerColor
+                            ? "border-rose-400 focus:ring-rose-500/20"
+                            : "border-gray-300 focus:ring-brand-500/20",
+                        )}
                         placeholder="#FF1E1E"
+                        aria-invalid={Boolean(colorErrors.headerColor)}
                       />
                     </div>
+                    {colorErrors.headerColor && (
+                      <p className="text-[11px] font-semibold text-rose-600">{colorErrors.headerColor}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -599,28 +726,27 @@ const HeaderCategories = () => {
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
-                        value={formData.headerFontColor || "#FFFFFF"}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            headerFontColor: e.target.value,
-                          })
-                        }
+                        value={toColorInputValue(formData.headerFontColor, "#FFFFFF")}
+                        onChange={(e) => setColorField("headerFontColor", e.target.value)}
                         className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer bg-transparent p-0 overflow-hidden shrink-0"
                       />
                       <input
                         type="text"
-                        value={formData.headerFontColor || "#FFFFFF"}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            headerFontColor: e.target.value,
-                          })
-                        }
-                        className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        value={formData.headerFontColor || ""}
+                        onChange={(e) => setColorField("headerFontColor", e.target.value)}
+                        className={cn(
+                          "flex-1 px-3 py-2 rounded-lg border text-xs font-mono focus:outline-none focus:ring-2",
+                          colorErrors.headerFontColor
+                            ? "border-rose-400 focus:ring-rose-500/20"
+                            : "border-gray-300 focus:ring-brand-500/20",
+                        )}
                         placeholder="#FFFFFF"
+                        aria-invalid={Boolean(colorErrors.headerFontColor)}
                       />
                     </div>
+                    {colorErrors.headerFontColor && (
+                      <p className="text-[11px] font-semibold text-rose-600">{colorErrors.headerFontColor}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -632,28 +758,27 @@ const HeaderCategories = () => {
                     <div className="flex items-center gap-2">
                       <input
                         type="color"
-                        value={formData.headerIconColor || "#111111"}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            headerIconColor: e.target.value,
-                          })
-                        }
+                        value={toColorInputValue(formData.headerIconColor, "#111111")}
+                        onChange={(e) => setColorField("headerIconColor", e.target.value)}
                         className="w-10 h-10 rounded-lg border border-gray-300 cursor-pointer bg-transparent p-0 overflow-hidden shrink-0"
                       />
                       <input
                         type="text"
-                        value={formData.headerIconColor || "#111111"}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            headerIconColor: e.target.value,
-                          })
-                        }
-                        className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        value={formData.headerIconColor || ""}
+                        onChange={(e) => setColorField("headerIconColor", e.target.value)}
+                        className={cn(
+                          "flex-1 px-3 py-2 rounded-lg border text-xs font-mono focus:outline-none focus:ring-2",
+                          colorErrors.headerIconColor
+                            ? "border-rose-400 focus:ring-rose-500/20"
+                            : "border-gray-300 focus:ring-brand-500/20",
+                        )}
                         placeholder="#111111"
+                        aria-invalid={Boolean(colorErrors.headerIconColor)}
                       />
                     </div>
+                    {colorErrors.headerIconColor && (
+                      <p className="text-[11px] font-semibold text-rose-600">{colorErrors.headerIconColor}</p>
+                    )}
                   </div>
                 </div>
 
@@ -664,16 +789,19 @@ const HeaderCategories = () => {
                   <input
                     type="text"
                     value={formData.name}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        name: e.target.value,
-                        slug: makeSlug(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    className={cn(
+                      "w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2",
+                      nameError
+                        ? "border-rose-400 focus:ring-rose-500/20"
+                        : "border-gray-300 focus:ring-brand-500/20 focus:border-brand-500",
+                    )}
                     placeholder="e.g., Electronics"
+                    aria-invalid={Boolean(nameError)}
                   />
+                  {nameError && (
+                    <p className="text-[11px] font-semibold text-rose-600">{nameError}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -777,7 +905,11 @@ const HeaderCategories = () => {
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {isDeleteModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onWheel={preventBackdropScroll}
+            onTouchMove={preventBackdropScroll}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}

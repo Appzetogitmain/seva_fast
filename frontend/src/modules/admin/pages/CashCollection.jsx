@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatDateTime, isSameCalendarDay } from '@shared/utils/formatDate';
 
 const CashCollection = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -119,10 +120,7 @@ const CashCollection = () => {
     const stats = {
         totalInHand: (ridersCashData || []).reduce((acc, r) => acc + (r.currentCash || 0), 0),
         overLimitCount: (ridersCashData || []).filter(r => (r.currentCash || 0) >= (r.limit || 5000)).length,
-        todaySettled: (historyData || []).filter(h => {
-            const today = new Date().toLocaleDateString();
-            return new Date(h.date).toLocaleDateString() === today;
-        }).reduce((acc, h) => acc + (h.amount || 0), 0),
+        todaySettled: (historyData || []).filter(h => isSameCalendarDay(h.date)).reduce((acc, h) => acc + (h.amount || 0), 0),
         avgBalance: (ridersCashData || []).length ? (ridersCashData || []).reduce((acc, r) => acc + (r.currentCash || 0), 0) / ridersCashData.length : 0
     };
 
@@ -316,7 +314,7 @@ const CashCollection = () => {
                                                 <Clock className="h-3.5 w-3.5 text-slate-400" />
                                                 <span className="text-xs">
                                                     {rider.lastSettlement !== 'Never'
-                                                        ? new Date(rider.lastSettlement).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                                        ? formatDateTime(rider.lastSettlement)
                                                         : 'No History'}
                                                 </span>
                                             </div>
@@ -367,7 +365,7 @@ const CashCollection = () => {
                                             </Badge>
                                         </td>
                                         <td className="px-6 py-5 text-right pr-8 text-xs font-bold text-slate-500">
-                                            {new Date(log.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                            {formatDateTime(log.date)}
                                         </td>
                                     </tr>
                                 ))}
@@ -456,7 +454,7 @@ const CashCollection = () => {
                                                 <div>
                                                     <p className="text-xs font-black text-slate-900">{item.reference || item.id}</p>
                                                     <p className="text-[9px] font-bold text-slate-400 uppercase">
-                                                        {new Date(item.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                        {formatDateTime(item.createdAt)}
                                                     </p>
                                                 </div>
                                             </div>

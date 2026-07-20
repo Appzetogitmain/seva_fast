@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence, useAnimation, useDragControls } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { X, ChevronDown, Share2, Heart, Search, Clock, Minus, Plus, ShoppingBag, Star, MessageSquare, ArrowLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronDown, Share2, Heart, Search, Clock, Minus, Plus, ShoppingBag, Star, MessageSquare, ArrowLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { useProductDetail } from '../../context/ProductDetailContext';
 import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
@@ -12,6 +12,7 @@ import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 import { customerApi } from '../../services/customerApi';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import { formatDate } from '@shared/utils/formatDate';
 import {
   effectiveUnitPrice,
   resolveDisplayedProductPrice,
@@ -686,6 +687,17 @@ const ProductDetailSheet = () => {
                                                 </div>
                                             </AccordionItem>
 
+                                            <AccordionItem
+                                                id="returns"
+                                                title="Return Policy"
+                                                icon={<RotateCcw size={16} />}
+                                            >
+                                                <p className="text-[13px] text-slate-500 font-medium leading-relaxed">
+                                                    Request a return from your order details page within the return window after delivery.
+                                                    Items should be unused and in original condition with accessories.
+                                                </p>
+                                            </AccordionItem>
+
                                             {/* Customer Reviews */}
                                             <AccordionItem 
                                                 id="reviews" 
@@ -746,7 +758,7 @@ const ProductDetailSheet = () => {
                                                                                 <div className="flex gap-0.5">{[...Array(5)].map((_, i) => <Star key={i} size={9} className={cn(i < r.rating ? 'text-primary fill-primary' : 'text-slate-200')} />)}</div>
                                                                             </div>
                                                                         </div>
-                                                                        <span className="text-[10px] font-bold text-slate-400">{new Date(r.createdAt).toLocaleDateString()}</span>
+                                                                        <span className="text-[10px] font-bold text-slate-400">{formatDate(r.createdAt)}</span>
                                                                     </div>
                                                                     <p className="text-[12px] text-slate-600 font-medium leading-relaxed pl-10">{r.comment}</p>
                                                                 </div>
@@ -980,6 +992,17 @@ const ProductDetailSheet = () => {
                                         </div>
                                     </AccordionItem>
 
+                                    <AccordionItem
+                                        id="returns"
+                                        title="Return Policy"
+                                        icon={<RotateCcw size={18} strokeWidth={2.5} />}
+                                    >
+                                        <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                                            Request a return from your order details page within the return window after delivery.
+                                            Items should be unused and in original condition with accessories.
+                                        </p>
+                                    </AccordionItem>
+
                                     {/* Customer Reviews */}
                                     <AccordionItem 
                                         id="reviews" 
@@ -1036,7 +1059,7 @@ const ProductDetailSheet = () => {
                                                                         <div className="flex gap-0.5">{[...Array(5)].map((_, i) => <Star key={i} size={10} className={cn(i < r.rating ? 'text-primary fill-primary' : 'text-slate-200')} />)}</div>
                                                                     </div>
                                                                 </div>
-                                                                <span className="text-[10px] font-bold text-slate-400">{new Date(r.createdAt).toLocaleDateString()}</span>
+                                                                <span className="text-[10px] font-bold text-slate-400">{formatDate(r.createdAt)}</span>
                                                             </div>
                                                             <p className="text-xs text-slate-600 font-medium leading-relaxed pl-10">{r.comment}</p>
                                                         </div>

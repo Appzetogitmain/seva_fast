@@ -2,18 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownLeft, ChevronLeft, Wallet } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
-
-const formatDate = (d) => {
-    if (!d) return '';
-    const date = new Date(d);
-    const now = new Date();
-    const today = now.toDateString();
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === today) return `Today, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    if (date.toDateString() === yesterday.toDateString()) return `Yesterday, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ', ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
+import { formatDateTime } from '@shared/utils/formatDate';
 
 const WalletPage = () => {
     const navigate = useNavigate();
@@ -93,7 +82,7 @@ const WalletPage = () => {
                                         </div>
                                         <div>
                                             <h4 className="font-semibold text-slate-800 text-sm">{tx.title}</h4>
-                                            <p className="text-[11px] text-slate-500">{formatDate(tx.date)}</p>
+                                            <p className="text-[11px] text-slate-500">{formatDateTime(tx.date)}</p>
                                             {tx.orderId && (
                                                 <p className="text-[10px] text-slate-500">#{tx.orderId}</p>
                                             )}

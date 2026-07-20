@@ -43,6 +43,7 @@ import {
   onReturnDropOtp,
 } from "@/core/services/orderSocket";
 import { getLegacyStatusFromOrder } from "@/shared/utils/orderStatus";
+import { formatTime } from "@shared/utils/formatDate";
 
 const coordsToLatLng = (coords) => {
   if (!Array.isArray(coords) || coords.length < 2) return null;
@@ -79,11 +80,7 @@ const distanceMeters = (from, to) => {
   return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const formatArrivalTime = (arrivalMs) =>
-  new Date(arrivalMs).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+const formatArrivalTime = (arrivalMs) => formatTime(arrivalMs);
 
 const formatArrivingIn = (minutes) => {
   if (!Number.isFinite(minutes) || minutes < 0) return "Soon";
@@ -410,7 +407,8 @@ const OrderDetailPage = () => {
     }
 
     const calculateCountdown = () => {
-      if (order.status !== "delivered") {
+      const legacyStatus = getLegacyStatusFromOrder(order);
+      if (legacyStatus !== "delivered" && String(order.status || "").toLowerCase() !== "delivered") {
         setReturnCountdown(null);
         return;
       }
@@ -637,32 +635,45 @@ const OrderDetailPage = () => {
     );
   }
 
-  const canRequestReturn = () => {
-    if (!order) return false;
-    if (order.status === "cancelled") return false;
-    if (order.status !== "delivered") return false;
-    if (
-      returnDetails &&
-      returnDetails.returnStatus &&
-      returnDetails.returnStatus !== "none" &&
-      returnDetails.returnStatus !== null
-    ) {
-      return false;
-    }
+  const activeReturnStatus =
+    (returnDetails?.returnStatus && returnDetails.returnStatus !== "none"
+      ? returnDetails.returnStatus
+      : null) ||
+    (order?.returnStatus && order.returnStatus !== "none" ? order.returnStatus : null);
 
+  const isOrderDelivered = order
+    ? getLegacyStatusFromOrder(order) === "delivered" ||
+      String(order.status || "").toLowerCase() === "delivered"
+    : false;
+
+  const getReturnWindowBounds = () => {
     const eligibleAtMs = returnDetails?.returnEligibleAt
       ? new Date(returnDetails.returnEligibleAt).getTime()
-      : order.returnEligibleAt
+      : order?.returnEligibleAt
         ? new Date(order.returnEligibleAt).getTime()
-        : new Date(order.deliveredAt || order.createdAt).getTime();
+        : new Date(order?.deliveredAt || order?.createdAt || Date.now()).getTime();
     const expiresAtMs = returnDetails?.returnWindowExpiresAt
       ? new Date(returnDetails.returnWindowExpiresAt).getTime()
-      : order.returnWindowExpiresAt
+      : order?.returnWindowExpiresAt
         ? new Date(order.returnWindowExpiresAt).getTime()
         : eligibleAtMs + returnWindowMinutes * 60 * 1000;
+    return { eligibleAtMs, expiresAtMs };
+  };
+
+  const canRequestReturn = () => {
+    if (!order) return false;
+    if (getLegacyStatusFromOrder(order) === "cancelled") return false;
+    if (!isOrderDelivered) return false;
+    if (activeReturnStatus) return false;
+
+    const { eligibleAtMs, expiresAtMs } = getReturnWindowBounds();
     const now = Date.now();
     return now >= eligibleAtMs && now <= expiresAtMs;
   };
+
+  const showReturnSection =
+    Boolean(activeReturnStatus) ||
+    (isOrderDelivered && getLegacyStatusFromOrder(order) !== "cancelled");
 
   const toggleItemSelection = (index) => {
     setSelectedReturnItems((prev) => {
@@ -1304,8 +1315,8 @@ const OrderDetailPage = () => {
           </button>
         </motion.div>
 
-        {/* Return Section - Only if applicable */}
-        {(canRequestReturn() || (returnDetails && returnDetails.returnStatus && returnDetails.returnStatus !== "none")) && (
+        {/* Return Section — show for delivered orders and any active return */}
+        {showReturnSection && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1316,22 +1327,29 @@ const OrderDetailPage = () => {
               <h3 className="text-base font-bold text-slate-800">
                 Return & Refund
               </h3>
-              {canRequestReturn() && returnCountdown !== 0 && (
+              {canRequestReturn() && returnCountdown && returnCountdown !== 0 && (
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-bold ring-1 ring-amber-200">
                   <Clock size={12} />
                   Ends in {returnCountdown}
                 </div>
               )}
+              {!canRequestReturn() &&
+                !activeReturnStatus &&
+                typeof returnCountdown === "string" &&
+                returnCountdown.startsWith("Available") && (
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold ring-1 ring-slate-200">
+                  <Clock size={12} />
+                  {returnCountdown}
+                </div>
+              )}
             </div>
 
-            {returnDetails &&
-              returnDetails.returnStatus &&
-              returnDetails.returnStatus !== "none" ? (
+            {activeReturnStatus ? (
               <div className="space-y-4 text-sm">
-                <ReturnProgressTracker returnStatus={returnDetails.returnStatus} />
+                <ReturnProgressTracker returnStatus={activeReturnStatus} />
 
                 {/* Return OTP Display for Customer if pickup is assigned */}
-                {returnDetails.returnStatus === "return_pickup_assigned" && (
+                {activeReturnStatus === "return_pickup_assigned" && (
                   <div className="bg-brand-50 rounded-2xl p-4 border border-brand-100">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center">
@@ -1358,22 +1376,26 @@ const OrderDetailPage = () => {
                   </div>
                 )}
 
-                {returnDetails.returnStatus === "return_rejected" && (
+                {activeReturnStatus === "return_rejected" && (
                   <p className="text-sm text-rose-600 font-medium bg-rose-50 p-3 rounded-xl border border-rose-100">
                     Return request rejected:{" "}
-                    {returnDetails.returnRejectedReason || "No reason provided"}
+                    {returnDetails?.returnRejectedReason || order.returnRejectedReason || "No reason provided"}
                   </p>
                 )}
-                {returnDetails.returnRefundAmount > 0 &&
-                  returnDetails.returnStatus === "refund_completed" && (
+                {(returnDetails?.returnRefundAmount > 0 || order.returnRefundAmount > 0) &&
+                  activeReturnStatus === "refund_completed" && (
                     <div className="bg-brand-50 p-4 rounded-2xl border border-brand-100">
                       <p className="text-xs font-bold text-brand-800 uppercase tracking-wider mb-1">Refund Successful</p>
                       <p className="text-sm text-brand-700 font-medium">
-                        ₹{returnDetails.returnRefundAmount} has been credited to your {order.paymentMethod === 'cod' ? 'hand (Cash)' : 'wallet'}.
+                        ₹{returnDetails?.returnRefundAmount || order.returnRefundAmount} has been credited to your {order.paymentMethod === 'cod' ? 'hand (Cash)' : 'wallet'}.
                       </p>
                     </div>
                   )}
               </div>
+            ) : returnCountdown === 0 ? (
+              <p className="text-sm text-slate-500 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                The return window for this order has ended.
+              </p>
             ) : (
               <p className="text-sm text-slate-500 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
                 You can request a return within the first {returnWindowLabel} after delivery.

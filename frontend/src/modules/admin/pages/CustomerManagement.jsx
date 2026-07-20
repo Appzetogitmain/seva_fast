@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import Pagination from '@shared/components/ui/Pagination';
 import { adminApi } from '../services/adminApi';
 import { toast } from 'sonner';
+import { isSameCalendarDay } from '@shared/utils/formatDate';
 
 const CustomerManagement = () => {
     const navigate = useNavigate();
@@ -75,11 +76,7 @@ const CustomerManagement = () => {
         return {
             total: total,
             active: safeCustomers.filter(c => c.status === 'active').length,
-            newToday: safeCustomers.filter(c => {
-                const today = new Date().toISOString().split('T')[0];
-                const joined = new Date(c.joinedDate).toISOString().split('T')[0];
-                return joined === today;
-            }).length
+            newToday: safeCustomers.filter(c => isSameCalendarDay(c.joinedDate)).length
         };
     }, [customers, total]);
 
@@ -126,20 +123,14 @@ const CustomerManagement = () => {
                     </div>
                 }
                 actions={
-                    <>
-                        <button
-                            onClick={handleExport}
-                            disabled={isExporting}
-                            className="ds-btn ds-btn-md bg-white ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50"
-                        >
-                            {isExporting ? <RotateCw className="ds-icon-sm animate-spin" /> : <Download className="ds-icon-sm" />}
-                            {isExporting ? 'EXPORTING...' : 'EXPORT'}
-                        </button>
-                        <button className="ds-btn ds-btn-md bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-                            <UserPlus className="ds-icon-sm" />
-                            NEW CUSTOMER
-                        </button>
-                    </>
+                    <button
+                        onClick={handleExport}
+                        disabled={isExporting}
+                        className="ds-btn ds-btn-md bg-white ring-1 ring-gray-200 text-gray-700 hover:bg-gray-50"
+                    >
+                        {isExporting ? <RotateCw className="ds-icon-sm animate-spin" /> : <Download className="ds-icon-sm" />}
+                        {isExporting ? 'EXPORTING...' : 'EXPORT'}
+                    </button>
                 }
             />
 

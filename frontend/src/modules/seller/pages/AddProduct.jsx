@@ -140,8 +140,16 @@ const AddProduct = () => {
     }
 
     const firstVariant = formData.variants[0] || {};
-    if (!firstVariant.price || !firstVariant.stock) {
+    if (!firstVariant.price || firstVariant.stock === "" || firstVariant.stock == null) {
       toast.error("Main variant must have price and stock");
+      return;
+    }
+    const hasNegativeStock = (formData.variants || []).some((v) => {
+      const s = Number(v.stock);
+      return v.stock !== "" && v.stock != null && (!Number.isFinite(s) || s < 0);
+    });
+    if (hasNegativeStock) {
+      toast.error("Stock cannot be negative");
       return;
     }
 
@@ -534,10 +542,24 @@ const AddProduct = () => {
                       </label>
                       <input
                         type="number"
+                        min={0}
+                        step={1}
+                        inputMode="numeric"
                         value={variant.stock}
+                        onKeyDown={(e) => {
+                          if (["-", "+", "e", "E", "."].includes(e.key)) e.preventDefault();
+                        }}
                         onChange={(e) => {
                           const newVariants = [...formData.variants];
-                          newVariants[index].stock = e.target.value;
+                          const raw = e.target.value;
+                          if (raw === "") {
+                            newVariants[index].stock = "";
+                          } else {
+                            const n = Number(raw);
+                            newVariants[index].stock = Number.isFinite(n)
+                              ? Math.max(0, Math.floor(n))
+                              : 0;
+                          }
                           setFormData({ ...formData, variants: newVariants });
                         }}
                         placeholder="10"

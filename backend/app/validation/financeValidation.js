@@ -63,6 +63,23 @@ export const deliveredSchema = Joi.object({
   deliveryPartnerId: Joi.string().optional(),
 });
 
+export const codChooseMethodSchema = Joi.object({
+  method: Joi.string().valid("online_qr", "cash").required(),
+});
+
+export const codOnlinePaidSchema = Joi.object({
+  note: Joi.string().allow("", null).max(500).optional(),
+});
+
+export const codHandoffToSellerSchema = Joi.object({
+  note: Joi.string().allow("", null).max(500).optional(),
+});
+
+export const sellerCodPaySchema = Joi.object({
+  amount: Joi.number().min(0.01).optional(),
+  orderId: Joi.string().optional(),
+});
+
 export const codReconcileSchema = Joi.object({
   amount: Joi.number().min(0.01).required(),
   deliveryPartnerId: Joi.string().optional(),

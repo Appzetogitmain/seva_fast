@@ -13,6 +13,7 @@ import {
   leaveTicketRoom,
   onTicketMessage,
 } from "@/core/services/orderSocket";
+import { formatTime } from "@shared/utils/formatDate";
 
 const emojis = [
   "😀",
@@ -37,17 +38,6 @@ const emojis = [
   "🤡",
 ];
 
-function formatTime(value) {
-  if (!value) return "";
-  try {
-    const date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return "";
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-}
-
 function normalizeTicketMessages(rawMessages = []) {
   const list = Array.isArray(rawMessages) ? rawMessages : [];
   return list.map((m, idx) => {
@@ -59,7 +49,7 @@ function normalizeTicketMessages(rawMessages = []) {
       mediaType: m?.mediaType || "",
       sender: m?.isAdmin ? "support" : "user",
       createdAt,
-      time: formatTime(createdAt),
+      time: formatTime(createdAt, ""),
     };
   });
 }
@@ -258,7 +248,7 @@ const ChatPage = () => {
         mediaType: payload?.message?.mediaType || "",
         sender: payload?.message?.isAdmin ? "support" : "user",
         createdAt: payload?.message?.createdAt || null,
-        time: formatTime(payload?.message?.createdAt),
+        time: formatTime(payload?.message?.createdAt, ""),
       };
 
       setMessages((prev) => mergeIncomingMessage(prev, incoming));

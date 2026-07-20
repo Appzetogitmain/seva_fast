@@ -64,6 +64,11 @@ export function getLegacyStatusFromOrder(order) {
       return "delivered";
     }
     if (workflowStatus === WORKFLOW_STATUS.DELIVERY_ASSIGNED) {
+      // Rider may be assigned at packed stage; keep the later legacy status if present.
+      const legacy = String(order.status ?? "").toLowerCase();
+      if (legacy === "packed" || legacy === "out_for_delivery" || legacy === "delivered") {
+        return legacy;
+      }
       return "confirmed";
     }
     if (workflowStatus === WORKFLOW_STATUS.PICKUP_READY) {
@@ -74,6 +79,11 @@ export function getLegacyStatusFromOrder(order) {
   }
 
   const riderStep = Number(order.deliveryRiderStep) || 0;
+  const legacyStatus = String(order.status ?? "pending").toLowerCase();
+  // Cancelled/delivered always win over rider-assignment heuristics.
+  if (legacyStatus === "cancelled" || legacyStatus === "delivered") {
+    return legacyStatus;
+  }
   if (riderStep >= 3 || order.outForDeliveryAt || order.pickupConfirmedAt) {
     return "out_for_delivery";
   }
@@ -81,8 +91,7 @@ export function getLegacyStatusFromOrder(order) {
     return "confirmed";
   }
 
-  const s = String(order.status ?? "pending").toLowerCase();
-  if (LEGACY_ENUM.has(s)) return s;
+  if (LEGACY_ENUM.has(legacyStatus)) return legacyStatus;
   return "pending";
 }
 

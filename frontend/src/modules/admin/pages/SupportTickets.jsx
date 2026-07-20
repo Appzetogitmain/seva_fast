@@ -23,6 +23,7 @@ import { useToast } from '@shared/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@core/context/AuthContext';
 import { joinTicketRoom, leaveTicketRoom, onTicketCreated, onTicketMessage } from '@/core/services/orderSocket';
+import { formatDateTime, formatTime } from '@shared/utils/formatDate';
 import { useSupportUnread } from '@core/context/SupportUnreadContext';
 
 const SupportTickets = () => {
@@ -85,11 +86,11 @@ const SupportTickets = () => {
                     id: t._id,
                     ticketCode: t._id.slice(-6).toUpperCase(),
                     user: t.userId?.name || "Unknown",
-                    date: new Date(t.createdAt).toLocaleString(),
+                    date: formatDateTime(t.createdAt),
                     messages: (t.messages || []).map((m, i) => ({
                         ...m,
                         id: m._id || m.id || `msg-${t._id}-${i}`,
-                        time: new Date(m.createdAt || Date.now()).toLocaleTimeString()
+                        time: formatTime(m.createdAt || Date.now())
                     }))
                 })));
                 setTotal(typeof payload.total === 'number' ? payload.total : data.length);
@@ -168,7 +169,7 @@ const SupportTickets = () => {
             if (!tid) return;
 
             const message = payload?.message || {};
-            const time = new Date(message.createdAt || Date.now()).toLocaleTimeString();
+            const time = formatTime(message.createdAt || Date.now());
             const normalized = {
                 ...message,
                 id: message._id || message.id || `msg-${tid}-${Date.now()}`,
@@ -330,7 +331,12 @@ const SupportTickets = () => {
     };
 
     const handleResolve = async (id) => {
-        return handleSetStatus(id, 'closed');
+        const current =
+            selectedTicket?.id === id
+                ? selectedTicket.status
+                : tickets.find((t) => t.id === id)?.status;
+        const nextStatus = String(current || '').toLowerCase() === 'closed' ? 'open' : 'closed';
+        return handleSetStatus(id, nextStatus);
     };
 
     const filteredTickets = tickets.filter(t =>
@@ -457,7 +463,7 @@ const SupportTickets = () => {
                                         "p-2.5 ring-1 ring-slate-200 rounded-xl transition-all",
                                         selectedTicket.status === 'closed' ? "bg-brand-50 text-brand-500 ring-brand-100" : "bg-white text-slate-400 hover:text-brand-500"
                                     )}
-                                    title="Mark as Resolved"
+                                    title={selectedTicket.status === 'closed' ? 'Reopen ticket' : 'Mark as Resolved'}
                                 >
                                     <HiOutlineCheckCircle className="h-5 w-5" />
                                 </button>

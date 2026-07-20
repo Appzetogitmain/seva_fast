@@ -16,18 +16,17 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@shared/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatTime } from "@shared/utils/formatDate";
 
 const FleetRadar = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [selectedRider, setSelectedRider] = useState(null);
-  const [currentTime, setCurrentTime] = useState(
-    new Date().toLocaleTimeString(),
-  );
+  const [currentTime, setCurrentTime] = useState(formatTime(new Date()));
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString());
+      setCurrentTime(formatTime(new Date()));
     }, 1000);
     return () => clearInterval(timer);
   }, []);

@@ -23,6 +23,15 @@ const ALLOWED_KEYS = [
   "companyName",
   "taxId",
   "address",
+  "termsAndConditions",
+  "privacyPolicy",
+  "sellerTermsAndConditions",
+  "sellerPrivacyPolicy",
+  "deliveryTermsAndConditions",
+  "deliveryPrivacyPolicy",
+  "adminPaymentQrUrl",
+  "adminUpiId",
+  "adminUpiName",
   "facebook",
   "twitter",
   "instagram",
@@ -113,6 +122,15 @@ const updateSettingsSchema = Joi.object({
   companyName: Joi.string().allow("").max(200),
   taxId: Joi.string().allow("").max(100),
   address: Joi.string().allow("").max(500),
+  termsAndConditions: Joi.string().allow("").max(100000),
+  privacyPolicy: Joi.string().allow("").max(100000),
+  sellerTermsAndConditions: Joi.string().allow("").max(100000),
+  sellerPrivacyPolicy: Joi.string().allow("").max(100000),
+  deliveryTermsAndConditions: Joi.string().allow("").max(100000),
+  deliveryPrivacyPolicy: Joi.string().allow("").max(100000),
+  adminPaymentQrUrl: Joi.string().allow("").max(2000),
+  adminUpiId: Joi.string().allow("").max(200),
+  adminUpiName: Joi.string().allow("").max(200),
   facebook: Joi.string().allow("").max(500),
   twitter: Joi.string().allow("").max(500),
   instagram: Joi.string().allow("").max(500),
@@ -189,7 +207,7 @@ export const getPublicSettings = async (req, res) => {
       async () => {
         const existing = await Setting.findOne(filter)
           .select(
-            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm createdAt",
+            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor companyName termsAndConditions privacyPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm createdAt updatedAt",
           )
           .lean();
         return existing || null;
@@ -279,8 +297,8 @@ export const updateSettings = async (req, res) => {
 export const uploadSettingsImage = async (req, res) => {
   try {
     const type = (req.query.type || "logo").toLowerCase();
-    if (type !== "logo" && type !== "favicon") {
-      return handleResponse(res, 400, "type must be logo or favicon");
+    if (!["logo", "favicon", "payment-qr"].includes(type)) {
+      return handleResponse(res, 400, "type must be logo, favicon, or payment-qr");
     }
 
     if (req.file) {

@@ -6,6 +6,7 @@ import { ArrowLeft, X } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
 import { useAuth } from '@/core/context/AuthContext';
 import PlanCard from '@/shared/components/ui/PlanCard';
+import { formatDate } from '@shared/utils/formatDate';
 
 const DEFAULT_REFERRAL_CODE = 'SEVAFAST';
 
@@ -307,7 +308,7 @@ const PlansPage = () => {
                                         {isActivePlan && planExpiry && (
                                             <div className="absolute top-4 right-4">
                                                 <div className="bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-[9px] font-bold text-slate-500 uppercase shadow-sm border border-slate-100">
-                                                    Valid till: {new Date(planExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                    Valid till: {formatDate(planExpiry)}
                                                 </div>
                                             </div>
                                         )}
