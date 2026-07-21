@@ -56,11 +56,10 @@ const ApplicationPending = () => {
               <span className="text-sm font-bold text-white/90">{appName} Seller</span>
             </div>
             <div
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest ${
-                isRejected
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest ${isRejected
                   ? "bg-rose-500/20 text-rose-200"
                   : "bg-amber-400/20 text-amber-100"
-              }`}
+                }`}
             >
               {isRejected ? <ShieldAlert className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
               {isRejected ? "Application Rejected" : "Application Pending"}
@@ -86,7 +85,7 @@ const ApplicationPending = () => {
           ) : null}
 
           {!isRejected ? (
-            <div className="mt-6 rounded-2xl border border-brand-400/30 bg-brand-500/10 px-4 py-3 text-sm text-brand-200 flex items-start gap-3">
+            <div className="mt-6 rounded-2xl border border-brand-400/30 bg-brand-500/10 px-4 py-3 text-sm text-slate-100 flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0 text-brand-400" />
               <p className="font-semibold">
                 Approval usually takes less than 24 hours. You can return to login and try again later.

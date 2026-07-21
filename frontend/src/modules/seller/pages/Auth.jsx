@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@core/context/AuthContext";
@@ -59,6 +59,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const appName = settings?.appName || "App";
   const logoUrl = settings?.logoUrl || "";
+  const isProcessing = useRef(false);
   const [verifications, setVerifications] = useState({
     email: createInitialVerificationState(),
     phone: createInitialVerificationState(),
@@ -133,7 +134,11 @@ const Auth = () => {
     const { name, value } = e.target;
     if (name === "name") {
       // Owner name: only alphabets and spaces
-      const cleaned = value.replace(/[^a-zA-Z\s]/g, "");
+      let cleaned = value.replace(/[^a-zA-Z\s]/g, "");
+      cleaned = cleaned.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+      setFormData({ ...formData, [name]: cleaned });
+    } else if (name === "shopName") {
+      const cleaned = value.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
       setFormData({ ...formData, [name]: cleaned });
     } else if (name === "email") {
       // Business email: trim leading spaces, disallow spaces inside
@@ -151,7 +156,11 @@ const Auth = () => {
       setFormData({ ...formData, [name]: digitsOnly });
     } else if (name === "city" || name === "state") {
       // City & State: only alphabets and spaces
-      const cleaned = value.replace(/[^a-zA-Z\s]/g, "");
+      let cleaned = value.replace(/[^a-zA-Z\s]/g, "");
+      cleaned = cleaned.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+      setFormData({ ...formData, [name]: cleaned });
+    } else if (name === "locality" || name === "address") {
+      const cleaned = value.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
       setFormData({ ...formData, [name]: cleaned });
     } else if (name === "pincode") {
       const digitsOnly = value.replace(/[^0-9]/g, "").slice(0, 6);
@@ -266,6 +275,8 @@ const Auth = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isProcessing.current) return;
+    isProcessing.current = true;
 
     try {
       // Basic client-side validation for signup
@@ -275,18 +286,27 @@ const Auth = () => {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           toast.error("Please enter a valid business email address.");
           setIsLoading(false);
+          isProcessing.current = false;
           return;
         }
         if (!/^[0-9]{10}$/.test(phone)) {
           toast.error("Please enter a valid 10-digit contact number.");
+          isProcessing.current = false;
           return;
         }
         if (verifications.email.status !== "verified" || !verifications.email.token) {
           toast.error("Please verify your business email before continuing.");
+          isProcessing.current = false;
           return;
         }
         if (verifications.phone.status !== "verified" || !verifications.phone.token) {
           toast.error("Please verify your contact number before continuing.");
+          isProcessing.current = false;
+          return;
+        }
+        if (signupStep === 2 && formData.locality && !/^[a-zA-Z0-9]/.test(formData.locality)) {
+          toast.error("Locality must start with an alphabet or number.");
+          isProcessing.current = false;
           return;
         }
       }
@@ -296,11 +316,13 @@ const Auth = () => {
         toast.error(
           "Password must be at least 6 characters.",
         );
+        isProcessing.current = false;
         return;
       }
 
       if (!isLogin && signupStep < 3) {
-        setSignupStep((prev) => prev + 1);
+        setSignupStep((prev) => (prev < 3 ? prev + 1 : prev));
+        isProcessing.current = false;
         return;
       }
 
@@ -312,6 +334,7 @@ const Auth = () => {
               .map((doc) => doc.label)
               .join(", ")}`,
           );
+          isProcessing.current = false;
           return;
         }
       }
@@ -414,6 +437,7 @@ const Auth = () => {
       toast.error(error.response?.data?.message || "Authentication failed");
     } finally {
       setIsLoading(false);
+      isProcessing.current = false;
     }
   };
 
@@ -502,7 +526,7 @@ const Auth = () => {
               transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
               className="space-y-8 py-4 md:py-6">
               <div className="space-y-4">
-                <span className="inline-block px-4 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200">
+                <span className="inline-block px-4 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200 text-center whitespace-normal w-full sm:w-auto">
                   {isLogin
                     ? "Welcome Back"
                     : `New Partnership - Step ${signupStep} of 3`}
@@ -538,6 +562,7 @@ const Auth = () => {
                             type="text"
                             name="name"
                             required
+                            maxLength={50}
                             placeholder="Owner Name"
                             className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
                             value={formData.name}
@@ -714,6 +739,7 @@ const Auth = () => {
                         name="password"
                         required
                         minLength={6}
+                        maxLength={32}
                         autoComplete="current-password"
                         placeholder="Enter your password"
                         className="w-full pl-12 pr-14 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
@@ -761,7 +787,7 @@ const Auth = () => {
                           ? "border-brand-200 bg-brand-50/50"
                           : "border-slate-200 bg-slate-50 hover:border-slate-300"
                           }`}>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 overflow-hidden">
                           <div
                             className={`p-2 rounded-md ${formData.lat ? "bg-brand-100 text-brand-600" : "bg-white text-slate-600 shadow-sm"}`}>
                             {formData.lat ? (
@@ -770,14 +796,14 @@ const Auth = () => {
                               <MapPin className="w-4 h-4" />
                             )}
                           </div>
-                          <div className="text-left">
+                          <div className="text-left flex-1 min-w-0">
                             <p
                               className={`text-xs font-bold ${formData.lat ? "text-brand-700" : "text-slate-600"}`}>
                               {formData.lat
                                 ? "Location Selected"
                                 : "Pin Shop on Map"}
                             </p>
-                            <p className="text-xs text-slate-600 font-medium truncate max-w-[250px]">
+                            <p className="text-xs text-slate-600 font-medium truncate w-full">
                               {formData.lat
                                 ? `${formData.address} (${formData.radius}km)`
                                 : "Precisely mark your shop location"}
@@ -801,6 +827,7 @@ const Auth = () => {
                           type="text"
                           name="locality"
                           required
+                          maxLength={100}
                           placeholder="Locality / Area"
                           className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
                           value={formData.locality}
@@ -815,6 +842,7 @@ const Auth = () => {
                           type="text"
                           name="pincode"
                           required
+                          maxLength={6}
                           placeholder="Pincode"
                           className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
                           value={formData.pincode}
@@ -829,6 +857,7 @@ const Auth = () => {
                           type="text"
                           name="city"
                           required
+                          maxLength={50}
                           placeholder="City"
                           className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
                           value={formData.city}
@@ -843,6 +872,7 @@ const Auth = () => {
                           type="text"
                           name="state"
                           required
+                          maxLength={50}
                           placeholder="State"
                           className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
                           value={formData.state}
@@ -859,6 +889,7 @@ const Auth = () => {
                         name="address"
                         rows={3}
                         required
+                        maxLength={250}
                         placeholder="Full address"
                         className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300 resize-none"
                         value={formData.address}
