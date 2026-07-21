@@ -7,7 +7,10 @@ export const customerApi = {
     axiosInstance.post("/customer/send-signup-otp", data),
   verifyOtp: (data) => axiosInstance.post("/customer/verify-otp", data),
   getProfile: () => getWithDedupe("/customer/profile", {}, { ttl: 5000 }), // Short cache for profile
-  updateProfile: (data) => axiosInstance.put("/customer/profile", data),
+  updateProfile: (data) => {
+    invalidateCache("/customer/profile");
+    return axiosInstance.put("/customer/profile", data);
+  },
   getWalletTransactions: (params) =>
     getWithDedupe("/customer/transactions", params),
   getReferralTree: () => getWithDedupe("/customer/referrals/tree"),

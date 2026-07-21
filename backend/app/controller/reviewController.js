@@ -1,4 +1,5 @@
 import Review from "../models/review.js";
+import Order from "../models/order.js";
 import handleResponse from "../utils/helper.js";
 import getPagination from "../utils/pagination.js";
 
@@ -7,6 +8,17 @@ export const submitReview = async (req, res) => {
     try {
         const { productId, rating, comment } = req.body;
         const userId = req.user.id;
+
+        // Check if user has purchased the product
+        const hasPurchased = await Order.findOne({ 
+            customer: userId, 
+            "items.product": productId, 
+            status: "delivered" 
+        });
+
+        if (!hasPurchased) {
+            return handleResponse(res, 403, "You can only rate products you have purchased and received.");
+        }
 
         // Check if user already reviewed this product
         const existingReview = await Review.findOne({ userId, productId });
@@ -19,11 +31,11 @@ export const submitReview = async (req, res) => {
             productId,
             rating,
             comment,
-            status: "pending", // Always pending until admin approves
+            status: "approved", // Automatically approve so they are visible
         });
 
         await newReview.save();
-        return handleResponse(res, 201, "Review submitted and pending approval", newReview);
+        return handleResponse(res, 201, "Review submitted successfully", newReview);
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }

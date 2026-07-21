@@ -62,6 +62,16 @@ const ProductCard = React.memo(
       ? variantIdentityKey(defaultVariant)
       : "";
 
+    const displayPrice = defaultVariant
+      ? (Number(defaultVariant.salePrice) > 0 && Number(defaultVariant.salePrice) < Number(defaultVariant.price)
+        ? Number(defaultVariant.salePrice)
+        : Number(defaultVariant.price))
+      : Number(product.price || 0);
+
+    const displayOriginalPrice = defaultVariant
+      ? Number(defaultVariant.price || 0)
+      : Number(product.originalPrice || 0);
+
     const cartKey = `${productId}::${requiresVariantSelection ? defaultVariantSku : ""}`;
 
     const cartItem = React.useMemo(() => {
@@ -185,19 +195,19 @@ const ProductCard = React.memo(
         <div className="relative">
           {(badge ||
             product.discount ||
-            product.originalPrice > product.price) && (
-            <div
-              className={cn(
-                "absolute z-10 bg-primary text-primary-foreground font-[900] rounded-md shadow-sm uppercase tracking-wider flex items-center justify-center",
-                compact
-                  ? "top-2 left-2 px-1.5 py-0.5 text-[7px]"
-                  : "top-2 left-2 px-1 py-0.5 text-[7px] sm:top-3 sm:left-3 sm:px-2 sm:py-1 sm:text-[9px]",
-              )}>
-              {badge ||
-                product.discount ||
-                `${Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF`}
-            </div>
-          )}
+            displayOriginalPrice > displayPrice) && (
+              <div
+                className={cn(
+                  "absolute z-10 bg-primary text-primary-foreground font-[900] rounded-md shadow-sm uppercase tracking-wider flex items-center justify-center",
+                  compact
+                    ? "top-2 left-2 px-1.5 py-0.5 text-[7px]"
+                    : "top-2 left-2 px-1 py-0.5 text-[7px] sm:top-3 sm:left-3 sm:px-2 sm:py-1 sm:text-[9px]",
+                )}>
+                {badge ||
+                  product.discount ||
+                  `${Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100)}% OFF`}
+              </div>
+            )}
 
           <button
             onClick={toggleWishlist}
@@ -306,15 +316,15 @@ const ProductCard = React.memo(
                   "font-[1000] text-[#1A1A1A]",
                   compact ? "text-[11px]" : "text-[13px] sm:text-sm",
                 )}>
-                ₹{product.price}
+                ₹{displayPrice}
               </span>
-              {product.originalPrice > product.price && (
+              {displayOriginalPrice > displayPrice && (
                 <span
                   className={cn(
                     "font-medium text-gray-400 line-through leading-none",
                     compact ? "text-[8px]" : "text-[9px] sm:text-[10px]",
                   )}>
-                  ₹{product.originalPrice}
+                  ₹{displayOriginalPrice}
                 </span>
               )}
             </div>

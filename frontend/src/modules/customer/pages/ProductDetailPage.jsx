@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Heart, Plus, Minus, Star, ShieldCheck, Clock, ArrowLeft, MessageSquare } from 'lucide-react';
+import { Heart, Plus, Minus, Star, ShieldCheck, Clock, ArrowLeft, MessageSquare, Share2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useToast } from '@shared/components/ui/Toast';
@@ -28,8 +28,6 @@ const ProductDetailPage = () => {
     const [activeImage, setActiveImage] = useState('');
     const [reviews, setReviews] = useState([]);
     const [reviewLoading, setReviewLoading] = useState(false);
-    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-    const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
     const [noServiceData, setNoServiceData] = useState(null);
 
     // Dynamically load no-service Lottie on mount
@@ -100,25 +98,22 @@ const ProductDetailPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentLocation?.latitude, currentLocation?.longitude]);
 
-    const handleReviewSubmit = async (e) => {
-        e.preventDefault();
-        if (!newReview.comment.trim()) return;
+    // Review submission is now handled by ReviewForm component
 
-        try {
-            setIsSubmittingReview(true);
-            const res = await customerApi.submitReview({
-                productId: id,
-                rating: newReview.rating,
-                comment: newReview.comment
-            });
-            if (res.data.success) {
-                showToast("Review submitted for moderation", "success");
-                setNewReview({ rating: 5, comment: '' });
+    const handleShare = async () => {
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: product.name,
+                    text: product.description,
+                    url: window.location.href,
+                });
+            } catch (error) {
+                console.error("Share failed", error);
             }
-        } catch (error) {
-            showToast(error.response?.data?.message || "Failed to submit review", "error");
-        } finally {
-            setIsSubmittingReview(false);
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+            showToast("Link copied to clipboard", "success");
         }
     };
 
@@ -201,24 +196,32 @@ const ProductDetailPage = () => {
                             loading="lazy"
                             className="w-full h-full object-contain p-2 md:p-4 transition-transform duration-700 group-hover:scale-105"
                         />
-                        <button
-                            onClick={handleToggleWishlist}
-                            className={cn(
-                                "absolute top-5 right-5 p-3.5 rounded-full shadow-2xl transition-all duration-300 hover:scale-110",
-                                isWishlisted ? "bg-red-50 text-red-500" : "bg-white text-slate-400"
-                            )}
-                        >
-                            <Heart size={20} className={cn(isWishlisted && "fill-current")} />
-                        </button>
+                        <div className="absolute top-5 right-5 flex flex-col gap-3">
+                            <button
+                                onClick={handleToggleWishlist}
+                                className={cn(
+                                    "p-3.5 rounded-full shadow-2xl transition-all duration-300 hover:scale-110",
+                                    isWishlisted ? "bg-red-50 text-red-500" : "bg-white text-slate-400"
+                                )}
+                            >
+                                <Heart size={20} className={cn(isWishlisted && "fill-current")} />
+                            </button>
+                            <button
+                                onClick={handleShare}
+                                className="p-3.5 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 bg-white text-slate-400 hover:text-primary"
+                            >
+                                <Share2 size={20} />
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
                         {product.images.map((img, idx) => (
                             <button
                                 key={idx}
                                 onClick={() => setActiveImage(img)}
                                 className={cn(
-                                    "relative h-20 w-20 md:h-24 md:w-24 rounded-2xl overflow-hidden flex-shrink-0 transition-all border-2",
+                                    "relative h-20 w-20 md:h-24 md:w-24 rounded-2xl overflow-hidden flex-shrink-0 transition-all border-2 snap-center",
                                     activeImage === img ? "border-primary shadow-lg scale-95" : "border-transparent opacity-70 hover:opacity-100"
                                 )}
                             >
@@ -325,45 +328,7 @@ const ProductDetailPage = () => {
                         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm sticky top-24">
                             <h3 className="text-2xl font-black text-slate-800 mb-2">Write a Review</h3>
                             <p className="text-slate-500 font-medium mb-6 text-sm">Share your experience with this product</p>
-
-                            <form onSubmit={handleReviewSubmit} className="space-y-6">
-                                <div className="space-y-3">
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Your Rating</label>
-                                    <div className="flex gap-2">
-                                        {[1, 2, 3, 4, 5].map((star) => (
-                                            <button
-                                                key={star}
-                                                type="button"
-                                                onClick={() => setNewReview({ ...newReview, rating: star })}
-                                                className={cn(
-                                                    "h-12 w-12 rounded-xl flex items-center justify-center transition-all",
-                                                    newReview.rating >= star ? "bg-orange-50 text-orange-500" : "bg-slate-50 text-slate-300"
-                                                )}
-                                            >
-                                                <Star className={cn("h-6 w-6", newReview.rating >= star && "fill-current")} />
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Comment</label>
-                                    <textarea
-                                        value={newReview.comment}
-                                        onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                                        placeholder="What did you like or dislike?"
-                                        className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold min-h-[120px] outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all"
-                                    />
-                                </div>
-
-                                <Button
-                                    type="submit"
-                                    disabled={isSubmittingReview}
-                                    className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95"
-                                >
-                                    {isSubmittingReview ? "SUBMITTING..." : "SUBMIT REVIEW"}
-                                </Button>
-                            </form>
+                            <ReviewForm productId={id} fetchReviews={fetchReviews} />
                         </div>
                     </div>
 
@@ -417,6 +382,76 @@ const ProductDetailPage = () => {
                 </div>
             </div>
         </div>
+    );
+};
+
+const ReviewForm = ({ productId, fetchReviews }) => {
+    const { showToast } = useToast();
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+    const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
+
+    const handleReviewSubmit = async (e) => {
+        e.preventDefault();
+        if (!newReview.comment.trim()) return;
+
+        try {
+            setIsSubmittingReview(true);
+            const res = await customerApi.submitReview({
+                productId,
+                rating: newReview.rating,
+                comment: newReview.comment
+            });
+            if (res.data.success) {
+                showToast("Review submitted successfully", "success");
+                setNewReview({ rating: 5, comment: '' });
+                fetchReviews(); // Re-fetch to show the new review immediately
+            }
+        } catch (error) {
+            showToast(error.response?.data?.message || "Failed to submit review", "error");
+        } finally {
+            setIsSubmittingReview(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleReviewSubmit} className="space-y-6">
+            <div className="space-y-3">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Your Rating</label>
+                <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                            key={star}
+                            type="button"
+                            onClick={() => setNewReview({ ...newReview, rating: star })}
+                            className={cn(
+                                "h-12 w-12 rounded-xl flex items-center justify-center transition-all",
+                                newReview.rating >= star ? "bg-orange-50 text-orange-500" : "bg-slate-50 text-slate-300"
+                            )}
+                        >
+                            <Star className={cn("h-6 w-6", newReview.rating >= star && "fill-current")} />
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Comment</label>
+                <textarea
+                    value={newReview.comment}
+                    onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                    placeholder="What did you like or dislike?"
+                    className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold min-h-[120px] outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all"
+                />
+            </div>
+
+            <Button
+                type="submit"
+                disabled={isSubmittingReview}
+                className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl shadow-xl transition-all active:scale-95"
+            >
+                {isSubmittingReview ? "SUBMITTING..." : "SUBMIT REVIEW"}
+            </Button>
+        </form>
     );
 };
 

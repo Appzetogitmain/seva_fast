@@ -60,8 +60,7 @@ const AddressesPage = () => {
 
     // Auto-open Add modal when navigated from LocationDrawer with ?add=1
     useEffect(() => {
-        if (searchParams.get('add') === '1' && !loading) {
-            setSearchParams({}, { replace: true });
+        if (searchParams.get('add') === '1' && !loading && !isAddOpen) {
             openAddModal();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,7 +83,32 @@ const AddressesPage = () => {
         pincode: ''
     });
 
+    useEffect(() => {
+        if (!isAddOpen) {
+            if (searchParams.get('add') === '1') {
+                setSearchParams({}, { replace: true });
+            }
+            sessionStorage.removeItem('addAddressFormDraft');
+        }
+    }, [isAddOpen, searchParams, setSearchParams]);
+
+    useEffect(() => {
+        if (isAddOpen) {
+            sessionStorage.setItem('addAddressFormDraft', JSON.stringify(addForm));
+        }
+    }, [addForm, isAddOpen]);
+
     const openAddModal = () => {
+        const savedDraft = sessionStorage.getItem('addAddressFormDraft');
+        if (savedDraft) {
+            try {
+                setAddForm(JSON.parse(savedDraft));
+                setIsAddOpen(true);
+                return;
+            } catch (e) {
+                // Ignore and fall through
+            }
+        }
         setAddForm({
             type: 'home',
             name: profileName,
@@ -105,10 +129,21 @@ const AddressesPage = () => {
         const landmark = addForm.landmark?.trim();
         const state = addForm.state?.trim();
         const pincode = addForm.pincode?.trim();
-        if (!address) {
-            toast.error('Please enter the address');
-            return;
-        }
+        const phone = addForm.phone?.trim();
+
+        if (!name) return toast.error('Please enter your full name');
+        if (!phone || !/^\d{10}$/.test(phone.replace(/\D/g, ''))) return toast.error('Please enter a valid 10-digit phone number');
+        if (!address) return toast.error('Please enter the address');
+        if (!city) return toast.error('Please enter the city');
+        if (!state) return toast.error('Please enter the state');
+        if (!pincode || !/^\d{6}$/.test(pincode)) return toast.error('Please enter a valid 6-digit pincode');
+
+        const isDuplicate = rawAddresses.some(a => 
+            a.fullAddress?.toLowerCase() === address.toLowerCase() && 
+            (a.label || 'home').toLowerCase() === addForm.type.toLowerCase()
+        );
+        if (isDuplicate) return toast.error('This address is already saved under this label');
+
         const newAddr = {
             label: addForm.type.toLowerCase(),
             fullAddress: address,
@@ -131,15 +166,13 @@ const AddressesPage = () => {
                     if (geo.data?.result?.formattedAddress) newAddr.formattedAddress = geo.data.result.formattedAddress;
                 }
             } catch (e) {
-                toast.error(
-                    e.response?.data?.message ||
-                    'Could not fetch coordinates for this address. Delivery fees may be inaccurate.'
-                );
+                console.warn("Geocoding failed, but continuing to save the address:", e);
+                toast.warning('Address saved, but location coordinates could not be pinpointed.');
             }
 
             await customerApi.updateProfile({
                 ...(name && { name }),
-                ...(addForm.phone && { phone: addForm.phone.trim() }),
+                ...(phone && { phone }),
                 addresses: [...rawAddresses, newAddr]
             });
             toast.success('Address saved successfully');
@@ -183,11 +216,21 @@ const AddressesPage = () => {
 
     const handleUpdateAddress = async () => {
         if (!selectedAddress) return;
+        
+        const name = editForm.name?.trim();
+        const phone = editForm.phone?.trim();
         const address = editForm.address?.trim();
-        if (!address) {
-            toast.error('Please enter the address');
-            return;
-        }
+        const city = editForm.city?.trim();
+        const state = editForm.state?.trim();
+        const pincode = editForm.pincode?.trim();
+
+        if (!name) return toast.error('Please enter your full name');
+        if (!phone || !/^\d{10}$/.test(phone.replace(/\D/g, ''))) return toast.error('Please enter a valid 10-digit phone number');
+        if (!address) return toast.error('Please enter the address');
+        if (!city) return toast.error('Please enter the city');
+        if (!state) return toast.error('Please enter the state');
+        if (!pincode || !/^\d{6}$/.test(pincode)) return toast.error('Please enter a valid 6-digit pincode');
+
         const idx = addresses.findIndex(a => (a.id === selectedAddress.id) || (a.address === selectedAddress.address && a.type === selectedAddress.type));
         if (idx < 0) {
             setIsEditOpen(false);
@@ -198,19 +241,19 @@ const AddressesPage = () => {
             label: editForm.type.toLowerCase(),
             fullAddress: address,
             ...(editForm.landmark?.trim() && { landmark: editForm.landmark.trim() }),
-            ...(editForm.city?.trim() && { city: editForm.city.trim() }),
-            ...(editForm.state?.trim() && { state: editForm.state.trim() }),
-            ...(editForm.pincode?.trim() && { pincode: editForm.pincode.trim() })
+            ...(city && { city }),
+            ...(state && { state }),
+            ...(pincode && { pincode })
         };
 
         // Best-effort: refresh coordinates + placeId whenever address fields change.
         try {
             const query = [
-                editForm.address?.trim(),
+                address,
                 editForm.landmark?.trim(),
-                editForm.city?.trim(),
-                editForm.state?.trim(),
-                editForm.pincode?.trim(),
+                city,
+                state,
+                pincode,
             ].filter(Boolean).join(', ');
             const geo = await customerApi.geocodeAddress(query);
             const loc = geo.data?.result?.location;
@@ -220,18 +263,16 @@ const AddressesPage = () => {
                 if (geo.data?.result?.formattedAddress) updatedRaw.formattedAddress = geo.data.result.formattedAddress;
             }
         } catch (e) {
-            toast.error(
-                e.response?.data?.message ||
-                'Could not refresh coordinates for this address. Delivery fees may be inaccurate.'
-            );
+            console.warn("Geocoding failed, but continuing to update the address:", e);
+            toast.warning('Address updated, but location coordinates could not be pinpointed.');
         }
 
         const updatedAddresses = rawAddresses.map((raw, i) => (i === idx ? updatedRaw : raw));
         setUpdating(true);
         try {
             await customerApi.updateProfile({
-                ...(editForm.name?.trim() && { name: editForm.name.trim() }),
-                ...(editForm.phone?.trim() && { phone: editForm.phone.trim() }),
+                ...(name && { name }),
+                ...(phone && { phone }),
                 addresses: updatedAddresses
             });
             toast.success('Address updated successfully');
@@ -275,6 +316,25 @@ const AddressesPage = () => {
             toast.error(err.response?.data?.message || 'Failed to delete address');
         } finally {
             setDeleting(false);
+        }
+    };
+
+    const handleSetDefault = async (addr) => {
+        const idx = addresses.findIndex(a => (a.id === addr.id) || (a.address === addr.address && a.type === addr.type));
+        if (idx <= 0) return; // Already default or not found
+
+        const updatedAddresses = [...rawAddresses];
+        const [movedAddress] = updatedAddresses.splice(idx, 1);
+        updatedAddresses.unshift(movedAddress);
+
+        try {
+            await customerApi.updateProfile({ addresses: updatedAddresses });
+            toast.success('Default address updated');
+            setLoading(true);
+            await fetchAddresses();
+            await refreshAddresses?.();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to set default address');
         }
     };
 
@@ -337,16 +397,24 @@ const AddressesPage = () => {
                                 </div>
                             </div>
 
-                            <div className="mt-4 flex items-center gap-2 pt-3 border-t border-slate-100">
+                            <div className="mt-4 flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+                                {!addr.isDefault && (
+                                    <button
+                                        onClick={() => handleSetDefault(addr)}
+                                        className="flex-1 min-w-[30%] py-2 rounded-lg bg-primary/10 text-primary font-semibold text-xs hover:bg-primary/20 transition-colors flex items-center justify-center gap-1.5"
+                                    >
+                                        Set as Default
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => handleEdit(addr)}
-                                    className="flex-1 py-2 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5"
+                                    className="flex-1 min-w-[25%] py-2 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5"
                                 >
                                     <Edit2 size={14} /> Edit
                                 </button>
                                 <button
                                     onClick={() => handleDelete(addr)}
-                                    className="flex-1 py-2 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5"
+                                    className="flex-1 min-w-[25%] py-2 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5"
                                 >
                                     <Trash2 size={14} /> Delete
                                 </button>

@@ -186,7 +186,7 @@ const ProductDetailSheet = () => {
             document.body.style.overflow = "unset";
             document.body.style.touchAction = "auto";
             document.documentElement.style.overflow = "unset";
-        }
+        };
     }, [isOpen, controls]);
 
     const handleDragEnd = (event, info) => {

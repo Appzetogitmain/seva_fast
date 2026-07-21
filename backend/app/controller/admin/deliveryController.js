@@ -2,6 +2,8 @@ import Delivery from "../../models/delivery.js";
 import Order from "../../models/order.js";
 import handleResponse from "../../utils/helper.js";
 import getPagination from "../../utils/pagination.js";
+import { notify } from "../../modules/notifications/notification.service.js";
+import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
 
 export const getDeliveryPartners = async (req, res) => {
   try {
@@ -67,6 +69,14 @@ export const approveDeliveryPartner = async (req, res) => {
       return handleResponse(res, 404, "Rider not found");
     }
 
+    try {
+      await notify(NOTIFICATION_EVENTS.DELIVERY_APPROVED, {
+        deliveryId: rider._id,
+      });
+    } catch (err) {
+      console.error("Failed to notify delivery partner of approval", err);
+    }
+
     return handleResponse(res, 200, "Rider approved successfully", rider);
   } catch (error) {
     return handleResponse(res, 500, error.message);
@@ -84,6 +94,14 @@ export const rejectDeliveryPartner = async (req, res) => {
 
     if (!rider) {
       return handleResponse(res, 404, "Rider not found");
+    }
+
+    try {
+      await notify(NOTIFICATION_EVENTS.DELIVERY_REJECTED, {
+        deliveryId: rider._id,
+      });
+    } catch (err) {
+      console.error("Failed to notify delivery partner of rejection", err);
     }
 
     return handleResponse(
