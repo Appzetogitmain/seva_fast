@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   Phone,
   ArrowRight,
@@ -81,6 +81,7 @@ const DeliveryAuth = () => {
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(30);
+  const [validationErrors, setValidationErrors] = useState({});
 
   const isCycleVehicle = signupVehicle === "cycle";
 
@@ -423,7 +424,12 @@ const DeliveryAuth = () => {
                               <input
                                 type="text"
                                 value={signupName}
-                                onChange={(e) => setSignupName(e.target.value)}
+                                maxLength={50}
+                                onChange={(e) => {
+                                  let val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                                  val = val.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+                                  setSignupName(val);
+                                }}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                                 placeholder="Enter your full name"
                               />
@@ -466,11 +472,22 @@ const DeliveryAuth = () => {
                               <MapPin className="absolute left-4 top-4 text-gray-300 w-4 h-4" />
                               <textarea
                                 value={signupAddress}
-                                onChange={(e) => setSignupAddress(e.target.value)}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+                                  setSignupAddress(val);
+                                  if (val && !/[a-zA-Z0-9]{3,}/.test(val)) {
+                                    setValidationErrors(prev => ({ ...prev, address: "Address must contain at least 3 alphanumeric characters" }));
+                                  } else {
+                                    setValidationErrors(prev => ({ ...prev, address: "" }));
+                                  }
+                                }}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all resize-none h-24"
                                 placeholder="Complete building address..."
                               />
                             </div>
+                            {validationErrors.address && (
+                              <p className="text-red-500 text-xs mt-1 ml-1">{validationErrors.address}</p>
+                            )}
                           </div>
 
                           <div className="space-y-1.5">
@@ -560,7 +577,11 @@ const DeliveryAuth = () => {
                               <input
                                 type="text"
                                 value={signupVehicleNumber}
-                                onChange={(e) => setSignupVehicleNumber(e.target.value.toUpperCase())}
+                                maxLength={20}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^a-zA-Z0-9\s]/g, "").toUpperCase();
+                                  setSignupVehicleNumber(val);
+                                }}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                                 placeholder={isCycleVehicle ? "HERO CYCLE / FRAME NO. (Optional)" : "KA 05 MN 8921"}
                               />
@@ -576,7 +597,11 @@ const DeliveryAuth = () => {
                               <input
                                 type="text"
                                 value={signupDLNumber}
-                                onChange={(e) => setSignupDLNumber(e.target.value.toUpperCase())}
+                                maxLength={16}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                                  setSignupDLNumber(val);
+                                }}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                                 placeholder={isCycleVehicle ? "AADHAAR / OTHER ID (Optional)" : "DL-1420110012345"}
                               />
@@ -632,17 +657,34 @@ const DeliveryAuth = () => {
                             <input
                               type="text"
                               value={signupPanNumber}
-                              onChange={(e) => setSignupPanNumber(e.target.value.toUpperCase().slice(0, 10))}
+                              maxLength={10}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                                setSignupPanNumber(val);
+                                if (val.length === 10 && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val)) {
+                                  setValidationErrors(prev => ({ ...prev, pan: "Invalid PAN format (e.g., ABCDE1234F)" }));
+                                } else {
+                                  setValidationErrors(prev => ({ ...prev, pan: "" }));
+                                }
+                              }}
                               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all font-mono"
                               placeholder="ABCDE1234F"
                             />
+                            {validationErrors.pan && (
+                              <p className="text-red-500 text-xs mt-1 ml-1">{validationErrors.pan}</p>
+                            )}
                           </div>
                           <div className="space-y-1.5">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Account Holder Name</label>
                             <input
                               type="text"
                               value={signupAccountHolder}
-                              onChange={(e) => setSignupAccountHolder(e.target.value.toUpperCase())}
+                              maxLength={50}
+                              onChange={(e) => {
+                                let val = e.target.value.replace(/[^a-zA-Z\s]/g, "").toUpperCase();
+                                val = val.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+                                setSignupAccountHolder(val);
+                              }}
                               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                               placeholder="AS PER BANK RECORDS"
                             />
@@ -652,20 +694,44 @@ const DeliveryAuth = () => {
                             <input
                               type="text"
                               value={signupAccountNumber}
-                              onChange={(e) => setSignupAccountNumber(e.target.value.replace(/\D/g, ""))}
+                              maxLength={18}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, "");
+                                setSignupAccountNumber(val);
+                                if (val.length > 0 && val.length < 9) {
+                                  setValidationErrors(prev => ({ ...prev, account: "Account number must be 9-18 digits" }));
+                                } else {
+                                  setValidationErrors(prev => ({ ...prev, account: "" }));
+                                }
+                              }}
                               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                               placeholder="000000000000"
                             />
+                            {validationErrors.account && (
+                              <p className="text-red-500 text-xs mt-1 ml-1">{validationErrors.account}</p>
+                            )}
                           </div>
                           <div className="space-y-1.5">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">IFSC Code</label>
                             <input
                               type="text"
                               value={signupIfsc}
-                              onChange={(e) => setSignupIfsc(e.target.value.toUpperCase())}
+                              maxLength={11}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                                setSignupIfsc(val);
+                                if (val.length === 11 && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(val)) {
+                                  setValidationErrors(prev => ({ ...prev, ifsc: "Invalid IFSC format" }));
+                                } else {
+                                  setValidationErrors(prev => ({ ...prev, ifsc: "" }));
+                                }
+                              }}
                               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                               placeholder="HDFC0001234"
                             />
+                            {validationErrors.ifsc && (
+                              <p className="text-red-500 text-xs mt-1 ml-1">{validationErrors.ifsc}</p>
+                            )}
                           </div>
 
                           <div className="flex gap-4 pt-2">
@@ -912,8 +978,8 @@ const DeliveryAuth = () => {
                     />
                     <label htmlFor="terms" className="text-xs text-gray-500 leading-relaxed cursor-pointer">
                       I confirm my phone number is correct and I agree to the{" "}
-                      <span className="text-brand-600 font-bold">Terms of Service</span> &amp;{" "}
-                      <span className="text-brand-600 font-bold">Privacy Policy</span>.
+                      <Link to="/terms" target="_blank" className="text-brand-600 font-bold hover:underline">Terms of Service</Link> &amp;{" "}
+                      <Link to="/privacy" target="_blank" className="text-brand-600 font-bold hover:underline">Privacy Policy</Link>.
                     </label>
                   </div>
 

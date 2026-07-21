@@ -266,8 +266,7 @@ function eventDefinition(eventType) {
           normalizeIdList(payload.customerId || payload.userId),
         title: () => "Return Request Rejected",
         body: (payload) =>
-          `Your return request for order #${payload.orderId || ""} was rejected.${
-            payload.data?.reason ? " Reason: " + payload.data.reason : ""
+          `Your return request for order #${payload.orderId || ""} was rejected.${payload.data?.reason ? " Reason: " + payload.data.reason : ""
           }`,
       };
     case NOTIFICATION_EVENTS.NEW_RETURN_BROADCAST:
@@ -286,10 +285,9 @@ function eventDefinition(eventType) {
         recipientIds: (payload) => normalizeIdList(payload.deliveryId),
         title: () => "Return Pickup Assigned",
         body: (payload) =>
-          `Return pickup for order #${payload.orderId || ""}.${
-            payload.data?.commission
-              ? " Commission: ₹" + payload.data.commission + "."
-              : ""
+          `Return pickup for order #${payload.orderId || ""}.${payload.data?.commission
+            ? " Commission: ₹" + payload.data.commission + "."
+            : ""
           } Check app for details.`,
       };
     case NOTIFICATION_EVENTS.RETURN_PICKUP_OTP:
@@ -340,8 +338,7 @@ function eventDefinition(eventType) {
           normalizeIdList(payload.customerId || payload.userId),
         title: () => "QC Passed — Refund Initiated 💸",
         body: (payload) =>
-          `Quality check passed for order #${payload.orderId || ""}. Refund of ₹${
-            payload.data?.refundAmount || 0
+          `Quality check passed for order #${payload.orderId || ""}. Refund of ₹${payload.data?.refundAmount || 0
           } credited to your wallet.`,
       };
     case NOTIFICATION_EVENTS.RETURN_QC_FAILED:
@@ -351,8 +348,7 @@ function eventDefinition(eventType) {
           normalizeIdList(payload.customerId || payload.userId),
         title: () => "QC Failed — No Refund",
         body: (payload) =>
-          `Quality check failed for order #${payload.orderId || ""}. No refund will be issued.${
-            payload.data?.note ? " Note: " + payload.data.note : ""
+          `Quality check failed for order #${payload.orderId || ""}. No refund will be issued.${payload.data?.note ? " Note: " + payload.data.note : ""
           }`,
       };
     case NOTIFICATION_EVENTS.SUPPORT_TICKET_MESSAGE:
@@ -496,49 +492,49 @@ function eventData(eventType, payload = {}, role) {
     };
   }
 
-    if (eventType === NOTIFICATION_EVENTS.NEW_SELLER_REGISTERED) {
-      const sellerId = String(payload.sellerId || "").trim() || undefined;
-      return {
-        eventType,
-        sellerId,
-        sellerName: String(payload.sellerName || "").trim() || undefined,
-        shopName: String(payload.shopName || "").trim() || undefined,
-        email: String(payload.email || "").trim() || undefined,
-        phone: String(payload.phone || "").trim() || undefined,
-        link: buildAppPath("/admin/pending-sellers"),
-        ...(payload.data || {}),
-      };
-    }
+  if (eventType === NOTIFICATION_EVENTS.NEW_SELLER_REGISTERED) {
+    const sellerId = String(payload.sellerId || "").trim() || undefined;
+    return {
+      eventType,
+      sellerId,
+      sellerName: String(payload.sellerName || "").trim() || undefined,
+      shopName: String(payload.shopName || "").trim() || undefined,
+      email: String(payload.email || "").trim() || undefined,
+      phone: String(payload.phone || "").trim() || undefined,
+      link: buildAppPath("/admin/pending-sellers"),
+      ...(payload.data || {}),
+    };
+  }
 
-    if (eventType === NOTIFICATION_EVENTS.NEW_DELIVERY_REGISTERED) {
-      const deliveryId = String(payload.deliveryId || "").trim() || undefined;
-      return {
-        eventType,
-        deliveryId,
-        deliveryName: String(payload.deliveryName || "").trim() || undefined,
-        email: String(payload.email || "").trim() || undefined,
-        phone: String(payload.phone || "").trim() || undefined,
-        link: buildAppPath("/admin/pending-riders"),
-        ...(payload.data || {}),
-      };
-    }
+  if (eventType === NOTIFICATION_EVENTS.NEW_DELIVERY_REGISTERED) {
+    const deliveryId = String(payload.deliveryId || "").trim() || undefined;
+    return {
+      eventType,
+      deliveryId,
+      deliveryName: String(payload.deliveryName || "").trim() || undefined,
+      email: String(payload.email || "").trim() || undefined,
+      phone: String(payload.phone || "").trim() || undefined,
+      link: buildAppPath("/admin/pending-riders"),
+      ...(payload.data || {}),
+    };
+  }
 
-    if (eventType === NOTIFICATION_EVENTS.DELIVERY_APPROVED || eventType === NOTIFICATION_EVENTS.DELIVERY_REJECTED) {
-      const deliveryId = String(payload.deliveryId || "").trim() || undefined;
-      return {
-        eventType,
-        deliveryId,
-        link: buildAppPath("/delivery"),
-        ...(payload.data || {}),
-      };
-    }
+  if (eventType === NOTIFICATION_EVENTS.DELIVERY_APPROVED || eventType === NOTIFICATION_EVENTS.DELIVERY_REJECTED) {
+    const deliveryId = String(payload.deliveryId || "").trim() || undefined;
+    return {
+      eventType,
+      deliveryId,
+      link: buildAppPath("/delivery"),
+      ...(payload.data || {}),
+    };
+  }
 
   const orderId = String(payload.orderId || "").trim() || undefined;
   const checkoutGroupId = String(payload.checkoutGroupId || "").trim() || undefined;
   const link =
     role === NOTIFICATION_ROLES.ADMIN &&
-    (eventType === NOTIFICATION_EVENTS.RETURN_REQUESTED ||
-      eventType === NOTIFICATION_EVENTS.RETURN_COMPLETED)
+      (eventType === NOTIFICATION_EVENTS.RETURN_REQUESTED ||
+        eventType === NOTIFICATION_EVENTS.RETURN_COMPLETED)
       ? buildAdminReturnsLink(orderId)
       : buildOrderLink(orderId);
   return {
