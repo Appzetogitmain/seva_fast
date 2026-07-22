@@ -150,7 +150,10 @@ const Dashboard = () => {
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24 relative overflow-hidden font-sans">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 pt-12 pb-4 flex justify-between items-center sticky top-0 z-30 transition-all duration-300">
+      <header 
+        style={{ paddingTop: 'max(48px, env(safe-area-inset-top))' }}
+        className="bg-primary/5 border-b border-primary/10 backdrop-blur-md px-6 pb-4 flex justify-between items-center sticky top-0 z-30 transition-all duration-300"
+      >
         <div className="flex items-center space-x-3">
           <div
             className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary ring-2 ring-primary/20 shadow-sm cursor-pointer"
