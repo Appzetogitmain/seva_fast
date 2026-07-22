@@ -340,11 +340,12 @@ export const loginSeller = async (req, res) => {
         const { email, password } = req.body;
 
         if (!email || !password) {
-            return handleResponse(res, 400, "Email and password are required");
+            return handleResponse(res, 400, "Email/Phone and password are required");
         }
 
-        // Include password for comparison
-        const seller = await Seller.findOne({ email }).select("+password");
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        const query = isEmail ? { email } : { phone: email };
+        const seller = await Seller.findOne(query).select("+password");
 
         if (!seller) {
             return handleResponse(res, 404, "Seller not found");

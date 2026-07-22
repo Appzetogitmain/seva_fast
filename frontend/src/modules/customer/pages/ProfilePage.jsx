@@ -888,24 +888,24 @@ const ReferralTreeModal = ({ isOpen, onClose, user }) => {
                         <>
                             {/* Stats Summary */}
                             <div className="grid grid-cols-3 gap-3 bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm text-center">
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Referrals</p>
-                                    <p className="text-xl font-extrabold text-indigo-600">{stats.total}</p>
-                                    <p className="text-[9px] font-black text-indigo-500 mt-0.5">₹{totalEarnings.toFixed(2)}</p>
+                                <div className="min-w-0 overflow-hidden">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Total Referrals</p>
+                                    <p className="text-xl font-extrabold text-indigo-600 truncate">{stats.total}</p>
+                                    <p className="text-[9px] font-black text-indigo-500 mt-0.5 truncate">₹{totalEarnings.toFixed(2)}</p>
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Level 1</p>
-                                    <p className="text-xl font-extrabold text-emerald-600">{stats.levels[1] || 0}</p>
-                                    <p className="text-[9px] font-black text-emerald-500 mt-0.5">₹{level1Earnings.toFixed(2)}</p>
+                                <div className="min-w-0 overflow-hidden">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Level 1</p>
+                                    <p className="text-xl font-extrabold text-emerald-600 truncate">{stats.levels[1] || 0}</p>
+                                    <p className="text-[9px] font-black text-emerald-500 mt-0.5 truncate">₹{level1Earnings.toFixed(2)}</p>
                                 </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Level 2+</p>
-                                    <p className="text-xl font-extrabold text-amber-600">
+                                <div className="min-w-0 overflow-hidden">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate">Level 2+</p>
+                                    <p className="text-xl font-extrabold text-amber-600 truncate">
                                         {Object.entries(stats.levels)
                                             .filter(([lvl]) => Number(lvl) > 1)
                                             .reduce((sum, [, count]) => sum + count, 0)}
                                     </p>
-                                    <p className="text-[9px] font-black text-amber-500 mt-0.5">₹{level2PlusEarnings.toFixed(2)}</p>
+                                    <p className="text-[9px] font-black text-amber-500 mt-0.5 truncate">₹{level2PlusEarnings.toFixed(2)}</p>
                                 </div>
                             </div>
 

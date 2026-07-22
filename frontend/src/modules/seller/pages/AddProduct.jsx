@@ -38,9 +38,16 @@ const AddProduct = () => {
   const isAutoSku = (sku, name, index = 1) =>
     String(sku || "").toLowerCase() === makeSku(name, index);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    slug: "",
+  const [formData, setFormData] = useState(() => {
+    const saved = localStorage.getItem("seller_add_product_draft");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      name: "",
+      slug: "",
     sku: "",
     description: "",
     price: "",
@@ -69,10 +76,15 @@ const AddProduct = () => {
         sku: "",
       },
     ],
+    };
   });
 
   const [dbCategories, setDbCategories] = useState([]);
   const [isLoadingCats, setIsLoadingCats] = useState(true);
+
+  useEffect(() => {
+    localStorage.setItem("seller_add_product_draft", JSON.stringify(formData));
+  }, [formData]);
 
   useEffect(() => {
     setFormData((prev) => {
@@ -145,6 +157,13 @@ const AddProduct = () => {
       return;
     }
 
+    for (const variant of formData.variants) {
+      if (variant.salePrice && Number(variant.salePrice) >= Number(variant.price)) {
+        toast.error(`Sale price must be less than regular price for variant "${variant.name || 'main'}".`);
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const data = new FormData();
@@ -189,7 +208,9 @@ const AddProduct = () => {
       const response = await sellerApi.createProduct(data);
       const approvalStatus = response?.data?.result?.approvalStatus;
       if (approvalStatus === "pending") {
-        toast.success("Product submitted for admin approval");
+        toast.success("Product published successfully!");
+        localStorage.removeItem("seller_add_product_draft");
+        navigate(-1);
       } else {
         toast.success(response?.data?.message || "Product saved successfully!");
       }
@@ -502,10 +523,11 @@ const AddProduct = () => {
                       </label>
                       <input
                         type="number"
+                        min="0"
                         value={variant.price}
                         onChange={(e) => {
                           const newVariants = [...formData.variants];
-                          newVariants[index].price = e.target.value;
+                          newVariants[index].price = Math.max(0, Number(e.target.value));
                           setFormData({ ...formData, variants: newVariants });
                         }}
                         placeholder="500"
@@ -518,10 +540,11 @@ const AddProduct = () => {
                       </label>
                       <input
                         type="number"
+                        min="0"
                         value={variant.salePrice}
                         onChange={(e) => {
                           const newVariants = [...formData.variants];
-                          newVariants[index].salePrice = e.target.value;
+                          newVariants[index].salePrice = Math.max(0, Number(e.target.value));
                           setFormData({ ...formData, variants: newVariants });
                         }}
                         placeholder="450"
@@ -534,10 +557,11 @@ const AddProduct = () => {
                       </label>
                       <input
                         type="number"
+                        min="0"
                         value={variant.stock}
                         onChange={(e) => {
                           const newVariants = [...formData.variants];
-                          newVariants[index].stock = e.target.value;
+                          newVariants[index].stock = Math.max(0, Number(e.target.value));
                           setFormData({ ...formData, variants: newVariants });
                         }}
                         placeholder="10"
@@ -670,6 +694,8 @@ const AddProduct = () => {
                   <div className="w-48 aspect-square rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center group hover:border-primary hover:bg-primary/5 transition-all cursor-pointer overflow-hidden relative">
                     <input
                       type="file"
+                      accept="image/*,video/*"
+                      capture="environment"
                       className="absolute inset-0 opacity-0 cursor-pointer z-10"
                       onChange={(e) => handleImageUpload(e, "main")}
                     />
@@ -721,6 +747,8 @@ const AddProduct = () => {
                         <>
                           <input
                             type="file"
+                            accept="image/*,video/*"
+                            capture="environment"
                             className="absolute inset-0 opacity-0 cursor-pointer z-10"
                             onChange={(e) => handleImageUpload(e, "gallery")}
                           />
@@ -742,7 +770,43 @@ const AddProduct = () => {
             </div>
           )}
 
-          
+          {/* Navigation Buttons */}
+          <div className="flex justify-between items-center mt-12 pt-6 border-t border-slate-100">
+            {modalTab !== "general" ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const tabs = ["general", "variants", "category", "media"];
+                  const currentIdx = tabs.indexOf(modalTab);
+                  if (currentIdx > 0) setModalTab(tabs[currentIdx - 1]);
+                }}
+                className="px-6 py-2.5 text-slate-600 border-slate-200 hover:bg-slate-50 font-bold"
+              >
+                ← Previous Step
+              </Button>
+            ) : <div />}
+
+            {modalTab !== "media" ? (
+              <Button
+                onClick={() => {
+                  const tabs = ["general", "variants", "category", "media"];
+                  const currentIdx = tabs.indexOf(modalTab);
+                  if (currentIdx < tabs.length - 1) setModalTab(tabs[currentIdx + 1]);
+                }}
+                className="px-6 py-2.5 bg-brand-500 text-white font-bold hover:bg-brand-600"
+              >
+                Next Step →
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-8 py-2.5 bg-black text-white hover:bg-slate-900 shadow-[0_10px_30px_rgba(0,0,0,0.2)] font-black tracking-widest text-xs uppercase"
+              >
+                {isSaving ? "Saving..." : "Save & Publish"}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

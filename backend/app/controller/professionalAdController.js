@@ -503,7 +503,14 @@ export const initiatePayMyAd = async (req, res) => {
             receipt: `pr_${String(ad._id).slice(-10)}_${String(Date.now()).slice(-8)}`
         };
 
-        const order = await razorpayInstance.orders.create(options);
+        let order;
+        try {
+            order = await razorpayInstance.orders.create(options);
+        } catch (rzpError) {
+            console.error("Razorpay orders.create error:", rzpError);
+            return handleResponse(res, 400, "Razorpay configuration error: Invalid API keys or authentication failed.");
+        }
+
         return handleResponse(res, 200, "Razorpay order initiated successfully", {
             isFree: false,
             orderId: order.id,

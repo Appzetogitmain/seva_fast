@@ -14,6 +14,7 @@ export const adminApi = {
     updateSellerDetails: (id, data) => axiosInstance.put(`/admin/sellers/${id}`, data),
     approveSeller: (id) => axiosInstance.patch(`/admin/sellers/approve/${id}`),
     rejectSeller: (id, data) => axiosInstance.delete(`/admin/sellers/reject/${id}`, { data }),
+    deleteSeller: (id) => axiosInstance.delete(`/admin/sellers/${id}`),
     getAdminWalletData: (params) => axiosInstance.get('/admin/wallet-data', { params }),
     getReports: () => axiosInstance.get('/admin/reports'),
     getProfile: () => axiosInstance.get('/admin/profile'),

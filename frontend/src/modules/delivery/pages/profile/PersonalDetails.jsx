@@ -16,9 +16,18 @@ const PersonalDetails = () => {
     phone: "",
     email: "",
     address: "",
-    dob: "1995-08-15",
+    dob: "15/08/1995",
     bloodGroup: "O+",
   });
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "15/08/1995";
+    if (dateString.includes("-")) {
+      const parts = dateString.split("-");
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateString;
+  };
 
   useEffect(() => {
     if (user) {
@@ -27,7 +36,7 @@ const PersonalDetails = () => {
         phone: user.phone || "",
         email: user.email || "",
         address: user.address || "",
-        dob: user.dob || "1995-08-15",
+        dob: formatDate(user.dob),
         bloodGroup: user.bloodGroup || "O+",
       });
     }

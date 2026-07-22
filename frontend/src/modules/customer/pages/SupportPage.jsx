@@ -17,6 +17,7 @@ const SupportPage = () => {
     const { showToast } = useToast();
     const { settings } = useSettings();
     const supportEmail = settings?.supportEmail || '';
+    const supportPhone = settings?.supportPhone || '';
     const supportEmailShort = supportEmail ? (supportEmail.length > 12 ? supportEmail.slice(0, 12) + '...' : supportEmail) : 'support@...';
     const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
     const [ticketLoading, setTicketLoading] = useState(false);
@@ -115,8 +116,29 @@ const SupportPage = () => {
                         sub="Formal Request"
                         onClick={() => setIsTicketModalOpen(true)}
                     />
-                    <ContactCard icon={Phone} label="Call Us" sub="+91 98765..." />
-                    <ContactCard icon={Mail} label="Email Us" sub={supportEmailShort} />
+                    <ContactCard
+                        icon={Phone}
+                        label="Call Us"
+                        sub={supportPhone || 'Not available'}
+                        onClick={() => {
+                            if (!supportPhone) return;
+                            const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+                            if (isMobile) {
+                                window.location.href = `tel:${supportPhone}`;
+                            } else {
+                                navigator.clipboard.writeText(supportPhone)
+                                    .then(() => showToast('Phone number copied!', 'success'))
+                                    .catch(() => showToast('Copy failed, number: ' + supportPhone, 'info'));
+                            }
+                        }}
+                    />
+                    <ContactCard
+                        icon={Mail}
+                        label="Email Us"
+                        sub={supportEmailShort}
+                        href={supportEmail ? `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(supportEmail)}` : undefined}
+                        newTab
+                    />
                 </div>
 
                 {/* FAQ Section */}
@@ -145,9 +167,6 @@ const SupportPage = () => {
                     <div className="space-y-3">
                         <Link to="/terms" className="flex items-center gap-2.5 text-slate-700 hover:text-slate-900 font-medium">
                             <FileText size={18} /> Terms & Conditions
-                        </Link>
-                        <Link to="/privacy" className="flex items-center gap-2.5 text-slate-700 hover:text-slate-900 font-medium">
-                            <FileText size={18} /> Privacy Policy
                         </Link>
                     </div>
                 </div>
@@ -253,12 +272,9 @@ const SupportPage = () => {
     );
 };
 
-const ContactCard = ({ icon: Icon, label, sub, to, onClick }) => {
-    const CardContent = (
-        <div
-            onClick={onClick}
-            className="bg-white p-3.5 rounded-xl border border-slate-200 flex flex-col items-center justify-center text-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer group h-full"
-        >
+const ContactCard = ({ icon: Icon, label, sub, to, onClick, href, newTab }) => {
+    const innerContent = (
+        <>
             <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 group-hover:text-slate-800 transition-colors">
                 <Icon size={20} />
             </div>
@@ -266,10 +282,33 @@ const ContactCard = ({ icon: Icon, label, sub, to, onClick }) => {
                 <h3 className="font-semibold text-slate-800 text-sm whitespace-nowrap">{label}</h3>
                 <p className="text-[10px] text-slate-500 font-medium">{sub}</p>
             </div>
-        </div>
+        </>
     );
 
-    return to ? <Link to={to} className="block h-full">{CardContent}</Link> : CardContent;
+    const commonClass = "bg-white p-3.5 rounded-xl border border-slate-200 flex flex-col items-center justify-center text-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer group h-full w-full";
+
+    if (to) {
+        return <Link to={to} className={commonClass}>{innerContent}</Link>;
+    }
+
+    if (href) {
+        return (
+            <a
+                href={href}
+                target={newTab ? "_blank" : "_self"}
+                rel="noopener noreferrer"
+                className={commonClass}
+            >
+                {innerContent}
+            </a>
+        );
+    }
+
+    return (
+        <button type="button" onClick={onClick} className={commonClass}>
+            {innerContent}
+        </button>
+    );
 };
 
 const FAQItem = ({ question, answer }) => {

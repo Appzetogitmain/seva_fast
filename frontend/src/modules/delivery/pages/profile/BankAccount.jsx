@@ -10,7 +10,7 @@ import { toast } from "sonner";
 const BankAccount = () => {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
-  
+
   const [newAccountNumber, setNewAccountNumber] = useState("");
   const [confirmAccountNumber, setConfirmAccountNumber] = useState("");
   const [ifsc, setIfsc] = useState("");
@@ -18,8 +18,8 @@ const BankAccount = () => {
 
   const bankDetails = {
     accountHolder: user?.accountHolder || user?.name || "Not Set",
-    accountNumber: user?.accountNumber 
-      ? `XXXXXX${user.accountNumber.slice(-4)}` 
+    accountNumber: user?.accountNumber
+      ? `XXXXXX${user.accountNumber.slice(-4)}`
       : "Not Configured",
     ifsc: user?.ifsc || "N/A",
     bankName: user?.ifsc ? `${user.ifsc.slice(0, 4).toUpperCase()} Bank` : "N/A",
@@ -62,8 +62,8 @@ const BankAccount = () => {
       {/* Header */}
       <div className="bg-white shadow-sm sticky top-0 z-10">
         <div className="flex items-center p-4">
-          <button 
-            onClick={() => navigate(-1)} 
+          <button
+            onClick={() => navigate(-1)}
             className="p-2 rounded-full hover:bg-gray-100 transition-colors mr-2"
           >
             <ArrowLeft size={20} className="text-gray-600" />
@@ -74,29 +74,29 @@ const BankAccount = () => {
 
       <div className="p-4 max-w-lg mx-auto space-y-6">
         {/* Bank Card Visual */}
-        <div className="bg-gradient-to-br from-brand-900 to-brand-800 text-white p-6 rounded-2xl shadow-xl relative overflow-hidden">
+        <div className="bg-gradient-to-br from-blue-900 to-blue-800 text-white p-6 rounded-2xl shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-          
+
           <div className="flex justify-between items-start mb-8 relative z-10">
             <Landmark size={32} className="text-white/80" />
-            <span className="bg-brand-500/20 text-brand-300 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-brand-500/30 flex items-center">
+            <span className="bg-blue-500/20 text-blue-200 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-blue-500/30 flex items-center">
               <CheckCircle2 size={12} className="mr-1" /> {bankDetails.status}
             </span>
           </div>
 
           <div className="space-y-1 relative z-10">
-            <p className="text-brand-200 text-xs uppercase tracking-wider">Account Number</p>
+            <p className="text-blue-200 text-xs uppercase tracking-wider">Account Number</p>
             <p className="font-mono text-2xl tracking-widest">{bankDetails.accountNumber}</p>
           </div>
 
           <div className="flex justify-between items-end mt-8 relative z-10">
             <div>
-              <p className="text-brand-200 text-xs uppercase tracking-wider mb-1">Account Holder</p>
+              <p className="text-blue-200 text-xs uppercase tracking-wider mb-1">Account Holder</p>
               <p className="font-bold text-lg">{bankDetails.accountHolder}</p>
             </div>
             <div className="text-right">
               <p className="text-white font-bold">{bankDetails.bankName}</p>
-              <p className="text-brand-200 text-xs">{bankDetails.ifsc}</p>
+              <p className="text-blue-200 text-xs">{bankDetails.ifsc}</p>
             </div>
           </div>
         </div>
@@ -107,7 +107,7 @@ const BankAccount = () => {
           <div>
             <h4 className="text-yellow-800 font-bold text-sm mb-1">Payment Information</h4>
             <p className="text-xs text-yellow-700 leading-relaxed">
-              Your weekly earnings will be deposited to this account every Tuesday. 
+              Your weekly earnings will be deposited to this account every Tuesday.
               Changes to bank details may delay your next payout by up to 7 days.
             </p>
           </div>
@@ -117,32 +117,32 @@ const BankAccount = () => {
         <div className="pt-4">
           <h3 className="ds-h4 text-gray-900 mb-4">Request Change</h3>
           <div className="space-y-4">
-            <Input 
-              label="New Account Number" 
-              placeholder="Enter account number" 
+            <Input
+              label="New Account Number"
+              placeholder="Enter account number"
               icon={CreditCard}
               value={newAccountNumber}
               onChange={(e) => setNewAccountNumber(e.target.value)}
               disabled={isLoading}
             />
-            <Input 
-              label="Confirm Account Number" 
-              placeholder="Re-enter account number" 
+            <Input
+              label="Confirm Account Number"
+              placeholder="Re-enter account number"
               icon={CreditCard}
               value={confirmAccountNumber}
               onChange={(e) => setConfirmAccountNumber(e.target.value)}
               disabled={isLoading}
             />
-            <Input 
-              label="IFSC Code" 
-              placeholder="Enter IFSC code" 
+            <Input
+              label="IFSC Code"
+              placeholder="Enter IFSC code"
               icon={Landmark}
               value={ifsc}
               onChange={(e) => setIfsc(e.target.value)}
               disabled={isLoading}
             />
-            <Button 
-              className="w-full mt-2" 
+            <Button
+              className="w-full mt-2"
               variant="outline"
               onClick={handleUpdate}
               disabled={isLoading}

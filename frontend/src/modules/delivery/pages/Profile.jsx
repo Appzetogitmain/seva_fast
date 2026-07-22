@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   User,
@@ -23,11 +23,14 @@ import { useAuth } from "@core/context/AuthContext";
 import { useSettings } from "@core/context/SettingsContext";
 import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 import axiosInstance from '@core/api/axios';
-import { useEffect } from 'react';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const { requestSignOut, signOutDialog } = useSignOutConfirmation();
   const { settings } = useSettings();
   const appName = settings?.appName || "App";

@@ -144,9 +144,9 @@ const SellerProfile = () => {
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8 font-['Outfit']">
       {/* Header Section */}
-      <div className="relative mb-24 px-4">
+      <div className="mb-8 px-4">
         {/* Banner Background */}
-        <div className="bg-linear-to-r from-slate-900 via-slate-950 to-black h-64 rounded-lg shadow-2xl relative overflow-hidden">
+        <div className="bg-linear-to-r from-slate-900 via-slate-950 to-black h-64 rounded-2xl shadow-2xl relative overflow-hidden">
           <div className="absolute inset-0 opacity-20">
             <div className="absolute top-0 left-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
             <div className="absolute bottom-0 right-0 w-96 h-96 bg-slate-500/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
@@ -154,7 +154,7 @@ const SellerProfile = () => {
         </div>
 
         {/* Profile Info Row */}
-        <div className="absolute bottom-8 left-4 right-4 md:left-8 md:right-8 lg:left-12 lg:right-12 grid grid-cols-1 md:grid-cols-[176px_minmax(0,1fr)_auto] items-center md:items-end gap-6 md:gap-8">
+        <div className="relative -mt-24 mx-4 md:mx-8 lg:mx-12 grid grid-cols-1 md:grid-cols-[176px_minmax(0,1fr)_auto] items-center md:items-end gap-6 md:gap-8">
           {/* Avatar Container */}
           <div className="h-44 w-44 rounded-full bg-white p-2 shadow-[0_30px_70px_rgba(0,0,0,0.15)] flex-shrink-0 mx-auto md:mx-0">
             <div className="h-full w-full rounded-full bg-slate-50 flex items-center justify-center border-4 border-slate-50">
@@ -167,7 +167,7 @@ const SellerProfile = () => {
           {/* Info Block */}
           <div className="min-w-0 pb-2 md:pb-4 text-center md:text-left">
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mb-3">
-              <span className="px-4 py-1.5 bg-white/10 backdrop-blur-xl text-white text-[10px] font-black uppercase tracking-[2px] rounded-full border border-white/20">
+              <span className="px-4 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-[2px] rounded-full border border-slate-200">
                 {profile?.role}
               </span>
               <button
@@ -185,10 +185,10 @@ const SellerProfile = () => {
                 {profile?.isActive ? "Active" : "Inactive"}
               </button>
             </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tighter drop-shadow-sm mb-1 break-words">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tighter drop-shadow-sm mb-1 break-words">
               {profile?.name}
             </h1>
-            <p className="text-white/60 font-black tracking-[1px] text-lg">
+            <p className="text-slate-500 font-black tracking-[1px] text-lg">
               {profile?.shopName}
             </p>
           </div>
@@ -198,7 +198,7 @@ const SellerProfile = () => {
             {!isEditing ? (
               <Button
                 onClick={() => setIsEditing(true)}
-                className="w-full md:w-auto bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-white hover:text-slate-950 transition-all rounded-lg px-6 lg:px-12 py-4 md:py-5 flex items-center justify-center gap-3 md:gap-4 font-black tracking-[2px] md:tracking-[3px] text-xs shadow-[0_20px_40px_rgba(0,0,0,0.1)] hover:scale-[1.03] active:scale-[0.95] whitespace-nowrap">
+                className="w-full md:w-auto bg-slate-900 text-white hover:bg-slate-800 transition-all rounded-lg px-6 lg:px-12 py-4 md:py-5 flex items-center justify-center gap-3 md:gap-4 font-black tracking-[2px] md:tracking-[3px] text-xs shadow-lg hover:shadow-xl hover:scale-[1.03] active:scale-[0.95] whitespace-nowrap">
                 <Edit2 size={18} /> EDIT PROFILE
               </Button>
             ) : (
@@ -206,13 +206,13 @@ const SellerProfile = () => {
                 <Button
                   onClick={() => setIsEditing(false)}
                   variant="outline"
-                  className="h-[64px] w-[64px] flex items-center justify-center bg-white/5 text-white border border-white/20 hover:bg-white hover:text-slate-900 rounded-lg shadow-lg transition-all backdrop-blur-md">
+                  className="h-[64px] w-[64px] flex items-center justify-center bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg shadow-sm transition-all">
                   <X size={24} className="stroke-[2.5]" />
                 </Button>
                 <Button
                   onClick={handleSubmit}
                   disabled={isSaving}
-                  className="min-w-0 max-w-full bg-white text-slate-950 hover:bg-slate-100 rounded-lg px-5 md:px-8 lg:px-12 py-4 md:py-5 font-black tracking-[2px] md:tracking-[3px] text-xs flex items-center gap-3 md:gap-4 shadow-[0_25px_50px_rgba(0,0,0,0.15)] h-[64px] whitespace-nowrap">
+                  className="min-w-0 max-w-full bg-slate-900 text-white hover:bg-slate-800 rounded-lg px-5 md:px-8 lg:px-12 py-4 md:py-5 font-black tracking-[2px] md:tracking-[3px] text-xs flex items-center gap-3 md:gap-4 shadow-lg h-[64px] whitespace-nowrap">
                   {isSaving ? (
                     "UPDATING..."
                   ) : (
@@ -333,10 +333,10 @@ const SellerProfile = () => {
 
             <div className="space-y-6">
               <div className="bg-slate-50 p-6 rounded-2xl border-2 border-slate-100/50 space-y-6">
-                <div className="flex items-center justify-between gap-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
                   <div className="flex items-center gap-4">
                     <div
-                      className={`h-12 w-12 rounded-xl flex items-center justify-center transition-all ${
+                      className={`h-12 w-12 shrink-0 rounded-xl flex items-center justify-center transition-all ${
                         formData.lat
                           ? "bg-brand-100 text-brand-600 shadow-[0_8px_20px_-6px_rgba(16,185,129,0.3)]"
                           : "bg-white text-slate-400 shadow-sm"
@@ -359,7 +359,7 @@ const SellerProfile = () => {
                     <Button
                       type="button"
                       onClick={() => setIsMapOpen(true)}
-                      className="bg-white text-slate-900 border-2 border-slate-200 hover:border-slate-900 rounded-lg px-8 py-3 text-[10px] font-black tracking-[2px] shadow-sm hover:shadow-md transition-all whitespace-nowrap">
+                      className="w-full sm:w-auto bg-white text-slate-900 border-2 border-slate-200 hover:border-slate-900 rounded-lg px-8 py-3 text-[10px] font-black tracking-[2px] shadow-sm hover:shadow-md transition-all whitespace-nowrap">
                       CHANGE PIN
                     </Button>
                   )}

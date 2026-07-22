@@ -5,7 +5,8 @@ import {
     HiOutlineUserCircle,
     HiOutlineBell,
     HiOutlineSearch,
-    HiOutlineMenu
+    HiOutlineMenu,
+    HiOutlineArrowLeft
 } from 'react-icons/hi';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ const Topbar = ({ onMenuClick }) => {
     const [notifications, setNotifications] = React.useState([]);
     const [unreadCount, setUnreadCount] = React.useState(0);
     const [showNotifications, setShowNotifications] = React.useState(false);
+    const [isMobileSearchOpen, setIsMobileSearchOpen] = React.useState(false);
     const notificationRef = React.useRef(null);
 
     const isSeller = location.pathname.startsWith('/seller');
@@ -152,6 +154,35 @@ const Topbar = ({ onMenuClick }) => {
         requestSignOut();
     };
 
+    if (isMobileSearchOpen) {
+        return (
+            <header className={cn(
+                "bg-white/70 backdrop-blur-xl border-b border-gray-100/50 flex items-center px-4 h-14 shadow-[0_4px_30px_rgba(0,0,0,0.02)] transition-all duration-300",
+                (role === 'admin' || role === 'seller')
+                    ? "fixed top-0 left-0 right-0 z-[200] md:hidden"
+                    : "fixed top-0 left-0 right-0 z-40 md:hidden"
+            )}>
+                <button
+                    onClick={() => setIsMobileSearchOpen(false)}
+                    className="p-2 mr-3 bg-gray-100/80 hover:bg-gray-200 rounded-xl text-gray-600 transition-all shadow-sm flex-shrink-0"
+                >
+                    <HiOutlineArrowLeft className="h-5 w-5" />
+                </button>
+                <form onSubmit={(e) => { handleSearchSubmit(e); setIsMobileSearchOpen(false); }} className="relative flex-1 group">
+                    <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 focus-within:text-primary transition-all duration-300" />
+                    <input
+                        type="text"
+                        autoFocus
+                        placeholder={isSeller ? "Search products..." : "Search anything..."}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-gray-100/50 border border-transparent rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary/20 outline-none"
+                    />
+                </form>
+            </header>
+        );
+    }
+
     return (
         <>
         <header className={cn(
@@ -181,15 +212,24 @@ const Topbar = ({ onMenuClick }) => {
                     )}
                 </div>
 
-                <form onSubmit={handleSearchSubmit} className="relative w-full md:w-[400px] group hidden md:block">
+                {/* Mobile Search Button */}
+                <button
+                    onClick={() => setIsMobileSearchOpen(true)}
+                    className="p-2 bg-gray-100/50 rounded-xl text-gray-500 hover:text-primary md:hidden ml-auto mr-2"
+                >
+                    <HiOutlineSearch className="h-5 w-5" />
+                </button>
+
+                {/* Desktop Search Input */}
+                <form onSubmit={handleSearchSubmit} className="relative hidden md:flex flex-1 md:w-[400px] group">
                     <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-all duration-300" />
                     <input
                         type="text"
-                        placeholder={isSeller ? "Search products by name or SKU..." : "Search anything..."}
+                        placeholder={isSeller ? "Search products..." : "Search anything..."}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
-                        className="w-full pl-10 pr-4 py-2 bg-gray-100/50 border border-transparent rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary/20 transition-all duration-500 outline-none"
+                        className="w-full pl-9 pr-3 py-2 bg-gray-100/50 border border-transparent rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary/20 transition-all duration-500 outline-none"
                     />
                 </form>
             </div>

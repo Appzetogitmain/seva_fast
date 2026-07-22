@@ -65,7 +65,7 @@ export const signupDelivery = async (req, res) => {
             email, address, vehicleNumber,
             drivingLicenseNumber,
             accountHolder, accountNumber, ifsc,
-            sellerCode
+            sellerCode, dob, bloodGroup, aadharNumber, panNumber
         } = req.body;
 
         if (!name || !phone) {
@@ -141,6 +141,10 @@ export const signupDelivery = async (req, res) => {
             accountNumber,
             ifsc,
             sellerId,
+            dob,
+            bloodGroup,
+            aadharNumber,
+            panNumber,
             profileImage: profileImageUrl,
             documents: {
                 aadhar: aadharUrl,
@@ -335,7 +339,11 @@ export const updateDeliveryProfile = async (req, res) => {
             address,
             accountHolder,
             accountNumber,
-            ifsc
+            ifsc,
+            dob,
+            bloodGroup,
+            aadharNumber,
+            panNumber
         } = req.body;
 
         const delivery = await Delivery.findById(req.user.id);
@@ -354,6 +362,10 @@ export const updateDeliveryProfile = async (req, res) => {
         if (accountHolder !== undefined) delivery.accountHolder = accountHolder;
         if (accountNumber !== undefined) delivery.accountNumber = accountNumber;
         if (ifsc !== undefined) delivery.ifsc = ifsc;
+        if (dob !== undefined) delivery.dob = dob;
+        if (bloodGroup !== undefined) delivery.bloodGroup = bloodGroup;
+        if (aadharNumber !== undefined) delivery.aadharNumber = aadharNumber;
+        if (panNumber !== undefined) delivery.panNumber = panNumber;
 
         await delivery.save();
 

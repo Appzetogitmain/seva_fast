@@ -630,9 +630,9 @@ const ProductManagement = () => {
                 <HiOutlineFunnel className="h-4 w-4" />
                 <span>Filters</span>
               </button>
-              
+
               {isFilterOpen && (
-                <div className="absolute z-[100] right-0 top-full mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-xl p-4 space-y-3">
+                <div className="absolute z-[100] right-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white shadow-xl p-4 space-y-3">
                   <div>
                     <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-[0.18em] mb-1">
                       Status

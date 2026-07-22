@@ -16,6 +16,8 @@ import {
   X,
   Camera,
   XCircle,
+  Calendar,
+  Droplet,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Lottie from "lottie-react";
@@ -58,6 +60,8 @@ const DeliveryAuth = () => {
   const [signupPhone, setSignupPhone] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupAddress, setSignupAddress] = useState("");
+  const [signupDob, setSignupDob] = useState("");
+  const [signupBloodGroup, setSignupBloodGroup] = useState("");
   const [signupVehicle, setSignupVehicle] = useState("bike");
   const [signupVehicleNumber, setSignupVehicleNumber] = useState("");
   const [signupDLNumber, setSignupDLNumber] = useState("");
@@ -132,11 +136,15 @@ const DeliveryAuth = () => {
         formData.append("vehicleType", signupVehicle);
         formData.append("email", signupEmail);
         formData.append("address", signupAddress);
+        if (signupDob) formData.append("dob", signupDob);
+        if (signupBloodGroup) formData.append("bloodGroup", signupBloodGroup);
         formData.append("vehicleNumber", signupVehicleNumber);
         formData.append("drivingLicenseNumber", signupDLNumber);
         formData.append("accountHolder", signupAccountHolder);
         formData.append("accountNumber", signupAccountNumber);
         formData.append("ifsc", signupIfsc);
+        if (signupAadharNumber) formData.append("aadharNumber", signupAadharNumber);
+        if (signupPanNumber) formData.append("panNumber", signupPanNumber);
         formData.append("sellerCode", signupSellerCode.trim().toUpperCase());
 
         if (profileImageFile) formData.append("profileImage", profileImageFile);
@@ -490,6 +498,43 @@ const DeliveryAuth = () => {
                             )}
                           </div>
 
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Date of Birth</label>
+                              <div className="relative">
+                                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
+                                <input
+                                  type="date"
+                                  value={signupDob}
+                                  onChange={(e) => setSignupDob(e.target.value)}
+                                  className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all uppercase"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Blood Group</label>
+                              <div className="relative">
+                                <Droplet className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
+                                <select
+                                  value={signupBloodGroup}
+                                  onChange={(e) => setSignupBloodGroup(e.target.value)}
+                                  className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all appearance-none"
+                                >
+                                  <option value="">Select...</option>
+                                  <option value="A+">A+</option>
+                                  <option value="A-">A-</option>
+                                  <option value="B+">B+</option>
+                                  <option value="B-">B-</option>
+                                  <option value="O+">O+</option>
+                                  <option value="O-">O-</option>
+                                  <option value="AB+">AB+</option>
+                                  <option value="AB-">AB-</option>
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                              </div>
+                            </div>
+                          </div>
+
                           <div className="space-y-1.5">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">
                               Seller Invite Code <span className="text-red-500">*</span>
@@ -509,7 +554,7 @@ const DeliveryAuth = () => {
 
                           <button
                             onClick={() => {
-                              if (!signupName || !signupPhone || !signupEmail || !signupAddress || !profileImageFile || !signupSellerCode.trim()) {
+                              if (!signupName || !signupPhone || !signupEmail || !signupAddress || !signupDob || !signupBloodGroup || !profileImageFile || !signupSellerCode.trim()) {
                                 toast.error("Please fill all personal information fields, upload photo, and enter seller invite code");
                                 return;
                               }
@@ -866,9 +911,9 @@ const DeliveryAuth = () => {
 
                       <p className="text-center text-xs text-gray-400 font-semibold pt-1">
                         By joining, you agree to our{" "}
-                        <span className="text-brand-500 font-bold cursor-pointer hover:underline">Terms</span>{" "}
-                        &amp;{" "}
-                        <span className="text-brand-500 font-bold cursor-pointer hover:underline">Privacy Policy</span>
+                        <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand-500 font-bold hover:underline">Terms</a>
+                        {" "}&amp;{" "}
+                        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-500 font-bold hover:underline">Privacy Policy</a>
                       </p>
                     </div>
                   )}

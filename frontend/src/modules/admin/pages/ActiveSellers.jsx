@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { adminApi } from "../services/adminApi";
+import { useLockBodyScroll } from "@/shared/hooks/useLockBodyScroll";
 
 const SORT_OPTIONS = [
   { value: "recent", label: "Newest first" },
@@ -104,6 +105,8 @@ const ActiveSellers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [sortBy, setSortBy] = useState("recent");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -129,19 +132,7 @@ const ActiveSellers = () => {
     loadHeaders();
   }, []);
 
-  useEffect(() => {
-    if (selectedSeller) {
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.documentElement.style.overflow = '';
-      document.body.style.overflow = '';
-    };
-  }, [selectedSeller]);
+  useLockBodyScroll(!!selectedSeller);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -167,6 +158,8 @@ const ActiveSellers = () => {
         const response = await adminApi.getActiveSellers({
           q: debouncedSearch || undefined,
           category: categoryFilter !== "all" ? categoryFilter : undefined,
+          joinedFrom: dateFrom || undefined,
+          joinedTo: dateTo || undefined,
           sort: sortBy,
           page,
           limit: pageSize,
@@ -208,7 +201,7 @@ const ActiveSellers = () => {
     };
 
     loadSellers();
-  }, [debouncedSearch, categoryFilter, sortBy, page, pageSize, refreshTick]);
+  }, [debouncedSearch, categoryFilter, dateFrom, dateTo, sortBy, page, pageSize, refreshTick]);
 
   const summaryCards = useMemo(
     () => [
@@ -347,13 +340,23 @@ const ActiveSellers = () => {
               ))}
             </select>
 
-            <button
-              onClick={() => setRefreshTick((value) => value + 1)}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-white ring-1 ring-slate-200 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
-            >
-              <HiOutlineFunnel className="h-4 w-4" />
-              Filter
-            </button>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="px-3 py-3 bg-white ring-1 ring-slate-200 rounded-2xl text-xs font-bold text-slate-700 outline-none w-full sm:w-auto"
+                title="Joined From"
+              />
+              <span className="text-slate-400 font-bold">-</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="px-3 py-3 bg-white ring-1 ring-slate-200 rounded-2xl text-xs font-bold text-slate-700 outline-none w-full sm:w-auto"
+                title="Joined To"
+              />
+            </div>
           </div>
         </div>
       </Card>
@@ -803,9 +806,10 @@ const ActiveSellers = () => {
                                 <span className="text-xs font-bold text-amber-900 whitespace-nowrap">Amount (₹):</span>
                                 <input 
                                     type="number" 
+                                    min="0"
                                     defaultValue={selectedSeller.oneTimeChargeAmount || 0}
                                     onBlur={async (e) => {
-                                        const amount = Number(e.target.value);
+                                        const amount = Math.max(0, Number(e.target.value));
                                         if (amount === selectedSeller.oneTimeChargeAmount) return;
                                         try {
                                             await adminApi.updateSellerDetails(selectedSeller.id || selectedSeller._id, { oneTimeChargeAmount: amount });
@@ -880,11 +884,12 @@ const ActiveSellers = () => {
                                 <div className="flex items-center gap-2">
                                   <input
                                     type="number"
+                                    min="0"
                                     placeholder="Global"
                                     defaultValue={currentVal}
                                     onBlur={async (e) => {
                                       const val = e.target.value;
-                                      const numVal = val === '' ? null : Number(val);
+                                      const numVal = val === '' ? null : Math.max(0, Number(val));
                                       if (currentVal === val || (currentVal === '' && numVal === null)) return;
                                       
                                       try {
@@ -924,6 +929,30 @@ const ActiveSellers = () => {
                   </div>
                   </div>
                 </div>
+              </div>
+              
+              <div className="p-4 border-t border-slate-100 bg-red-50/30 flex justify-end">
+                <button
+                  onClick={async () => {
+                    const shopName = selectedSeller.shopName || selectedSeller.ownerName;
+                    const confirmText = prompt(`Are you sure you want to permanently delete this store? Type "${shopName}" to confirm:`);
+                    if (confirmText === shopName) {
+                      try {
+                        await adminApi.deleteSeller(selectedSeller.id || selectedSeller._id);
+                        toast.success("Store deleted successfully.");
+                        setSelectedSeller(null);
+                        setRefreshTick((v) => v + 1);
+                      } catch (error) {
+                        toast.error("Failed to delete store.");
+                      }
+                    } else if (confirmText !== null) {
+                      toast.error("Shop name did not match. Deletion cancelled.");
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700 transition-colors shadow-sm"
+                >
+                  Delete Store
+                </button>
               </div>
             </motion.div>
           </div>

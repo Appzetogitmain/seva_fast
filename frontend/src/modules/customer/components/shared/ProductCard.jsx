@@ -70,7 +70,7 @@ const ProductCard = React.memo(
 
     const displayOriginalPrice = defaultVariant
       ? Number(defaultVariant.price || 0)
-      : Number(product.originalPrice || 0);
+      : Number(product.originalPrice || product.basePrice || product.mrp || 0);
 
     const cartKey = `${productId}::${requiresVariantSelection ? defaultVariantSku : ""}`;
 

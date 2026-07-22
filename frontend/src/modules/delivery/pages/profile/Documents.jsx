@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, FileCheck, UploadCloud, XCircle, Clock } from "lucide-react";
 import Button from "@/shared/components/ui/Button";
@@ -7,6 +7,8 @@ import { toast } from "sonner";
 
 const Documents = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+  const [activeDocId, setActiveDocId] = useState(null);
 
   const [docs, setDocs] = useState([
     {
@@ -47,7 +49,23 @@ const Documents = () => {
   ]);
 
   const handleUpload = (id) => {
-    toast.info("Upload functionality would open file picker here");
+    setActiveDocId(id);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file && activeDocId) {
+      setDocs(docs.map(doc =>
+        doc.id === activeDocId
+          ? { ...doc, status: "Pending", fileName: file.name, uploadedOn: new Date().toLocaleDateString('en-GB') }
+          : doc
+      ));
+      toast.success(`${file.name} uploaded successfully! Status changed to Pending.`);
+      setActiveDocId(null);
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -80,8 +98,8 @@ const Documents = () => {
       {/* Header */}
       <div className="bg-white shadow-sm sticky top-0 z-10">
         <div className="flex items-center p-4">
-          <button 
-            onClick={() => navigate(-1)} 
+          <button
+            onClick={() => navigate(-1)}
             className="p-2 rounded-full hover:bg-gray-100 transition-colors mr-2"
           >
             <ArrowLeft size={20} className="text-gray-600" />
@@ -114,19 +132,19 @@ const Documents = () => {
 
             <div className="flex space-x-2">
               {doc.status !== "Verified" && (
-                <Button 
-                  size="sm" 
-                  className="w-full text-xs h-8" 
+                <Button
+                  size="sm"
+                  className="w-full text-xs h-8"
                   onClick={() => handleUpload(doc.id)}
                 >
-                  <UploadCloud size={14} className="mr-1" /> 
+                  <UploadCloud size={14} className="mr-1" />
                   {doc.status === "Rejected" ? "Re-upload" : "Update"}
                 </Button>
               )}
               {doc.fileName && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="w-full text-xs h-8"
                   onClick={() => toast.success("Downloading document...")}
                 >
@@ -137,6 +155,13 @@ const Documents = () => {
           </Card>
         ))}
       </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        accept="image/*,.pdf"
+      />
     </div>
   );
 };
