@@ -316,9 +316,9 @@ const AdminSettings = () => {
                                     <div className="relative group">
                                         <Phone className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                         <input
-                                            type="text"
+                                            type="tel"
                                             value={settings.supportPhone}
-                                            onChange={(e) => handleInputChange('supportPhone', e.target.value)}
+                                            onChange={(e) => handleInputChange('supportPhone', e.target.value.replace(/[^\d+]/g, ''))}
                                             className="w-full pl-12 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                         />
                                     </div>

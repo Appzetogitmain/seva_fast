@@ -101,7 +101,23 @@ export const getDeliveryStats = async (req, res) => {
 export const getDeliveryEarnings = async (req, res) => {
     try {
         const deliveryBoyId = new mongoose.Types.ObjectId(req.user.id);
-        const transactions = await Transaction.find({ user: deliveryBoyId, userModel: 'Delivery' })
+        const { period } = req.query; // 'today', 'weekly', 'monthly'
+
+        let dateFilter = {};
+        const now = new Date();
+        if (period === 'today') {
+            const startOfDay = new Date(now.setHours(0,0,0,0));
+            dateFilter = { createdAt: { $gte: startOfDay } };
+        } else if (period === 'weekly') {
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - 7);
+            dateFilter = { createdAt: { $gte: startOfWeek } };
+        } else if (period === 'monthly') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            dateFilter = { createdAt: { $gte: startOfMonth } };
+        }
+
+        const transactions = await Transaction.find({ user: deliveryBoyId, userModel: 'Delivery', ...dateFilter })
             .sort({ createdAt: -1 })
             .limit(200)
             .populate("order", "orderId pricing paymentBreakdown");

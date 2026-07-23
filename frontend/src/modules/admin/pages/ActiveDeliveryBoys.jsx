@@ -53,7 +53,7 @@ const ActiveDeliveryBoys = () => {
     const fetchRiders = async (requestedPage = 1) => {
         setIsLoading(true);
         try {
-            const params = { page: requestedPage, limit: pageSize };
+            const params = { page: requestedPage, limit: pageSize, verified: 'true' };
             if (searchTerm.trim()) params.search = searchTerm.trim();
             if (statusFilter !== 'all') params.status = statusFilter;
 
@@ -123,6 +123,11 @@ const handleAction = (type, rider) => {
 
 const handleOnboardSubmit = (e) => {
     e.preventDefault();
+    if (!formState.name?.trim()) return toast.error("Name is required");
+    if (!/^\d{10}$/.test(formState.phone?.replace(/\D/g, ''))) return toast.error("Valid 10-digit phone required");
+    if (formState.vehicle !== 'Cycle' && !formState.vehicleNum?.trim()) return toast.error("Vehicle number is required");
+    if (!formState.location?.trim()) return toast.error("Operational area is required");
+
     const newRider = {
         ...formState,
         id: 'r' + (riders.length + 1),
@@ -134,6 +139,7 @@ const handleOnboardSubmit = (e) => {
         joinDate: new Date().toLocaleDateString()
     };
     setRiders([newRider, ...riders]);
+    toast.success("Rider onboarded successfully");
     setIsOnboardModalOpen(false);
     setFormState({ name: '', phone: '', email: '', vehicle: '', vehicleNum: '', location: '' });
 };
@@ -141,6 +147,11 @@ const handleOnboardSubmit = (e) => {
 const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!selectedRider?.id) return;
+
+    if (!formState.name?.trim()) return toast.error("Name is required");
+    if (!/^\d{10}$/.test(formState.phone?.replace(/\D/g, ''))) return toast.error("Valid 10-digit phone required");
+    if (formState.vehicle !== 'Cycle' && !formState.vehicleNum?.trim()) return toast.error("Vehicle number is required");
+    if (!formState.location?.trim()) return toast.error("Operational area is required");
 
     try {
         setIsSaving(true);
@@ -567,17 +578,19 @@ return (
                                         </select>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Registration Vehicle No.</label>
-                                    <input
-                                        required
-                                        type="text"
-                                        value={formState.vehicleNum}
-                                        onChange={(e) => setFormState({ ...formState, vehicleNum: e.target.value })}
-                                        className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/10 transition-all"
-                                        placeholder="e.g. MH-12-AB-0000"
-                                    />
-                                </div>
+                                {formState.vehicle !== 'Cycle' && (
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Registration Vehicle No.</label>
+                                        <input
+                                            required
+                                            type="text"
+                                            value={formState.vehicleNum}
+                                            onChange={(e) => setFormState({ ...formState, vehicleNum: e.target.value })}
+                                            className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                            placeholder="e.g. MH-12-AB-0000"
+                                        />
+                                    </div>
+                                )}
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned Operational Area</label>
                                     <input

@@ -560,11 +560,11 @@ const SellerLocations = () => {
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 relative z-50">
               <select
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
-                className="px-3 py-2 rounded-xl bg-white ring-1 ring-slate-200 text-[11px] font-bold text-slate-700 outline-none">
+                className="px-3 py-2 rounded-xl bg-white ring-1 ring-slate-200 text-[11px] font-bold text-slate-700 outline-none relative z-50">
                 <option value="all">All categories</option>
                 {filtersMeta.categories.map((option) => (
                   <option key={option} value={option}>
@@ -575,7 +575,7 @@ const SellerLocations = () => {
               <select
                 value={city}
                 onChange={(event) => setCity(event.target.value)}
-                className="px-3 py-2 rounded-xl bg-white ring-1 ring-slate-200 text-[11px] font-bold text-slate-700 outline-none">
+                className="px-3 py-2 rounded-xl bg-white ring-1 ring-slate-200 text-[11px] font-bold text-slate-700 outline-none relative z-50">
                 <option value="all">All cities</option>
                 {filtersMeta.cities.map((option) => (
                   <option key={option} value={option}>
@@ -586,7 +586,7 @@ const SellerLocations = () => {
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
+          <div className="flex-1 min-h-0 max-h-[calc(100vh-250px)] overflow-y-auto p-3 space-y-2">
             {loading ? (
               <div className="h-full flex items-center justify-center text-slate-500 text-sm font-bold">
                 Loading seller nodes...

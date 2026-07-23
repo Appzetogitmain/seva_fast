@@ -415,6 +415,22 @@ export const getSellerProducts = async (req, res) => {
       query.stock = { $gt: 0 };
     } else if (stockStatus === "out") {
       query.stock = 0;
+    } else if (stockStatus === "low") {
+      query.$expr = {
+        $and: [
+          { $gt: [{ $convert: { input: "$stock", to: "double", onError: 0, onNull: 0 } }, 0] },
+          {
+            $lte: [
+              { $convert: { input: "$stock", to: "double", onError: 0, onNull: 0 } },
+              { $convert: { input: "$lowStockAlert", to: "double", onError: 5, onNull: 5 } },
+            ],
+          },
+        ],
+      };
+    }
+
+    if (req.query.status && String(req.query.status).trim().toLowerCase() !== "all") {
+      query.status = String(req.query.status).trim().toLowerCase();
     }
 
     if (approvalStatus && String(approvalStatus).trim().toLowerCase() !== "all") {

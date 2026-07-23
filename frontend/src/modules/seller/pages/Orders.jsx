@@ -585,7 +585,7 @@ const Orders = () => {
         try {
             await sellerApi.updateOrderStatus(orderId, { status: newStatus.toLowerCase() });
             showToast(`Order status updated to ${newStatus}`, "success");
-            fetchOrders(); // Refresh orders
+            fetchOrders(page, false); // Refresh orders on current page
             if (selectedOrder && selectedOrder.id === orderId) {
                 setSelectedOrder({ ...selectedOrder, status: newStatus });
             }

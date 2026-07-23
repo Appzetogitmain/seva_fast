@@ -314,13 +314,19 @@ const CheckoutPage = () => {
     }
   }, [useWallet, user?.walletBalance, pricingPreview?.grandTotal]);
 
+  const hasInstant = cart.some((item) => (item.deliveryType || "instant") === "instant");
+  const hasScheduled = cart.some((item) => item.deliveryType === "scheduled");
+  const hasMixedCart = hasInstant && hasScheduled;
+
   const finalAmountToPay = Math.max(0, (pricingPreview?.grandTotal ?? cartTotal) - walletAmountToUse);
   const slideToPayText =
-    finalAmountToPay === 0
-      ? "Place Free Order"
-      : selectedPayment === "online"
-        ? "Slide to Pay"
-        : "Slide to Place Order";
+    hasMixedCart
+      ? "Cannot checkout mixed cart"
+      : finalAmountToPay === 0
+        ? "Place Free Order"
+        : selectedPayment === "online"
+          ? "Slide to Pay"
+          : "Slide to Place Order";
 
   const buildAddressForOrder = () => {
     if (savedRecipient) {
@@ -1214,6 +1220,18 @@ const CheckoutPage = () => {
               onApplyManualCode={handleApplyManualCode}
             />
 
+            {hasMixedCart && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-red-600 font-bold">
+                  <AlertCircle className="h-5 w-5" />
+                  Mixed Cart Detected
+                </div>
+                <p className="text-sm text-red-600">
+                  You cannot checkout with both instant (local) and scheduled (global) items at the same time. Please checkout separately.
+                </p>
+              </div>
+            )}
+
             {/* Pricing Breakdown */}
             <CheckoutPricingBreakdown
               pricingPreview={pricingPreview}
@@ -1243,7 +1261,7 @@ const CheckoutPage = () => {
                 amount={finalAmountToPay}
                 onSuccess={handlePlaceOrder}
                 isLoading={isPlacingOrder || isPreviewLoading}
-                disabled={isPlacingOrder || isPreviewLoading}
+                disabled={isPlacingOrder || isPreviewLoading || hasMixedCart}
                 text={slideToPayText}
               />
               <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-[0.1em]">
@@ -1263,7 +1281,7 @@ const CheckoutPage = () => {
             amount={finalAmountToPay}
             onSuccess={handlePlaceOrder}
             isLoading={isPlacingOrder || isPreviewLoading}
-            disabled={isPlacingOrder || isPreviewLoading}
+            disabled={isPlacingOrder || isPreviewLoading || hasMixedCart}
             text={slideToPayText}
           />
         </div>

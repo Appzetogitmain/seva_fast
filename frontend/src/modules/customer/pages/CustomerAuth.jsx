@@ -175,6 +175,20 @@ const CustomerAuth = () => {
                 return;
             }
 
+            if (
+                !isLogin &&
+                (status === 409 || errorCode === 'ACCOUNT_EXISTS')
+            ) {
+                toast.info('Account already exists, please login.');
+                setShowOtp(false);
+                setIsLogin(true);
+                navigate('/login', {
+                    replace: true,
+                    state: { phone: formData.phone },
+                });
+                return;
+            }
+
             toast.error(error?.response?.data?.message || 'Failed to send OTP. Please check your number.');
         } finally {
             setIsLoading(false);

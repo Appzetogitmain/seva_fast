@@ -322,13 +322,6 @@ const SellerProfile = () => {
               <h3 className="text-xl font-black text-slate-900">
                 Location & Service Settings
               </h3>
-              {!isEditing && (
-                <Button
-                  onClick={() => setIsEditing(true)}
-                  className="bg-slate-900 text-white hover:bg-black rounded-lg px-6 py-2 text-[10px] font-black tracking-[2px]">
-                  MANAGE
-                </Button>
-              )}
             </div>
 
             <div className="space-y-6">

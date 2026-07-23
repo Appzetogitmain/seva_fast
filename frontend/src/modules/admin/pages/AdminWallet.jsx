@@ -379,7 +379,7 @@ const AdminWallet = () => {
                         className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                     >
                         {isProcessing ? <RotateCw className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
-                        {isProcessing ? 'PROCESSING...' : 'PROCESS PAYOUTS'}
+                        {isProcessing ? 'PROCESSING...' : 'BULK SETTLEMENT'}
                     </button>
                 </div>
             </div>
@@ -402,7 +402,7 @@ const AdminWallet = () => {
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">Live</span>
-                                        <div className="h-2 w-2 rounded-full bg-brand-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] animate-pulse" />
+                                        <div className="h-2 w-2 rounded-full bg-[#22C55E] shadow-[0_0_8px_rgba(34,197,94,0.5)] animate-pulse" />
                                     </div>
                                 </div>
 

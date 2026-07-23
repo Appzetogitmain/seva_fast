@@ -26,17 +26,20 @@ const AddProduct = () => {
   const [modalTab, setModalTab] = useState("general");
   const [isSaving, setIsSaving] = useState(false);
 
-  const makeSku = (name, index = 1) => {
+  const uniqueSuffix = useMemo(() => Math.random().toString(36).substring(2, 6).toUpperCase(), []);
+
+  const makeSku = React.useCallback((name, index = 1) => {
     const prefix =
       String(name || "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "")
-        .slice(0, 5) || "item";
-    return `${prefix}-${String(index).padStart(3, "0")}`;
-  };
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 5) || "ITEM";
+    return `${prefix}-${uniqueSuffix}-${String(index).padStart(3, "0")}`;
+  }, [uniqueSuffix]);
 
-  const isAutoSku = (sku, name, index = 1) =>
-    String(sku || "").toLowerCase() === makeSku(name, index);
+  const isAutoSku = React.useCallback((sku, name, index = 1) => {
+    return String(sku || "").toUpperCase() === makeSku(name, index);
+  }, [makeSku]);
 
   const [formData, setFormData] = useState(() => {
     const saved = localStorage.getItem("seller_add_product_draft");
@@ -68,7 +71,7 @@ const AddProduct = () => {
     galleryImages: [],
     variants: [
       {
-        id: Date.now(),
+        id: crypto.randomUUID(),
         name: "",
         price: "",
         salePrice: "",
@@ -473,7 +476,7 @@ const AddProduct = () => {
                       variants: [
                         ...prev.variants,
                         {
-                          id: Date.now(),
+                          id: crypto.randomUUID(),
                           name: "",
                           price: "",
                           salePrice: "",
@@ -527,7 +530,7 @@ const AddProduct = () => {
                         value={variant.price}
                         onChange={(e) => {
                           const newVariants = [...formData.variants];
-                          newVariants[index].price = Math.max(0, Number(e.target.value));
+                          newVariants[index].price = e.target.value;
                           setFormData({ ...formData, variants: newVariants });
                         }}
                         placeholder="500"
@@ -544,7 +547,7 @@ const AddProduct = () => {
                         value={variant.salePrice}
                         onChange={(e) => {
                           const newVariants = [...formData.variants];
-                          newVariants[index].salePrice = Math.max(0, Number(e.target.value));
+                          newVariants[index].salePrice = e.target.value;
                           setFormData({ ...formData, variants: newVariants });
                         }}
                         placeholder="450"
@@ -561,7 +564,7 @@ const AddProduct = () => {
                         value={variant.stock}
                         onChange={(e) => {
                           const newVariants = [...formData.variants];
-                          newVariants[index].stock = Math.max(0, Number(e.target.value));
+                          newVariants[index].stock = e.target.value;
                           setFormData({ ...formData, variants: newVariants });
                         }}
                         placeholder="10"

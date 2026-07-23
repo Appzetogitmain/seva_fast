@@ -179,8 +179,12 @@ const ActiveSellers = () => {
         setCategories(
           Array.isArray(payload.filters?.categories) ? payload.filters.categories : [],
         );
-        setTotal(safeNumber(payload.total) || normalizedItems.length);
-        setTotalPages(safeNumber(payload.totalPages) || 1);
+        setTotal(safeNumber(payload.total) || safeNumber(payload.count) || normalizedItems.length);
+        setTotalPages(
+            safeNumber(payload.totalPages) ||
+            Math.ceil((safeNumber(payload.total) || safeNumber(payload.count) || normalizedItems.length) / pageSize) ||
+            1
+        );
         setLastSyncAt(new Date());
 
         if (safeNumber(payload.totalPages) > 0 && page > payload.totalPages) {

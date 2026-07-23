@@ -178,6 +178,7 @@ const OrderDetail = () => {
     const adminDeliveryShare = Number(paymentBreakdown.adminDeliveryFeeShare ?? 0);
     const sellerDeliveryShare = Number(paymentBreakdown.sellerDeliveryFeeShare ?? 0);
     const handlingFee = Number(paymentBreakdown.handlingFeeCharged ?? 0);
+    const platformFee = Number(paymentBreakdown.platformFee ?? order.pricing?.platformFee ?? 0);
     const tip = Number(paymentBreakdown.tipTotal ?? paymentBreakdown.riderTipAmount ?? 0);
     const riderPayout = Number(paymentBreakdown.riderPayoutTotal ?? 0);
     const productSubtotal = Number(paymentBreakdown.productSubtotal ?? order.pricing?.subtotal ?? 0);
@@ -540,6 +541,12 @@ const OrderDetail = () => {
                                                     <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
                                                         <span>Tip</span>
                                                         <span>₹{tip.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {platformFee > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Platform Fee</span>
+                                                        <span>₹{platformFee.toLocaleString("en-IN")}</span>
                                                     </div>
                                                 )}
                                             </div>

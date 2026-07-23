@@ -509,9 +509,16 @@ const DeliveryLayout = () => {
     };
   }, [user?.isOnline, pollIncomingNotifications]);
 
-  const skipOrder = useCallback(async () => {
+  const skipOrder = useCallback(async (isTimeout = false) => {
     const current = activeOrderRef.current;
     if (!current || acceptInFlightRef.current) return;
+    
+    // Clear UI state immediately to stop ringtone and hide modal
+    shownOrderIdsRef.current = new Set(shownOrderIdsRef.current).add(current.id);
+    markIncomingOrderHandled(current.id);
+    stopOrderRingtone();
+    setActiveOrder(null);
+
     try {
       console.log("Delivery Alert - Skipping order:", current.id);
       if (current.isReturnPickup) {
@@ -519,14 +526,11 @@ const DeliveryLayout = () => {
       } else {
         await deliveryApi.skipOrder(current.id);
       }
-      shownOrderIdsRef.current = new Set(shownOrderIdsRef.current).add(current.id);
-      markIncomingOrderHandled(current.id);
-      stopOrderRingtone();
-      setActiveOrder(null);
-      toast.info("Order skipped");
+      if (!isTimeout) {
+        toast.info("Order skipped");
+      }
     } catch (error) {
       console.error("Delivery Alert - Skip failed:", error);
-      setActiveOrder(null);
     }
   }, []);
 
@@ -536,7 +540,7 @@ const DeliveryLayout = () => {
     const left = secondsLeftUntilDeliveryExpiry(activeOrder.expiresAt);
     if (left <= 0) {
       if (!acceptInFlightRef.current) {
-        skipOrder();
+        skipOrder(true);
         toast.error("Order request timed out");
       }
       return undefined;
@@ -549,7 +553,7 @@ const DeliveryLayout = () => {
       if (next <= 0) {
         clearInterval(timer);
         if (!acceptInFlightRef.current) {
-          skipOrder();
+          skipOrder(true);
           toast.error("Order request timed out");
         }
       }

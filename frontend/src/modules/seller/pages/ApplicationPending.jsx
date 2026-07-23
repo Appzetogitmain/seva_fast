@@ -7,7 +7,7 @@ import { useSettings } from "@core/context/SettingsContext";
 
 const ApplicationPending = () => {
   const location = useLocation();
-  const { isAuthenticated, role, user, isLoading } = useAuth();
+  const { isAuthenticated, role, user, isLoading, refreshUser } = useAuth();
   const { settings } = useSettings();
 
   const appName = settings?.appName || "App";
@@ -29,6 +29,20 @@ const ApplicationPending = () => {
       return <Navigate to="/seller" replace />;
     }
   }
+
+  React.useEffect(() => {
+    let interval;
+    if (isAuthenticated && role === "seller" && applicationStatus === "pending") {
+      interval = setInterval(() => {
+        if (refreshUser) {
+          refreshUser();
+        }
+      }, 30000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isAuthenticated, role, applicationStatus, refreshUser]);
 
   const isRejected = applicationStatus === "rejected";
 

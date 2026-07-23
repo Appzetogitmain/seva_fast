@@ -206,6 +206,7 @@ const BillingCharges = () => {
                                     <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-slate-300 group-focus-within:text-red-500 transition-colors">₹</span>
                                     <input
                                         type="number"
+                                        min="0"
                                         value={config.platformFee}
                                         onChange={(e) => handleInputChange('platformFee', e.target.value)}
                                         className="w-full pl-10 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-base font-black text-slate-900 outline-none focus:ring-2 focus:ring-red-500/10 transition-all"
@@ -222,6 +223,7 @@ const BillingCharges = () => {
                                     <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-slate-300 group-focus-within:text-red-500 transition-colors">₹</span>
                                     <input
                                         type="number"
+                                        min="0"
                                         value={config.freeDeliveryThreshold}
                                         onChange={(e) => handleInputChange('freeDeliveryThreshold', e.target.value)}
                                         className="w-full pl-10 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-base font-black text-slate-900 outline-none focus:ring-2 focus:ring-red-500/10 transition-all"
@@ -266,6 +268,7 @@ const BillingCharges = () => {
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Base Delivery Charge (₹)</label>
                                             <input
                                                 type="number"
+                                                min="0"
                                                 value={config.baseCharge}
                                                 onChange={(e) => handleInputChange('baseCharge', e.target.value)}
                                                 className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
@@ -276,6 +279,7 @@ const BillingCharges = () => {
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rider Base Payout (₹)</label>
                                             <input
                                                 type="number"
+                                                min="0"
                                                 value={config.riderBasePayout}
                                                 onChange={(e) => handleInputChange('riderBasePayout', e.target.value)}
                                                 className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
@@ -288,11 +292,12 @@ const BillingCharges = () => {
                                                 <input
                                                     type="number"
                                                     step="0.1"
+                                                    min="0"
                                                     value={config.baseDistance}
                                                     onChange={(e) => handleInputChange('baseDistance', e.target.value)}
-                                                    className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                                    className="w-full pl-5 pr-12 py-4 bg-slate-50 border-none rounded-2xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                                 />
-                                                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 uppercase">km</span>
+                                                <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 uppercase pointer-events-none">km</span>
                                             </div>
                                             <p className="text-[10px] font-bold text-slate-400 italic">Radius covered by the base charge.</p>
                                         </div>
@@ -300,6 +305,7 @@ const BillingCharges = () => {
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Incremental Km Surcharge (₹)</label>
                                             <input
                                                 type="number"
+                                                min="0"
                                                 value={config.extraPerKm}
                                                 onChange={(e) => handleInputChange('extraPerKm', e.target.value)}
                                                 className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
@@ -310,6 +316,7 @@ const BillingCharges = () => {
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Delivery Partner Rate (₹/km)</label>
                                             <input
                                                 type="number"
+                                                min="0"
                                                 value={config.deliveryPartnerRatePerKm}
                                                 onChange={(e) => handleInputChange('deliveryPartnerRatePerKm', e.target.value)}
                                                 className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-black text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
@@ -326,6 +333,7 @@ const BillingCharges = () => {
                                             <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-slate-300 group-focus-within:text-slate-900 transition-colors">₹</span>
                                             <input
                                                 type="number"
+                                                min="0"
                                                 value={config.fixedCharge}
                                                 onChange={(e) => handleInputChange('fixedCharge', e.target.value)}
                                                 className="w-full pl-10 pr-5 py-4 bg-white ring-1 ring-slate-200 border-none rounded-xl text-base font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"

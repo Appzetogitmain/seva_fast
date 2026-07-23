@@ -145,6 +145,34 @@ const WithdrawalRequests = () => {
         }
     };
 
+    const handleExportAll = () => {
+        try {
+            const dataToExport = activeTab === 'sellers' ? sellerRequests : deliveryRequests;
+            if (!dataToExport || dataToExport.length === 0) {
+                toast.error("No data to export");
+                return;
+            }
+            
+            const headers = ['Request ID,User ID,Name,Phone,Amount,Status,Date'];
+            const rows = dataToExport.map(r => {
+                const name = r.user?.shopName || r.user?.name || '';
+                const phone = r.user?.phone || '';
+                return `${r._id},${r.user?._id || ''},"${name}","${phone}",${r.amount},${r.status},${new Date(r.createdAt).toLocaleDateString()}`;
+            });
+            const csv = [...headers, ...rows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `withdrawal-requests-${activeTab}-${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast.success("Export successful");
+        } catch (error) {
+            toast.error("Export failed");
+        }
+    };
+
     return (
         <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header Section */}
@@ -163,7 +191,7 @@ const WithdrawalRequests = () => {
                     >
                         <RotateCw className={cn("h-4 w-4", loading && "animate-spin")} />
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 text-slate-600 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm">
+                    <button onClick={handleExportAll} className="flex items-center gap-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 text-slate-600 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm">
                         <Download className="h-4 w-4" />
                         EXPORT ALL
                     </button>
