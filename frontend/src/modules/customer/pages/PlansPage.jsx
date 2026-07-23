@@ -133,6 +133,16 @@ const PlansPage = () => {
             });
 
             const payload = initRes.data?.result || {};
+            
+            if (payload.isFree) {
+                toast.success("Free plan activated successfully!");
+                if (refreshUser) {
+                    await refreshUser();
+                }
+                fetchPlans();
+                return;
+            }
+
             const orderId = payload.orderId;
             const razorpayKey = payload.razorpayKey || import.meta.env.VITE_RAZORPAY_KEY_ID;
 

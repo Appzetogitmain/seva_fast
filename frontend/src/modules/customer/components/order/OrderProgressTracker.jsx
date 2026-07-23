@@ -95,13 +95,12 @@ const OrderProgressTracker = ({
               <div className="flex items-center gap-4">
                 {/* Icon Circle */}
                 <div
-                  className={`relative z-10 h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    isCompleted
+                  className={`relative z-10 h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 ${isCompleted
                       ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                       : isActive
-                      ? "bg-amber-100 text-amber-600 border-2 border-amber-400"
-                      : "bg-slate-100 text-slate-400"
-                  }`}
+                        ? "bg-amber-100 text-amber-600 border-2 border-amber-400"
+                        : "bg-slate-100 text-slate-400"
+                    }`}
                 >
                   {isCompleted ? (
                     <CheckCircle size={24} className="fill-current" />
@@ -117,13 +116,12 @@ const OrderProgressTracker = ({
                 {/* Label */}
                 <div className="flex-1">
                   <p
-                    className={`text-sm font-bold ${
-                      isCompleted
+                    className={`text-sm font-bold ${isCompleted
                         ? "text-slate-900"
                         : isActive
-                        ? "text-amber-700"
-                        : "text-slate-400"
-                    }`}
+                          ? "text-amber-700"
+                          : "text-slate-400"
+                      }`}
                   >
                     {step.label}
                   </p>
@@ -146,9 +144,8 @@ const OrderProgressTracker = ({
               {index < steps.length - 1 && (
                 <div className="absolute left-6 top-12 bottom-0 w-0.5 -mb-4">
                   <div
-                    className={`h-full w-full ${
-                      isCompleted ? "bg-primary" : "bg-slate-200"
-                    }`}
+                    className={`h-full w-full ${isCompleted ? "bg-primary" : "bg-slate-200"
+                      }`}
                   />
                 </div>
               )}

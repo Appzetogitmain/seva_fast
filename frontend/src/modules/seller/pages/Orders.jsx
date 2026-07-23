@@ -37,7 +37,7 @@ import { getLegacyStatusFromOrder } from '@/shared/utils/orderStatus';
 import { Loader2 } from 'lucide-react';
 import Pagination from '@shared/components/ui/Pagination';
 import { DatePicker } from "@/components/ui/date-picker";
-import { onSellerOrderNew } from '@core/services/orderSocket';
+import { onSellerOrderNew, onOrderStatusUpdate } from '@core/services/orderSocket';
 import { getSellerOrderEarning, getSellerEarningBreakdown, getCustomerOrderBill } from '@/shared/utils/sellerOrderEarning';
 import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
 
@@ -104,15 +104,21 @@ const Orders = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, startDate, endDate]);
 
-    // Socket listener for new orders
+    // Socket listener for new orders and status updates
     useEffect(() => {
         const getToken = () => localStorage.getItem('auth_seller');
-        const unSub = onSellerOrderNew(getToken, (payload) => {
+        const unSubNew = onSellerOrderNew(getToken, (payload) => {
             showToast("New order received!", "info");
             fetchOrders(page, false);
         });
+        
+        const unSubStatus = onOrderStatusUpdate(getToken, (payload) => {
+            fetchOrders(page, false);
+        });
+
         return () => {
-            if (typeof unSub === 'function') unSub();
+            if (typeof unSubNew === 'function') unSubNew();
+            if (typeof unSubStatus === 'function') unSubStatus();
         };
     }, [page, startDate, endDate]);
 
@@ -581,7 +587,24 @@ const Orders = () => {
         printWindow.document.close();
     };
 
+    const STATUS_RANK = { pending: 0, confirmed: 1, packed: 2, out_for_delivery: 3, delivered: 4, cancelled: 99 };
+
     const handleStatusUpdate = async (orderId, newStatus) => {
+        const currentOrder = orders.find(o => o.id === orderId) || selectedOrder;
+        const currentStatus = (currentOrder?.status || '').toLowerCase();
+        const currentRank = STATUS_RANK[currentStatus] ?? -1;
+        const newRank = STATUS_RANK[newStatus.toLowerCase()] ?? -1;
+
+        // Prevent backward or same status changes for terminal statuses
+        if (currentRank >= 4) {
+            showToast("Cannot change status of a delivered or cancelled order", "error");
+            return;
+        }
+        if (newRank < currentRank) {
+            showToast("Cannot move order to a previous status", "error");
+            return;
+        }
+
         try {
             await sellerApi.updateOrderStatus(orderId, { status: newStatus.toLowerCase() });
             showToast(`Order status updated to ${newStatus}`, "success");
@@ -836,88 +859,88 @@ const Orders = () => {
                                         <Button variant="outline" className="mt-4 rounded-xl text-xs" onClick={() => { setActiveTab('All'); setSearchTerm(''); }}>CLEAR FILTERS</Button>
                                     </div>
                                 ) : (
-                                <AnimatePresence mode="popLayout">
-                                    {filteredOrders
-                                        .slice((page - 1) * pageSize, page * pageSize)
-                                        .map((order) => (
-                                        <motion.div
-                                            key={order.id}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                            className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm active:bg-slate-50/50"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0 flex-1" onClick={() => handleViewDetails(order)}>
-                                                    <p className="text-xs font-black text-slate-900 truncate">#{order.id}</p>
-                                                    <p className="text-xs font-semibold text-slate-600 mt-0.5 flex items-center gap-1">
-                                                        <HiOutlineCalendarDays className="h-3 w-3 shrink-0" />
-                                                        {order.date} • {order.time}
-                                                    </p>
-                                                    <div className="flex items-center gap-2 mt-2">
-                                                        <div className="h-7 w-7 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shrink-0">
-                                                            {order.customer.avatar}
+                                    <AnimatePresence mode="popLayout">
+                                        {filteredOrders
+                                            .slice((page - 1) * pageSize, page * pageSize)
+                                            .map((order) => (
+                                                <motion.div
+                                                    key={order.id}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, scale: 0.95 }}
+                                                    className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm active:bg-slate-50/50"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0 flex-1" onClick={() => handleViewDetails(order)}>
+                                                            <p className="text-xs font-black text-slate-900 truncate">#{order.id}</p>
+                                                            <p className="text-xs font-semibold text-slate-600 mt-0.5 flex items-center gap-1">
+                                                                <HiOutlineCalendarDays className="h-3 w-3 shrink-0" />
+                                                                {order.date} • {order.time}
+                                                            </p>
+                                                            <div className="flex items-center gap-2 mt-2">
+                                                                <div className="h-7 w-7 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shrink-0">
+                                                                    {order.customer.avatar}
+                                                                </div>
+                                                                <p className="text-xs font-bold text-slate-800 truncate">{order.customer.name}</p>
+                                                            </div>
+                                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-2">Your Earning</p>
+                                                            <p className="text-sm font-black text-slate-900">₹{order.total.toLocaleString()}</p>
                                                         </div>
-                                                        <p className="text-xs font-bold text-slate-800 truncate">{order.customer.name}</p>
+                                                        <div className="flex flex-col items-end gap-2 shrink-0">
+                                                            <Badge variant={getStatusColor(order.status)} className="text-[10px] font-black uppercase px-2 py-0">
+                                                                {order.status}
+                                                            </Badge>
+                                                            <select
+                                                                value={order.status}
+                                                                onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className={cn(
+                                                                    "w-full min-w-[112px] text-[10px] pl-2 pr-6 py-1.5 rounded-lg font-black uppercase cursor-pointer appearance-none border outline-none",
+                                                                    order.status === 'pending' ? "bg-amber-100 text-amber-700" :
+                                                                        order.status === 'delivered' ? "bg-brand-100 text-brand-700" :
+                                                                            order.status === 'cancelled' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"
+                                                                )}
+                                                            >
+                                                                <option value="pending">Pending</option>
+                                                                <option value="confirmed">Confirmed</option>
+                                                                <option value="packed">Packed</option>
+                                                                <option value="out_for_delivery">Out</option>
+                                                                <option value="delivered">Delivered</option>
+                                                                <option value="cancelled">Cancelled</option>
+                                                            </select>
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleThermalPrint(order);
+                                                                    }}
+                                                                    title="Thermal Print"
+                                                                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
+                                                                >
+                                                                    <HiOutlinePrinter className="h-4 w-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleNormalPrint(order);
+                                                                    }}
+                                                                    title="Normal Print (A4)"
+                                                                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
+                                                                >
+                                                                    <HiOutlineDocumentText className="h-4 w-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleViewDetails(order)}
+                                                                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
+                                                                >
+                                                                    <HiOutlineEye className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-2">Your Earning</p>
-                                                    <p className="text-sm font-black text-slate-900">₹{order.total.toLocaleString()}</p>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-2 shrink-0">
-                                                    <Badge variant={getStatusColor(order.status)} className="text-[10px] font-black uppercase px-2 py-0">
-                                                        {order.status}
-                                                    </Badge>
-                                                    <select
-                                                        value={order.status}
-                                                        onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className={cn(
-                                                            "w-full min-w-[112px] text-[10px] pl-2 pr-6 py-1.5 rounded-lg font-black uppercase cursor-pointer appearance-none border outline-none",
-                                                            order.status === 'pending' ? "bg-amber-100 text-amber-700" :
-                                                                order.status === 'delivered' ? "bg-brand-100 text-brand-700" :
-                                                                    order.status === 'cancelled' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"
-                                                        )}
-                                                    >
-                                                        <option value="pending">Pending</option>
-                                                        <option value="confirmed">Confirmed</option>
-                                                        <option value="packed">Packed</option>
-                                                        <option value="out_for_delivery">Out</option>
-                                                        <option value="delivered">Delivered</option>
-                                                        <option value="cancelled">Cancelled</option>
-                                                    </select>
-                                                    <div className="flex items-center gap-1">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleThermalPrint(order);
-                                                            }}
-                                                            title="Thermal Print"
-                                                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
-                                                        >
-                                                            <HiOutlinePrinter className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleNormalPrint(order);
-                                                            }}
-                                                            title="Normal Print (A4)"
-                                                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
-                                                        >
-                                                            <HiOutlineDocumentText className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleViewDetails(order)}
-                                                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600"
-                                                        >
-                                                            <HiOutlineEye className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    ))}
-                                </AnimatePresence>
+                                                </motion.div>
+                                            ))}
+                                    </AnimatePresence>
                                 )}
                             </div>
 
@@ -938,122 +961,122 @@ const Orders = () => {
                                             {filteredOrders
                                                 .slice((page - 1) * pageSize, page * pageSize)
                                                 .map((order) => (
-                                                <motion.tr
-                                                    layout
-                                                    initial={{ opacity: 0, y: 10 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, scale: 0.95 }}
-                                                    key={order.id}
-                                                    className="hover:bg-slate-50/50 transition-colors group"
-                                                >
-                                                    <td className="px-4 lg:px-6 py-3 lg:py-4">
-                                                        <div>
-                                                            <span className="text-xs font-bold text-slate-900 group-hover:text-primary transition-colors cursor-pointer" onClick={() => handleViewDetails(order)}>
-                                                                #{order.id}
-                                                            </span>
-                                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mt-1">
-                                                                <HiOutlineCalendarDays className="h-3 w-3" />
-                                                                {order.date} • {order.time}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 lg:px-6 py-3 lg:py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-8 w-8 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white">
-                                                                {order.customer.avatar}
-                                                            </div>
+                                                    <motion.tr
+                                                        layout
+                                                        initial={{ opacity: 0, y: 10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                        key={order.id}
+                                                        className="hover:bg-slate-50/50 transition-colors group"
+                                                    >
+                                                        <td className="px-4 lg:px-6 py-3 lg:py-4">
                                                             <div>
-                                                                <p className="text-xs font-bold text-slate-900">{order.customer.name}</p>
-                                                                <p className="text-xs font-semibold text-slate-600">{order.customer.phone}</p>
+                                                                <span className="text-xs font-bold text-slate-900 group-hover:text-primary transition-colors cursor-pointer" onClick={() => handleViewDetails(order)}>
+                                                                    #{order.id}
+                                                                </span>
+                                                                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mt-1">
+                                                                    <HiOutlineCalendarDays className="h-3 w-3" />
+                                                                    {order.date} • {order.time}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 lg:px-6 py-3 lg:py-4">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-xs font-bold text-slate-900">₹{order.total.toLocaleString()}</span>
-                                                            <span className="text-xs font-semibold text-slate-600">{order.items.length} items</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 lg:px-6 py-3 lg:py-4">
-                                                        <div className="relative inline-block w-36">
-                                                            <select
-                                                                value={order.status}
-                                                                onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
-                                                                className={cn(
-                                                                    "w-full text-[10px] pl-2.5 pr-8 py-1.5 rounded-full font-black uppercase tracking-widest cursor-pointer appearance-none focus:ring-2 focus:ring-offset-1 transition-all border-none outline-none shadow-sm",
-                                                                    order.status === 'pending' ? "bg-amber-100 text-amber-700 focus:ring-amber-200" :
-                                                                        order.status === 'confirmed' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
-                                                                            order.status === 'packed' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
-                                                                                order.status === 'out_for_delivery' ? "bg-purple-100 text-purple-700 focus:ring-purple-200" :
-                                                                                    order.status === 'delivered' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
-                                                                                        order.status === 'cancelled' ? "bg-rose-100 text-rose-700 focus:ring-rose-200" :
-                                                                                            "bg-slate-100 text-slate-700 focus:ring-slate-200"
+                                                        </td>
+                                                        <td className="px-4 lg:px-6 py-3 lg:py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="h-8 w-8 rounded-full bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white">
+                                                                    {order.customer.avatar}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-bold text-slate-900">{order.customer.name}</p>
+                                                                    <p className="text-xs font-semibold text-slate-600">{order.customer.phone}</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 lg:px-6 py-3 lg:py-4">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-xs font-bold text-slate-900">₹{order.total.toLocaleString()}</span>
+                                                                <span className="text-xs font-semibold text-slate-600">{order.items.length} items</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 lg:px-6 py-3 lg:py-4">
+                                                            <div className="relative inline-block w-36">
+                                                                <select
+                                                                    value={order.status}
+                                                                    onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
+                                                                    className={cn(
+                                                                        "w-full text-[10px] pl-2.5 pr-8 py-1.5 rounded-full font-black uppercase tracking-widest cursor-pointer appearance-none focus:ring-2 focus:ring-offset-1 transition-all border-none outline-none shadow-sm",
+                                                                        order.status === 'pending' ? "bg-amber-100 text-amber-700 focus:ring-amber-200" :
+                                                                            order.status === 'confirmed' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
+                                                                                order.status === 'packed' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
+                                                                                    order.status === 'out_for_delivery' ? "bg-purple-100 text-purple-700 focus:ring-purple-200" :
+                                                                                        order.status === 'delivered' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
+                                                                                            order.status === 'cancelled' ? "bg-rose-100 text-rose-700 focus:ring-rose-200" :
+                                                                                                "bg-slate-100 text-slate-700 focus:ring-slate-200"
+                                                                    )}
+                                                                >
+                                                                    <option value="pending">Pending</option>
+                                                                    <option value="confirmed">Confirmed</option>
+                                                                    <option value="packed">Packed</option>
+                                                                    <option value="out_for_delivery">Out for Delivery</option>
+                                                                    <option value="delivered">Delivered</option>
+                                                                    <option value="cancelled">Cancelled</option>
+                                                                </select>
+                                                                <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 lg:px-6 py-3 lg:py-4 text-right">
+                                                            <div className="flex items-center justify-end space-x-1.5">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleThermalPrint(order);
+                                                                    }}
+                                                                    title="Thermal Print"
+                                                                    className="p-1.5 hover:bg-white hover:text-primary rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
+                                                                >
+                                                                    <HiOutlinePrinter className="h-4 w-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleNormalPrint(order);
+                                                                    }}
+                                                                    title="Normal Print (A4)"
+                                                                    className="p-1.5 hover:bg-white hover:text-primary rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
+                                                                >
+                                                                    <HiOutlineDocumentText className="h-4 w-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleViewDetails(order)}
+                                                                    className="p-1.5 hover:bg-white hover:text-primary rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
+                                                                >
+                                                                    <HiOutlineEye className="h-4 w-4" />
+                                                                </button>
+                                                                {order.status === 'Pending' && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleStatusUpdate(order.id, 'Processing');
+                                                                            }}
+                                                                            className="p-1.5 hover:bg-brand-50 hover:text-brand-600 rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
+                                                                        >
+                                                                            <HiOutlineCheck className="h-4 w-4" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleStatusUpdate(order.id, 'Cancelled');
+                                                                            }}
+                                                                            className="p-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
+                                                                        >
+                                                                            <HiOutlineXMark className="h-4 w-4" />
+                                                                        </button>
+                                                                    </>
                                                                 )}
-                                                            >
-                                                                <option value="pending">Pending</option>
-                                                                <option value="confirmed">Confirmed</option>
-                                                                <option value="packed">Packed</option>
-                                                                <option value="out_for_delivery">Out for Delivery</option>
-                                                                <option value="delivered">Delivered</option>
-                                                                <option value="cancelled">Cancelled</option>
-                                                            </select>
-                                                            <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 lg:px-6 py-3 lg:py-4 text-right">
-                                                        <div className="flex items-center justify-end space-x-1.5">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleThermalPrint(order);
-                                                                }}
-                                                                title="Thermal Print"
-                                                                className="p-1.5 hover:bg-white hover:text-primary rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
-                                                            >
-                                                                <HiOutlinePrinter className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleNormalPrint(order);
-                                                                }}
-                                                                title="Normal Print (A4)"
-                                                                className="p-1.5 hover:bg-white hover:text-primary rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
-                                                            >
-                                                                <HiOutlineDocumentText className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleViewDetails(order)}
-                                                                className="p-1.5 hover:bg-white hover:text-primary rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
-                                                            >
-                                                                <HiOutlineEye className="h-4 w-4" />
-                                                            </button>
-                                                            {order.status === 'Pending' && (
-                                                                <>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleStatusUpdate(order.id, 'Processing');
-                                                                        }}
-                                                                        className="p-1.5 hover:bg-brand-50 hover:text-brand-600 rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
-                                                                    >
-                                                                        <HiOutlineCheck className="h-4 w-4" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleStatusUpdate(order.id, 'Cancelled');
-                                                                        }}
-                                                                        className="p-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all text-slate-600 shadow-sm ring-1 ring-slate-100"
-                                                                    >
-                                                                        <HiOutlineXMark className="h-4 w-4" />
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </motion.tr>
-                                            ))}
+                                                            </div>
+                                                        </td>
+                                                    </motion.tr>
+                                                ))}
                                         </AnimatePresence>
                                     </tbody>
                                 </table>
@@ -1102,348 +1125,348 @@ const Orders = () => {
 
                     {/* Quick View Summary Modal */}
                     {createPortal(
-                    <AnimatePresence>
-                        {isQuickViewModalOpen && (
-                            <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-4 overflow-hidden overscroll-none">
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm touch-none"
-                                    onClick={() => setIsQuickViewModalOpen(false)}
-                                    onWheel={preventBackdropScroll}
-                                    onTouchMove={preventBackdropScroll}
-                                />
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    className="w-full max-w-lg relative z-10 bg-white rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
-                                >
-                                    <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div className="h-9 w-9 sm:h-10 sm:w-10 bg-primary text-primary-foreground rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
-                                                <HiOutlineChartBar className="h-4 w-4 sm:h-5 sm:w-5" />
+                        <AnimatePresence>
+                            {isQuickViewModalOpen && (
+                                <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-4 overflow-hidden overscroll-none">
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm touch-none"
+                                        onClick={() => setIsQuickViewModalOpen(false)}
+                                        onWheel={preventBackdropScroll}
+                                        onTouchMove={preventBackdropScroll}
+                                    />
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                        className="w-full max-w-lg relative z-10 bg-white rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+                                    >
+                                        <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="h-9 w-9 sm:h-10 sm:w-10 bg-primary text-primary-foreground rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
+                                                    <HiOutlineChartBar className="h-4 w-4 sm:h-5 sm:w-5" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">Quick Snapshot</h3>
+                                                    <p className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest">Today's Performance</p>
+                                                </div>
                                             </div>
-                                            <div className="min-w-0">
-                                                <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">Quick Snapshot</h3>
-                                                <p className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest">Today's Performance</p>
+                                            <button onClick={() => setIsQuickViewModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600 shrink-0">
+                                                <HiOutlineXMark className="h-5 w-5" />
+                                            </button>
+                                        </div>
+
+                                        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+                                            {/* Summary Grid */}
+                                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                                <div className="p-3 sm:p-4 rounded-2xl bg-brand-50 border border-brand-100">
+                                                    <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Your Earnings</p>
+                                                    <p className="text-base sm:text-xl font-black text-brand-700 truncate">₹{summary.totalAmount.toLocaleString('en-IN')}</p>
+                                                </div>
+                                                <div className="p-3 sm:p-4 rounded-2xl bg-brand-50 border border-brand-100">
+                                                    <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Avg. Earning / Order</p>
+                                                    <p className="text-base sm:text-xl font-black text-brand-700">₹{summary.totalOrders ? (summary.totalAmount / summary.totalOrders).toFixed(0) : '0'}</p>
+                                                </div>
                                             </div>
                                         </div>
-                                        <button onClick={() => setIsQuickViewModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600 shrink-0">
-                                            <HiOutlineXMark className="h-5 w-5" />
-                                        </button>
-                                    </div>
 
-                                    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-                                        {/* Summary Grid */}
-                                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                                            <div className="p-3 sm:p-4 rounded-2xl bg-brand-50 border border-brand-100">
-                                                <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Your Earnings</p>
-                                                <p className="text-base sm:text-xl font-black text-brand-700 truncate">₹{summary.totalAmount.toLocaleString('en-IN')}</p>
-                                            </div>
-                                            <div className="p-3 sm:p-4 rounded-2xl bg-brand-50 border border-brand-100">
-                                                <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Avg. Earning / Order</p>
-                                                <p className="text-base sm:text-xl font-black text-brand-700">₹{summary.totalOrders ? (summary.totalAmount / summary.totalOrders).toFixed(0) : '0'}</p>
-                                            </div>
+                                        <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-100">
+                                            <Button
+                                                onClick={() => {
+                                                    setIsQuickViewModalOpen(false);
+                                                    setActiveTab('Pending');
+                                                }}
+                                                className="w-full py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold"
+                                            >
+                                                VIEW ALL PENDING ORDERS
+                                            </Button>
                                         </div>
-                                    </div>
-
-                                    <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-100">
-                                        <Button
-                                            onClick={() => {
-                                                setIsQuickViewModalOpen(false);
-                                                setActiveTab('Pending');
-                                            }}
-                                            className="w-full py-2.5 sm:py-3 text-[10px] sm:text-xs font-bold"
-                                        >
-                                            VIEW ALL PENDING ORDERS
-                                        </Button>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )}
-                    </AnimatePresence>,
-                    document.body
+                                    </motion.div>
+                                </div>
+                            )}
+                        </AnimatePresence>,
+                        document.body
                     )}
                     {createPortal(
-                    <AnimatePresence>
-                        {isDetailsModalOpen && selectedOrder && (
-                            <div className="fixed inset-0 z-[250] flex items-stretch sm:items-center justify-center p-3 sm:p-6 lg:p-12 overflow-hidden overscroll-none">
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-md touch-none"
-                                    onClick={() => setIsDetailsModalOpen(false)}
-                                    onWheel={preventBackdropScroll}
-                                    onTouchMove={preventBackdropScroll}
-                                />
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    className="w-full max-w-lg sm:max-w-2xl relative z-10 bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-                                >
-                                    {/* Modal Header */}
-                                    <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="h-10 w-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg">
-                                                <HiOutlineTruck className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-base font-black text-slate-900">Order Details</h3>
-                                                <div className="flex items-center space-x-2 mt-0.5">
-                                                    <Badge variant={getStatusColor(selectedOrder.status)} className="text-[10px] font-black uppercase tracking-widest px-1.5 py-0">{selectedOrder.status}</Badge>
-                                                    <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">#{selectedOrder.id}</span>
+                        <AnimatePresence>
+                            {isDetailsModalOpen && selectedOrder && (
+                                <div className="fixed inset-0 z-[250] flex items-stretch sm:items-center justify-center p-3 sm:p-6 lg:p-12 overflow-hidden overscroll-none">
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md touch-none"
+                                        onClick={() => setIsDetailsModalOpen(false)}
+                                        onWheel={preventBackdropScroll}
+                                        onTouchMove={preventBackdropScroll}
+                                    />
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                        className="w-full max-w-lg sm:max-w-2xl relative z-10 bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                                    >
+                                        {/* Modal Header */}
+                                        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="h-10 w-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg">
+                                                    <HiOutlineTruck className="h-5 w-5" />
                                                 </div>
-                                                {(selectedOrder.date || selectedOrder.time) && (
-                                                    <p className="text-[11px] font-bold text-slate-500 mt-1.5 flex items-center gap-1.5">
-                                                        <HiOutlineCalendarDays className="h-3.5 w-3.5" />
-                                                        {selectedOrder.date}
-                                                        {selectedOrder.time && (
-                                                            <>
-                                                                <span className="text-slate-300">•</span>
-                                                                <HiOutlineClock className="h-3.5 w-3.5" />
-                                                                {selectedOrder.time}
-                                                            </>
-                                                        )}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <button onClick={() => setIsDetailsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600">
-                                            <HiOutlineXMark className="h-5 w-5" />
-                                        </button>
-                                    </div>
-
-                                    <div className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto scrollbar-hide flex-1">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                                            <div className="space-y-3 sm:space-y-4">
                                                 <div>
-                                                    <div className="flex items-center justify-between gap-2 mb-2">
-                                                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                                                            <HiOutlineMapPin className="h-3 w-3 text-primary" /> Delivery Address
-                                                        </h4>
-                                                        {selectedOrder.location &&
-                                                            typeof selectedOrder.location.lat === "number" &&
-                                                            typeof selectedOrder.location.lng === "number" && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        const { lat, lng } = selectedOrder.location;
-                                                                        window.open(
-                                                                            `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
-                                                                            "_blank",
-                                                                        );
-                                                                    }}
-                                                                    className="text-[10px] font-bold text-primary hover:underline"
-                                                                >
-                                                                    View on map
-                                                                </button>
+                                                    <h3 className="text-base font-black text-slate-900">Order Details</h3>
+                                                    <div className="flex items-center space-x-2 mt-0.5">
+                                                        <Badge variant={getStatusColor(selectedOrder.status)} className="text-[10px] font-black uppercase tracking-widest px-1.5 py-0">{selectedOrder.status}</Badge>
+                                                        <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">#{selectedOrder.id}</span>
+                                                    </div>
+                                                    {(selectedOrder.date || selectedOrder.time) && (
+                                                        <p className="text-[11px] font-bold text-slate-500 mt-1.5 flex items-center gap-1.5">
+                                                            <HiOutlineCalendarDays className="h-3.5 w-3.5" />
+                                                            {selectedOrder.date}
+                                                            {selectedOrder.time && (
+                                                                <>
+                                                                    <span className="text-slate-300">•</span>
+                                                                    <HiOutlineClock className="h-3.5 w-3.5" />
+                                                                    {selectedOrder.time}
+                                                                </>
                                                             )}
-                                                    </div>
-                                                    <p className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
-                                                        {selectedOrder.address}
-                                                    </p>
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                <div>
-                                                    <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                        <HiOutlinePhone className="h-3 w-3 text-brand-500" /> Contact Info
-                                                    </h4>
-                                                    <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
-                                                        <p className="text-xs font-bold text-slate-800">{selectedOrder.customer.name}</p>
-                                                        <p className="text-xs font-semibold text-slate-600 mt-0.5">{selectedOrder.customer.phone}</p>
+                                            </div>
+                                            <button onClick={() => setIsDetailsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600">
+                                                <HiOutlineXMark className="h-5 w-5" />
+                                            </button>
+                                        </div>
+
+                                        <div className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto scrollbar-hide flex-1">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                                                <div className="space-y-3 sm:space-y-4">
+                                                    <div>
+                                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                                            <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest flex items-center gap-2">
+                                                                <HiOutlineMapPin className="h-3 w-3 text-primary" /> Delivery Address
+                                                            </h4>
+                                                            {selectedOrder.location &&
+                                                                typeof selectedOrder.location.lat === "number" &&
+                                                                typeof selectedOrder.location.lng === "number" && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const { lat, lng } = selectedOrder.location;
+                                                                            window.open(
+                                                                                `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+                                                                                "_blank",
+                                                                            );
+                                                                        }}
+                                                                        className="text-[10px] font-bold text-primary hover:underline"
+                                                                    >
+                                                                        View on map
+                                                                    </button>
+                                                                )}
+                                                        </div>
+                                                        <p className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
+                                                            {selectedOrder.address}
+                                                        </p>
                                                     </div>
-                                                </div>
-                                                {selectedOrder.status.toLowerCase() !== 'pending' && selectedOrder.status.toLowerCase() !== 'cancelled' && (
                                                     <div>
                                                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                            <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
+                                                            <HiOutlinePhone className="h-3 w-3 text-brand-500" /> Contact Info
                                                         </h4>
-                                                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm space-y-2">
-                                                            {selectedOrder.deliveryBoy ? (
-                                                                <div className="flex flex-col gap-1.5">
-                                                                    <div className="flex justify-between items-center">
-                                                                        <div>
-                                                                            <p className="text-xs font-bold text-slate-800">{selectedOrder.deliveryBoy.name}</p>
-                                                                            <p className="text-[11px] font-semibold text-slate-600">{selectedOrder.deliveryBoy.phone}</p>
+                                                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
+                                                            <p className="text-xs font-bold text-slate-800">{selectedOrder.customer.name}</p>
+                                                            <p className="text-xs font-semibold text-slate-600 mt-0.5">{selectedOrder.customer.phone}</p>
+                                                        </div>
+                                                    </div>
+                                                    {selectedOrder.status.toLowerCase() !== 'pending' && selectedOrder.status.toLowerCase() !== 'cancelled' && (
+                                                        <div>
+                                                            <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                                <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
+                                                            </h4>
+                                                            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+                                                                {selectedOrder.deliveryBoy ? (
+                                                                    <div className="flex flex-col gap-1.5">
+                                                                        <div className="flex justify-between items-center">
+                                                                            <div>
+                                                                                <p className="text-xs font-bold text-slate-800">{selectedOrder.deliveryBoy.name}</p>
+                                                                                <p className="text-[11px] font-semibold text-slate-600">{selectedOrder.deliveryBoy.phone}</p>
+                                                                            </div>
+                                                                            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Assigned</span>
                                                                         </div>
-                                                                        <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Assigned</span>
+                                                                        <div className="h-px bg-slate-200 my-1" />
+                                                                        <div className="relative">
+                                                                            <select
+                                                                                value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}
+                                                                                onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
+                                                                                className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
+                                                                            >
+                                                                                <option value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}>
+                                                                                    {selectedOrder.deliveryBoy.name} ({selectedOrder.deliveryBoy.phone})
+                                                                                </option>
+                                                                                <option value="" disabled>Change Rider...</option>
+                                                                                {deliveryBoys
+                                                                                    .filter(boy => (boy._id || boy.id) !== (selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id))
+                                                                                    .map(boy => (
+                                                                                        <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
+                                                                                    ))}
+                                                                            </select>
+                                                                            <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="h-px bg-slate-200 my-1" />
+                                                                ) : (
                                                                     <div className="relative">
                                                                         <select
-                                                                            value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}
+                                                                            value=""
                                                                             onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
                                                                             className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
                                                                         >
-                                                                            <option value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}>
-                                                                                {selectedOrder.deliveryBoy.name} ({selectedOrder.deliveryBoy.phone})
-                                                                            </option>
-                                                                            <option value="" disabled>Change Rider...</option>
-                                                                            {deliveryBoys
-                                                                                .filter(boy => (boy._id || boy.id) !== (selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id))
-                                                                                .map(boy => (
+                                                                            <option value="">Assign Rider...</option>
+                                                                            {deliveryBoys.length === 0 ? (
+                                                                                <option value="" disabled>No online riders available</option>
+                                                                            ) : (
+                                                                                deliveryBoys.map(boy => (
                                                                                     <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
-                                                                                ))}
+                                                                                ))
+                                                                            )}
                                                                         </select>
                                                                         <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
                                                                     </div>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="relative">
-                                                                    <select
-                                                                        value=""
-                                                                        onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
-                                                                        className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
-                                                                    >
-                                                                        <option value="">Assign Rider...</option>
-                                                                        {deliveryBoys.length === 0 ? (
-                                                                            <option value="" disabled>No online riders available</option>
-                                                                        ) : (
-                                                                            deliveryBoys.map(boy => (
-                                                                                <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
-                                                                            ))
-                                                                        )}
-                                                                    </select>
-                                                                    <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {selectedOrder.deliveryType === "scheduled" && (
-                                                    <div>
-                                                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                            <HiOutlineTruck className="h-3 w-3 text-indigo-500" /> Shipment Details
-                                                        </h4>
-                                                        <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100 shadow-sm space-y-2">
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Shiprocket Fulfillment</span>
+                                                                )}
                                                             </div>
-                                                            {selectedOrder.shipmentDetails?.awbCode ? (
-                                                                <div className="text-xs font-semibold text-slate-700 mt-2 space-y-1">
-                                                                    <p><span className="text-slate-500 font-bold">Courier:</span> {selectedOrder.shipmentDetails.courierName || "Standard"}</p>
-                                                                    <p><span className="text-slate-500 font-bold">AWB Code:</span> {selectedOrder.shipmentDetails.awbCode}</p>
-                                                                    <p><span className="text-slate-500 font-bold">Status:</span> <span className="uppercase text-indigo-600 font-black">{selectedOrder.shipmentDetails.status || "Created"}</span></p>
-                                                                </div>
-                                                            ) : (
-                                                                <p className="text-[10px] text-slate-500 font-medium italic mt-2">Awaiting shipment details (creates on status packed)</p>
-                                                            )}
                                                         </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="space-y-3 sm:space-y-4">
-                                                <div className="bg-slate-50 p-3 sm:p-4 rounded-3xl border border-slate-100">
-                                                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                                                        Order Amount (Customer)
-                                                    </h4>
-                                                    <p className="text-lg font-black text-slate-900">
-                                                        ₹{getCustomerOrderBill(selectedOrder).grandTotal.toFixed(2)}
-                                                    </p>
-                                                </div>
-                                                <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
-                                                    <h4 className="text-xs font-black text-primary uppercase tracking-widest mb-3">Your Earning</h4>
-                                                    <div className="space-y-2">
-                                                        {(() => {
-                                                            const { productEarning, deliveryShare, total } =
-                                                                getSellerEarningBreakdown(selectedOrder);
-                                                            return (
-                                                                <>
-                                                                    <div className="flex justify-between text-xs">
-                                                                        <span className="font-bold text-slate-600">Product</span>
-                                                                        <span className="font-black text-slate-900">₹{productEarning.toFixed(2)}</span>
-                                                                    </div>
-                                                                    {deliveryShare > 0 ? (
-                                                                        <div className="flex justify-between text-xs">
-                                                                            <span className="font-bold text-slate-600">Delivery (80%)</span>
-                                                                            <span className="font-black text-brand-600">₹{deliveryShare.toFixed(2)}</span>
-                                                                        </div>
-                                                                    ) : null}
-                                                                    <div className="h-px bg-primary/10 my-2" />
-                                                                    <div className="flex justify-between text-sm">
-                                                                        <span className="font-black text-slate-900">Your Earning</span>
-                                                                        <span className="font-black text-primary">₹{total.toFixed(2)}</span>
-                                                                    </div>
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                </div>
-                                                <div className="bg-slate-900 p-3 sm:p-4 rounded-3xl text-white shadow-xl shadow-slate-900/10">
-                                                    <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2">Payment Status</h4>
-                                                    <div className="flex items-center gap-2">
-                                                        <HiOutlineBanknotes className="h-5 w-5 text-brand-400" />
-                                                        <span className="text-xs font-bold tracking-tight">{selectedOrder.payment}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">Items Ordered ({selectedOrder.items.length})</h4>
-                                        <div className="space-y-3 max-h-52 sm:max-h-64 overflow-y-auto pr-1">
-                                            {selectedOrder.items.map((item, idx) => (
-                                                <div key={idx} className="flex items-center justify-between p-3 bg-white ring-1 ring-slate-100 rounded-2xl group hover:shadow-md transition-all">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="h-12 w-12 rounded-xl overflow-hidden bg-slate-50 ring-1 ring-slate-200">
-                                                            <img src={item.image} alt={item.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs font-bold text-slate-900">{item.name}</p>
-                                                            <p className="text-xs font-semibold text-slate-600 mt-0.5">₹{item.price.toFixed(2)} × {item.qty}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xs font-black text-slate-900">₹{(item.price * item.qty).toFixed(2)}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Modal Footer */}
-                                    <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 sm:gap-0 sm:items-center justify-between">
-                                        <button
-                                            onClick={() => handleThermalPrint(selectedOrder)}
-                                            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-700 transition-all shadow-sm"
-                                        >
-                                            <HiOutlinePrinter size={16} /> THERMAL PRINT
-                                        </button>
-                                        <div className="flex gap-2 items-center">
-                                            <button onClick={() => setIsDetailsModalOpen(false)} className="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all">CLOSE</button>
-                                            <div className="relative inline-block w-40">
-                                                <select
-                                                    value={selectedOrder.status.toLowerCase()}
-                                                    onChange={(e) => handleStatusUpdate(selectedOrder.id, e.target.value)}
-                                                    className={cn(
-                                                        "w-full text-xs pl-3 pr-8 py-2 rounded-xl font-black uppercase tracking-wider border appearance-none cursor-pointer focus:ring-2 focus:ring-offset-1 transition-all outline-none shadow-sm",
-                                                        getStatusColor(selectedOrder.status) === 'warning' ? "bg-amber-100 text-amber-700 focus:ring-amber-200" :
-                                                            getStatusColor(selectedOrder.status) === 'info' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
-                                                                getStatusColor(selectedOrder.status) === 'primary' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
-                                                                    getStatusColor(selectedOrder.status) === 'secondary' ? "bg-purple-100 text-purple-700 focus:ring-purple-200" :
-                                                                        getStatusColor(selectedOrder.status) === 'success' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
-                                                                            getStatusColor(selectedOrder.status) === 'error' ? "bg-rose-100 text-rose-700 focus:ring-rose-200" :
-                                                                                "bg-slate-100 text-slate-700 focus:ring-slate-200"
                                                     )}
-                                                >
-                                                    <option value="pending">Pending</option>
-                                                    <option value="confirmed">Confirmed</option>
-                                                    <option value="packed">Packed</option>
-                                                    <option value="out_for_delivery">Out for Delivery</option>
-                                                    <option value="delivered">Delivered</option>
-                                                    <option value="cancelled">Cancelled</option>
-                                                </select>
-                                                <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                                    {selectedOrder.deliveryType === "scheduled" && (
+                                                        <div>
+                                                            <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                                <HiOutlineTruck className="h-3 w-3 text-indigo-500" /> Shipment Details
+                                                            </h4>
+                                                            <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100 shadow-sm space-y-2">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Shiprocket Fulfillment</span>
+                                                                </div>
+                                                                {selectedOrder.shipmentDetails?.awbCode ? (
+                                                                    <div className="text-xs font-semibold text-slate-700 mt-2 space-y-1">
+                                                                        <p><span className="text-slate-500 font-bold">Courier:</span> {selectedOrder.shipmentDetails.courierName || "Standard"}</p>
+                                                                        <p><span className="text-slate-500 font-bold">AWB Code:</span> {selectedOrder.shipmentDetails.awbCode}</p>
+                                                                        <p><span className="text-slate-500 font-bold">Status:</span> <span className="uppercase text-indigo-600 font-black">{selectedOrder.shipmentDetails.status || "Created"}</span></p>
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-[10px] text-slate-500 font-medium italic mt-2">Awaiting shipment details (creates on status packed)</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-3 sm:space-y-4">
+                                                    <div className="bg-slate-50 p-3 sm:p-4 rounded-3xl border border-slate-100">
+                                                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                                                            Order Amount (Customer)
+                                                        </h4>
+                                                        <p className="text-lg font-black text-slate-900">
+                                                            ₹{getCustomerOrderBill(selectedOrder).grandTotal.toFixed(2)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
+                                                        <h4 className="text-xs font-black text-primary uppercase tracking-widest mb-3">Your Earning</h4>
+                                                        <div className="space-y-2">
+                                                            {(() => {
+                                                                const { productEarning, deliveryShare, total } =
+                                                                    getSellerEarningBreakdown(selectedOrder);
+                                                                return (
+                                                                    <>
+                                                                        <div className="flex justify-between text-xs">
+                                                                            <span className="font-bold text-slate-600">Product</span>
+                                                                            <span className="font-black text-slate-900">₹{productEarning.toFixed(2)}</span>
+                                                                        </div>
+                                                                        {deliveryShare > 0 ? (
+                                                                            <div className="flex justify-between text-xs">
+                                                                                <span className="font-bold text-slate-600">Delivery (80%)</span>
+                                                                                <span className="font-black text-brand-600">₹{deliveryShare.toFixed(2)}</span>
+                                                                            </div>
+                                                                        ) : null}
+                                                                        <div className="h-px bg-primary/10 my-2" />
+                                                                        <div className="flex justify-between text-sm">
+                                                                            <span className="font-black text-slate-900">Your Earning</span>
+                                                                            <span className="font-black text-primary">₹{total.toFixed(2)}</span>
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-slate-900 p-3 sm:p-4 rounded-3xl text-white shadow-xl shadow-slate-900/10">
+                                                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2">Payment Status</h4>
+                                                        <div className="flex items-center gap-2">
+                                                            <HiOutlineBanknotes className="h-5 w-5 text-brand-400" />
+                                                            <span className="text-xs font-bold tracking-tight">{selectedOrder.payment}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">Items Ordered ({selectedOrder.items.length})</h4>
+                                            <div className="space-y-3 max-h-52 sm:max-h-64 overflow-y-auto pr-1">
+                                                {selectedOrder.items.map((item, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between p-3 bg-white ring-1 ring-slate-100 rounded-2xl group hover:shadow-md transition-all">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="h-12 w-12 rounded-xl overflow-hidden bg-slate-50 ring-1 ring-slate-200">
+                                                                <img src={item.image} alt={item.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-bold text-slate-900">{item.name}</p>
+                                                                <p className="text-xs font-semibold text-slate-600 mt-0.5">₹{item.price.toFixed(2)} × {item.qty}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-xs font-black text-slate-900">₹{(item.price * item.qty).toFixed(2)}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )}
-                    </AnimatePresence>,
-                    document.body
+
+                                        {/* Modal Footer */}
+                                        <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 sm:gap-0 sm:items-center justify-between">
+                                            <button
+                                                onClick={() => handleThermalPrint(selectedOrder)}
+                                                className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-700 transition-all shadow-sm"
+                                            >
+                                                <HiOutlinePrinter size={16} /> THERMAL PRINT
+                                            </button>
+                                            <div className="flex gap-2 items-center">
+                                                <button onClick={() => setIsDetailsModalOpen(false)} className="px-6 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-all">CLOSE</button>
+                                                <div className="relative inline-block w-40">
+                                                    <select
+                                                        value={selectedOrder.status.toLowerCase()}
+                                                        onChange={(e) => handleStatusUpdate(selectedOrder.id, e.target.value)}
+                                                        className={cn(
+                                                            "w-full text-xs pl-3 pr-8 py-2 rounded-xl font-black uppercase tracking-wider border appearance-none cursor-pointer focus:ring-2 focus:ring-offset-1 transition-all outline-none shadow-sm",
+                                                            getStatusColor(selectedOrder.status) === 'warning' ? "bg-amber-100 text-amber-700 focus:ring-amber-200" :
+                                                                getStatusColor(selectedOrder.status) === 'info' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
+                                                                    getStatusColor(selectedOrder.status) === 'primary' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
+                                                                        getStatusColor(selectedOrder.status) === 'secondary' ? "bg-purple-100 text-purple-700 focus:ring-purple-200" :
+                                                                            getStatusColor(selectedOrder.status) === 'success' ? "bg-brand-100 text-brand-700 focus:ring-brand-200" :
+                                                                                getStatusColor(selectedOrder.status) === 'error' ? "bg-rose-100 text-rose-700 focus:ring-rose-200" :
+                                                                                    "bg-slate-100 text-slate-700 focus:ring-slate-200"
+                                                        )}
+                                                    >
+                                                        <option value="pending">Pending</option>
+                                                        <option value="confirmed">Confirmed</option>
+                                                        <option value="packed">Packed</option>
+                                                        <option value="out_for_delivery">Out for Delivery</option>
+                                                        <option value="delivered">Delivered</option>
+                                                        <option value="cancelled">Cancelled</option>
+                                                    </select>
+                                                    <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                </div>
+                            )}
+                        </AnimatePresence>,
+                        document.body
                     )}
                 </>
             )}

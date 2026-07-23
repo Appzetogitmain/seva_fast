@@ -92,7 +92,7 @@ export const addToCart = async (req, res) => {
     const { productId, quantity = 1, variantSku = "" } = req.body;
     const normalizedVariantSku = String(variantSku || "").trim();
     const customerVisibleProduct = await getCustomerVisibleProductById(productId, {
-      select: "_id name variants",
+      select: "_id name variants sellerId",
     });
     if (!customerVisibleProduct) {
       return handleResponse(res, 404, "Product is not available for purchase");
@@ -107,6 +107,15 @@ export const addToCart = async (req, res) => {
     }
 
     let cart = await Cart.findOne({ customerId });
+
+    if (cart && cart.items.length > 0) {
+      const firstItemProductId = cart.items[0].productId;
+      const firstProduct = await getCustomerVisibleProductById(firstItemProductId, { select: "sellerId" });
+      
+      if (firstProduct && String(firstProduct.sellerId) !== String(customerVisibleProduct.sellerId)) {
+        return handleResponse(res, 400, "Cart contains items from another store. Please clear your cart first.");
+      }
+    }
 
     if (!cart) {
       cart = new Cart({ customerId, items: [] });

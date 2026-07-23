@@ -9,6 +9,7 @@ import { deliveryApi } from "../services/deliveryApi";
 import { useAuth } from "@core/context/AuthContext";
 import {
   getOrderSocket,
+  onDeliveryBroadcast,
   onDeliveryBroadcastWithdrawn,
   onOrderAssigned,
 } from "@/core/services/orderSocket";
@@ -451,6 +452,7 @@ const DeliveryLayout = () => {
     };
 
     const unsubAssigned = onOrderAssigned(getToken, handleIncoming);
+    const unsubBroadcast = onDeliveryBroadcast(getToken, handleIncoming);
     const onConnect = () => {
       syncAssignedOrders();
       pollIncomingNotifications();
@@ -459,6 +461,7 @@ const DeliveryLayout = () => {
 
     return () => {
       unsubAssigned();
+      unsubBroadcast();
       socket?.off("connect", onConnect);
     };
   }, [
@@ -512,7 +515,7 @@ const DeliveryLayout = () => {
   const skipOrder = useCallback(async (isTimeout = false) => {
     const current = activeOrderRef.current;
     if (!current || acceptInFlightRef.current) return;
-    
+
     // Clear UI state immediately to stop ringtone and hide modal
     shownOrderIdsRef.current = new Set(shownOrderIdsRef.current).add(current.id);
     markIncomingOrderHandled(current.id);

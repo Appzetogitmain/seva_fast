@@ -148,9 +148,15 @@ const ProfilePage = () => {
             });
         } catch (error) {
             const message = error?.response?.data?.message || error?.message || 'Unknown error';
-            toast.error('Failed to trigger test push', {
-                description: message,
-            });
+            if (message.includes('not supported') || message.includes('Permission denied')) {
+                toast.info('Push Notifications Unavailable', {
+                    description: 'Your browser or device settings currently block push notifications.',
+                });
+            } else {
+                toast.error('Failed to trigger test push', {
+                    description: message,
+                });
+            }
         } finally {
             setIsTestingPush(false);
         }
@@ -605,7 +611,7 @@ const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                             type="text" 
                             placeholder="Type your city to find sellers..." 
                             value={city} 
-                            onChange={(e) => setCity(e.target.value)}
+                            onChange={(e) => setCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-brand-500 outline-none transition-colors"
                         />
                     </div>
@@ -679,7 +685,8 @@ const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                             )}
                             <input 
                                 type="file" 
-                                accept="image/*" 
+                                accept="image/*, .jpg, .jpeg, .png, .webp, .heic, .heif"
+                                capture="environment"
                                 onChange={handleFileChange}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             />

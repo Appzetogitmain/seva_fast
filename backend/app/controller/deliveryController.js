@@ -58,6 +58,12 @@ export const getDeliveryStats = async (req, res) => {
             .lean();
         const totalDeliveries = orders.length;
 
+        // Bug 224: Count active orders by status
+        const [confirmedCount, outForDeliveryCount] = await Promise.all([
+            Order.countDocuments({ deliveryBoy: deliveryBoyId, status: 'confirmed' }),
+            Order.countDocuments({ deliveryBoy: deliveryBoyId, status: 'out_for_delivery' }),
+        ]);
+
         // Today's earnings - Using a more robust date check
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
@@ -65,10 +71,15 @@ export const getDeliveryStats = async (req, res) => {
         const allTransactions = await Transaction.find({
             user: deliveryBoyId,
             userModel: 'Delivery',
-            createdAt: { $gte: startOfToday }
         }).lean();
 
-        const todayEarnings = allTransactions
+        const todayTransactions = allTransactions.filter(t => new Date(t.createdAt) >= startOfToday);
+
+        const todayEarnings = todayTransactions
+            .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
+            .reduce((acc, t) => acc + t.amount, 0);
+
+        const totalEarnings = allTransactions
             .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
             .reduce((acc, t) => acc + t.amount, 0);
 
@@ -86,9 +97,12 @@ export const getDeliveryStats = async (req, res) => {
 
         return handleResponse(res, 200, "Stats fetched", {
             today: todayEarnings,
+            totalEarnings,
             deliveries: totalDeliveries,
             incentives,
-            cashCollected
+            cashCollected,
+            confirmedCount,
+            outForDeliveryCount,
         });
     } catch (error) {
         return handleResponse(res, 500, error.message);

@@ -290,7 +290,7 @@ export const getMyOrders = async (req, res) => {
         ]);
 
         console.log(`[getMyOrders Debug] Customer ID: ${customerId} | Total Orders: ${total} | Skip: ${skip} | Limit: ${limit}`);
-        
+
         return {
           items: orders,
           page,
@@ -486,12 +486,12 @@ export const getOrderDetails = async (req, res) => {
     const isAssignedDeliveryBoy =
       role === "delivery" &&
       (primaryRiderId === uid || returnRiderId === uid);
-    
+
     // ALLOW view if it is a broadcasted delivery or return that is not yet assigned
-    const isBroadcastedOrder = 
-      role === "delivery" && 
-      ((!order.deliveryBoy && order.workflowStatus === WORKFLOW_STATUS.DELIVERY_SEARCH) || 
-       (!order.returnDeliveryBoy && ["return_approved", "return_pickup_assigned"].includes(order.returnStatus)));
+    const isBroadcastedOrder =
+      role === "delivery" &&
+      ((!order.deliveryBoy && order.workflowStatus === WORKFLOW_STATUS.DELIVERY_SEARCH) ||
+        (!order.returnDeliveryBoy && ["return_approved", "return_pickup_assigned"].includes(order.returnStatus)));
 
     const isSubAdmin = role === "sub-admin";
     const isSubAdminWithZone =
@@ -945,7 +945,7 @@ export const updateOrderStatus = async (req, res) => {
           const populatedOrder = await Order.findById(order._id)
             .populate("customer", "name phone email")
             .populate("seller", "shopName address name location");
-          
+
           const shipment = await createShiprocketOrder(populatedOrder);
           if (shipment && shipment.success) {
             order.shipmentDetails = {
@@ -998,15 +998,15 @@ export const updateOrderStatus = async (req, res) => {
         order.assignedAt = new Date();
         order.deliveryRiderStep = order.deliveryRiderStep || 1;
       }
-      
+
       if (Array.isArray(order.skippedBy)) {
         order.skippedBy = order.skippedBy.filter(
           (id) => id.toString() !== deliveryBoyId.toString()
         );
       }
-      
+
       await order.save();
-      
+
       try {
         await retractDeliveryBroadcastForOrder(canonicalOrderId, deliveryBoyId);
       } catch (retractErr) {
@@ -1352,6 +1352,10 @@ export const updateReturnQcStatus = async (req, res) => {
     const order = await Order.findOne(orderKey);
     if (!order) {
       return handleResponse(res, 404, "Order not found");
+    }
+
+    if (order.returnStatus === "qc_passed" || order.returnStatus === "refund_completed") {
+      return handleResponse(res, 200, "Return QC already processed and refund completed.", order);
     }
 
     if (order.returnStatus !== "returned") {

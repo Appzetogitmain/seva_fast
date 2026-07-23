@@ -46,6 +46,9 @@ const ProductManagement = () => {
         pending: 0,
         approved: 0,
         rejected: 0,
+        lowStock: 0,
+        outOfStock: 0,
+        active: 0,
     });
     const [moderatingActionId, setModeratingActionId] = useState('');
 
@@ -119,6 +122,9 @@ const ProductManagement = () => {
                     pending: Number(payload?.counts?.pending || 0),
                     approved: Number(payload?.counts?.approved || 0),
                     rejected: Number(payload?.counts?.rejected || 0),
+                    lowStock: Number(payload?.counts?.lowStock || 0),
+                    outOfStock: Number(payload?.counts?.outOfStock || 0),
+                    active: Number(payload?.counts?.active || 0),
                 });
             }
         } catch (error) {
@@ -338,10 +344,10 @@ const ProductManagement = () => {
     const productsList = Array.isArray(products) ? products : [];
     const stats = useMemo(() => ({
         total: total,
-        lowStock: productsList.filter(p => p.stock > 0 && p.stock <= 10).length,
-        outOfStock: productsList.filter(p => p.stock === 0).length,
-        active: productsList.filter(p => p.status === 'active').length
-    }), [productsList, total]);
+        lowStock: moderationCounts.lowStock,
+        outOfStock: moderationCounts.outOfStock,
+        active: moderationCounts.active
+    }), [total, moderationCounts]);
 
     const StatusBadge = ({ status, stock }) => {
         if (stock === 0) return <Badge variant="error" className="text-[10px] px-1.5 py-0">Out of Stock</Badge>;

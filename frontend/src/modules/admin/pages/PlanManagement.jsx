@@ -12,6 +12,8 @@ const PlanManagement = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all'); // all, active, inactive
+    const [viewMode, setViewMode] = useState('grid'); // grid, list
 
     const fetchPlans = async () => {
         try {
@@ -69,9 +71,19 @@ const PlanManagement = () => {
         }
     };
 
-    const filteredPlans = plans.filter(p => 
-        p.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredPlans = plans.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesStatus = statusFilter === 'all' ? true : (statusFilter === 'active' ? p.isActive : !p.isActive);
+        return matchesSearch && matchesStatus;
+    });
+
+    const toggleFilter = () => {
+        setStatusFilter(prev => prev === 'all' ? 'active' : prev === 'active' ? 'inactive' : 'all');
+    };
+
+    const toggleViewMode = () => {
+        setViewMode(prev => prev === 'grid' ? 'list' : 'grid');
+    };
 
     return (
         <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
@@ -108,11 +120,19 @@ const PlanManagement = () => {
                     />
                 </div>
                 <div className="flex items-center gap-2 w-full md:w-auto">
-                    <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 bg-slate-50 text-slate-600 rounded-[20px] text-xs font-black uppercase tracking-widest hover:bg-slate-100 transition-all">
+                    <button 
+                        onClick={toggleFilter}
+                        className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-4 rounded-[20px] text-xs font-black uppercase tracking-widest transition-all ${
+                            statusFilter !== 'all' ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                        }`}
+                    >
                         <Filter className="h-4 w-4" />
-                        Filter
+                        {statusFilter === 'all' ? 'Filter' : statusFilter}
                     </button>
-                    <button className="p-4 bg-slate-50 text-slate-600 rounded-[20px] hover:bg-slate-100 transition-all">
+                    <button 
+                        onClick={toggleViewMode}
+                        className="p-4 bg-slate-50 text-slate-600 rounded-[20px] hover:bg-slate-100 transition-all"
+                    >
                         <LayoutGrid className="h-5 w-5" />
                     </button>
                 </div>
@@ -145,7 +165,7 @@ const PlanManagement = () => {
                     )}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" : "flex flex-col gap-6"}>
                     {filteredPlans.map((plan) => (
                         <PlanCard 
                             key={plan._id} 

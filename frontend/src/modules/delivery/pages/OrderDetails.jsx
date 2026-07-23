@@ -622,10 +622,10 @@ const OrderDetails = () => {
         <div className="flex flex-col items-end">
           <span
             className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wide ${publicStatusStage === 1
-                ? "bg-brand-100 text-brand-700"
-                : publicStatusStage === 2
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-brand-100 text-brand-700"
+              ? "bg-brand-100 text-brand-700"
+              : publicStatusStage === 2
+                ? "bg-amber-100 text-amber-700"
+                : "bg-brand-100 text-brand-700"
               }`}
           >
             {isReturn ? (
@@ -939,13 +939,21 @@ const OrderDetails = () => {
                       </h2>
                       <div className="flex items-center space-x-2 mt-0.5">
                         <p
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${order.payment?.method?.toLowerCase() === "cash" ||
-                              order.payment?.method?.toLowerCase() === "cod"
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay === 0
+                              ? "bg-purple-50 text-purple-700 border-purple-200"
+                              : order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay > 0
+                              ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                              : order.payment?.method?.toLowerCase() === "cash" || order.payment?.method?.toLowerCase() === "cod"
                               ? "bg-orange-50 text-orange-700 border-orange-200"
                               : "bg-brand-50 text-brand-700 border-brand-200"
-                            }`}
+                          }`}
                         >
-                          {order.payment?.method?.toUpperCase() || "PENDING"}
+                          {order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay === 0
+                            ? "WALLET"
+                            : order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay > 0
+                            ? "WALLET + " + (order.payment?.method?.toUpperCase() || "ONLINE")
+                            : order.payment?.method?.toUpperCase() || "CASH"}
                         </p>
                         <p className="text-[10px] text-gray-400 font-medium">Bill: Rs.{order.pricing?.total}</p>
                       </div>
@@ -1097,10 +1105,24 @@ const OrderDetails = () => {
           </motion.div>
         )}
 
-        {/* Pickup OTP input */}
+        {/* Pickup OTP input — Bug 232: Clearly visible with instruction */}
         {showOtpInput && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="p-6 rounded-3xl shadow-sm border border-slate-100">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            ref={(el) => el?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          >
+            {isReturn && (
+              <div className="mb-3 bg-orange-50 border border-orange-200 rounded-2xl p-3 flex items-start gap-3">
+                <span className="text-orange-500 text-xl">📦</span>
+                <div>
+                  <p className="text-sm font-bold text-orange-800">OTP Sent to Customer</p>
+                  <p className="text-xs text-orange-600 mt-0.5">Ask the customer for the 6-digit OTP to confirm return pickup.</p>
+                </div>
+              </div>
+            )}
+            <Card className="p-6 rounded-3xl shadow-sm border border-slate-100 overflow-visible">
               <OtpInput
                 orderId={orderId}
                 isReturn={isReturn}

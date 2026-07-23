@@ -298,27 +298,29 @@ const OtpInput = ({ orderId, isReturn = false, isReturnDrop = false, onSuccess, 
         </button>
       )}
 
-      {/* Submit Button — enabled when all 6 digits are entered */}
-      <button
-        onClick={handleSubmit}
-        disabled={!isComplete || isLoading || isGenerating}
-        className={`w-full h-12 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2 outline-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-0 ${!isComplete || isLoading || isGenerating
-          ? "bg-gray-200 text-gray-600 cursor-not-allowed"
-          : "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 shadow-md hover:shadow-lg"
-          }`}
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Validating...</span>
-          </>
-        ) : (
-          <>
-            <CheckCircle className="w-5 h-5" />
-            <span>{isReturnDrop ? "Confirm Return Delivery" : isReturn ? "Confirm Pickup" : "Confirm Delivery"}</span>
-          </>
-        )}
-      </button>
+      {/* Submit Button — sticky so it stays visible when keyboard opens */}
+      <div className="sticky bottom-0 pb-2 bg-white">
+        <button
+          onClick={handleSubmit}
+          disabled={!isComplete || isLoading || isGenerating}
+          className={`w-full h-12 rounded-xl font-bold transition-all duration-200 flex items-center justify-center gap-2 outline-none focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-0 ${!isComplete || isLoading || isGenerating
+            ? "bg-gray-200 text-gray-600 cursor-not-allowed"
+            : "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 shadow-md hover:shadow-lg"
+            }`}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Validating...</span>
+            </>
+          ) : (
+            <>
+              <CheckCircle className="w-5 h-5" />
+              <span>{isReturnDrop ? "Confirm Return Delivery" : isReturn ? "Confirm Pickup" : "Confirm Delivery"}</span>
+            </>
+          )}
+        </button>
+      </div>
 
       {/* Clear Button */}
       <button

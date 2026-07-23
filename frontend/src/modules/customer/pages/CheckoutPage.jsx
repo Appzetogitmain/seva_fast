@@ -187,7 +187,7 @@ const CheckoutPage = () => {
     if (cart.length === 0) {
       import("../../../assets/lottie/Empty box.json")
         .then((m) => setEmptyBoxData(m.default))
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [cart.length === 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -195,24 +195,24 @@ const CheckoutPage = () => {
     ...(settings?.onlineEnabled === false
       ? []
       : [
-          {
-            id: "online",
-            label: "Pay Online",
-            icon: CreditCard,
-            sublabel: "Razorpay • UPI / Cards / NetBanking",
-            badge: "Razorpay",
-          },
-        ]),
+        {
+          id: "online",
+          label: "Pay Online",
+          icon: CreditCard,
+          sublabel: "Razorpay • UPI / Cards / NetBanking",
+          badge: "Razorpay",
+        },
+      ]),
     ...(settings?.codEnabled === false
       ? []
       : [
-          {
-            id: "cash",
-            label: "Cash on Delivery",
-            icon: Banknote,
-            sublabel: "Pay after delivery",
-          },
-        ]),
+        {
+          id: "cash",
+          label: "Cash on Delivery",
+          icon: Banknote,
+          sublabel: "Pay after delivery",
+        },
+      ]),
   ];
 
   const discountAmount = selectedCoupon
@@ -273,13 +273,13 @@ const CheckoutPage = () => {
         ...(primarySaved?.location
           ? { location: primarySaved.location }
           : typeof currentLocation?.latitude === "number" &&
-              typeof currentLocation?.longitude === "number"
+            typeof currentLocation?.longitude === "number"
             ? {
-                location: {
-                  lat: currentLocation.latitude,
-                  lng: currentLocation.longitude,
-                },
-              }
+              location: {
+                lat: currentLocation.latitude,
+                lng: currentLocation.longitude,
+              },
+            }
             : {}),
       };
     });
@@ -323,7 +323,7 @@ const CheckoutPage = () => {
     hasMixedCart
       ? "Cannot checkout mixed cart"
       : finalAmountToPay === 0
-        ? "Place Free Order"
+        ? "Pay via Wallet"
         : selectedPayment === "online"
           ? "Slide to Pay"
           : "Slide to Place Order";
@@ -464,8 +464,8 @@ const CheckoutPage = () => {
       } catch (e) {
         showToast(
           e?.__serverMsg ||
-            e?.message ||
-            "Could not fetch coordinates for this address. Delivery charges may not update.",
+          e?.message ||
+          "Could not fetch coordinates for this address. Delivery charges may not update.",
           "error",
         );
       }
@@ -559,7 +559,7 @@ const CheckoutPage = () => {
     } catch (e) {
       showToast(
         e.response?.data?.message ||
-          "Could not fetch coordinates for this address. Delivery charges may be inaccurate.",
+        "Could not fetch coordinates for this address. Delivery charges may be inaccurate.",
         "error",
       );
     }
@@ -589,7 +589,7 @@ const CheckoutPage = () => {
           .filter(Boolean)
           .join(", "),
         ...(typeof liveLocation.latitude === "number" &&
-        typeof liveLocation.longitude === "number"
+          typeof liveLocation.longitude === "number"
           ? { location: { lat: liveLocation.latitude, lng: liveLocation.longitude } }
           : {}),
       }));
@@ -608,7 +608,7 @@ const CheckoutPage = () => {
           .filter(Boolean)
           .join(", "),
         ...(typeof currentLocation.latitude === "number" &&
-        typeof currentLocation.longitude === "number"
+          typeof currentLocation.longitude === "number"
           ? { location: { lat: currentLocation.latitude, lng: currentLocation.longitude } }
           : {}),
       }));
@@ -816,7 +816,7 @@ const CheckoutPage = () => {
           setRecommendedProducts(items.slice(0, 8));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [cartProductIdKey]);
 
   const handlePlaceOrder = async () => {
@@ -958,8 +958,8 @@ const CheckoutPage = () => {
             setIsPlacingOrder(false);
             showToast(
               payError.response?.data?.message ||
-                payError.message ||
-                "Could not open Razorpay checkout. Please try again.",
+              payError.message ||
+              "Could not open Razorpay checkout. Please try again.",
               "error",
             );
             return;
@@ -1005,7 +1005,7 @@ const CheckoutPage = () => {
       setIsPlacingOrder(false);
       showToast(
         error.response?.data?.message ||
-          "Failed to place order. Please try again.",
+        "Failed to place order. Please try again.",
         "error"
       );
     }
@@ -1039,7 +1039,7 @@ const CheckoutPage = () => {
       .then((r) => {
         if (r.data?.result) applyCancelled(r.data.result);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     const off = onOrderStatusUpdate(getToken, (order) => applyCancelled(order));
 
@@ -1300,11 +1300,10 @@ const CheckoutPage = () => {
                 key={addr.id}
                 onClick={() => handleSelectSavedAddress(addr)}
                 disabled={isResolvingAddressCoords}
-                className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
-                  currentAddress.id === addr.id
+                className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${currentAddress.id === addr.id
                     ? "border-primary bg-brand-50 shadow-sm"
                     : "border-slate-100 bg-white hover:border-slate-200"
-                }`}>
+                  }`}>
                 <div className="flex items-center gap-3 mb-2">
                   <div className={`p-2 rounded-full ${currentAddress.id === addr.id ? "bg-primary text-primary-foreground" : "bg-slate-100 text-slate-500"}`}>
                     <MapPin size={16} />

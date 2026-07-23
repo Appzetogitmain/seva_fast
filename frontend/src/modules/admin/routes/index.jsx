@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "@shared/layout/DashboardLayout";
 import { useSupportUnread } from "@core/context/SupportUnreadContext";
 import { useAuth } from "@core/context/AuthContext";
+import { useEffect } from "react";
+import { getOrderSocket } from "@/core/services/orderSocket";
 import {
   LayoutDashboard,
   Tag,
@@ -257,7 +259,23 @@ const BillingCharges = React.lazy(() => import("../pages/BillingCharges"));
 
 const AdminRoutes = () => {
   const { totalUnread } = useSupportUnread();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+
+  // Bug 255: Listen for force-logout event (when this sub-admin is deleted by super admin)
+  useEffect(() => {
+    if (user?.role !== "sub-admin") return;
+    const getToken = () => localStorage.getItem('auth_admin');
+    const socket = getOrderSocket(getToken);
+    if (!socket) return;
+    const handleForceLogout = () => {
+      logout();
+      window.location.href = '/admin/login';
+    };
+    socket.on('admin:force-logout', handleForceLogout);
+    return () => {
+      socket.off('admin:force-logout', handleForceLogout);
+    };
+  }, [user, logout]);
 
   const SubadminRoute = React.useCallback(({ permission, children }) => {
     if (user?.role === "sub-admin") {

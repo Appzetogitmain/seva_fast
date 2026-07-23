@@ -56,6 +56,8 @@ const Returns = () => {
                 return "Rejected";
             case "return_pickup_assigned":
                 return "Pickup Assigned";
+            case "picked_up":
+                return "Picked Up";
             case "return_in_transit":
             case "return_drop_pending":
                 return "In Transit";
@@ -83,6 +85,8 @@ const Returns = () => {
             case "return_in_transit":
             case "return_drop_pending":
                 return "secondary";
+            case "picked_up":
+                return "primary";
             case "qc_passed":
                 return "success";
             case "qc_failed":

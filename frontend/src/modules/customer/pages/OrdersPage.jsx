@@ -4,6 +4,7 @@ import { Package, ChevronRight, Clock, CheckCircle, Loader2, ChevronLeft } from 
 import { customerApi } from '../services/customerApi';
 import { getOrderStatusLabel, getLegacyStatusFromOrder } from '@/shared/utils/orderStatus';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
+import { getOrderSocket, onOrderStatusUpdate } from '@/core/services/orderSocket';
 
 const OrdersPage = () => {
     const navigate = useNavigate();
@@ -39,6 +40,17 @@ const OrdersPage = () => {
         };
 
         fetchOrders();
+
+        // Socket listener for order status updates
+        const getToken = () => localStorage.getItem('auth_customer');
+        getOrderSocket(getToken);
+        const unSub = onOrderStatusUpdate(getToken, (payload) => {
+            fetchOrders();
+        });
+
+        return () => {
+            if (typeof unSub === 'function') unSub();
+        };
     }, []);
 
     if (loading) {
@@ -80,87 +92,85 @@ const OrdersPage = () => {
                     orders.map((order) => {
                         const legacy = getLegacyStatusFromOrder(order);
                         return (
-                        <Link
-                            to={`/orders/${order.orderId}`}
-                            key={order._id}
-                            className="block bg-white rounded-2xl px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-slate-100/80 active:scale-[0.985] transition-transform cursor-pointer hover:shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
-                        >
-                            <div className="flex justify-between items-start gap-3 mb-3.5">
-                                <div className="flex gap-3.5 flex-1 min-w-0">
-                                    <div className="h-12 w-12 rounded-xl overflow-hidden flex items-center justify-center bg-slate-50 ring-1 ring-slate-200/90 shrink-0">
-                                        {order.items[0]?.image ? (
-                                            <img
-                                                src={applyCloudinaryTransform(order.items[0].image)}
-                                                alt={order.items[0]?.name || 'Order thumbnail'}
-                                                loading="lazy"
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <Package size={22} className="text-slate-400" />
-                                        )}
+                            <Link
+                                to={`/orders/${order.orderId}`}
+                                key={order._id}
+                                className="block bg-white rounded-2xl px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] border border-slate-100/80 active:scale-[0.985] transition-transform cursor-pointer hover:shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
+                            >
+                                <div className="flex flex-wrap sm:flex-nowrap justify-between items-start gap-3 mb-3.5">
+                                    <div className="flex gap-3.5 flex-1 min-w-[200px]">
+                                        <div className="h-12 w-12 rounded-xl overflow-hidden flex items-center justify-center bg-slate-50 ring-1 ring-slate-200/90 shrink-0">
+                                            {order.items[0]?.image ? (
+                                                <img
+                                                    src={applyCloudinaryTransform(order.items[0].image)}
+                                                    alt={order.items[0]?.name || 'Order thumbnail'}
+                                                    loading="lazy"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <Package size={22} className="text-slate-400" />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="font-semibold text-slate-900 text-sm tracking-tight leading-snug">
+                                                Order #{order.orderId.slice(-6)}
+                                            </h3>
+                                            <p className="mt-0.5 text-[11px] text-slate-500 font-medium leading-tight">
+                                                {new Date(order.createdAt).toLocaleDateString('en-IN', {
+                                                    day: 'numeric',
+                                                    month: 'short',
+                                                })}{' '}
+                                                <span className="mx-1 text-slate-400">•</span>
+                                                {new Date(order.createdAt).toLocaleTimeString('en-IN', {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <h3 className="font-semibold text-slate-900 text-sm tracking-tight leading-snug">
-                                            Order #{order.orderId.slice(-6)}
-                                        </h3>
-                                        <p className="mt-0.5 text-[11px] text-slate-500 font-medium leading-tight">
-                                            {new Date(order.createdAt).toLocaleDateString('en-IN', {
-                                                day: 'numeric',
-                                                month: 'short',
-                                            })}{' '}
-                                            <span className="mx-1 text-slate-400">•</span>
-                                            {new Date(order.createdAt).toLocaleTimeString('en-IN', {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                            })}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex flex-col items-end gap-1 shrink-0 text-right">
-                                    <span
-                                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${
-                                            legacy === 'delivered'
-                                                ? 'bg-brand-50 text-brand-700 border-brand-100'
-                                                : legacy === 'cancelled'
-                                                    ? 'bg-rose-50 text-rose-700 border-rose-100'
-                                                    : 'bg-brand-50 text-brand-700 border-brand-100'
-                                        }`}
-                                    >
-                                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/80">
-                                            <CheckCircle
-                                                size={9}
-                                                className={`${
-                                                    legacy === 'delivered'
-                                                        ? 'text-brand-600'
-                                                        : legacy === 'cancelled'
-                                                            ? 'text-rose-500'
-                                                            : 'text-brand-500'
+                                    <div className="flex flex-col items-end gap-1 shrink-0 text-right">
+                                        <span
+                                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${legacy === 'delivered'
+                                                    ? 'bg-brand-50 text-brand-700 border-brand-100'
+                                                    : legacy === 'cancelled'
+                                                        ? 'bg-rose-50 text-rose-700 border-rose-100'
+                                                        : 'bg-brand-50 text-brand-700 border-brand-100'
                                                 }`}
-                                            />
+                                        >
+                                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/80">
+                                                <CheckCircle
+                                                    size={9}
+                                                    className={`${legacy === 'delivered'
+                                                            ? 'text-brand-600'
+                                                            : legacy === 'cancelled'
+                                                                ? 'text-rose-500'
+                                                                : 'text-brand-500'
+                                                        }`}
+                                                />
+                                            </span>
+                                            <span>{getOrderStatusLabel(order).toUpperCase()}</span>
                                         </span>
-                                        <span>{getOrderStatusLabel(order).toUpperCase()}</span>
-                                    </span>
-                                    <span className="inline-flex items-center text-[10px] font-medium text-slate-400">
-                                        <span className="h-1 w-1 rounded-full bg-slate-300 mr-1" />
-                                        Tap to view details
-                                    </span>
+                                        <span className="inline-flex items-center text-[10px] font-medium text-slate-400">
+                                            <span className="h-1 w-1 rounded-full bg-slate-300 mr-1" />
+                                            Tap to view details
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="border-t border-slate-100 pt-3 flex justify-between items-center gap-3">
-                                <div className="text-[11px] text-slate-500 font-medium truncate max-w-[230px]">
-                                    {order.items.map((i) => i.name).join(', ')}
+                                <div className="border-t border-slate-100 pt-3 flex justify-between items-center gap-3">
+                                    <div className="text-[11px] text-slate-500 font-medium truncate max-w-[230px]">
+                                        {order.items.map((i) => i.name).join(', ')}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="text-[11px] font-medium text-slate-400">Total</span>
+                                        <span className="text-sm font-semibold text-slate-900">
+                                            ₹{order.pricing.total}
+                                        </span>
+                                        <ChevronRight size={16} className="text-slate-300" />
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                    <span className="text-[11px] font-medium text-slate-400">Total</span>
-                                    <span className="text-sm font-semibold text-slate-900">
-                                    ₹{order.pricing.total}
-                                    </span>
-                                    <ChevronRight size={16} className="text-slate-300" />
-                                </div>
-                            </div>
-                        </Link>
-                    );
+                            </Link>
+                        );
                     })
                 )}
             </div>
@@ -169,4 +179,3 @@ const OrdersPage = () => {
 };
 
 export default OrdersPage;
-

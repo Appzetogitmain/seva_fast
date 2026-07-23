@@ -1105,38 +1105,59 @@ export const getModerationProducts = async (req, res) => {
     };
     const sortQuery = sortMap[String(sort || "newest").toLowerCase()] || sortMap.newest;
 
-    const [items, total, allCount, pendingCount, approvedCount, rejectedCount] =
-      await Promise.all([
-        Product.find(moderatedQuery)
-          .select(
-            "name slug description sku price salePrice stock lowStockAlert brand weight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
-          )
-          .populate("headerId", "name")
-          .populate("categoryId", "name")
-          .populate("subcategoryId", "name")
-          .populate("sellerId", "shopName name")
-          .populate("approvalReviewedBy", "name email")
-          .sort(sortQuery)
-          .skip(skip)
-          .limit(limit)
-          .lean(),
-        Product.countDocuments(moderatedQuery),
-        Product.countDocuments(baseQuery),
-        Product.countDocuments({
-          ...baseQuery,
-          approvalStatus: PRODUCT_APPROVAL_STATUS.PENDING,
-        }),
-        Product.countDocuments({
-          $and: [
-            { ...baseQuery },
-            buildApprovalStatusFilter(PRODUCT_APPROVAL_STATUS.APPROVED),
-          ],
-        }),
-        Product.countDocuments({
-          ...baseQuery,
-          approvalStatus: PRODUCT_APPROVAL_STATUS.REJECTED,
-        }),
-      ]);
+    const [
+      items,
+      total,
+      allCount,
+      pendingCount,
+      approvedCount,
+      rejectedCount,
+      lowStockCount,
+      outOfStockCount,
+      activeCount
+    ] = await Promise.all([
+      Product.find(moderatedQuery)
+        .select(
+          "name slug description sku price salePrice stock lowStockAlert brand weight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
+        )
+        .populate("headerId", "name")
+        .populate("categoryId", "name")
+        .populate("subcategoryId", "name")
+        .populate("sellerId", "shopName name")
+        .populate("approvalReviewedBy", "name email")
+        .sort(sortQuery)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(moderatedQuery),
+      Product.countDocuments(baseQuery),
+      Product.countDocuments({
+        ...baseQuery,
+        approvalStatus: PRODUCT_APPROVAL_STATUS.PENDING,
+      }),
+      Product.countDocuments({
+        $and: [
+          { ...baseQuery },
+          buildApprovalStatusFilter(PRODUCT_APPROVAL_STATUS.APPROVED),
+        ],
+      }),
+      Product.countDocuments({
+        ...baseQuery,
+        approvalStatus: PRODUCT_APPROVAL_STATUS.REJECTED,
+      }),
+      Product.countDocuments({
+        ...baseQuery,
+        stock: { $gt: 0, $lte: 10 }
+      }),
+      Product.countDocuments({
+        ...baseQuery,
+        stock: 0
+      }),
+      Product.countDocuments({
+        ...baseQuery,
+        status: 'active'
+      }),
+    ]);
 
     return handleResponse(res, 200, "Moderation products fetched", {
       items: normalizeProductListModeration(items),
@@ -1149,6 +1170,9 @@ export const getModerationProducts = async (req, res) => {
         pending: pendingCount,
         approved: approvedCount,
         rejected: rejectedCount,
+        lowStock: lowStockCount,
+        outOfStock: outOfStockCount,
+        active: activeCount,
       },
     });
   } catch (error) {
