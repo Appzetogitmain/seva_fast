@@ -1040,6 +1040,19 @@ export const validateDeliveryOtp = async (req, res) => {
                 status: "delivered",
                 deliveredAt: now.toISOString()
             });
+
+            const { emitOrderStatusUpdate } = await import('../services/orderSocketEmitter.js');
+            emitOrderStatusUpdate(
+                order.orderId,
+                {
+                    status: "delivered",
+                    workflowStatus: WORKFLOW_STATUS.DELIVERED,
+                    deliveredAt: now.toISOString()
+                },
+                order.customer?._id,
+                order.seller,
+                order._id
+            );
         } catch (socketError) {
             console.error('Error emitting Socket.IO event:', socketError);
             // Don't fail the request if socket emission fails
