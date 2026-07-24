@@ -675,6 +675,9 @@ export const createProduct = async (req, res) => {
             ? variant.sku
             : makeProductSku(productData.name, idx + 1),
       }));
+      if (productData.variants.length > 0) {
+        productData.stock = productData.variants.reduce((acc, v) => acc + (Number(v.stock) || 0), 0);
+      }
     }
 
     let moderationUpdate = {};
@@ -834,6 +837,9 @@ export const updateProduct = async (req, res) => {
             ? variant.sku
             : makeProductSku(skuBaseName, idx + 1),
       }));
+      if (productData.variants.length > 0) {
+        productData.stock = productData.variants.reduce((acc, v) => acc + (Number(v.stock) || 0), 0);
+      }
     }
 
     let moderationUpdate = {};

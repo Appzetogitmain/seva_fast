@@ -102,10 +102,11 @@ export const CartProvider = ({ children }) => {
   const addToCart = async (product) => {
     // Bug 238 Check: Prevent multi-store ordering
     if (cart.length > 0) {
-      const existingSellerId = cart[0].sellerId || cart[0].seller?._id || cart[0].seller;
-      const newSellerId = product.sellerId || product.seller?._id || product.seller;
+      const extractId = (val) => (val && typeof val === 'object' && val._id ? String(val._id) : String(val || ''));
+      const existingSellerId = extractId(cart[0].sellerId) || extractId(cart[0].seller);
+      const newSellerId = extractId(product.sellerId) || extractId(product.seller);
 
-      if (existingSellerId && newSellerId && String(existingSellerId) !== String(newSellerId)) {
+      if (existingSellerId && newSellerId && existingSellerId !== newSellerId) {
         const confirmReplace = window.confirm(
           "Your cart contains items from another store. Do you want to clear your cart and add this item instead?"
         );
