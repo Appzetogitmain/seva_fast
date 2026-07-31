@@ -187,7 +187,7 @@ const CheckoutPage = () => {
     if (cart.length === 0) {
       import("../../../assets/lottie/Empty box.json")
         .then((m) => setEmptyBoxData(m.default))
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [cart.length === 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -195,24 +195,24 @@ const CheckoutPage = () => {
     ...(settings?.onlineEnabled === false
       ? []
       : [
-          {
-            id: "online",
-            label: "Pay Online",
-            icon: CreditCard,
-            sublabel: "Razorpay • UPI / Cards / NetBanking",
-            badge: "Razorpay",
-          },
-        ]),
+        {
+          id: "online",
+          label: "Pay Online",
+          icon: CreditCard,
+          sublabel: "Razorpay • UPI / Cards / NetBanking",
+          badge: "Razorpay",
+        },
+      ]),
     ...(settings?.codEnabled === false
       ? []
       : [
-          {
-            id: "cash",
-            label: "Cash on Delivery",
-            icon: Banknote,
-            sublabel: "Pay after delivery",
-          },
-        ]),
+        {
+          id: "cash",
+          label: "Cash on Delivery",
+          icon: Banknote,
+          sublabel: "Pay after delivery",
+        },
+      ]),
   ];
 
   const discountAmount = selectedCoupon
@@ -273,13 +273,13 @@ const CheckoutPage = () => {
         ...(primarySaved?.location
           ? { location: primarySaved.location }
           : typeof currentLocation?.latitude === "number" &&
-              typeof currentLocation?.longitude === "number"
+            typeof currentLocation?.longitude === "number"
             ? {
-                location: {
-                  lat: currentLocation.latitude,
-                  lng: currentLocation.longitude,
-                },
-              }
+              location: {
+                lat: currentLocation.latitude,
+                lng: currentLocation.longitude,
+              },
+            }
             : {}),
       };
     });
@@ -314,6 +314,10 @@ const CheckoutPage = () => {
     }
   }, [useWallet, user?.walletBalance, pricingPreview?.grandTotal]);
 
+  const hasInstant = cart.some((item) => (item.deliveryType || "instant") === "instant");
+  const hasScheduled = cart.some((item) => item.deliveryType === "scheduled");
+  const hasMixedCart = hasInstant && hasScheduled;
+
   const finalAmountToPay = Math.max(0, (pricingPreview?.grandTotal ?? cartTotal) - walletAmountToUse);
   const minimumOrderValue = Number(settings?.minimumOrderValue || 0);
   const checkoutSubtotal = Number(pricingPreview?.productSubtotal ?? cartTotal ?? 0);
@@ -322,11 +326,13 @@ const CheckoutPage = () => {
   const isBelowMinimumOrder =
     minimumOrderValue > 0 && checkoutSubtotal < minimumOrderValue;
   const slideToPayText =
-    finalAmountToPay === 0
-      ? "Place Free Order"
-      : selectedPayment === "online"
-        ? "Slide to Pay"
-        : "Slide to Place Order";
+    hasMixedCart
+      ? "Cannot checkout mixed cart"
+      : finalAmountToPay === 0
+        ? "Pay via Wallet"
+        : selectedPayment === "online"
+          ? "Slide to Pay"
+          : "Slide to Place Order";
 
   const buildAddressForOrder = () => {
     if (savedRecipient) {
@@ -464,8 +470,8 @@ const CheckoutPage = () => {
       } catch (e) {
         showToast(
           e?.__serverMsg ||
-            e?.message ||
-            "Could not fetch coordinates for this address. Delivery charges may not update.",
+          e?.message ||
+          "Could not fetch coordinates for this address. Delivery charges may not update.",
           "error",
         );
       }
@@ -559,7 +565,7 @@ const CheckoutPage = () => {
     } catch (e) {
       showToast(
         e.response?.data?.message ||
-          "Could not fetch coordinates for this address. Delivery charges may be inaccurate.",
+        "Could not fetch coordinates for this address. Delivery charges may be inaccurate.",
         "error",
       );
     }
@@ -589,7 +595,7 @@ const CheckoutPage = () => {
           .filter(Boolean)
           .join(", "),
         ...(typeof liveLocation.latitude === "number" &&
-        typeof liveLocation.longitude === "number"
+          typeof liveLocation.longitude === "number"
           ? { location: { lat: liveLocation.latitude, lng: liveLocation.longitude } }
           : {}),
       }));
@@ -608,7 +614,7 @@ const CheckoutPage = () => {
           .filter(Boolean)
           .join(", "),
         ...(typeof currentLocation.latitude === "number" &&
-        typeof currentLocation.longitude === "number"
+          typeof currentLocation.longitude === "number"
           ? { location: { lat: currentLocation.latitude, lng: currentLocation.longitude } }
           : {}),
       }));
@@ -816,7 +822,7 @@ const CheckoutPage = () => {
           setRecommendedProducts(items.slice(0, 8));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [cartProductIdKey]);
 
   const handlePlaceOrder = async () => {
@@ -966,8 +972,8 @@ const CheckoutPage = () => {
             setIsPlacingOrder(false);
             showToast(
               payError.response?.data?.message ||
-                payError.message ||
-                "Could not open Razorpay checkout. Please try again.",
+              payError.message ||
+              "Could not open Razorpay checkout. Please try again.",
               "error",
             );
             return;
@@ -1013,7 +1019,7 @@ const CheckoutPage = () => {
       setIsPlacingOrder(false);
       showToast(
         error.response?.data?.message ||
-          "Failed to place order. Please try again.",
+        "Failed to place order. Please try again.",
         "error"
       );
     }
@@ -1047,7 +1053,7 @@ const CheckoutPage = () => {
       .then((r) => {
         if (r.data?.result) applyCancelled(r.data.result);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     const off = onOrderStatusUpdate(getToken, (order) => applyCancelled(order));
 
@@ -1228,6 +1234,18 @@ const CheckoutPage = () => {
               onApplyManualCode={handleApplyManualCode}
             />
 
+            {hasMixedCart && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-red-600 font-bold">
+                  <AlertCircle className="h-5 w-5" />
+                  Mixed Cart Detected
+                </div>
+                <p className="text-sm text-red-600">
+                  You cannot checkout with both instant (local) and scheduled (global) items at the same time. Please checkout separately.
+                </p>
+              </div>
+            )}
+
             {/* Pricing Breakdown */}
             <CheckoutPricingBreakdown
               pricingPreview={pricingPreview}
@@ -1264,7 +1282,11 @@ const CheckoutPage = () => {
                 amount={finalAmountToPay}
                 onSuccess={handlePlaceOrder}
                 isLoading={isPlacingOrder || isPreviewLoading}
+<<<<<<< HEAD
                 disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder}
+=======
+                disabled={isPlacingOrder || isPreviewLoading || hasMixedCart}
+>>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
                 text={slideToPayText}
               />
               <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-[0.1em]">
@@ -1284,7 +1306,11 @@ const CheckoutPage = () => {
             amount={finalAmountToPay}
             onSuccess={handlePlaceOrder}
             isLoading={isPlacingOrder || isPreviewLoading}
+<<<<<<< HEAD
             disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder}
+=======
+            disabled={isPlacingOrder || isPreviewLoading || hasMixedCart}
+>>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
             text={slideToPayText}
           />
         </div>
@@ -1303,11 +1329,10 @@ const CheckoutPage = () => {
                 key={addr.id}
                 onClick={() => handleSelectSavedAddress(addr)}
                 disabled={isResolvingAddressCoords}
-                className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${
-                  currentAddress.id === addr.id
+                className={`w-full p-4 rounded-2xl border-2 text-left transition-all ${currentAddress.id === addr.id
                     ? "border-primary bg-brand-50 shadow-sm"
                     : "border-slate-100 bg-white hover:border-slate-200"
-                }`}>
+                  }`}>
                 <div className="flex items-center gap-3 mb-2">
                   <div className={`p-2 rounded-full ${currentAddress.id === addr.id ? "bg-primary text-primary-foreground" : "bg-slate-100 text-slate-500"}`}>
                     <MapPin size={16} />

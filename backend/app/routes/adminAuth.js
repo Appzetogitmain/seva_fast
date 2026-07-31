@@ -39,6 +39,7 @@ import {
     getPlatformSettings,
     updatePlatformSettings,
     updateSellerDetails,
+    deleteSeller,
     getZones,
     createZone,
     updateZone,
@@ -188,6 +189,8 @@ router.get("/sellers/pending", verifyToken, allowRoles("admin"), getPendingSelle
 router.put("/sellers/:id", verifyToken, allowRoles("admin"), updateSellerDetails);
 router.patch("/sellers/approve/:id", verifyToken, allowRoles("admin"), approveSellerApplication);
 router.delete("/sellers/reject/:id", verifyToken, allowRoles("admin"), rejectSellerApplication);
+router.delete("/sellers/:id", verifyToken, allowRoles("admin"), deleteSeller);
+
 
 router.get(
     "/delivery-partners",

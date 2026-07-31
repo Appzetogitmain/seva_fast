@@ -100,6 +100,31 @@ export const CartProvider = ({ children }) => {
   }, [cart, isAuthenticated]);
 
   const addToCart = async (product) => {
+    // Bug 238 Check: Prevent multi-store ordering
+    if (cart.length > 0) {
+      const extractId = (val) => (val && typeof val === 'object' && val._id ? String(val._id) : String(val || ''));
+      const existingSellerId = extractId(cart[0].sellerId) || extractId(cart[0].seller);
+      const newSellerId = extractId(product.sellerId) || extractId(product.seller);
+
+      if (existingSellerId && newSellerId && existingSellerId !== newSellerId) {
+        const confirmReplace = window.confirm(
+          "Your cart contains items from another store. Do you want to clear your cart and add this item instead?"
+        );
+        
+        if (!confirmReplace) return;
+
+        // Clear cart first
+        if (isAuthenticated) {
+          try {
+            await customerApi.clearCart();
+          } catch (error) {
+            console.error("Failed to clear backend cart:", error);
+          }
+        }
+        setCart([]); // Reset local state
+      }
+    }
+
     const variantSku = String(product?.variantSku || product?.variantName || "").trim();
     const id = product.id || product._id;
     const key = `${id}::${variantSku || ""}`;

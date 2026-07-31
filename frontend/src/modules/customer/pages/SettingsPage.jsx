@@ -1,7 +1,9 @@
 import React from 'react';
-import { Bell, Lock, User, Globe, ChevronRight, ToggleRight, LogOut } from 'lucide-react';
+import { Bell, Lock, User, Globe, ChevronRight, ToggleRight, LogOut, Trash2 } from 'lucide-react';
+import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 
 const SettingsPage = () => {
+    const { requestSignOut, signOutDialog } = useSignOutConfirmation();
     return (
         <div className="min-h-screen bg-slate-50 pb-24 font-sans">
             {/* Header */}
@@ -40,13 +42,20 @@ const SettingsPage = () => {
                 {/* Danger Zone */}
                 <div className="bg-white rounded-3xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
                     <div className="p-4">
-                        <button className="w-full py-4 text-red-600 font-bold bg-red-50 rounded-2xl flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
-                            <LogOut size={20} /> Delete Account
+                        <button
+                            onClick={requestSignOut}
+                            className="w-full py-4 text-slate-700 font-bold bg-white rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors border border-slate-200 mb-3"
+                        >
+                            <LogOut size={20} /> Sign Out
+                        </button>
+                        <button className="w-full py-4 text-rose-600 font-bold bg-rose-50 rounded-2xl flex items-center justify-center gap-2 hover:bg-rose-100 transition-colors">
+                            <Trash2 size={20} /> Delete Account
                         </button>
                     </div>
                 </div>
 
             </div>
+            {signOutDialog}
         </div>
     );
 };

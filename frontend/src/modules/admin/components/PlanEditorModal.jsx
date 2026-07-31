@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Shield, Gift, Zap, Users, TrendingUp, ShoppingBag, Layers, Percent, Target, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@shared/components/ui/Toast';
 
 const featureOptions = [
     { key: "FREE_DELIVERY", label: "Free Deliveries / Month", unit: "Count", icon: Zap },
@@ -24,7 +25,8 @@ const cleanNumberInput = (val) => {
     return cleaned;
 };
 
-const PlanEditorModal = ({ isOpen, onClose, onSave, plan }) => {
+const PlanEditorModal = ({ isOpen, onClose, plan, onSave }) => {
+    const { showToast } = useToast();
     const [formData, setFormData] = useState({
         name: '',
         price: '',
@@ -112,6 +114,10 @@ const PlanEditorModal = ({ isOpen, onClose, onSave, plan }) => {
     };
 
     const handleSubmit = () => {
+        if (!formData.name.trim()) return showToast('Plan name is required', 'error');
+        if (formData.price === '') return showToast('Plan price is required', 'error');
+        if (formData.validityDays === '') return showToast('Validity (days) is required', 'error');
+
         const cleanedData = {
             ...formData,
             price: formData.price === '' ? 0 : parseFloat(formData.price),

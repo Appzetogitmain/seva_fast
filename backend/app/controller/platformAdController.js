@@ -40,6 +40,43 @@ export const createPlatformAd = async (req, res) => {
     }
 };
 
+// Update platform ad request
+export const updatePlatformAd = async (req, res) => {
+    try {
+        const ownerId = req.user.id;
+        const { id } = req.params;
+        const { title, content, mediaUrl, mediaType, targetUrl, city, imageUrl, videoUrl } = req.body;
+
+        if (!title || !content || !city) {
+            return handleResponse(res, 400, "Title, content, and city are required fields");
+        }
+
+        const ad = await PlatformAd.findOne({ _id: id, owner: ownerId });
+        if (!ad) {
+            return handleResponse(res, 404, "Platform advertisement not found");
+        }
+
+        ad.title = title.trim();
+        ad.content = content.trim();
+        if (mediaUrl !== undefined) ad.mediaUrl = mediaUrl;
+        if (mediaType !== undefined) ad.mediaType = mediaType;
+        if (imageUrl !== undefined) ad.imageUrl = imageUrl;
+        if (videoUrl !== undefined) ad.videoUrl = videoUrl;
+        if (targetUrl !== undefined) ad.targetUrl = targetUrl;
+        ad.city = city.trim();
+
+        // Reset approval status since content changed
+        ad.approvalStatus = "pending";
+        ad.rejectionReason = "";
+        
+        await ad.save();
+
+        return handleResponse(res, 200, "Platform advertisement updated successfully", ad);
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
 // Get current user's platform ads
 export const getMyPlatformAds = async (req, res) => {
     try {
@@ -241,7 +278,14 @@ export const initiatePayPlatformAd = async (req, res) => {
             receipt: `pl_${String(ad._id).slice(-10)}_${String(Date.now()).slice(-8)}`
         };
 
-        const order = await razorpayInstance.orders.create(options);
+        let order;
+        try {
+            order = await razorpayInstance.orders.create(options);
+        } catch (rzpError) {
+            console.error("Razorpay orders.create error:", rzpError);
+            return handleResponse(res, 400, "Razorpay configuration error: Invalid API keys or authentication failed.");
+        }
+
         return handleResponse(res, 200, "Razorpay order initiated successfully", {
             orderId: order.id,
             amount: order.amount,

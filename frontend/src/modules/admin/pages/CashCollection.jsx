@@ -118,20 +118,30 @@ const CashCollection = () => {
     }, [selectedRider]);
 
     const stats = {
+<<<<<<< HEAD
         totalInHand: (ridersCashData || []).reduce((acc, r) => acc + (r.currentCash || 0), 0),
         overLimitCount: (ridersCashData || []).filter(r => (r.currentCash || 0) >= (r.limit || 5000)).length,
         todaySettled: (historyData || []).filter(h => isSameCalendarDay(h.date)).reduce((acc, h) => acc + (h.amount || 0), 0),
         avgBalance: (ridersCashData || []).length ? (ridersCashData || []).reduce((acc, r) => acc + (r.currentCash || 0), 0) / ridersCashData.length : 0
+=======
+        totalInHand: (ridersCashData || []).reduce((acc, r) => acc + Math.max(0, r.currentCash || 0), 0),
+        overLimitCount: (ridersCashData || []).filter(r => Math.max(0, r.currentCash || 0) >= (r.limit || 5000)).length,
+        todaySettled: (historyData || []).filter(h => {
+            const today = new Date().toLocaleDateString();
+            return new Date(h.date).toLocaleDateString() === today;
+        }).reduce((acc, h) => acc + Math.max(0, h.amount || 0), 0),
+        avgBalance: (ridersCashData || []).length ? (ridersCashData || []).reduce((acc, r) => acc + Math.max(0, r.currentCash || 0), 0) / ridersCashData.length : 0
+>>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
     };
 
     const filteredRiders = (ridersCashData || []).filter(r =>
-        (r.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (r.id || "").toLowerCase().includes(searchTerm.toLowerCase())
+        String(r.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(r.id || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const filteredHistory = (historyData || []).filter(h =>
-        (h.rider || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (h.id || "").toLowerCase().includes(searchTerm.toLowerCase())
+        String(h.rider || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(h.id || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handleSettlement = (rider) => {
@@ -160,6 +170,85 @@ const CashCollection = () => {
         }
     };
 
+    const handleExportLedger = () => {
+        try {
+            const dataToExport = activeTab === 'live_balances' ? ridersCashData : historyData;
+            if (!dataToExport || dataToExport.length === 0) {
+                toast.error("No data to export");
+                return;
+            }
+            
+            let headers = [];
+            let rows = [];
+
+            if (activeTab === 'live_balances') {
+                headers = ['Rider ID,Name,Current Cash,Limit,Status'];
+                rows = dataToExport.map(r => 
+                    `${r.id},"${r.name || ''}",${r.currentCash || 0},${r.limit || 0},${r.status || 'unknown'}`
+                );
+            } else {
+                headers = ['Settlement ID,Rider Name,Amount,Method,Date'];
+                rows = dataToExport.map(h => 
+                    `${h.id},"${h.rider || ''}",${h.amount || 0},"${h.method || ''}",${new Date(h.date).toLocaleDateString()}`
+                );
+            }
+
+            const csv = [...headers, ...rows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cash-collection-${activeTab}-${Date.now()}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast.success("Ledger exported successfully");
+        } catch (error) {
+            toast.error("Export failed");
+        }
+    };
+
+    const handleBulkSettle = async () => {
+        const ridersToSettle = (ridersCashData || []).filter(r => (r.currentCash || 0) > 0);
+        
+        if (ridersToSettle.length === 0) {
+            toast.info("No riders have pending cash to settle.");
+            return;
+        }
+
+        const confirm = window.confirm(`Are you sure you want to settle cash for ${ridersToSettle.length} riders?`);
+        if (!confirm) return;
+
+        setIsProcessing(true);
+        toast.loading(`Processing ${ridersToSettle.length} settlements...`, { id: 'bulk-settle' });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const rider of ridersToSettle) {
+            try {
+                await adminApi.settleRiderCash({
+                    riderId: rider.id,
+                    amount: Number(rider.currentCash),
+                    method: 'Bulk Admin Submission'
+                });
+                successCount++;
+            } catch (error) {
+                failCount++;
+            }
+        }
+
+        setIsProcessing(false);
+        toast.dismiss('bulk-settle');
+        
+        if (failCount === 0) {
+            toast.success(`Successfully settled ${successCount} riders.`);
+        } else {
+            toast.warning(`Settled ${successCount} riders, but ${failCount} failed.`);
+        }
+        
+        fetchData(ridersPage, historyPage);
+    };
+
     return (
         <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12 pt-6 relative z-10">
             {/* Header Section */}
@@ -174,13 +263,20 @@ const CashCollection = () => {
                     <p className="ds-description mt-1">Manage physical cash collected by delivery partners and track settlements.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 px-5 py-3 bg-white ring-1 ring-slate-200 text-slate-700 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm">
+                    <button 
+                        onClick={handleExportLedger}
+                        className="flex items-center gap-2 px-5 py-3 bg-white ring-1 ring-slate-200 text-slate-700 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm"
+                    >
                         <Download className="h-4 w-4" />
                         EXPORT LEDGER
                     </button>
-                    <button className="flex items-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl text-xs font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 shadow-slate-200">
-                        <CheckCircle2 className="h-4 w-4 text-slate-100" />
-                        BULK SETTLE ALL
+                    <button 
+                        onClick={handleBulkSettle}
+                        disabled={isProcessing}
+                        className="flex items-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl text-xs font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 shadow-slate-200 disabled:opacity-50"
+                    >
+                        {isProcessing ? <RotateCw className="h-4 w-4 animate-spin text-slate-100" /> : <CheckCircle2 className="h-4 w-4 text-slate-100" />}
+                        {isProcessing ? 'PROCESSING...' : 'BULK SETTLE ALL'}
                     </button>
                 </div>
             </div>

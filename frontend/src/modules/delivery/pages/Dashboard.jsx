@@ -36,9 +36,12 @@ const Dashboard = () => {
   const [availableOrders, setAvailableOrders] = useState([]);
   const [earnings, setEarnings] = useState({
     today: 0,
+    totalEarnings: 0,
     deliveries: 0,
     incentives: 0,
     cashCollected: 0,
+    confirmedCount: 0,
+    outForDeliveryCount: 0,
   });
 
   // Sync isOnline with user profile from context
@@ -150,13 +153,16 @@ const Dashboard = () => {
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24 relative overflow-hidden font-sans">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 pt-12 pb-4 flex justify-between items-center sticky top-0 z-30 transition-all duration-300">
+      <header 
+        style={{ paddingTop: 'max(48px, env(safe-area-inset-top))' }}
+        className="bg-primary/5 border-b border-primary/10 backdrop-blur-md px-6 pb-4 flex justify-between items-center sticky top-0 z-30 transition-all duration-300"
+      >
         <div className="flex items-center space-x-3">
           <div
             className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary ring-2 ring-primary/20 shadow-sm cursor-pointer"
             onClick={() => navigate("/delivery/profile")}>
             <img
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
+              src={user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'Felix'}`}
               alt="Profile"
               className="w-full h-full object-cover"
             />
@@ -173,7 +179,7 @@ const Dashboard = () => {
                 4.8
               </span>
               <span className="text-gray-300 mx-2">•</span>
-              <span className="ds-caption text-gray-500">ID: 882190</span>
+              <span className="ds-caption text-gray-500">ID: {user?._id ? user._id.slice(-6).toUpperCase() : "N/A"}</span>
             </div>
           </div>
         </div>
@@ -245,7 +251,7 @@ const Dashboard = () => {
               className={cn(
                 "w-1/2 h-full rounded-xl shadow-md flex items-center justify-center gap-2 z-10 border transition-all duration-500 cursor-grab active:cursor-grabbing",
                 isOnline 
-                  ? "bg-gradient-to-r from-primary to-[var(--brand-400)] border-[#389ecb] text-white" 
+                  ? "bg-gradient-to-r from-orange-500 to-orange-400 border-orange-600 text-white" 
                   : "bg-gradient-to-r from-slate-700 to-slate-800 border-slate-900 text-white"
               )}
               animate={{ x: isOnline ? "100%" : "0%" }}
@@ -313,7 +319,7 @@ const Dashboard = () => {
             </Button>
           </div>
 
-          <div className="flex items-baseline mb-6 relative z-10">
+          <div className="flex items-baseline mb-2 relative z-10">
             <span className="text-2xl font-bold text-gray-400 mr-1">₹</span>
             <span className="text-4xl font-extrabold text-gray-900 tracking-tight">
               {earnings.today}
@@ -322,6 +328,12 @@ const Dashboard = () => {
               <TrendingUp size={12} className="mr-1" /> +12%
             </span>
           </div>
+          {earnings.today === 0 && earnings.totalEarnings > 0 && (
+            <p className="text-xs text-gray-400 font-medium mb-4 relative z-10">
+              Total Earned: <span className="text-gray-700 font-bold">₹{earnings.totalEarnings}</span>
+            </p>
+          )}
+          {earnings.today > 0 && <div className="mb-6" />}
 
           <div className="grid grid-cols-3 gap-4 border-t border-gray-50 pt-4 relative z-10">
             <div className="text-center group cursor-pointer">
@@ -356,6 +368,28 @@ const Dashboard = () => {
               </p>
             </div>
           </div>
+
+          {/* Bug 224: Active order counts */}
+          {(earnings.confirmedCount > 0 || earnings.outForDeliveryCount > 0) && (
+            <div className="flex gap-3 mt-4 pt-4 border-t border-gray-50">
+              {earnings.confirmedCount > 0 && (
+                <div className="flex-1 bg-brand-50 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-brand-100 flex items-center justify-center">
+                    <span className="text-xs font-black text-brand-700">{earnings.confirmedCount}</span>
+                  </div>
+                  <p className="text-xs font-bold text-brand-700">Confirmed</p>
+                </div>
+              )}
+              {earnings.outForDeliveryCount > 0 && (
+                <div className="flex-1 bg-purple-50 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-purple-100 flex items-center justify-center">
+                    <span className="text-xs font-black text-purple-700">{earnings.outForDeliveryCount}</span>
+                  </div>
+                  <p className="text-xs font-bold text-purple-700">Out for Delivery</p>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* Active Order / Status */}

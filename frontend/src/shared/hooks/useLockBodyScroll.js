@@ -8,6 +8,7 @@ export function useLockBodyScroll(locked) {
   useEffect(() => {
     if (!locked) return undefined;
 
+<<<<<<< HEAD
     const scrollY = window.scrollY;
     const html = document.documentElement;
     const { style } = document.body;
@@ -51,6 +52,13 @@ export function useLockBodyScroll(locked) {
       html.style.overflowX = previous.htmlOverflowX;
       html.style.overflowY = previous.htmlOverflowY;
       window.scrollTo(0, scrollY);
+=======
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+>>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
     };
   }, [locked]);
 }

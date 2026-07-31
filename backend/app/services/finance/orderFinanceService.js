@@ -832,15 +832,15 @@ export async function handleCodOrderFinance(
     });
 
     order.paymentBreakdown = {
-      ...(order.paymentBreakdown || {}),
+      ...(typeof order.paymentBreakdown?.toObject === "function" ? order.paymentBreakdown.toObject() : (order.paymentBreakdown || {})),
       codCollectedAmount: roundCurrency(
         (order.paymentBreakdown?.codCollectedAmount || 0) + codAmountNet,
       ),
       codRemittedAmount: roundCurrency(order.paymentBreakdown?.codRemittedAmount || 0),
       codPendingAmount: roundCurrency(
         (order.paymentBreakdown?.codCollectedAmount || 0) +
-          codAmountNet -
-          (order.paymentBreakdown?.codRemittedAmount || 0),
+        codAmountNet -
+        (order.paymentBreakdown?.codRemittedAmount || 0),
       ),
     };
 
@@ -1099,7 +1099,7 @@ export async function reconcileCodCash(
     const nextPending = roundCurrency(codCollected - nextRemitted);
 
     order.paymentBreakdown = {
-      ...(order.paymentBreakdown || {}),
+      ...(typeof order.paymentBreakdown?.toObject === "function" ? order.paymentBreakdown.toObject() : (order.paymentBreakdown || {})),
       codCollectedAmount: codCollected,
       codRemittedAmount: nextRemitted,
       codPendingAmount: nextPending,

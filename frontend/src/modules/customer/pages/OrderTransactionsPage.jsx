@@ -79,14 +79,14 @@ const OrderTransactionsPage = () => {
                                             <div
                                                 className={`h-10 w-10 rounded-lg flex items-center justify-center ${
                                                     isRefund
-                                                        ? 'bg-amber-50 text-amber-600'
+                                                        ? 'bg-emerald-50 text-emerald-600'
                                                         : 'bg-slate-100 text-slate-700'
                                                 }`}
                                             >
                                                 {isRefund ? (
-                                                    <ArrowUpRight size={19} />
-                                                ) : (
                                                     <ArrowDownLeft size={19} />
+                                                ) : (
+                                                    <ArrowUpRight size={19} />
                                                 )}
                                             </div>
                                             <div>
@@ -106,7 +106,7 @@ const OrderTransactionsPage = () => {
                                         </div>
                                         <div
                                             className={`text-sm font-semibold ${
-                                                isRefund ? 'text-amber-600' : 'text-slate-900'
+                                                isRefund ? 'text-emerald-600' : 'text-slate-900'
                                             }`}
                                         >
                                             {isRefund ? '+' : '-'}₹{amount}

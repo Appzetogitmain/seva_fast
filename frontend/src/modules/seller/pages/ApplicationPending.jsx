@@ -7,7 +7,7 @@ import { useSettings } from "@core/context/SettingsContext";
 
 const ApplicationPending = () => {
   const location = useLocation();
-  const { isAuthenticated, role, user, isLoading } = useAuth();
+  const { isAuthenticated, role, user, isLoading, refreshUser } = useAuth();
   const { settings } = useSettings();
 
   const appName = settings?.appName || "App";
@@ -29,6 +29,20 @@ const ApplicationPending = () => {
       return <Navigate to="/seller" replace />;
     }
   }
+
+  React.useEffect(() => {
+    let interval;
+    if (isAuthenticated && role === "seller" && applicationStatus === "pending") {
+      interval = setInterval(() => {
+        if (refreshUser) {
+          refreshUser();
+        }
+      }, 30000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isAuthenticated, role, applicationStatus, refreshUser]);
 
   const isRejected = applicationStatus === "rejected";
   const isStatusUnknown = !applicationStatus;
@@ -58,8 +72,8 @@ const ApplicationPending = () => {
             </div>
             <div
               className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest ${isRejected
-                  ? "bg-rose-500/20 text-rose-200"
-                  : "bg-amber-400/20 text-amber-100"
+                ? "bg-rose-500/20 text-rose-200"
+                : "bg-amber-400/20 text-amber-100"
                 }`}
             >
               {isRejected ? <ShieldAlert className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}

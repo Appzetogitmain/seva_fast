@@ -71,6 +71,7 @@ const AddressesPage = () => {
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [selectedAddress, setSelectedAddress] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [isGeoLocating, setIsGeoLocating] = useState(false);
 
     const [addForm, setAddForm] = useState({
         type: 'home',
@@ -120,6 +121,47 @@ const AddressesPage = () => {
             pincode: ''
         });
         setIsAddOpen(true);
+    };
+
+    const handleUseCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            toast.error("Geolocation is not supported by your browser");
+            return;
+        }
+        setIsGeoLocating(true);
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            try {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
+                if (!res.ok) throw new Error("Reverse geocode failed");
+                const data = await res.json();
+                
+                const addressFields = data.address || {};
+                const displayAddress = data.display_name || "";
+                const city = addressFields.city || addressFields.town || addressFields.village || addressFields.county || "";
+                const state = addressFields.state || "";
+                const pincode = addressFields.postcode || "";
+                
+                setAddForm(prev => ({
+                    ...prev,
+                    address: displayAddress,
+                    city: city,
+                    state: state,
+                    pincode: pincode
+                }));
+                toast.success("Location fetched successfully");
+            } catch (err) {
+                console.error(err);
+                toast.error("Failed to fetch address from location");
+            } finally {
+                setIsGeoLocating(false);
+            }
+        }, (err) => {
+            console.error(err);
+            toast.error("Permission denied or unable to fetch location");
+            setIsGeoLocating(false);
+        });
     };
 
     const handleSaveNewAddress = async () => {
@@ -433,7 +475,22 @@ const AddressesPage = () => {
                             Enter your delivery details below.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
+                    <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleUseCurrentLocation}
+                            disabled={isGeoLocating}
+                            className="w-full flex items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 shadow-sm"
+                        >
+                            {isGeoLocating ? (
+                                <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <MapPin size={16} className="text-indigo-600" />
+                            )}
+                            {isGeoLocating ? "Fetching Location..." : "Use Current Location"}
+                        </Button>
+
                         <div className="grid gap-2">
                             <Label>Address Type</Label>
                             <div className="flex gap-2">

@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { adminApi } from '../services/adminApi';
+import { getOrderSocket } from '@/core/services/orderSocket';
 
 const ALL_PERMISSIONS = [
     "Dashboard",
@@ -145,6 +146,12 @@ const UserManagement = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // Bug 254: Validate name - only alphabets and spaces allowed
+        const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!nameRegex.test(formData.name.trim())) {
+            showToast('Full name must contain only alphabets and spaces', 'error');
+            return;
+        }
         if (formData.phone.length !== 10) {
             showToast('Phone number must be exactly 10 digits', 'error');
             return;
@@ -189,6 +196,14 @@ const UserManagement = () => {
             const res = await adminApi.deleteSubadmin(id);
             if (res.data.success) {
                 showToast('Sub-admin removed successfully', 'warning');
+                // Bug 255: Force-logout the deleted sub-admin via socket
+                try {
+                    const getToken = () => localStorage.getItem('auth_admin');
+                    const socket = getOrderSocket(getToken);
+                    if (socket) {
+                        socket.emit('admin:force-logout', { targetAdminId: id });
+                    }
+                } catch (_) { /* ignore socket errors */ }
                 fetchData();
                 setDeleteTarget(null);
             }
@@ -436,7 +451,11 @@ const UserManagement = () => {
                             required
                             type="text"
                             value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            onChange={(e) => {
+                                // Bug 254: Only allow alphabets and spaces
+                                const val = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                                setFormData({ ...formData, name: val });
+                            }}
                             placeholder="John Doe"
                             className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none"
                         />

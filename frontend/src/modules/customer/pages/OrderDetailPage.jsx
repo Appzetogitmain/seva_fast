@@ -1049,7 +1049,7 @@ const OrderDetailPage = () => {
         />
 
         {/* Delivery Partner Card - Redesigned */}
-        {order.deliveryBoy && status !== "delivered" && status !== "cancelled" && (
+        {order.deliveryBoy && ["out_for_delivery", "delivered"].includes(status) && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

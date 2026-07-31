@@ -46,12 +46,20 @@ const ProductManagement = () => {
 
   const fetchProducts = async (requestedPage = 1) => {
     setIsLoading(true);
+    
+    let apiStockStatus = undefined;
+    let apiStatus = undefined;
+    if (filterStatus === "Active") apiStatus = "active";
+    if (filterStatus === "Low Stock") apiStockStatus = "low";
+    if (filterStatus === "Out of Stock") apiStockStatus = "out";
+
     try {
       const res = await sellerApi.getProducts({
         page: requestedPage,
         limit: pageSize,
         sort: sortBy,
-        approvalStatus: filterApproval,
+        ...(apiStockStatus ? { stockStatus: apiStockStatus } : {}),
+        ...(apiStatus ? { status: apiStatus } : {}),
       });
       if (res.data.success) {
         // Backend returns handleResponse(..., { items, page, limit, total, totalPages })
@@ -114,7 +122,6 @@ const ProductManagement = () => {
 
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterStatus, setFilterStatus] = useState("All");
-  const [filterApproval, setFilterApproval] = useState("all"); // all | approved | pending | rejected
   const [sortBy, setSortBy] = useState("newest");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
@@ -194,7 +201,7 @@ const ProductManagement = () => {
 
   React.useEffect(() => {
     fetchProducts(1);
-  }, [searchTerm, filterCategory, filterStatus, filterApproval, sortBy, pageSize]);
+  }, [searchTerm, filterCategory, filterStatus, sortBy, pageSize]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -272,18 +279,10 @@ const ProductManagement = () => {
         matchesPrice = matchesPrice && effectivePrice <= max;
       }
 
-      const rawApproval = String(p.approvalStatus || "").trim().toLowerCase();
-      const normalizedApproval = rawApproval || "approved"; // legacy products without moderation fields are treated as approved
-      let matchesApproval = true;
-      if (filterApproval !== "all") {
-        matchesApproval = normalizedApproval === filterApproval;
-      }
-
       return (
         matchesSearch &&
         matchesCategory &&
         matchesStatus &&
-        matchesApproval &&
         matchesPrice
       );
     });
@@ -292,7 +291,6 @@ const ProductManagement = () => {
     searchTerm,
     filterCategory,
     filterStatus,
-    filterApproval,
     priceMin,
     priceMax,
   ]);
@@ -676,18 +674,7 @@ const ProductManagement = () => {
                 </optgroup>
               ))}
             </select>
-            <select
-              value={filterApproval}
-              onChange={(e) => setFilterApproval(e.target.value)}
-              className="flex-1 lg:flex-none px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary/5 outline-none appearance-none cursor-pointer"
-              aria-label="Filter by approval status"
-              title="Approval"
-            >
-              <option value="all">All Approvals</option>
-              <option value="approved">Approved</option>
-              <option value="pending">Pending</option>
-              <option value="rejected">Rejected</option>
-            </select>
+
             <div className="relative" ref={filterDropdownRef}>
               <button
                 onClick={() => setIsFilterOpen((prev) => !prev)}
@@ -696,9 +683,9 @@ const ProductManagement = () => {
                 <HiOutlineFunnel className="h-4 w-4" />
                 <span>Filters</span>
               </button>
-              
+
               {isFilterOpen && (
-                <div className="absolute z-[100] right-0 top-full mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-xl p-4 space-y-3">
+                <div className="absolute z-[100] right-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] max-h-[80vh] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl p-4 space-y-3">
                   <div>
                     <p className="text-[11px] font-semibold text-slate-600 uppercase tracking-[0.18em] mb-1">
                       Status
@@ -746,7 +733,6 @@ const ProductManagement = () => {
                       onClick={() => {
                         setFilterCategory("all");
                         setFilterStatus("All");
-                        setFilterApproval("all");
                         setPriceMin("");
                         setPriceMax("");
                         setSearchTerm("");

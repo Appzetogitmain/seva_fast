@@ -58,6 +58,12 @@ export const getDeliveryStats = async (req, res) => {
             .lean();
         const totalDeliveries = orders.length;
 
+        // Bug 224: Count active orders by status
+        const [confirmedCount, outForDeliveryCount] = await Promise.all([
+            Order.countDocuments({ deliveryBoy: deliveryBoyId, status: 'confirmed' }),
+            Order.countDocuments({ deliveryBoy: deliveryBoyId, status: 'out_for_delivery' }),
+        ]);
+
         // Today's earnings - Using a more robust date check
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
@@ -65,10 +71,15 @@ export const getDeliveryStats = async (req, res) => {
         const allTransactions = await Transaction.find({
             user: deliveryBoyId,
             userModel: 'Delivery',
-            createdAt: { $gte: startOfToday }
         }).lean();
 
-        const todayEarnings = allTransactions
+        const todayTransactions = allTransactions.filter(t => new Date(t.createdAt) >= startOfToday);
+
+        const todayEarnings = todayTransactions
+            .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
+            .reduce((acc, t) => acc + t.amount, 0);
+
+        const totalEarnings = allTransactions
             .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
             .reduce((acc, t) => acc + t.amount, 0);
 
@@ -86,9 +97,12 @@ export const getDeliveryStats = async (req, res) => {
 
         return handleResponse(res, 200, "Stats fetched", {
             today: todayEarnings,
+            totalEarnings,
             deliveries: totalDeliveries,
             incentives,
-            cashCollected
+            cashCollected,
+            confirmedCount,
+            outForDeliveryCount,
         });
     } catch (error) {
         return handleResponse(res, 500, error.message);
@@ -101,7 +115,23 @@ export const getDeliveryStats = async (req, res) => {
 export const getDeliveryEarnings = async (req, res) => {
     try {
         const deliveryBoyId = new mongoose.Types.ObjectId(req.user.id);
-        const transactions = await Transaction.find({ user: deliveryBoyId, userModel: 'Delivery' })
+        const { period } = req.query; // 'today', 'weekly', 'monthly'
+
+        let dateFilter = {};
+        const now = new Date();
+        if (period === 'today') {
+            const startOfDay = new Date(now.setHours(0,0,0,0));
+            dateFilter = { createdAt: { $gte: startOfDay } };
+        } else if (period === 'weekly') {
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - 7);
+            dateFilter = { createdAt: { $gte: startOfWeek } };
+        } else if (period === 'monthly') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            dateFilter = { createdAt: { $gte: startOfMonth } };
+        }
+
+        const transactions = await Transaction.find({ user: deliveryBoyId, userModel: 'Delivery', ...dateFilter })
             .sort({ createdAt: -1 })
             .limit(200)
             .populate("order", "orderId pricing paymentBreakdown");
@@ -1026,6 +1056,19 @@ export const validateDeliveryOtp = async (req, res) => {
                 status: "delivered",
                 deliveredAt: now.toISOString()
             });
+
+            const { emitOrderStatusUpdate } = await import('../services/orderSocketEmitter.js');
+            emitOrderStatusUpdate(
+                order.orderId,
+                {
+                    status: "delivered",
+                    workflowStatus: WORKFLOW_STATUS.DELIVERED,
+                    deliveredAt: now.toISOString()
+                },
+                order.customer?._id,
+                order.seller,
+                order._id
+            );
         } catch (socketError) {
             console.error('Error emitting Socket.IO event:', socketError);
             // Don't fail the request if socket emission fails

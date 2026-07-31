@@ -36,6 +36,11 @@ export function sanitizeOrderForDeliveryView(order) {
     Number(order.paymentBreakdown?.walletAmount) ||
     0;
 
+  const finalAmountToPay =
+    Number(order.pricing?.finalAmountToPay) ||
+    Number(order.paymentBreakdown?.finalAmountToPay) ||
+    Math.max(0, total - walletAmount);
+
   return {
     ...order,
     items: Array.isArray(order.items)
@@ -47,14 +52,22 @@ export function sanitizeOrderForDeliveryView(order) {
     pricing: {
       total,
       walletAmount,
+      finalAmountToPay,
     },
     paymentBreakdown: order.paymentBreakdown
       ? {
           grandTotal: Number(order.paymentBreakdown.grandTotal) || total,
           walletAmount:
             Number(order.paymentBreakdown.walletAmount) || walletAmount,
+          finalAmountToPay,
         }
       : undefined,
+    // Bug 222: Include distance/time for history cards
+    distanceKm: order.distanceKm ?? order.routeDistanceKm ?? null,
+    estimatedMinutes: order.estimatedMinutes ?? order.routeEstimatedMinutes ?? null,
+    // Bug 231/230: Include return fields
+    returnStatus: order.returnStatus,
+    returnDeliveryCommission: order.returnDeliveryCommission ?? null,
   };
 }
 

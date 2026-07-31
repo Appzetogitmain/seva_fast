@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
 const HelpSupport = () => {
@@ -61,14 +62,14 @@ const HelpSupport = () => {
       <div className="p-4 max-w-lg mx-auto space-y-6">
         {/* Support Channels */}
         <section className="grid grid-cols-2 gap-4">
-          <Card className="p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-md transition-shadow">
+          <Card className="p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-md transition-shadow h-full">
             <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center text-brand-600 mb-3">
               <MessageCircle size={24} />
             </div>
             <h4 className="font-bold text-gray-800">Chat Support</h4>
             <p className="text-xs text-gray-500 mt-1">Wait time: ~2 mins</p>
           </Card>
-          <Card className="p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-md transition-shadow">
+          <Card className="p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-md transition-shadow h-full">
             <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center text-brand-600 mb-3">
               <Phone size={24} />
             </div>
@@ -119,7 +120,7 @@ const HelpSupport = () => {
 
         <div className="text-center pt-8">
           <p className="text-gray-500 text-sm">Still need help?</p>
-          <Button variant="link" className="text-primary font-bold">
+          <Button variant="link" className="text-primary font-bold" onClick={() => toast.info("Opening FAQ Portal...")}>
             View All FAQs
           </Button>
         </div>

@@ -40,7 +40,7 @@ const EarningsPage = () => {
   const fetchEarnings = async () => {
     try {
       setLoading(true);
-      const response = await deliveryApi.getEarnings();
+      const response = await deliveryApi.getEarnings({ period: activeTab });
       if (response.data.success && response.data.result) {
         const result = response.data.result;
         setEarningsData({
@@ -62,7 +62,7 @@ const EarningsPage = () => {
   React.useEffect(() => {
     fetchEarnings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeTab]);
 
   const containerVariants = {
     hidden: { opacity: 0 },

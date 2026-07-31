@@ -151,6 +151,8 @@ export const customerApi = {
     axiosInstance.get("/maps/geocode", { params: { address, ...params } }),
   geocodePlaceId: (placeId, params = {}) =>
     axiosInstance.get("/maps/geocode", { params: { placeId, ...params } }),
+  reverseGeocode: (lat, lng, params = {}) =>
+    axiosInstance.get("/maps/reverse-geocode", { params: { lat, lng, ...params } }),
 
   // Push (FCM) test
   testPushNotification: () => axiosInstance.post("/push/test"),
@@ -177,6 +179,7 @@ export const customerApi = {
   }),
 
   createPlatformAd: (data) => axiosInstance.post("/professionals/platform-ads", data),
+  updatePlatformAd: (id, data) => axiosInstance.put(`/professionals/platform-ads/${id}`, data),
   getMyPlatformAds: () => axiosInstance.get("/professionals/platform-ads"),
   payPlatformAd: (id) => axiosInstance.post(`/professionals/platform-ads/${id}/pay`),
   initiatePayPlatformAd: (id) => axiosInstance.post(`/professionals/platform-ads/${id}/pay/initiate`),

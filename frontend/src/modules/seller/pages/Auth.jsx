@@ -139,6 +139,7 @@ const Auth = () => {
       // Owner name: only alphabets and spaces
       let cleaned = value.replace(/[^a-zA-Z\s]/g, "");
       cleaned = cleaned.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+      if (cleaned.trim() === "") cleaned = "";
       setFormData({ ...formData, [name]: cleaned });
     } else if (name === "shopName") {
       const cleaned = value.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
@@ -284,6 +285,11 @@ const Auth = () => {
     try {
       // Basic client-side validation for signup
       if (!isLogin) {
+        if (!formData.name.trim()) {
+          toast.error("Owner name is required and cannot be blank.");
+          isProcessing.current = false;
+          return;
+        }
         const email = formData.email || "";
         const phone = formData.phone || "";
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -567,7 +573,7 @@ const Auth = () => {
                             required
                             maxLength={50}
                             placeholder="Owner Name"
-                            className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                            className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                             value={formData.name}
                             onChange={handleChange}
                           />
@@ -581,7 +587,7 @@ const Auth = () => {
                             name="shopName"
                             required
                             placeholder="Shop / Business Name"
-                            className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                            className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                             value={formData.shopName}
                             onChange={handleChange}
                           />
@@ -594,13 +600,13 @@ const Auth = () => {
                         <Mail size={18} />
                       </div>
                       <input
-                        type="email"
+                        type={isLogin ? "text" : "email"}
                         name="email"
                         required
-                        inputMode="email"
+                        inputMode={isLogin ? "text" : "email"}
                         autoComplete="email"
-                        placeholder="Business Email"
-                        className="w-full pl-12 pr-28 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                        placeholder={isLogin ? "Business Email or Phone" : "Business Email"}
+                        className="w-full pl-12 pr-28 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                         value={formData.email}
                         onChange={handleChange}
                       />
@@ -670,9 +676,10 @@ const Auth = () => {
                           <input
                             type="tel"
                             name="phone"
+                            inputMode="numeric"
                             required
                             placeholder="Contact Number"
-                            className="w-full pl-12 pr-28 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                            className="w-full pl-12 pr-28 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                             value={formData.phone}
                             onChange={handleChange}
                           />
@@ -745,7 +752,7 @@ const Auth = () => {
                         maxLength={32}
                         autoComplete="current-password"
                         placeholder="Enter your password"
-                        className="w-full pl-12 pr-14 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                        className="w-full pl-12 pr-14 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                         value={formData.password}
                         onChange={handleChange}
                       />
@@ -767,7 +774,7 @@ const Auth = () => {
                           type="text"
                           name="referralCode"
                           placeholder="Referral Code (Optional)"
-                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300 uppercase"
+                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400 uppercase"
                           value={formData.referralCode || ""}
                           onChange={(e) => setFormData({ ...formData, referralCode: e.target.value.toUpperCase() })}
                         />
@@ -832,7 +839,7 @@ const Auth = () => {
                           required
                           maxLength={100}
                           placeholder="Locality / Area"
-                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                           value={formData.locality}
                           onChange={handleChange}
                         />
@@ -847,7 +854,7 @@ const Auth = () => {
                           required
                           maxLength={6}
                           placeholder="Pincode"
-                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                           value={formData.pincode}
                           onChange={handleChange}
                         />
@@ -862,7 +869,7 @@ const Auth = () => {
                           required
                           maxLength={50}
                           placeholder="City"
-                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                           value={formData.city}
                           onChange={handleChange}
                         />
@@ -877,7 +884,7 @@ const Auth = () => {
                           required
                           maxLength={50}
                           placeholder="State"
-                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300"
+                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                           value={formData.state}
                           onChange={handleChange}
                         />
@@ -894,7 +901,7 @@ const Auth = () => {
                         required
                         maxLength={250}
                         placeholder="Full address"
-                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-300 resize-none"
+                        className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400 resize-none"
                         value={formData.address}
                         onChange={handleChange}
                       />
@@ -982,10 +989,11 @@ const Auth = () => {
                 </div>
               </form>
 
-              <div className="pt-1 border-t border-slate-50 flex flex-col items-center gap-1">
+              <div className="pt-1 border-t border-slate-50 flex items-center justify-center text-center">
                 <p className="text-slate-600 font-bold text-sm">
                   {isLogin ? "New to the platform?" : "Already part of us?"}{" "}
                   <button
+                    type="button"
                     onClick={() => {
                       setIsLogin(!isLogin);
                       setSignupStep(1);
@@ -994,7 +1002,7 @@ const Auth = () => {
                         phone: createInitialVerificationState(),
                       });
                     }}
-                    className="text-slate-900 hover:text-black transition-colors px-2">
+                    className="text-slate-900 hover:text-black transition-colors underline underline-offset-4 font-black">
                     {isLogin ? "Register Store" : "Sign In"}
                   </button>
                 </p>

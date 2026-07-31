@@ -51,6 +51,20 @@ export const initSocket = (io) => {
       socket.join("admin:orders");
       socket.join("admin:support");
     }
+    // Bug 255: Sub-admins join their own room so they can be force-logged out
+    if (role === "sub-admin") {
+      socket.join(`subadmin:${userId}`);
+      socket.join("admin:orders");
+    }
+
+    // Bug 255: Super admin can force-logout a specific sub-admin
+    socket.on("admin:force-logout", ({ targetAdminId } = {}) => {
+      if (socket.user?.role !== "admin") return; // Only super admin can do this
+      if (!targetAdminId) return;
+      if (_io) {
+        _io.to(`subadmin:${targetAdminId}`).emit("admin:force-logout");
+      }
+    });
 
     socket.on("join_order", (orderId) => {
       if (!orderId || typeof orderId !== "string") return;

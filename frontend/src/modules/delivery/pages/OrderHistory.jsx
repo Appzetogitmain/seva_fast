@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { formatDate, formatTime } from "@shared/utils/formatDate";
 
 const displayOrderStatus = (order) => {
+  if (order?.returnStatus && order?.returnStatus !== "none") return "return";
   if (order?.workflowStatus === "DELIVERED" || order?.status === "delivered")
     return "delivered";
   if (order?.workflowStatus === "CANCELLED" || order?.status === "cancelled")
@@ -256,12 +257,17 @@ const OrderHistory = () => {
                     </div>
 
                     <div className="border-t border-b border-gray-50 py-3 my-3 space-y-2">
+                      {/* Store / Customer routing depending on return */}
                       <div className="flex items-start">
                         <div className="w-2 h-2 rounded-full bg-brand-500 mt-1.5 mr-2 flex-shrink-0 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
                         <div>
-                          <p className="ds-caption text-gray-500 mb-0.5">Store</p>
+                          <p className="ds-caption text-gray-500 mb-0.5">
+                            {displayOrderStatus(order) === "return" ? "Customer (Pickup)" : "Store"}
+                          </p>
                           <p className="text-sm font-medium text-gray-800 line-clamp-1">
-                            {order.seller?.shopName || "Unknown Store"}
+                            {displayOrderStatus(order) === "return"
+                              ? (order.customer?.name || "Customer")
+                              : (order.seller?.shopName || "Unknown Store")}
                           </p>
                         </div>
                       </div>
@@ -269,25 +275,43 @@ const OrderHistory = () => {
                         <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5 mr-2 flex-shrink-0 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
                         <div>
                           <p className="ds-caption text-gray-500 mb-0.5">
-                            Customer
+                            {displayOrderStatus(order) === "return" ? "Store (Drop)" : "Customer"}
                           </p>
                           <p className="text-sm font-medium text-gray-800 line-clamp-1">
-                            {order.customer?.name || "Customer"}
+                            {displayOrderStatus(order) === "return"
+                              ? (order.seller?.shopName || "Store")
+                              : (order.customer?.name || "Customer")}
                           </p>
                         </div>
                       </div>
                     </div>
 
+                    {/* Bug 231: For return orders show commission only, not cash */}
                     <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center text-xs text-gray-500">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="flex items-center bg-gray-50 px-2 py-1 rounded border border-gray-100">
-                          <MapPin size={12} className="mr-1 text-gray-400" />{" "}
-                          2.4 km {/* Mock for now */}
-                        </span>
-                        <span className="flex items-center bg-gray-50 px-2 py-1 rounded border border-gray-100">
-                          <Clock size={12} className="mr-1 text-gray-400" /> 15
-                          min
-                        </span>
+                        {/* Bug 222: Real distance/time from API */}
+                        {order.distanceKm != null ? (
+                          <span className="flex items-center bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                            <MapPin size={12} className="mr-1 text-gray-400" />{order.distanceKm.toFixed(1)} km
+                          </span>
+                        ) : null}
+                        {order.estimatedMinutes != null ? (
+                          <span className="flex items-center bg-gray-50 px-2 py-1 rounded border border-gray-100">
+                            <Clock size={12} className="mr-1 text-gray-400" />{order.estimatedMinutes} min
+                          </span>
+                        ) : null}
+                        {/* Bug 231: Return commission badge */}
+                        {displayOrderStatus(order) === "return" && (
+                          <span className="flex items-center bg-purple-50 px-2 py-1 rounded border border-purple-100 text-purple-700 font-bold">
+                            Commission: ₹{order.returnDeliveryCommission ?? Math.round((order.pricing?.total || 0) * 0.1)}
+                          </span>
+                        )}
+                        {/* Bug 231: Hide cash for return, show it only for normal orders */}
+                        {displayOrderStatus(order) !== "return" && (
+                          <span className="block font-bold text-sm text-brand-600 whitespace-nowrap">
+                            ₹{order.returnDeliveryCommission ?? Math.round((order.pricing?.total || 0) * 0.1)} earned
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center text-primary font-bold group-hover:underline self-end sm:self-auto">
                         View Details <ChevronRight size={14} className="ml-0.5" />

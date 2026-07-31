@@ -182,9 +182,8 @@ const LocalProfessionalsDirectory = () => {
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-t border-slate-50 pt-4">
                     <button
                         onClick={() => setSelectedCategoryId('')}
-                        className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
-                            !selectedCategoryId ? 'bg-black text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                        }`}
+                        className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${!selectedCategoryId ? 'bg-black text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                            }`}
                     >
                         All Categories
                     </button>
@@ -192,9 +191,8 @@ const LocalProfessionalsDirectory = () => {
                         <button
                             key={cat._id}
                             onClick={() => setSelectedCategoryId(cat._id)}
-                            className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                                selectedCategoryId === cat._id ? 'bg-black text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                            }`}
+                            className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedCategoryId === cat._id ? 'bg-black text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                }`}
                         >
                             {cat.icon && (
                                 cat.icon.startsWith('http') ? (
@@ -269,7 +267,7 @@ const LocalProfessionalsDirectory = () => {
                                         <div className="flex flex-wrap gap-1.5">
                                             {pro.services.slice(0, 2).map((svc, idx) => (
                                                 <span key={idx} className="text-[11px] font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
-                                                    {svc.name} (₹{svc.price})
+                                                    {svc.name} ({svc.price === 0 || svc.price === '0' ? 'FREE' : '₹' + svc.price})
                                                 </span>
                                             ))}
                                             {pro.services.length > 2 && (
@@ -337,7 +335,7 @@ const LocalProfessionalsDirectory = () => {
                                             <h4 className="text-sm font-black text-slate-900">{svc.name}</h4>
                                             {svc.description && <p className="text-xs text-slate-500 font-bold mt-1">{svc.description}</p>}
                                         </div>
-                                        <span className="text-sm font-black text-emerald-600">₹{svc.price}</span>
+                                        <span className="text-sm font-black text-emerald-600">{svc.price === 0 || svc.price === '0' ? 'FREE' : '₹' + svc.price}</span>
                                     </div>
                                 ))
                             ) : (

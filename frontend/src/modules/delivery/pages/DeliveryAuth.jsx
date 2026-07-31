@@ -16,6 +16,8 @@ import {
   X,
   Camera,
   XCircle,
+  Calendar,
+  Droplet,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Lottie from "lottie-react";
@@ -58,6 +60,8 @@ const DeliveryAuth = () => {
   const [signupPhone, setSignupPhone] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupAddress, setSignupAddress] = useState("");
+  const [signupDob, setSignupDob] = useState("");
+  const [signupBloodGroup, setSignupBloodGroup] = useState("");
   const [signupVehicle, setSignupVehicle] = useState("bike");
   const [signupVehicleNumber, setSignupVehicleNumber] = useState("");
   const [signupDLNumber, setSignupDLNumber] = useState("");
@@ -132,11 +136,15 @@ const DeliveryAuth = () => {
         formData.append("vehicleType", signupVehicle);
         formData.append("email", signupEmail);
         formData.append("address", signupAddress);
+        if (signupDob) formData.append("dob", signupDob);
+        if (signupBloodGroup) formData.append("bloodGroup", signupBloodGroup);
         formData.append("vehicleNumber", signupVehicleNumber);
         formData.append("drivingLicenseNumber", signupDLNumber);
         formData.append("accountHolder", signupAccountHolder);
         formData.append("accountNumber", signupAccountNumber);
         formData.append("ifsc", signupIfsc);
+        if (signupAadharNumber) formData.append("aadharNumber", signupAadharNumber);
+        if (signupPanNumber) formData.append("panNumber", signupPanNumber);
         formData.append("sellerCode", signupSellerCode.trim().toUpperCase());
 
         if (profileImageFile) formData.append("profileImage", profileImageFile);
@@ -251,28 +259,11 @@ const DeliveryAuth = () => {
   };
 
   const switchMode = (newMode) => {
+    if (newMode === mode) return; // No-op if same tab
     setMode(newMode);
     setStep("form");
     setOtp(["", "", "", "", "", ""]);
-    setLoginPhone("");
     setSignupStep(1);
-    setSignupName("");
-    setSignupPhone("");
-    setSignupEmail("");
-    setSignupAddress("");
-    setSignupVehicle("bike");
-    setSignupVehicleNumber("");
-    setSignupDLNumber("");
-    setSignupAccountNumber("");
-    setSignupIfsc("");
-    setSignupAccountHolder("");
-    setSignupSellerCode("");
-    setAadharFile(null);
-    setPanFile(null);
-    setDlFile(null);
-    setAgreed(false);
-    setProfileImageFile(null);
-    setProfileImagePreview("");
   };
 
   const slideVariants = {
@@ -282,7 +273,21 @@ const DeliveryAuth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F4FF] flex flex-col items-center justify-center p-5 font-['Outfit',_sans-serif]">
+    <div className="min-h-screen bg-[#F0F4FF] flex flex-col items-center justify-center p-5 pt-20 font-['Outfit',_sans-serif]">
+      {/* Fixed Logo Bar - outside the card */}
+      <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4">
+        <div className="w-14 h-14 rounded-2xl bg-white/85 backdrop-blur-sm border border-brand-100 shadow-sm flex items-center justify-center overflow-hidden">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={`${appName} logo`}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <ShieldCheck className="w-5 h-5 text-brand-600" />
+          )}
+        </div>
+      </div>
       {/* Background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-32 -left-32 w-80 h-80 bg-brand-200/40 rounded-full blur-3xl" />
@@ -299,20 +304,7 @@ const DeliveryAuth = () => {
         <div className="bg-white rounded-[2.5rem] shadow-[0_24px_60px_rgba(99,102,241,0.1)] border border-brand-50 overflow-hidden">
 
           {/* Header with Lottie */}
-          <div className="bg-gradient-to-br from-brand-50 to-purple-50 p-8 flex flex-col items-center relative">
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-              <div className="w-14 h-14 rounded-2xl bg-white/85 backdrop-blur-sm border border-brand-100 shadow-sm flex items-center justify-center overflow-hidden">
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt={`${appName} logo`}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <ShieldCheck className="w-5 h-5 text-brand-600" />
-                )}
-              </div>
-            </div>
+          <div className="bg-gradient-to-br from-brand-50 to-purple-50 p-8 pt-10 flex flex-col items-center relative">
             <div className="w-40 h-40">
               <Lottie animationData={deliveryRiding} loop />
             </div>
@@ -490,6 +482,43 @@ const DeliveryAuth = () => {
                             )}
                           </div>
 
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Date of Birth</label>
+                              <div className="relative">
+                                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
+                                <input
+                                  type="date"
+                                  value={signupDob}
+                                  onChange={(e) => setSignupDob(e.target.value)}
+                                  className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all uppercase"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Blood Group</label>
+                              <div className="relative">
+                                <Droplet className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
+                                <select
+                                  value={signupBloodGroup}
+                                  onChange={(e) => setSignupBloodGroup(e.target.value)}
+                                  className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all appearance-none"
+                                >
+                                  <option value="">Select...</option>
+                                  <option value="A+">A+</option>
+                                  <option value="A-">A-</option>
+                                  <option value="B+">B+</option>
+                                  <option value="B-">B-</option>
+                                  <option value="O+">O+</option>
+                                  <option value="O-">O-</option>
+                                  <option value="AB+">AB+</option>
+                                  <option value="AB-">AB-</option>
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                              </div>
+                            </div>
+                          </div>
+
                           <div className="space-y-1.5">
                             <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">
                               Seller Invite Code <span className="text-red-500">*</span>
@@ -509,7 +538,7 @@ const DeliveryAuth = () => {
 
                           <button
                             onClick={() => {
-                              if (!signupName || !signupPhone || !signupEmail || !signupAddress || !profileImageFile || !signupSellerCode.trim()) {
+                              if (!signupName || !signupPhone || !signupEmail || !signupAddress || !signupDob || !signupBloodGroup || !profileImageFile || !signupSellerCode.trim()) {
                                 toast.error("Please fill all personal information fields, upload photo, and enter seller invite code");
                                 return;
                               }
@@ -866,9 +895,9 @@ const DeliveryAuth = () => {
 
                       <p className="text-center text-xs text-gray-400 font-semibold pt-1">
                         By joining, you agree to our{" "}
-                        <span className="text-brand-500 font-bold cursor-pointer hover:underline">Terms</span>{" "}
-                        &amp;{" "}
-                        <span className="text-brand-500 font-bold cursor-pointer hover:underline">Privacy Policy</span>
+                        <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand-500 font-bold hover:underline">Terms</a>
+                        {" "}&amp;{" "}
+                        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-500 font-bold hover:underline">Privacy Policy</a>
                       </p>
                     </div>
                   )}

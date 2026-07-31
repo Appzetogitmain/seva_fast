@@ -30,7 +30,10 @@ const ProductDetailPage = () => {
     const [reviewLoading, setReviewLoading] = useState(false);
 
     const fetchData = async (showLoader = true) => {
-        if (showLoader) setIsLoading(true);
+        if (showLoader) {
+            setIsLoading(true);
+            setProduct(null);
+        }
         setError(null);
         try {
             const hasValidLocation =

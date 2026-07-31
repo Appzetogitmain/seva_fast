@@ -47,6 +47,10 @@ export const createSubadmin = async (req, res) => {
     if (!name || !email || !password) {
       return handleResponse(res, 400, "Name, email and password are required");
     }
+    // Bug 254: Name must contain only alphabets and spaces
+    if (!/^[a-zA-Z\s]+$/.test(name.trim())) {
+      return handleResponse(res, 400, "Full name must contain only alphabets and spaces");
+    }
 
     const existing = await Admin.findOne({ email });
     if (existing) {
@@ -99,7 +103,13 @@ export const updateSubadmin = async (req, res) => {
       subadmin.email = email;
     }
 
-    if (name) subadmin.name = name;
+    if (name) {
+      // Bug 254: Name must contain only alphabets and spaces
+      if (!/^[a-zA-Z\s]+$/.test(name.trim())) {
+        return handleResponse(res, 400, "Full name must contain only alphabets and spaces");
+      }
+      subadmin.name = name;
+    }
     if (phone) subadmin.phone = phone;
     if (assignedZones) subadmin.assignedZones = assignedZones;
     if (allowedPermissions) subadmin.allowedPermissions = allowedPermissions;

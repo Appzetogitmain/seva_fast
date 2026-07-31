@@ -30,6 +30,16 @@ const deliverySchema = new mongoose.Schema(
             trim: true,
         },
 
+        dob: {
+            type: String,
+            trim: true,
+        },
+
+        bloodGroup: {
+            type: String,
+            trim: true,
+        },
+
         accountHolder: {
             type: String,
             trim: true,
@@ -49,6 +59,17 @@ const deliverySchema = new mongoose.Schema(
             aadhar: { type: String },
             pan: { type: String },
             drivingLicense: { type: String },
+        },
+
+        aadharNumber: {
+            type: String,
+            trim: true,
+        },
+
+        panNumber: {
+            type: String,
+            trim: true,
+            uppercase: true,
         },
 
         vehicleNumber: {

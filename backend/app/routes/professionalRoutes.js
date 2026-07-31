@@ -13,6 +13,7 @@ import {
 import { getCategories } from "../controller/admin/professionalCategoryController.js";
 import {
     createPlatformAd,
+    updatePlatformAd,
     getMyPlatformAds,
     payPlatformAd,
     getActivePlatformAds,
@@ -38,6 +39,7 @@ router.post("/profile/pay/verify", verifyToken, verifyPayMyAd);
 
 // Separated Platform Ad Requests routes
 router.post("/platform-ads", verifyToken, createPlatformAd);
+router.put("/platform-ads/:id", verifyToken, updatePlatformAd);
 router.get("/platform-ads", verifyToken, getMyPlatformAds);
 router.post("/platform-ads/:id/pay", verifyToken, payPlatformAd);
 router.post("/platform-ads/:id/pay/initiate", verifyToken, initiatePayPlatformAd);

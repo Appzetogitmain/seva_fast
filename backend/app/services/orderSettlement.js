@@ -80,7 +80,6 @@ export async function applyDeliveredSettlement(order, orderIdString) {
         $set: {
           amount: sellerEarning,
           status: sellerTxnStatus,
-          type: "Order Payment",
         },
         $setOnInsert: {
           user: settled.seller,

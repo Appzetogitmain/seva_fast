@@ -42,6 +42,7 @@ const SellerTransactions = () => {
     const [filterType, setFilterType] = useState('all');
     const [selectedSeller, setSelectedSeller] = useState('all');
     const [selectedTxn, setSelectedTxn] = useState(null);
+    const [isInsightsOpen, setIsInsightsOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [transactions, setTransactions] = useState([]);
     const [page, setPage] = useState(1);
@@ -133,10 +134,25 @@ const SellerTransactions = () => {
 
     const handleExport = () => {
         setIsExporting(true);
-        setTimeout(() => {
+        try {
+            const headers = ['Txn ID,Order ID,Date,Seller,Type,Amount,Status'];
+            const rows = transactions.map(t =>
+                `${t.id},${t.orderId || ''},${t.date},"${t.seller}",${t.type},${t.amount},${t.status}`
+            );
+            const csv = [...headers, ...rows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `master-ledger-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast.success('Master ledger downloaded!');
+        } catch (e) {
+            toast.error('Export failed');
+        } finally {
             setIsExporting(false);
-            alert('Financial ledger exported successfully.');
-        }, 1500);
+        }
     };
 
     if (loading) {
@@ -175,7 +191,10 @@ const SellerTransactions = () => {
                         {isExporting ? <RotateCw className="h-4 w-4 animate-spin text-orange-500" /> : <Download className="h-4 w-4" />}
                         {isExporting ? 'Generating Report...' : 'Download Master Ledger'}
                     </button>
-                    <button className="flex items-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl text-xs font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 group">
+                    <button 
+                        onClick={() => setIsInsightsOpen(true)}
+                        className="flex items-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl text-xs font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 group"
+                    >
                         <TrendingUp className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                         Revenue Insights
                     </button>
@@ -390,7 +409,7 @@ const SellerTransactions = () => {
                             <h2 className="text-3xl font-black text-slate-900 tracking-tight">
                                 {selectedTxn.amount > 0 ? '' : '-'}₹{Math.abs(selectedTxn.amount).toLocaleString()}
                             </h2>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">{selectedTxn.id}</p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-2 break-all max-w-full px-4">{selectedTxn.id}</p>
                         </div>
 
                         <div className="space-y-6">
@@ -551,13 +570,63 @@ const SellerTransactions = () => {
                                 >
                                     Download Voucher
                                 </button>
-                                <button className="p-4 bg-slate-100 text-slate-900 rounded-2xl flex items-center justify-center hover:bg-slate-200 transition-all">
+                                <button 
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/admin/orders/${selectedTxn.orderId}`;
+                                        if (navigator.share) {
+                                            navigator.share({ title: 'Transaction', url }).catch(() => {});
+                                        } else {
+                                            navigator.clipboard.writeText(url);
+                                            toast.success('Order link copied to clipboard!');
+                                        }
+                                    }}
+                                    className="p-4 bg-slate-100 text-slate-900 rounded-2xl flex items-center justify-center hover:bg-slate-200 transition-all"
+                                >
                                     <ExternalLink className="h-5 w-5" />
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
+            </Modal>
+
+
+            {/* Revenue Insights Modal */}
+            <Modal
+                isOpen={isInsightsOpen}
+                onClose={() => setIsInsightsOpen(false)}
+                title="Revenue Insights"
+                size="md"
+            >
+                <div className="ds-section-spacing space-y-6">
+                    <div className="p-6 bg-orange-50 rounded-2xl border border-orange-100">
+                        <div className="flex items-center gap-3 mb-6">
+                            <TrendingUp className="h-6 w-6 text-orange-500" />
+                            <h3 className="text-lg font-black text-orange-900">Platform Economics</h3>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
+                                <span className="text-sm font-bold text-slate-600">Gross Sales Volume</span>
+                                <span className="text-lg font-black text-slate-900">₹{stats.totalGross.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-brand-50 p-4 rounded-xl shadow-sm border border-brand-100">
+                                <span className="text-sm font-bold text-brand-700">Platform Revenue (Commission)</span>
+                                <span className="text-lg font-black text-brand-700">₹{stats.totalCommission.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
+                                <span className="text-sm font-bold text-slate-600">Disbursed to Merchants</span>
+                                <span className="text-lg font-black text-emerald-600">₹{stats.totalPayouts.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-amber-100">
+                                <span className="text-sm font-bold text-amber-600">Pending Settlements</span>
+                                <span className="text-lg font-black text-amber-600">₹{stats.pendingSettlements.toLocaleString()}</span>
+                            </div>
+                        </div>
+                        <p className="text-[10px] font-bold text-orange-600/60 mt-4 text-center uppercase tracking-widest">
+                            Calculated from loaded ledger entries
+                        </p>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

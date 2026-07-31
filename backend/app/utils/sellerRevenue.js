@@ -10,6 +10,7 @@ export function sellerDeliveredOrderMatch(sellerId) {
   return {
     seller: sellerOid,
     $or: [{ status: "delivered" }, { workflowStatus: WORKFLOW_STATUS.DELIVERED }],
+    returnStatus: { $nin: ["returned", "qc_passed", "refund_completed"] },
   };
 }
 

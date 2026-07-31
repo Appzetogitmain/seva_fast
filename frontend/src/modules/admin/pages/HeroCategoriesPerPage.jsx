@@ -4,6 +4,8 @@ import {
   HiOutlinePhoto,
   HiOutlinePlus,
   HiOutlineXMark,
+  HiOutlineChevronUp,
+  HiOutlineChevronDown,
 } from "react-icons/hi2";
 import { adminApi } from "../services/adminApi";
 import Card from "@shared/components/ui/Card";
@@ -162,6 +164,24 @@ export default function HeroCategoriesPerPage() {
     );
   };
 
+  const moveCategoryUp = (index) => {
+    if (index === 0) return;
+    setFormCategoryIds((prev) => {
+      const next = [...prev];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next;
+    });
+  };
+
+  const moveCategoryDown = (index) => {
+    if (index === formCategoryIds.length - 1) return;
+    setFormCategoryIds((prev) => {
+      const next = [...prev];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next;
+    });
+  };
+
   const handleSave = async () => {
     const items = formBanners.filter((b) => b.imageUrl).map((b) => ({
       imageUrl: b.imageUrl,
@@ -186,10 +206,10 @@ export default function HeroCategoriesPerPage() {
         prev.map((p) =>
           p.id === editingRow.id
             ? {
-                ...p,
-                bannerCount: items.length,
-                categoryCount: formCategoryIds.length,
-              }
+              ...p,
+              bannerCount: items.length,
+              categoryCount: formCategoryIds.length,
+            }
             : p
         )
       );
@@ -399,29 +419,78 @@ export default function HeroCategoriesPerPage() {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">
                 Categories below hero
               </label>
-              <div className="flex flex-wrap gap-2">
-                {allCategories.map((c) => {
-                  const isSelected = formCategoryIds.includes(c._id);
-                  return (
-                    <button
-                      key={c._id}
-                      type="button"
-                      onClick={() => toggleCategory(c._id)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all",
-                        isSelected
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-white"
-                      )}
-                    >
-                      {c.name}
-                    </button>
-                  );
-                })}
+
+              <div className="space-y-4">
+                {/* Selected Categories */}
+                {formCategoryIds.length > 0 && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-bold text-slate-500 mb-2">Selected Categories (in order):</p>
+                    <div className="flex flex-col gap-2">
+                      {formCategoryIds.map((catId, index) => {
+                        const c = allCategories.find((cat) => cat._id === catId);
+                        if (!c) return null;
+                        return (
+                          <div key={catId} className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">{index + 1}</span>
+                              {c.name}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveCategoryUp(index)}
+                                disabled={index === 0}
+                                className="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-md disabled:opacity-30 transition-colors"
+                              >
+                                <HiOutlineChevronUp className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveCategoryDown(index)}
+                                disabled={index === formCategoryIds.length - 1}
+                                className="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-md disabled:opacity-30 transition-colors"
+                              >
+                                <HiOutlineChevronDown className="w-4 h-4" />
+                              </button>
+                              <div className="w-px h-4 bg-slate-200 mx-1" />
+                              <button
+                                type="button"
+                                onClick={() => toggleCategory(catId)}
+                                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors"
+                              >
+                                <HiOutlineXMark className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Available Categories */}
+                <div>
+                  <p className="text-xs font-bold text-slate-500 mb-2">Available Categories (click to add):</p>
+                  <div className="flex flex-wrap gap-2">
+                    {allCategories.filter(c => !formCategoryIds.includes(c._id)).map((c) => (
+                      <button
+                        key={c._id}
+                        type="button"
+                        onClick={() => toggleCategory(c._id)}
+                        className="px-3 py-1.5 rounded-full text-[11px] font-bold border bg-slate-50 text-slate-600 border-slate-200 hover:bg-white transition-all"
+                      >
+                        + {c.name}
+                      </button>
+                    ))}
+                  </div>
+                  {allCategories.length === 0 && (
+                    <p className="text-xs text-slate-400">No main categories found. Add categories in Header / Main Categories first.</p>
+                  )}
+                  {allCategories.length > 0 && allCategories.filter(c => !formCategoryIds.includes(c._id)).length === 0 && (
+                    <p className="text-xs text-slate-400">All categories selected.</p>
+                  )}
+                </div>
               </div>
-              {allCategories.length === 0 && (
-                <p className="text-xs text-slate-400">No main categories found. Add categories in Header / Main Categories first.</p>
-              )}
             </div>
           </div>
         )}

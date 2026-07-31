@@ -65,9 +65,10 @@ const PlanEnforcer = ({ children }) => {
     const location = useLocation();
 
     if (isAuthenticated && user?.role === 'customer' && !user?.currentPlan) {
-        if (!['/plans', '/terms', '/privacy', '/about'].includes(location.pathname)) {
-            return <Navigate to="/plans" replace />;
-        }
+        // Disabled forcing users to /plans globally so they can access the home page
+        // if (!['/plans', '/terms', '/privacy', '/about'].includes(location.pathname)) {
+        //     return <Navigate to="/plans" replace />;
+        // }
     }
     return children;
 };
@@ -151,11 +152,21 @@ const router = createBrowserRouter([
                 },
                 {
                     path: 'seller/auth',
-                    element: <Auth />,
+                    element: (
+                        <>
+                            <ScrollToTop />
+                            <Auth />
+                        </>
+                    ),
                 },
                 {
                     path: 'seller/pending-approval',
-                    element: <ApplicationPending />,
+                    element: (
+                        <>
+                            <ScrollToTop />
+                            <ApplicationPending />
+                        </>
+                    ),
                 },
                 {
                     path: 'admin/auth',
@@ -174,7 +185,10 @@ const router = createBrowserRouter([
                     element: (
                         <ProtectedRoute>
                             <RoleGuard allowedRoles={[UserRole.SELLER]}>
-                                <SellerModule />
+                                <>
+                                    <ScrollToTop />
+                                    <SellerModule />
+                                </>
                             </RoleGuard>
                         </ProtectedRoute>
                     ),

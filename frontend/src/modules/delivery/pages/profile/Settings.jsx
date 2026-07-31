@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Bell, Smartphone, Moon, Globe, ChevronRight } from "lucide-react";
 import Button from "@/shared/components/ui/Button";
@@ -8,14 +8,27 @@ import { toast } from "sonner";
 const Settings = () => {
   const navigate = useNavigate();
 
-  const [settings, setSettings] = useState({
-    pushNotifications: true,
-    emailAlerts: false,
-    sound: true,
-    vibration: true,
-    darkMode: false,
-    language: "English",
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem('app_settings');
+    if (saved) return JSON.parse(saved);
+    return {
+      pushNotifications: true,
+      emailAlerts: false,
+      sound: true,
+      vibration: true,
+      darkMode: false,
+      language: "English",
+    };
   });
+
+  useEffect(() => {
+    localStorage.setItem('app_settings', JSON.stringify(settings));
+    if (settings.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [settings]);
 
   const toggleSetting = (key) => {
     setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -27,8 +40,8 @@ const Settings = () => {
       {/* Header */}
       <div className="bg-white shadow-sm sticky top-0 z-10">
         <div className="flex items-center p-4">
-          <button 
-            onClick={() => navigate(-1)} 
+          <button
+            onClick={() => navigate(-1)}
             className="p-2 rounded-full hover:bg-gray-100 transition-colors mr-2"
           >
             <ArrowLeft size={20} className="text-gray-600" />
@@ -53,7 +66,7 @@ const Settings = () => {
                 <div className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform duration-200 ease-in-out ${settings.pushNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
               </div>
             </div>
-            
+
             <div className="p-4 flex justify-between items-center cursor-pointer" onClick={() => toggleSetting('sound')}>
               <div className="flex items-center">
                 <Smartphone size={20} className="text-gray-400 mr-3" />

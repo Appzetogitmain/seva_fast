@@ -95,9 +95,9 @@ const OrderDetail = () => {
     const handlePrintInvoice = async () => {
         const element = invoiceRef.current;
         if (!element) return;
-        
+
         showToast("Generating PDF Invoice...", "info");
-        
+
         try {
             const canvas = await html2canvas(element, {
                 scale: 2,
@@ -121,7 +121,7 @@ const OrderDetail = () => {
                             // Skip cross-origin stylesheets that we can't access
                         }
                     }
-                    
+
                     // Also explicitly reset root variables just in case
                     const style = clonedDoc.createElement('style');
                     style.innerHTML = `
@@ -139,7 +139,7 @@ const OrderDetail = () => {
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-            
+
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
             pdf.save(`Invoice_${order.orderId}.pdf`);
             showToast("Invoice downloaded successfully", "success");
@@ -179,6 +179,7 @@ const OrderDetail = () => {
     const adminDeliveryShare = Number(paymentBreakdown.adminDeliveryFeeShare ?? 0);
     const sellerDeliveryShare = Number(paymentBreakdown.sellerDeliveryFeeShare ?? 0);
     const handlingFee = Number(paymentBreakdown.handlingFeeCharged ?? 0);
+    const platformFee = Number(paymentBreakdown.platformFee ?? order.pricing?.platformFee ?? 0);
     const tip = Number(paymentBreakdown.tipTotal ?? paymentBreakdown.riderTipAmount ?? 0);
     const riderPayout = Number(paymentBreakdown.riderPayoutTotal ?? 0);
     const productSubtotal = Number(paymentBreakdown.productSubtotal ?? order.pricing?.subtotal ?? 0);
@@ -238,7 +239,7 @@ const OrderDetail = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button 
+                    <button
                         onClick={handlePrintInvoice}
                         className="flex items-center gap-2 px-5 py-3 bg-white ring-1 ring-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm"
                     >
@@ -367,10 +368,10 @@ const OrderDetail = () => {
                             Customer Node Information
                         </h4>
                         <div className="flex items-center gap-4">
-                            <img 
-                                src="https://cdn-icons-png.flaticon.com/512/149/149071.png" 
-                                alt="" 
-                                className="h-16 w-16 rounded-2xl bg-slate-50 ring-2 ring-white shadow-sm object-cover" 
+                            <img
+                                src="https://cdn-icons-png.flaticon.com/512/149/149071.png"
+                                alt=""
+                                className="h-16 w-16 rounded-2xl bg-slate-50 ring-2 ring-white shadow-sm object-cover"
                             />
                             <div className="text-left">
                                 <h3 className="text-lg font-black text-slate-900 leading-tight">
@@ -543,6 +544,12 @@ const OrderDetail = () => {
                                                         <span>₹{tip.toLocaleString("en-IN")}</span>
                                                     </div>
                                                 )}
+                                                {platformFee > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Platform Fee</span>
+                                                        <span>₹{platformFee.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -660,14 +667,14 @@ const OrderDetail = () => {
 
             {/* Hidden Printable Invoice Template */}
             <div className="fixed -left-[9999px] top-0">
-                <div 
+                <div
                     ref={invoiceRef}
                     className="w-[800px] bg-white p-1"
                     style={{ backgroundColor: "#f8fafc" }}
                 >
                     {/* Inner Paper with Border */}
-                    <div style={{ 
-                        backgroundColor: "#ffffff", 
+                    <div style={{
+                        backgroundColor: "#ffffff",
                         margin: "40px",
                         padding: "65px",
                         border: "1px solid #e2e8f0",

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, UserPlus, Phone, Trash2, Shield, Lock, Eye } from "lucide-react";
 import Button from "@/shared/components/ui/Button";
@@ -12,10 +12,20 @@ const SafetyPrivacy = () => {
   const { settings } = useSettings();
   const appName = settings?.appName || "App";
 
-  const [contacts, setContacts] = useState([
-    { id: 1, name: "Anita Kumar (Wife)", phone: "+91 98765 12345" },
-    { id: 2, name: "Ravi Singh (Brother)", phone: "+91 98765 67890" },
-  ]);
+  const [contacts, setContacts] = useState(() => {
+    const saved = localStorage.getItem('emergency_contacts');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return [
+      { id: 1, name: "Anita Kumar (Wife)", phone: "9876512345" },
+      { id: 2, name: "Ravi Singh (Brother)", phone: "9876567890" },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('emergency_contacts', JSON.stringify(contacts));
+  }, [contacts]);
 
   const [newContact, setNewContact] = useState({ name: "", phone: "" });
   const [showAddContact, setShowAddContact] = useState(false);
@@ -39,8 +49,8 @@ const SafetyPrivacy = () => {
       {/* Header */}
       <div className="bg-white shadow-sm sticky top-0 z-10">
         <div className="flex items-center p-4">
-          <button 
-            onClick={() => navigate(-1)} 
+          <button
+            onClick={() => navigate(-1)}
             className="p-2 rounded-full hover:bg-gray-100 transition-colors mr-2"
           >
             <ArrowLeft size={20} className="text-gray-600" />
@@ -68,9 +78,9 @@ const SafetyPrivacy = () => {
                     <Phone size={14} className="mr-1" /> {contact.phone}
                   </p>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
+                <Button
+                  variant="ghost"
+                  size="icon"
                   className="text-red-500 hover:bg-red-50"
                   onClick={() => handleRemoveContact(contact.id)}
                 >
@@ -81,16 +91,23 @@ const SafetyPrivacy = () => {
 
             {showAddContact ? (
               <Card className="p-4 border-dashed border-2 border-gray-200 bg-gray-50">
-                <Input 
-                  placeholder="Name (e.g. Wife, Brother)" 
+                <Input
+                  placeholder="Name (e.g. Wife, Brother)"
                   value={newContact.name}
-                  onChange={(e) => setNewContact({...newContact, name: e.target.value})}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^a-zA-Z\s()]/g, "");
+                    setNewContact({ ...newContact, name: val });
+                  }}
                   className="mb-3 bg-white"
                 />
-                <Input 
-                  placeholder="Phone Number" 
+                <Input
+                  placeholder="Phone Number"
                   value={newContact.phone}
-                  onChange={(e) => setNewContact({...newContact, phone: e.target.value})}
+                  maxLength={10}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setNewContact({ ...newContact, phone: val });
+                  }}
                   className="mb-3 bg-white"
                 />
                 <div className="flex space-x-2">
@@ -99,8 +116,8 @@ const SafetyPrivacy = () => {
                 </div>
               </Card>
             ) : (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full border-dashed border-gray-300 text-gray-500 hover:border-primary hover:text-primary"
                 onClick={() => setShowAddContact(true)}
               >

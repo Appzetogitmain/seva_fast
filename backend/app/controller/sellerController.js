@@ -183,6 +183,7 @@ export const updateSellerProfile = async (req, res) => {
         type: "Point",
         coordinates: [Number(lng), Number(lat)],
       };
+      seller.markModified("location");
     }
 
     if (radius !== undefined) {

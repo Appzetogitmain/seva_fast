@@ -105,3 +105,18 @@ export const updateSellerDetails = async (req, res) => {
     return handleResponse(res, 500, error.message);
   }
 };
+
+export const deleteSeller = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const seller = await Seller.findByIdAndDelete(id);
+    
+    if (!seller) {
+      return handleResponse(res, 404, "Seller not found");
+    }
+    
+    return handleResponse(res, 200, "Seller deleted successfully", seller);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};

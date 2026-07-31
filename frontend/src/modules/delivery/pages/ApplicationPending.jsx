@@ -24,7 +24,7 @@ const ApplicationPending = () => {
   const isRejected = applicationStatus === "rejected";
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden font-['Outfit']">
+    <div className="min-h-screen bg-[#0F172A] relative overflow-hidden font-['Outfit']">
       <div className="absolute inset-0">
         <div className="absolute top-[-20%] right-[-10%] h-[420px] w-[420px] rounded-full bg-amber-400/10 blur-3xl" />
         <div className="absolute bottom-[-20%] left-[-10%] h-[420px] w-[420px] rounded-full bg-brand-400/10 blur-3xl" />
@@ -44,35 +44,34 @@ const ApplicationPending = () => {
               ) : (
                 <Bike className="h-5 w-5 text-white/80" />
               )}
-              <span className="text-sm font-bold text-white/90">{appName} Delivery</span>
+              <span className="text-sm font-bold text-[#F8FAFC]">{appName} Delivery</span>
             </div>
             <div
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest ${
-                isRejected
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest ${isRejected
                   ? "bg-rose-500/20 text-rose-200"
                   : "bg-amber-400/20 text-amber-100"
-              }`}
+                }`}
             >
               {isRejected ? <ShieldAlert className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
               {isRejected ? "Application Rejected" : "Application Pending"}
             </div>
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-black text-white leading-tight">
+          <h1 className="text-3xl md:text-4xl font-black text-[#FFFFFF] leading-tight">
             {isRejected
               ? "Your delivery partner application needs action."
               : "Your delivery partner profile is pending for approval."}
           </h1>
-          <p className="mt-4 text-base md:text-lg text-slate-200/90 font-medium max-w-2xl">
+          <p className="mt-4 text-base md:text-lg text-[#E2E8F0] font-medium max-w-2xl">
             {isRejected
               ? "You cannot access the delivery dashboard yet. Please contact admin or your seller and re-submit with the required details."
               : "Dashboard access unlocks automatically once your seller or admin approves your account."}
           </p>
 
           {!isRejected ? (
-            <div className="mt-6 rounded-2xl border border-brand-400/30 bg-brand-500/10 px-4 py-3 text-sm text-brand-200 flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0 text-brand-400" />
-              <p className="font-semibold">
+            <div className="mt-6 rounded-2xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-slate-200 flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0 text-emerald-400" />
+              <p className="font-semibold text-[#CBD5E1]">
                 Approval usually takes less than 24 hours. You can return to login and try again later.
               </p>
             </div>

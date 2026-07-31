@@ -28,7 +28,7 @@ async function fetchPopulatedWishlist(wishlistId) {
   const wishlist = await Wishlist.findById(wishlistId)
     .populate({
       path: "products",
-      select: "name slug price salePrice mainImage stock status approvalStatus variants listingVariantSku",
+      select: "name slug price salePrice mainImage stock status approvalStatus variants listingVariantSku deliveryType sellerId",
       match: CUSTOMER_VISIBLE_PRODUCT_MATCH,
     })
     .lean();

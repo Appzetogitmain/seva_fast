@@ -183,12 +183,18 @@ const CustomerAuth = () => {
 
             if (
                 !isLogin &&
+<<<<<<< HEAD
                 (status === 409 || errorCode === 'ACCOUNT_ALREADY_EXISTS')
             ) {
                 toast.error(
                     error?.response?.data?.message ||
                         'An account already exists with this number. Please login.',
                 );
+=======
+                (status === 409 || errorCode === 'ACCOUNT_EXISTS')
+            ) {
+                toast.info('Account already exists, please login.');
+>>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
                 setShowOtp(false);
                 setIsLogin(true);
                 navigate('/login', {
@@ -223,7 +229,7 @@ const CustomerAuth = () => {
 
             login({ ...customer, token, role: 'customer' });
 
-            if (!customer.currentPlan) {
+            if (!isLogin && !customer.currentPlan) {
                 toast.success('Account created! Please select a plan to continue.');
                 navigate('/plans', { replace: true });
             } else {
@@ -300,17 +306,26 @@ const CustomerAuth = () => {
             </div>
 
             {/* Premium Centered Card Container */}
-            <div className="w-[92%] max-w-[400px] h-[80vh] min-h-[520px] max-h-[780px] bg-white relative z-10 overflow-y-auto custom-scrollbar rounded-[40px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] border border-white/40 flex flex-col transition-colors duration-1000">
+            <div className="w-[92%] max-w-[400px] h-[80vh] min-h-[520px] max-h-[780px] bg-white relative z-10 overflow-hidden rounded-[40px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] border border-white/40 flex flex-col transition-colors duration-1000">
 
-                {/* Scrollable Content Container */}
-                <div className="w-full flex flex-col pb-6">
-
+                {/* FIXED HEADER SECTION */}
+                <div className="w-full shrink-0 relative">
                     {/* Header: Immersive Category Visuals */}
                     <motion.div
                         animate={{ backgroundColor: activeCategory.theme }}
                         transition={{ duration: 1 }}
                         className="relative h-48 w-full overflow-hidden"
                     >
+                        {/* Fixed Top Branding Bar inside Header */}
+                        <div className="absolute top-8 left-0 w-full px-6 flex items-center justify-between z-50">
+                            <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 bg-black/20 backdrop-blur-xl rounded-xl flex items-center justify-center border border-white/30 shadow-sm">
+                                    <ShoppingBag size={20} className="text-white drop-shadow-sm" />
+                                </div>
+                                <span className="text-white font-black tracking-tighter text-xl drop-shadow-md">{appName.toUpperCase()}</span>
+                            </div>
+                        </div>
+
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={carouselIndex}
@@ -330,15 +345,6 @@ const CustomerAuth = () => {
                             </motion.div>
                         </AnimatePresence>
 
-                        {/* Top Branding Bar */}
-                        <div className="absolute top-8 left-0 w-full px-6 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 bg-white/20 backdrop-blur-xl rounded-xl flex items-center justify-center border border-white/30">
-                                    <ShoppingBag size={20} className="text-white" />
-                                </div>
-                                <span className="text-white font-black tracking-tighter text-xl">{appName.toUpperCase()}</span>
-                            </div>
-                        </div>
 
                         {/* Centered App Message */}
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 text-white pt-10">
@@ -392,10 +398,12 @@ const CustomerAuth = () => {
                             </AnimatePresence>
                         </div>
                     </div>
+                </div>
 
-
+                {/* SCROLLABLE FORM SECTION */}
+                <div className="flex-1 w-full overflow-y-auto custom-scrollbar flex flex-col">
                     {/* Authentication Form Block */}
-                    <div className="px-6 pt-6 pb-10">
+                    <div className="px-6 pt-2 pb-10">
                         <AnimatePresence mode="wait">
                             {!showOtp ? (
                                 <motion.div
@@ -451,10 +459,14 @@ const CustomerAuth = () => {
                                                 <input
                                                     required
                                                     name="name"
+                                                    value={formData.name || ""}
                                                     placeholder="Full Name"
                                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
                                                     style={{ '--theme-color': activeCategory.theme }}
-                                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                                                        setFormData({ ...formData, name: val });
+                                                    }}
                                                     onFocus={(e) => e.target.style.borderColor = activeCategory.theme}
                                                     onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
                                                 />

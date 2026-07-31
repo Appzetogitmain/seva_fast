@@ -95,6 +95,25 @@ export const createPlanOrder = async (req, res) => {
             referralCode,
         });
 
+        if (plan.price === 0) {
+            // It's a free plan, activate immediately
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + (plan.validityDays || 365));
+
+            await User.findByIdAndUpdate(userId, {
+                $set: {
+                    activePlan: plan._id,
+                    planExpiry: expiryDate
+                }
+            });
+
+            return handleResponse(res, 200, "Free plan activated successfully", {
+                success: true,
+                isFree: true,
+                orderId: `free_${Date.now()}`
+            });
+        }
+
         const razorpay = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID || "dummy_key",
             key_secret: process.env.RAZORPAY_KEY_SECRET || "dummy_secret"

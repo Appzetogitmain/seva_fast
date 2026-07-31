@@ -137,6 +137,17 @@ export async function issueCustomerOtp({
       err.code = "ACCOUNT_NOT_FOUND";
       throw err;
     }
+  } else if (flow === "signup") {
+    if (customer && customer.isVerified) {
+      otpAuditLog("customer_otp_signup_account_exists", {
+        phone: maskPhone(phone),
+        ipAddress,
+      });
+      const err = new Error("Account already exists, please login.");
+      err.statusCode = 409;
+      err.code = "ACCOUNT_EXISTS";
+      throw err;
+    }
   }
 
   if (flow === "signup" && customer?.isVerified) {
