@@ -15,6 +15,17 @@ const AppZetoBridge = {
   },
 
   /**
+   * Restore auth token from Flutter secure storage into WebView localStorage.
+   * Flutter should call this on WebView load via runJavaScript.
+   */
+  restoreAuth: (token, role = 'customer') => {
+    if (typeof window.SevaFastRestoreAuth === 'function') {
+      return window.SevaFastRestoreAuth(token, role);
+    }
+    return false;
+  },
+
+  /**
    * Send a message to Flutter
    * @param {string} action - Action name (open_camera, get_location, pick_file, get_fcm_token)
    */

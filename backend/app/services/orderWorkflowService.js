@@ -29,6 +29,10 @@ import { applyDeliveredSettlement } from "./orderSettlement.js";
 import { requireCanonicalOrderId } from "../utils/orderLookup.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
+import {
+  createShiprocketShipmentForOrder,
+  cancelShiprocketShipmentForOrder,
+} from "./shiprocket/shiprocketOrderService.js";
 
 const DELIVERY_SEARCH_MAX_ATTEMPTS = () =>
   parseInt(process.env.DELIVERY_SEARCH_MAX_ATTEMPTS || "3", 10);
@@ -316,6 +320,23 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
     sellerId: updated.seller?._id || updated.seller,
   });
 
+  // Scheduled (courier) only — instant orders use local riders, not Shiprocket.
+  if (isScheduled) {
+    setImmediate(async () => {
+      try {
+        await createShiprocketShipmentForOrder(updated._id);
+        console.log(
+          `[Shiprocket] Shipment created for scheduled order ${updated.orderId}`,
+        );
+      } catch (shiprocketErr) {
+        console.warn(
+          `[Shiprocket] Background create failed for order ${updated.orderId}:`,
+          shiprocketErr.message,
+        );
+      }
+    });
+  }
+
   return updated;
 }
 
@@ -371,6 +392,14 @@ export async function sellerRejectAtomic(sellerId, orderId) {
 
   await removeSellerTimeoutJob(orderId);
   await compensateOrderCancellation(order, orderId);
+
+  setImmediate(async () => {
+    try {
+      await cancelShiprocketShipmentForOrder(order._id);
+    } catch (cancelErr) {
+      console.warn(`[Shiprocket] Cancel shipment failed for rejected order ${orderId}:`, cancelErr.message);
+    }
+  });
 
   emitOrderStatusUpdate(
     order.orderId,

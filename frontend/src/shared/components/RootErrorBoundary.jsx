@@ -2,6 +2,7 @@ import React from 'react';
 import { useRouteError, useNavigate, isRouteErrorResponse } from 'react-router-dom';
 import { ShoppingBag, RefreshCw, Home, AlertCircle } from 'lucide-react';
 import { DEFAULT_SETTINGS } from '@core/context/SettingsDefaults';
+import ServiceUnavailableSection from './ServiceUnavailableSection';
 
 const RootErrorBoundary = () => {
     const error = useRouteError();
@@ -17,6 +18,22 @@ const RootErrorBoundary = () => {
         errorMessage = error.statusText || error.data?.message || errorMessage;
     } else if (error instanceof Error) {
         errorMessage = error.message;
+    }
+
+    const normalizedMessage = String(errorMessage || '').toLowerCase();
+    const isServiceUnavailable =
+        errorStatus === 503 ||
+        normalizedMessage.includes('service unavailable') ||
+        normalizedMessage.includes('failed to fetch') ||
+        normalizedMessage.includes('network error') ||
+        normalizedMessage.includes('load failed');
+
+    if (isServiceUnavailable) {
+        return (
+            <ServiceUnavailableSection
+                description="Our servers are currently unavailable. Please wait a bit and try again."
+            />
+        );
     }
 
     return (

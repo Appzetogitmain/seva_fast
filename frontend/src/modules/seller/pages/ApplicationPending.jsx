@@ -16,7 +16,7 @@ const ApplicationPending = () => {
   const applicationStatus =
     location.state?.applicationStatus ||
     user?.applicationStatus ||
-    (user?.isVerified ? "approved" : "pending");
+    null;
   const rejectionReason = location.state?.rejectionReason || user?.rejectionReason || "";
 
   if (!isLoading && isAuthenticated && role === "seller") {
@@ -31,6 +31,7 @@ const ApplicationPending = () => {
   }
 
   const isRejected = applicationStatus === "rejected";
+  const isStatusUnknown = !applicationStatus;
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden font-['Outfit']">
@@ -56,26 +57,29 @@ const ApplicationPending = () => {
               <span className="text-sm font-bold text-white/90">{appName} Seller</span>
             </div>
             <div
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest ${
-                isRejected
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest ${isRejected
                   ? "bg-rose-500/20 text-rose-200"
                   : "bg-amber-400/20 text-amber-100"
-              }`}
+                }`}
             >
               {isRejected ? <ShieldAlert className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
-              {isRejected ? "Application Rejected" : "Application Pending"}
+              {isRejected ? "Application Rejected" : isStatusUnknown ? "Status Unavailable" : "Application Pending"}
             </div>
           </div>
 
           <h1 className="text-3xl md:text-4xl font-black text-white leading-tight">
             {isRejected
               ? "Your seller application needs action."
-              : "Your seller application is under review."}
+              : isStatusUnknown
+                ? "We could not verify your seller status right now."
+                : "Your seller application is under review."}
           </h1>
           <p className="mt-4 text-base md:text-lg text-slate-200/90 font-medium max-w-2xl">
             {isRejected
               ? "You cannot access the seller dashboard yet. Please contact admin support and re-submit with the required details."
-              : "Dashboard access unlocks automatically once admin approves your account."}
+              : isStatusUnknown
+                ? "This can happen during a temporary network issue. Please reconnect and try signing in again."
+                : "Dashboard access unlocks automatically once admin approves your account."}
           </p>
 
           {rejectionReason ? (
@@ -85,8 +89,8 @@ const ApplicationPending = () => {
             </div>
           ) : null}
 
-          {!isRejected ? (
-            <div className="mt-6 rounded-2xl border border-brand-400/30 bg-brand-500/10 px-4 py-3 text-sm text-brand-200 flex items-start gap-3">
+          {!isRejected && !isStatusUnknown ? (
+            <div className="mt-6 rounded-2xl border border-brand-400/30 bg-brand-500/10 px-4 py-3 text-sm text-slate-100 flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0 text-brand-400" />
               <p className="font-semibold">
                 Approval usually takes less than 24 hours. You can return to login and try again later.

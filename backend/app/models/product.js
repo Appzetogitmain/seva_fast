@@ -51,6 +51,22 @@ const productSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+        // Package dims (cm) — required when deliveryType is "scheduled" for Shiprocket
+        packageLength: {
+            type: Number,
+            min: 0,
+            default: null,
+        },
+        packageBreadth: {
+            type: Number,
+            min: 0,
+            default: null,
+        },
+        packageHeight: {
+            type: Number,
+            min: 0,
+            default: null,
+        },
         tags: [{
             type: String,
             trim: true,

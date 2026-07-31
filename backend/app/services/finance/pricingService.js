@@ -109,6 +109,23 @@ function normalizeLinePrice(value) {
   return Number.isFinite(amount) ? clampMoney(amount, 0) : 0;
 }
 
+function getSellerCategoryOverridePercent(sellerConfig, headerCategoryId) {
+  if (!sellerConfig?.categoryCommissionOverrides || !headerCategoryId) return null;
+  const key = String(headerCategoryId);
+  const source = sellerConfig.categoryCommissionOverrides;
+
+  let raw;
+  if (typeof source.get === "function") {
+    raw = source.get(key);
+  } else if (typeof source === "object") {
+    raw = source[key];
+  }
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return null;
+  return value;
+}
+
 function resolveCommissionConfig(category) {
   if (!category) {
     return {
@@ -427,7 +444,7 @@ export async function hydrateOrderItems(
     .filter(Boolean);
 
   const productQuery = Product.find({ _id: { $in: productIds } })
-    .select("_id name salePrice price mainImage headerId sellerId status approvalStatus variants deliveryType weight")
+    .select("_id name salePrice price mainImage headerId sellerId status approvalStatus variants deliveryType weight packageLength packageBreadth packageHeight")
     .lean();
   if (session) productQuery.session(session);
   const products = await productQuery;
@@ -485,6 +502,9 @@ export async function hydrateOrderItems(
       variantName: resolvedVariant ? String(resolvedVariant?.name || "").trim() : "",
       deliveryType: product.deliveryType || "instant",
       weight: product.weight || "",
+      packageLength: product.packageLength ?? null,
+      packageBreadth: product.packageBreadth ?? null,
+      packageHeight: product.packageHeight ?? null,
     };
   });
 }
@@ -615,30 +635,67 @@ export async function generateOrderPaymentBreakdown({
   // Compute splits
   const isExempt = sellerConfig?.commissionModel === "ONE_TIME" && sellerConfig?.oneTimeChargePaid;
 
-  const categoryConfig = normalizedItems.length > 0 && normalizedItems[0].headerCategoryId
-    ? categoryById.get(String(normalizedItems[0].headerCategoryId))
-    : null;
+  const lineItems = normalizedItems.map((item) => {
+    const category = categoryById.get(String(item.headerCategoryId));
+    const itemSubtotal = roundCurrency(item.price * item.quantity);
+    
+    const itemShippingProportion = productSubtotal > 0 ? (itemSubtotal / productSubtotal) * shippingChargeToDeduct : 0;
+    const itemCommissionBase = Math.max(itemSubtotal - itemShippingProportion, 0);
 
-  const categoryCommissionVal = categoryConfig
-    ? (categoryConfig.adminCommissionValue ?? categoryConfig.adminCommission ?? 0)
-    : 0;
+    const categoryCommissionVal = category
+      ? Number(category.adminCommissionValue ?? category.adminCommission ?? 0)
+      : 0;
+    const overridePercent = getSellerCategoryOverridePercent(
+      sellerConfig,
+      item.headerCategoryId,
+    );
+    const appliedPercent =
+      overridePercent !== null
+        ? overridePercent
+        : categoryCommissionVal > 0
+          ? categoryCommissionVal
+          : Number(effectiveSettings.adminCommissionPercent ?? 0);
 
-  const adminCommPercent = categoryCommissionVal > 0
-    ? categoryCommissionVal
-    : (effectiveSettings.adminCommissionPercent ?? 0);
+    const itemCommission = isExempt
+      ? 0
+      : roundCurrency((itemCommissionBase * appliedPercent) / 100);
+    const itemSellerPayout = Math.max(itemSubtotal - itemCommission, 0);
+
+    return {
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.price,
+      itemSubtotal,
+      sellerPayout: itemSellerPayout,
+      adminProductCommission: itemCommission,
+      headerCategoryId: item.headerCategoryId,
+      headerCategoryName: category?.name || "Unknown",
+      appliedCommissionType: isExempt
+        ? "one_time_exempt"
+        : overridePercent !== null
+          ? "seller_category_override"
+          : "global_slab",
+      appliedCommissionValue: isExempt ? 0 : appliedPercent,
+      appliedCommissionFixedRule: "percentage",
+    };
+  });
 
   // IMPORTANT:
   // Seller payout should be reduced only by seller/category commission.
   // Platform allocation percentages (technical/sub-admin/site cashback/etc.)
   // are internal splits and must not be additionally deducted from seller.
-  const totalCommissionPercent = isExempt ? 0 : adminCommPercent;
   const totalCommissionAmount = roundCurrency(
-    (commissionBase * totalCommissionPercent) / 100,
+    lineItems.reduce((sum, line) => sum + Number(line.adminProductCommission || 0), 0),
   );
+  const adminCommPercent =
+    commissionBase > 0
+      ? roundCurrency((totalCommissionAmount * 100) / commissionBase)
+      : 0;
 
   const commissionBreakdown = {
     adminCommissionPercent: adminCommPercent,
-    adminCommissionAmount: isExempt ? 0 : roundCurrency((commissionBase * adminCommPercent) / 100),
+    adminCommissionAmount: totalCommissionAmount,
     
     technicalChargePercent: effectiveSettings.technicalChargePercent ?? 0,
     technicalChargeAmount: isExempt ? 0 : roundCurrency((commissionBase * (effectiveSettings.technicalChargePercent ?? 0)) / 100),
@@ -671,31 +728,6 @@ export async function generateOrderPaymentBreakdown({
     commissionBaseAmount: commissionBase,
     shippingDeductedAmount: shippingChargeToDeduct,
   };
-
-  const lineItems = normalizedItems.map((item) => {
-    const category = categoryById.get(String(item.headerCategoryId));
-    const itemSubtotal = roundCurrency(item.price * item.quantity);
-    
-    const itemShippingProportion = productSubtotal > 0 ? (itemSubtotal / productSubtotal) * shippingChargeToDeduct : 0;
-    const itemCommissionBase = Math.max(itemSubtotal - itemShippingProportion, 0);
-    const itemCommission = isExempt ? 0 : roundCurrency((itemCommissionBase * totalCommissionPercent) / 100);
-    const itemSellerPayout = Math.max(itemSubtotal - itemCommission, 0);
-
-    return {
-      productId: item.productId,
-      productName: item.productName,
-      quantity: item.quantity,
-      unitPrice: item.price,
-      itemSubtotal,
-      sellerPayout: itemSellerPayout,
-      adminProductCommission: itemCommission,
-      headerCategoryId: item.headerCategoryId,
-      headerCategoryName: category?.name || "Unknown",
-      appliedCommissionType: isExempt ? "one_time_exempt" : "global_slab",
-      appliedCommissionValue: isExempt ? 0 : totalCommissionPercent,
-      appliedCommissionFixedRule: "percentage",
-    };
-  });
 
   let handling = calculateHandlingFee(normalizedItems, {
     handlingFeeStrategy: effectiveHandlingStrategy,

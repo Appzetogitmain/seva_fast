@@ -21,6 +21,7 @@ import {
   HiOutlineFolderOpen,
   HiOutlineSwatch,
   HiOutlineSquaresPlus,
+  HiOutlineCloudArrowUp,
 } from "react-icons/hi2";
 import Modal from "@shared/components/ui/Modal";
 import { cn } from "@/lib/utils";
@@ -212,6 +213,9 @@ const ProductManagement = () => {
     weight: "",
     weightVal: "",
     weightUnit: "kg",
+    packageLength: "",
+    packageBreadth: "",
+    packageHeight: "",
     deliveryType: "instant",
     brand: "",
     mainImage: null,
@@ -351,6 +355,17 @@ const ProductManagement = () => {
           toast.error("Please provide a valid product weight for scheduled nationwide delivery.");
           return;
         }
+        const length = parseFloat(formData.packageLength);
+        const breadth = parseFloat(formData.packageBreadth);
+        const height = parseFloat(formData.packageHeight);
+        if (
+          !formData.packageLength || !formData.packageBreadth || !formData.packageHeight ||
+          Number.isNaN(length) || Number.isNaN(breadth) || Number.isNaN(height) ||
+          length <= 0 || breadth <= 0 || height <= 0
+        ) {
+          toast.error("Please provide package length, breadth and height (cm) for Shiprocket shipping.");
+          return;
+        }
       }
 
       const data = new FormData();
@@ -368,6 +383,11 @@ const ProductManagement = () => {
       data.append("brand", formData.brand);
       data.append("weight", formData.weight);
       data.append("deliveryType", formData.deliveryType || "instant");
+      if (formData.deliveryType === "scheduled") {
+        data.append("packageLength", formData.packageLength);
+        data.append("packageBreadth", formData.packageBreadth);
+        data.append("packageHeight", formData.packageHeight);
+      }
       data.append("tags", formData.tags);
       data.append("variants", JSON.stringify(formData.variants));
 
@@ -468,6 +488,9 @@ const ProductManagement = () => {
         weight: item.weight || "",
         weightVal: Number.isFinite(parseFloat(String(item.weight || "").replace(/[^\d.]/g, ""))) ? String(parseFloat(String(item.weight || "").replace(/[^\d.]/g, ""))) : "",
         weightUnit: (String(item.weight || "").toLowerCase().includes("gm") || String(item.weight || "").toLowerCase().includes("gram")) ? "gm" : "kg",
+        packageLength: item.packageLength != null && item.packageLength !== "" ? String(item.packageLength) : "",
+        packageBreadth: item.packageBreadth != null && item.packageBreadth !== "" ? String(item.packageBreadth) : "",
+        packageHeight: item.packageHeight != null && item.packageHeight !== "" ? String(item.packageHeight) : "",
         deliveryType: item.deliveryType || "instant",
         brand: item.brand || "",
         mainImage: item.mainImage || null,
@@ -501,6 +524,9 @@ const ProductManagement = () => {
         weight: "",
         weightVal: "",
         weightUnit: "kg",
+        packageLength: "",
+        packageBreadth: "",
+        packageHeight: "",
         deliveryType: "instant",
         brand: "",
         mainImage: null,
@@ -539,12 +565,20 @@ const ProductManagement = () => {
             Track your items, prices, and how many are left in stock.
           </p>
         </div>
-        <button
-          onClick={() => navigate("/seller/products/add")}
-          className="flex items-center gap-2 bg-black  text-primary-foreground px-4 py-2 rounded-lg hover:bg-brand-700 transition-colors">
-          <HiOutlinePlus className="h-5 w-5" />
-          Add New Product
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => navigate("/seller/products/bulk")}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors">
+            <HiOutlineCloudArrowUp className="h-5 w-5" />
+            Bulk Upload
+          </button>
+          <button
+            onClick={() => navigate("/seller/products/add")}
+            className="flex items-center gap-2 bg-black  text-primary-foreground px-4 py-2 rounded-lg hover:bg-brand-700 transition-colors">
+            <HiOutlinePlus className="h-5 w-5" />
+            Add New Product
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1185,6 +1219,61 @@ const ProductManagement = () => {
                           </div>
                         </div>
                       </div>
+
+                      {formData.deliveryType === "scheduled" && (
+                        <div className="space-y-2 pt-2">
+                          <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                            Package Size (cm) <span className="text-rose-500">*</span>
+                          </label>
+                          <p className="text-[11px] text-slate-500 font-medium ml-1">
+                            Required for Shiprocket delivery rate &amp; AWB calculation.
+                          </p>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-1 flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Length</span>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={formData.packageLength || ""}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, packageLength: e.target.value })
+                                }
+                                className="w-full px-3 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/5"
+                                placeholder="cm"
+                              />
+                            </div>
+                            <div className="space-y-1 flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Breadth</span>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={formData.packageBreadth || ""}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, packageBreadth: e.target.value })
+                                }
+                                className="w-full px-3 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/5"
+                                placeholder="cm"
+                              />
+                            </div>
+                            <div className="space-y-1 flex flex-col">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Height</span>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={formData.packageHeight || ""}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, packageHeight: e.target.value })
+                                }
+                                className="w-full px-3 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/5"
+                                placeholder="cm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {/* Additional tabs populated as needed */}

@@ -5,9 +5,12 @@ import Lottie from "lottie-react";
 import LocationDrawer from "./LocationDrawer";
 import { useLocation } from "../../context/LocationContext";
 import { useProductDetail } from "../../context/ProductDetailContext";
+import { useCart } from "../../context/CartContext";
 import { useSettings } from "@core/context/SettingsContext";
+import { useAuth } from "@core/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
+import { isBirthdayToday } from "@shared/utils/birthdayUtils";
 import {
   buildHeaderGradient,
   buildMiniCartColor,
@@ -163,6 +166,9 @@ const MainLocationHeader = ({
     useLocation();
   const { isOpen: isProductDetailOpen } = useProductDetail();
   const { settings } = useSettings();
+  const { user, isAuthenticated } = useAuth();
+  const isBirthday =
+    isAuthenticated && !!user?.dateOfBirth && isBirthdayToday(user.dateOfBirth);
   const appName = settings?.appName || "App";
   const logoUrl = settings?.logoUrl || LogoImage;
   const navigate = useNavigate();
@@ -302,7 +308,8 @@ const MainLocationHeader = ({
     <>
       <div
         className={cn(
-          "fixed top-0 left-0 right-0 z-200",
+          "fixed left-0 right-0 z-200",
+          isBirthday ? "top-9" : "top-0",
           isProductDetailOpen && "hidden md:block",
         )}>
         <motion.div
@@ -315,7 +322,7 @@ const MainLocationHeader = ({
             opacity: bgOpacity,
             backgroundImage: headerGradient,
           }}
-          className="px-4 shadow-[0_4px_20px_rgba(0,0,0,0.15)] overflow-hidden transform-gpu will-change-transform">
+          className="px-4 shadow-[0_4px_20px_rgba(0,0,0,0.15)] overflow-hidden transform-gpu will-change-transform relative">
           {/* Subtle Glow Overlay */}
           <div className="absolute inset-0 bg-white/8 pointer-events-none" />
 

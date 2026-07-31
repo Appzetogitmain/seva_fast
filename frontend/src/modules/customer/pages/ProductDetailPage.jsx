@@ -10,8 +10,8 @@ import { customerApi } from '../services/customerApi';
 import { useLocation as useAppLocation } from '../context/LocationContext';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 import { useSettings } from '@core/context/SettingsContext';
-import Lottie from 'lottie-react';
 import { formatDate } from '@shared/utils/formatDate';
+import ServiceUnavailableSection from '@shared/components/ServiceUnavailableSection';
 
 const ProductDetailPage = () => {
     const { id } = useParams();
@@ -28,14 +28,6 @@ const ProductDetailPage = () => {
     const [activeImage, setActiveImage] = useState('');
     const [reviews, setReviews] = useState([]);
     const [reviewLoading, setReviewLoading] = useState(false);
-    const [noServiceData, setNoServiceData] = useState(null);
-
-    // Dynamically load no-service Lottie on mount
-    useEffect(() => {
-        import('@/assets/lottie/animation.json')
-            .then((m) => setNoServiceData(m.default))
-            .catch(() => {});
-    }, []);
 
     const fetchData = async (showLoader = true) => {
         if (showLoader) setIsLoading(true);
@@ -137,37 +129,19 @@ const ProductDetailPage = () => {
 
     if (error || !product) {
         return (
-            <div className="min-h-screen bg-white py-20 px-8 flex flex-col items-center justify-center text-center">
-                <div className="w-64 h-64 mb-6">
-                    {noServiceData ? (
-                        <Lottie animationData={noServiceData} loop={true} />
-                    ) : (
-                        <div className="w-64 h-64" />
-                    )}
-                </div>
-                <h3 className="text-3xl font-[1000] text-slate-800 tracking-tighter mb-4 uppercase">
-                    Item <span className="text-primary">Unavailable</span>
-                </h3>
-                <p className="text-slate-500 font-bold text-sm max-w-[280px] mb-8 leading-relaxed">
-                    {error === "Product not available in your area" 
-                        ? "This item is not available at your current location yet." 
-                        : "We couldn't load this product details. Try again later!"}
-                </p>
-                <div className="flex flex-col gap-3 w-full max-w-xs">
-                    <button 
-                        onClick={() => navigate('/')}
-                        className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl shadow-black/10"
-                    >
-                        Go to Home
-                    </button>
-                    <button 
-                        onClick={() => navigate(-1)}
-                        className="px-10 py-4 bg-white text-slate-900 border border-slate-200 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-50 active:scale-95 transition-all"
-                    >
-                        Go Back
-                    </button>
-                </div>
-            </div>
+            <ServiceUnavailableSection
+                embedded
+                title="Item"
+                description={
+                    error === 'Product not available in your area'
+                        ? 'This item is not available at your current location yet.'
+                        : "We couldn't load this product details. Try again later!"
+                }
+                buttonLabel="Go to Home"
+                onRetry={() => navigate('/')}
+                secondaryButtonLabel="Go Back"
+                onSecondaryClick={() => navigate(-1)}
+            />
         );
     }
 

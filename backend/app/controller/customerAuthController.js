@@ -14,9 +14,11 @@ import {
     sendSignupOtpSchema,
     validateSchema,
     verifyOtpSchema,
+    updateCustomerProfileSchema,
 } from "../validation/customerAuthValidation.js";
 import { recordAuthActivity } from "../services/authActivityService.js";
 import { ensurePlanSubscriptionsSynced } from "../services/planSubscriptionService.js";
+import { applyDateOfBirthToCustomer } from "../utils/customerDob.js";
 
 const CUSTOMER_REFERRED_BY_FIELDS = "name phone referralCode role";
 
@@ -95,6 +97,11 @@ export const verifyCustomerOTP = async (req, res) => {
             otp: payload.otp,
             ipAddress: req.ip,
         });
+
+        if (payload.dateOfBirth !== undefined) {
+            applyDateOfBirthToCustomer(customer, payload.dateOfBirth);
+            await customer.save();
+        }
         await customer.populate("currentPlan");
         await customer.populate("planSubscriptions.plan");
         await customer.populate("referredBy", CUSTOMER_REFERRED_BY_FIELDS);
@@ -286,16 +293,19 @@ export const getCustomerReferralTree = async (req, res) => {
 ================================ */
 export const updateCustomerProfile = async (req, res) => {
     try {
-        const { name, email, addresses } = req.body;
+        const payload = validateSchema(updateCustomerProfileSchema, req.body || {});
 
         const customer = await Customer.findById(req.user.id);
         if (!customer) {
             return handleResponse(res, 404, "Customer not found");
         }
 
-        if (name) customer.name = name;
-        if (email) customer.email = email;
-        if (addresses) customer.addresses = addresses;
+        if (payload.name) customer.name = payload.name;
+        if (payload.email !== undefined) customer.email = payload.email || undefined;
+        if (payload.addresses) customer.addresses = payload.addresses;
+        if (payload.dateOfBirth !== undefined) {
+            applyDateOfBirthToCustomer(customer, payload.dateOfBirth);
+        }
 
         await customer.save();
 
@@ -303,7 +313,7 @@ export const updateCustomerProfile = async (req, res) => {
 
         return handleResponse(res, 200, "Profile updated successfully", updatedCustomer);
     } catch (error) {
-        return handleResponse(res, 500, error.message);
+        return handleResponse(res, error.statusCode || 500, error.message);
     }
 };
 

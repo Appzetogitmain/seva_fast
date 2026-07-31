@@ -1,5 +1,5 @@
 import React from 'react';
-import { Facebook, Twitter, Instagram, Youtube, Mail, MapPin, Phone } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Youtube, Mail, Phone } from 'lucide-react';
 import Logo from '@/assets/Logo.png';
 import { useSettings } from '@core/context/SettingsContext';
 import { Link } from 'react-router-dom';
@@ -53,6 +53,7 @@ const Footer = () => {
                             <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>About Us</a></li>
                             <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Shop</a></li>
                             <li><Link to="/professionals" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Services near you</Link></li>
+                            <li><Link to="/seller/auth?mode=signup" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Become a Seller</Link></li>
                             <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Blogs</a></li>
                             <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Contact</a></li>
                         </ul>
@@ -78,20 +79,15 @@ const Footer = () => {
                             <span className="h-1 w-4 hidden md:block" style={{ backgroundColor: primaryColor }}></span> Contact Us
                         </h3>
                         <ul className="space-y-4 md:space-y-6">
-                            <li className="flex items-start gap-3 md:gap-5 group">
-                                <div className="hidden md:flex h-12 w-12 rounded-xl bg-white/10 items-center justify-center text-white transition-all shrink-0 group-hover:opacity-90"><MapPin size={22} /></div>
-                                <MapPin className="mt-1 shrink-0 md:hidden" size={18} style={{ color: primaryColor }} />
-                                <span className="md:text-base text-white md:pt-1 font-medium">{settings?.address || '—'}</span>
-                            </li>
                             <li className="flex items-center gap-3 md:gap-5 group">
                                 <div className="hidden md:flex h-12 w-12 rounded-xl bg-white/10 items-center justify-center text-white transition-all shrink-0 group-hover:opacity-90"><Phone size={22} /></div>
                                 <Phone className="shrink-0 md:hidden" size={18} style={{ color: primaryColor }} />
-                                <span className="md:text-base text-white font-medium">{settings?.supportPhone || '—'}</span>
+                                <span className="md:text-base text-white font-medium">9960827288</span>
                             </li>
                             <li className="flex items-center gap-3 md:gap-5 group">
                                 <div className="hidden md:flex h-12 w-12 rounded-xl bg-white/10 items-center justify-center text-white transition-all shrink-0 group-hover:opacity-90"><Mail size={22} /></div>
                                 <Mail className="shrink-0 md:hidden" size={18} style={{ color: primaryColor }} />
-                                <span className="md:text-base text-white font-medium">{settings?.supportEmail || '—'}</span>
+                                <span className="md:text-base text-white font-medium">mahaesevas@gmail.com</span>
                             </li>
                         </ul>
                     </div>

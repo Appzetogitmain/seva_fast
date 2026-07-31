@@ -83,8 +83,30 @@ async function persistTransaction(record, session) {
   return doc;
 }
 
+import { extractIndianPincode, parseCityStatePincode } from "../utils/pincode.js";
+
 function normalizeAddress(address = {}) {
   const normalized = { ...(address || {}) };
+  const parsedCity = parseCityStatePincode(normalized.city);
+
+  if (!normalized.pincode) {
+    normalized.pincode =
+      extractIndianPincode(normalized.address, normalized.landmark, normalized.city) ||
+      parsedCity.pincode;
+  } else {
+    normalized.pincode = String(normalized.pincode).trim();
+  }
+  if (!normalized.state && parsedCity.state) {
+    normalized.state = parsedCity.state;
+  }
+  if (normalized.state != null) {
+    normalized.state = String(normalized.state).trim();
+  }
+  if (parsedCity.city && String(normalized.city || "").includes(",")) {
+    normalized.city = parsedCity.city;
+  } else if (normalized.city != null) {
+    normalized.city = String(normalized.city).trim();
+  }
   if (address?.location) {
     const lat = Number(address.location.lat);
     const lng = Number(address.location.lng);
@@ -105,6 +127,16 @@ function mapOrderItemsForPersistence(hydratedItems = []) {
     price: item.price,
     variantSlot: String(item.variantSku || item.variantSlot || "").trim() || undefined,
     image: item.image || "",
+    weight: item.weight || "",
+    packageLength: Number.isFinite(Number(item.packageLength))
+      ? Number(item.packageLength)
+      : undefined,
+    packageBreadth: Number.isFinite(Number(item.packageBreadth))
+      ? Number(item.packageBreadth)
+      : undefined,
+    packageHeight: Number.isFinite(Number(item.packageHeight))
+      ? Number(item.packageHeight)
+      : undefined,
   }));
 }
 

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Lottie from 'lottie-react';
 import { useCart } from '../context/CartContext';
+import { useSettings } from '@core/context/SettingsContext';
 import {
     Minus,
     Plus,
@@ -18,8 +19,16 @@ import { cartItemUnitPrice } from '../utils/productPricing';
 
 const CartPage = () => {
     const { cart, removeFromCart, updateQuantity, cartTotal, clearCart } = useCart();
+    const { settings } = useSettings();
     const { showToast } = useToast();
     const itemCount = cart.reduce((count, item) => count + item.quantity, 0);
+    const minimumOrderValue = Number(settings?.minimumOrderValue || 0);
+    const minimumOrderShortfall = useMemo(
+        () => (minimumOrderValue > 0 ? Math.max(0, minimumOrderValue - cartTotal) : 0),
+        [minimumOrderValue, cartTotal],
+    );
+    const isBelowMinimumOrder =
+        minimumOrderValue > 0 && cartTotal < minimumOrderValue;
     const [emptyBoxData, setEmptyBoxData] = useState(null);
 
     // Dynamically load empty-box Lottie when cart is empty
@@ -192,11 +201,26 @@ const CartPage = () => {
                                         </div>
                                     </div>
 
-                                    <Link to="/checkout" className="block">
-                                        <Button className="h-14 w-full rounded-full bg-brand-400 text-slate-950 hover:bg-brand-300 text-base font-black flex items-center justify-center gap-2 shadow-[0_18px_35px_rgba(16,185,129,0.3)] transition-all">
-                                            Place Order <ArrowRight size={18} />
-                                        </Button>
-                                    </Link>
+                                    {isBelowMinimumOrder ? (
+                                        <div className="space-y-3">
+                                            <Button
+                                                disabled
+                                                className="h-14 w-full rounded-full bg-white/20 text-white/70 text-base font-black flex items-center justify-center gap-2 cursor-not-allowed"
+                                            >
+                                                Place Order <ArrowRight size={18} />
+                                            </Button>
+                                            <p className="rounded-2xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-center text-sm font-semibold text-amber-100">
+                                                Minimum order value is ₹{minimumOrderValue}. Add ₹
+                                                {Math.ceil(minimumOrderShortfall)} more to checkout.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <Link to="/checkout" className="block">
+                                            <Button className="h-14 w-full rounded-full bg-brand-400 text-slate-950 hover:bg-brand-300 text-base font-black flex items-center justify-center gap-2 shadow-[0_18px_35px_rgba(16,185,129,0.3)] transition-all">
+                                                Place Order <ArrowRight size={18} />
+                                            </Button>
+                                        </Link>
+                                    )}
 
                                     <div className="grid grid-cols-2 gap-3 text-xs font-bold uppercase tracking-[0.16em] text-white/55">
                                         <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3">

@@ -58,6 +58,7 @@ const DeliveryModule = lazy(() => import('../../modules/delivery/routes/index'))
 import CustomerLayout from '../../modules/customer/components/layout/CustomerLayout';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
+import ServiceUnavailableSection from '../../shared/components/ServiceUnavailableSection';
 
 const PlanEnforcer = ({ children }) => {
     const { user, isAuthenticated } = useAuth();
@@ -201,6 +202,14 @@ const router = createBrowserRouter([
                 {
                     path: 'unauthorized',
                     element: <div className="flex h-screen items-center justify-center font-outfit">Unauthorized Access</div>,
+                },
+                {
+                    path: 'service-unavailable',
+                    element: (
+                        <ServiceUnavailableSection
+                            description="Our service is temporarily down for maintenance. Please check back shortly."
+                        />
+                    ),
                 },
                 {
                     element: <CustomerLayoutWrapper />,

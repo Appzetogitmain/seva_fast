@@ -44,6 +44,8 @@ export const DEFAULT_SETTINGS = {
   deliveryPartnerRatePerKm: 5,
   fleetCommissionRatePerKm: 5,
   fixedDeliveryFee: 30,
+  minimumOrderValue: 0,
+  freeDeliveryThreshold: 0,
   handlingFeeStrategy: "highest_category_fee",
   codEnabled: true,
   onlineEnabled: true,

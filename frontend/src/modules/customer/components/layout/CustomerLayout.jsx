@@ -5,6 +5,7 @@ import BottomNav from './BottomNav';
 import MiniCart from '../shared/MiniCart';
 import ProductDetailSheet from '../shared/ProductDetailSheet';
 import MobileFooterMessage from './MobileFooterMessage';
+import BirthdayHeaderCelebration from '../shared/BirthdayHeaderCelebration';
 import { useProductDetail } from '../../context/ProductDetailContext';
 import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
@@ -12,11 +13,13 @@ import { useAuth } from '@core/context/AuthContext';
 import { onReturnPickupOtp, onReturnDropOtp } from '@core/services/orderSocket';
 import { toast } from 'sonner';
 import { ShieldCheck, Package } from 'lucide-react';
+import { isBirthdayToday } from '@shared/utils/birthdayUtils';
 
 const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = false, showCart: showCartProp, showBottomNav: showBottomNavProp }) => {
     const location = useLocation();
     const { isOpen: isProductDetailOpen } = useProductDetail();
     const { user, token } = useAuth();
+    const isBirthday = !!user?.dateOfBirth && isBirthdayToday(user.dateOfBirth);
 
     // Listen for Return OTPs (Real-time Alert for Customer)
     useEffect(() => {
@@ -99,7 +102,8 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
     const finalShowFooterMessageMobile = showFooterMessage && !isProductDetailOpen;
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+        <div className={cn("min-h-screen bg-slate-50 flex flex-col font-sans", isBirthday && "pt-9")}>
+            <BirthdayHeaderCelebration variant="global" />
             {/* Header logic: Always show on desktop if showHeader is true. On mobile, hide if product detail is open. */}
             {showHeader && (
                 <>

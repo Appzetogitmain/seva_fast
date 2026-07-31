@@ -4,6 +4,30 @@ import {
   formatSellerApplication,
   formatSellerDocuments,
 } from "./shared/sellerAdminUtils.js";
+import { registerOrUpdateSellerPickupLocation } from "../shiprocket/shiprocketOrderService.js";
+import { generateSellerCertificatePdf } from "../sellerCertificateService.js";
+import { sendSellerApprovalEmail } from "../emailService.js";
+import logger from "../logger.js";
+
+function buildSellerCode() {
+  const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `SV-${randomCode}`;
+}
+
+async function ensureSellerCodeForCertificate(seller) {
+  if (seller?.sellerCode) {
+    return seller;
+  }
+
+  const sellerCode = buildSellerCode();
+  const updatedSeller = await Seller.findByIdAndUpdate(
+    seller._id,
+    { $set: { sellerCode } },
+    { new: true },
+  );
+
+  return updatedSeller || { ...seller.toObject?.() ?? seller, sellerCode };
+}
 
 export async function getPendingSellerApplications({
   q = "",
@@ -123,6 +147,41 @@ export async function approveSellerApplicationById({ sellerId, reviewedBy }) {
   if (!seller) {
     return null;
   }
+
+  // Multi-vendor: register this seller's shop as a Shiprocket pickup location
+  setImmediate(() => {
+    registerOrUpdateSellerPickupLocation(seller).catch((err) => {
+      console.warn(
+        `[SellerApprove] Shiprocket pickup sync failed for ${seller._id}:`,
+        err.message,
+      );
+    });
+  });
+
+  // Send approval email + filled Authorized Seller Certificate (non-blocking)
+  setImmediate(() => {
+    (async () => {
+      const sellerForCertificate = await ensureSellerCodeForCertificate(seller);
+      const certificate = await generateSellerCertificatePdf(sellerForCertificate);
+      await sendSellerApprovalEmail({
+        email: sellerForCertificate.email,
+        sellerName: sellerForCertificate.name,
+        shopName: sellerForCertificate.shopName,
+        sellerId: sellerForCertificate.sellerCode || String(sellerForCertificate._id),
+        mobile: sellerForCertificate.phone,
+        certificateNo: certificate.certificateNo,
+        issueDate: certificate.issueDate,
+        certificatePdf: certificate.buffer,
+        certificateFilename: certificate.filename,
+      });
+    })().catch((err) => {
+      logger.warn("Seller approval email/certificate failed", {
+        sellerId: String(seller._id),
+        email: seller.email,
+        error: err?.message || String(err),
+      });
+    });
+  });
 
   return formatSellerApplication(seller);
 }

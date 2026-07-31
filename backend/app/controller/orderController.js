@@ -45,7 +45,7 @@ import { sanitizeOrderForSellerView } from "../utils/sellerOrderView.js";
 import { createFinanceOrderSchema } from "../validation/financeValidation.js";
 import { placeOrderAtomic } from "../services/orderPlacementService.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
-import { createShiprocketOrder, cancelShiprocketOrder } from "../services/shiprocketService.js";
+import { cancelShiprocketShipmentForOrder } from "../services/shiprocket/shiprocketOrderService.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import {
   emitDeliveryBroadcastForSeller,
@@ -992,27 +992,8 @@ export const updateOrderStatus = async (req, res) => {
 
     const oldStatus = order.status;
     if (nextStatus) {
-      if (nextStatus === "packed" && order.deliveryType === "scheduled") {
-        try {
-          const populatedOrder = await Order.findById(order._id)
-            .populate("customer", "name phone email")
-            .populate("seller", "shopName address name location");
-          
-          const shipment = await createShiprocketOrder(populatedOrder);
-          if (shipment && shipment.success) {
-            order.shipmentDetails = {
-              shipmentId: shipment.shipment_id,
-              awbCode: shipment.awb_code,
-              courierName: shipment.courier_name,
-              status: shipment.status,
-              createdAt: new Date(),
-            };
-          }
-        } catch (shiprocketError) {
-          console.error("[SHIPROCKET_ERROR] Failed to create shipment:", shiprocketError);
-          return handleResponse(res, 400, `Shiprocket Shipment Creation Failed: ${shiprocketError.message}`);
-        }
-      }
+      // Shiprocket create runs on seller accept for scheduled orders (see orderWorkflowService).
+      // Do not create again on packed — avoids double Shiprocket orders in multi-vendor flow.
       order.status = nextStatus;
       order.orderStatus = nextStatus;
       if (order.workflowVersion >= 2) {
@@ -1142,9 +1123,9 @@ export const updateOrderStatus = async (req, res) => {
 
     // Handle Cancellation (Stock Reversal & Transaction Update)
     if (nextStatus === "cancelled" && oldStatus !== "cancelled") {
-      if (order.deliveryType === "scheduled" && order.shipmentDetails?.shipmentId) {
+      if (order.deliveryType === "scheduled" && order.shipmentDetails?.shiprocketOrderId) {
         try {
-          await cancelShiprocketOrder(order.orderId);
+          await cancelShiprocketShipmentForOrder(order._id);
         } catch (cancelErr) {
           console.warn("[SHIPROCKET_CANCEL_ERROR] Failed to cancel shipment:", cancelErr.message);
         }

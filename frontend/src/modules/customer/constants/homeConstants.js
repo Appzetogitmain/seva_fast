@@ -21,9 +21,17 @@ import LocalGroceryStoreIcon from "@mui/icons-material/LocalGroceryStore";
 
 export const MARQUEE_MESSAGES = [
   "24/7 Delivery",
-  "Minimum Order ₹99",
   "Save Big on Essentials!",
 ];
+
+export function buildMarqueeMessages(minimumOrderValue = 0) {
+  const messages = [...MARQUEE_MESSAGES];
+  const minValue = Number(minimumOrderValue || 0);
+  if (minValue > 0) {
+    messages.splice(1, 0, `Minimum Order ₹${minValue}`);
+  }
+  return messages;
+}
 
 export const ICON_COMPONENTS = {
   electronics: DevicesIcon,

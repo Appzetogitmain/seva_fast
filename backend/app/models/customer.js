@@ -170,6 +170,23 @@ const userSchema = new mongoose.Schema(
         permissions: [{
             type: String,
         }],
+
+        dateOfBirth: {
+            type: Date,
+        },
+        dobMonth: {
+            type: Number,
+            min: 1,
+            max: 12,
+        },
+        dobDay: {
+            type: Number,
+            min: 1,
+            max: 31,
+        },
+        birthdayWishSentYear: {
+            type: Number,
+        },
     },
     {
         timestamps: true,
@@ -177,6 +194,7 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ dobMonth: 1, dobDay: 1, isVerified: 1, isActive: 1 });
 
 userSchema.pre("validate", function(next) {
     if (this.phone) {

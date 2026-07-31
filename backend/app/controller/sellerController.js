@@ -3,6 +3,7 @@ import Transaction from "../models/transaction.js";
 import { handleResponse, calculateDistance } from "../utils/helper.js";
 import mongoose from "mongoose";
 import { invalidateSellerName } from "../services/entityNameCache.js";
+import { registerOrUpdateSellerPickupLocation } from "../services/shiprocket/shiprocketOrderService.js";
 
 /* ===============================
    GET NEARBY SELLERS
@@ -195,6 +196,13 @@ export const updateSellerProfile = async (req, res) => {
     // Invalidate cached seller name in case shopName changed
     invalidateSellerName(req.user.id).catch((err) => {
       console.warn("[Seller] Name cache invalidation failed:", err.message);
+    });
+
+    // Sync pickup location to Shiprocket in background
+    setImmediate(() => {
+      registerOrUpdateSellerPickupLocation(updatedSeller).catch((err) => {
+        console.warn("[Seller] Shiprocket pickup location sync failed:", err.message);
+      });
     });
 
     return handleResponse(

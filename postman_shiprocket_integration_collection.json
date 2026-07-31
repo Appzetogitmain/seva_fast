@@ -1,0 +1,328 @@
+{
+	"info": {
+		"_postman_id": "shiprocket-order-workflow-collection",
+		"name": "Shiprocket & Order Integration Collection",
+		"description": "Complete Postman Collection for testing Seller Address Sync to Shiprocket and Order Acceptance -> Shiprocket Shipment Creation Workflow.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000",
+			"type": "string"
+		},
+		{
+			"key": "sellerToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "customerToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "orderId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "shiprocketWebhookSecret",
+			"value": "your_shiprocket_webhook_secret",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Auth - Seller Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var response = pm.response.json();",
+							"if (response.data && response.data.token) {",
+							"    pm.collectionVariables.set('sellerToken', response.data.token);",
+							"    console.log('Seller token saved!');",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phone\": \"9876543210\",\n  \"password\": \"sellerpassword\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/seller/login",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"seller",
+						"login"
+					]
+				},
+				"description": "Logs in the seller and automatically saves `sellerToken` to collection variables."
+			}
+		},
+		{
+			"name": "2. Auth - Customer Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var response = pm.response.json();",
+							"if (response.data && response.data.token) {",
+							"    pm.collectionVariables.set('customerToken', response.data.token);",
+							"    console.log('Customer token saved!');",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"phone\": \"9999988888\",\n  \"password\": \"customerpassword\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/customer/login",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"customer",
+						"login"
+					]
+				},
+				"description": "Logs in customer and automatically saves `customerToken` to collection variables."
+			}
+		},
+		{
+			"name": "3. Seller - Update Profile & Sync Address to Shiprocket",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{sellerToken}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"shopName\": \"SuperFast Electronics Store\",\n  \"phone\": \"9876543210\",\n  \"address\": \"Plot 42, Sector 18, Commercial Hub\",\n  \"locality\": \"Udyog Vihar\",\n  \"city\": \"Gurugram\",\n  \"state\": \"Haryana\",\n  \"pincode\": \"122015\",\n  \"lat\": 28.4595,\n  \"lng\": 77.0266\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/seller/profile",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"seller",
+						"profile"
+					]
+				},
+				"description": "Updates seller address in DB and automatically syncs store address as a Pickup Location in Shiprocket."
+			}
+		},
+		{
+			"name": "4. Customer - Place Order",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var response = pm.response.json();",
+							"var order = response.data ? (response.data.order || response.data) : null;",
+							"if (order && order.orderId) {",
+							"    pm.collectionVariables.set('orderId', order.orderId);",
+							"    console.log('OrderId saved:', order.orderId);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{customerToken}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"items\": [\n    {\n      \"product\": \"650000000000000000000001\",\n      \"quantity\": 1,\n      \"price\": 499\n    }\n  ],\n  \"address\": {\n    \"type\": \"Home\",\n    \"name\": \"Rahul Sharma\",\n    \"address\": \"Flat 101, Sunshine Heights, Cyber City\",\n    \"city\": \"Gurugram\",\n    \"state\": \"Haryana\",\n    \"pincode\": \"122002\",\n    \"phone\": \"9999988888\",\n    \"location\": {\n      \"lat\": 28.495,\n      \"lng\": 77.089\n    }\n  },\n  \"paymentMode\": \"COD\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/orders/place",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"orders",
+						"place"
+					]
+				},
+				"description": "Places a new order as customer. Automatically saves `orderId` to collection variables."
+			}
+		},
+		{
+			"name": "5. Seller - Accept Order (Triggers Shiprocket Shipment)",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{sellerToken}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"status\": \"confirmed\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/orders/status/{{orderId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"orders",
+						"status",
+						"{{orderId}}"
+					]
+				},
+				"description": "Seller accepts order. Automatically triggers background order creation on Shiprocket using seller's registered pickup location, assigns AWB, and schedules pickup."
+			}
+		},
+		{
+			"name": "6. Order - Get Order Details (Check Shipment Status)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{sellerToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/orders/details/{{orderId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"orders",
+						"details",
+						"{{orderId}}"
+					]
+				},
+				"description": "Fetches order details including `shipmentDetails` (Shiprocket Order ID, Shipment ID, AWB Code, Courier Name, Pickup Schedule Status)."
+			}
+		},
+		{
+			"name": "7. Seller - Reject / Cancel Order (Cancels Shiprocket Shipment)",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{sellerToken}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"status\": \"cancelled\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/orders/status/{{orderId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"orders",
+						"status",
+						"{{orderId}}"
+					]
+				},
+				"description": "Rejects/cancels the order and automatically cancels the corresponding shipment on Shiprocket."
+			}
+		},
+		{
+			"name": "8. Webhook - Shiprocket Status Update Callback",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "x-api-key",
+						"value": "{{shiprocketWebhookSecret}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"order_id\": \"{{orderId}}\",\n  \"shipment_id\": 10001234,\n  \"awb\": \"141234567890\",\n  \"current_status\": \"Out For Delivery\",\n  \"courier_name\": \"Delhivery\",\n  \"etd\": \"2026-07-22\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/orders/shipping/shiprocket/webhook",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"orders",
+						"shipping",
+						"shiprocket",
+						"webhook"
+					]
+				},
+				"description": "Simulates webhook notification callback sent by Shiprocket to update shipment tracking status."
+			}
+		}
+	]
+}

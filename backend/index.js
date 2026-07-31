@@ -272,6 +272,19 @@ async function startScheduler() {
     getMonthlyTurnoverCommissionJobInterval(),
     getMonthlyTurnoverCommissionJobHandler()
   );
+
+  const {
+    getBirthdayWishJobInterval,
+    getBirthdayWishJobHandler,
+    isBirthdayWishJobEnabled,
+  } = await import("./app/jobs/birthdayWishJob.js");
+  if (isBirthdayWishJobEnabled()) {
+    registerScheduledJob(
+      'birthdayWishJob',
+      getBirthdayWishJobInterval(),
+      getBirthdayWishJobHandler()
+    );
+  }
   
   // Register payout batch job (if enabled)
   if (isPayoutBatchJobEnabled()) {

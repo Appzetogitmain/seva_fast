@@ -17,7 +17,7 @@ import MiniCart from '../components/shared/MiniCart';
 import SectionRenderer from "../components/experience/SectionRenderer";
 import { useLocation as useAppLocation } from '../context/LocationContext';
 import { useSettings } from '@core/context/SettingsContext';
-import Lottie from 'lottie-react';
+import ServiceUnavailableSection from '@shared/components/ServiceUnavailableSection';
 
 const CategoryProductsPage = () => {
     const { categoryName: catId } = useParams();
@@ -32,14 +32,6 @@ const CategoryProductsPage = () => {
     const [subCategories, setSubCategories] = useState([{ id: 'all', name: 'All', icon: 'https://cdn-icons-png.flaticon.com/128/2321/2321831.png' }]);
     const [products, setProducts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [noServiceData, setNoServiceData] = useState(null);
-
-    // Dynamically load no-service Lottie on mount
-    useEffect(() => {
-        import('@/assets/lottie/animation.json')
-            .then((m) => setNoServiceData(m.default))
-            .catch(() => {});
-    }, []);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -146,26 +138,13 @@ const CategoryProductsPage = () => {
 
             <div className="flex flex-1 relative items-start">
                 {(safeProducts.length === 0 && !isLoading) ? (
-                    <div className="w-full flex-1 py-20 px-8 flex flex-col items-center justify-center text-center">
-                        <div className="w-64 h-64 mb-6">
-                            {noServiceData ? (
-                                <Lottie animationData={noServiceData} loop={true} />
-                            ) : (
-                                <div className="w-64 h-64" />
-                            )}
-                        </div>
-                        <h3 className="text-3xl font-[1000] text-slate-800 tracking-tighter mb-4 uppercase">
-                            Service <span className="text-primary">Unavailable</span>
-                        </h3>
-                        <p className="text-slate-500 font-bold text-sm max-w-[280px] mb-8 leading-relaxed">
-                            {settings?.appName || 'Our service'} is not available in your area yet. We're expanding fast!
-                        </p>
-                        <button 
-                            onClick={fetchData}
-                            className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-xl shadow-black/10"
-                        >
-                            Try Refreshing
-                        </button>
+                    <div className="w-full flex-1">
+                        <ServiceUnavailableSection
+                            embedded
+                            description={`${settings?.appName || 'Our service'} is not available in your area yet. We're expanding fast!`}
+                            buttonLabel="Try Refreshing"
+                            onRetry={fetchData}
+                        />
                     </div>
                 ) : (
                     <>

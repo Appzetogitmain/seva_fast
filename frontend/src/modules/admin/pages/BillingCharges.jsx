@@ -28,6 +28,7 @@ const BillingCharges = () => {
 
     const [config, setConfig] = useState({
         platformFee: 0,
+        minimumOrderValue: 0,
         freeDeliveryThreshold: 0,
         baseCharge: 30,
         riderBasePayout: 30,
@@ -89,6 +90,8 @@ const BillingCharges = () => {
                     setDeliveryMode(s.deliveryPricingMode === 'fixed_price' ? 'fixed' : 'distance');
                     setConfig((prev) => ({
                         ...prev,
+                        minimumOrderValue: s.minimumOrderValue ?? prev.minimumOrderValue,
+                        freeDeliveryThreshold: s.freeDeliveryThreshold ?? prev.freeDeliveryThreshold,
                         baseCharge: s.customerBaseDeliveryFee ?? s.baseDeliveryCharge ?? prev.baseCharge,
                         riderBasePayout: s.riderBasePayout ?? s.customerBaseDeliveryFee ?? prev.riderBasePayout,
                         baseDistance: s.baseDistanceCapacityKm ?? prev.baseDistance,
@@ -125,6 +128,8 @@ const BillingCharges = () => {
                     deliveryPartnerRatePerKm: config.deliveryPartnerRatePerKm,
                     fleetCommissionRatePerKm: config.deliveryPartnerRatePerKm,
                     fixedDeliveryFee: config.fixedCharge,
+                    minimumOrderValue: config.minimumOrderValue,
+                    freeDeliveryThreshold: config.freeDeliveryThreshold,
                     handlingFeeStrategy: config.handlingFeeStrategy,
                     codEnabled: config.codEnabled,
                     onlineEnabled: config.onlineEnabled,
@@ -199,6 +204,23 @@ const BillingCharges = () => {
                         <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="space-y-3">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    Minimum Order Value (₹)
+                                    <Info className="h-3 w-3 opacity-50" />
+                                </label>
+                                <div className="relative group">
+                                    <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-slate-300 group-focus-within:text-red-500 transition-colors">₹</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={config.minimumOrderValue}
+                                        onChange={(e) => handleInputChange('minimumOrderValue', e.target.value)}
+                                        className="w-full pl-10 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-base font-black text-slate-900 outline-none focus:ring-2 focus:ring-red-500/10 transition-all"
+                                    />
+                                </div>
+                                <p className="text-[10px] font-bold text-slate-400 italic">Orders below this cart value cannot be placed.</p>
+                            </div>
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                     Platform/Handling Fee (₹)
                                     <Info className="h-3 w-3 opacity-50" />
                                 </label>
@@ -213,7 +235,7 @@ const BillingCharges = () => {
                                 </div>
                                 <p className="text-[10px] font-bold text-slate-400 italic">Fee added to every order.</p>
                             </div>
-                            <div className="space-y-3">
+                            <div className="space-y-3 md:col-span-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                     Free Delivery Minimum (₹)
                                     <Zap className="h-3 w-3 text-amber-500" />

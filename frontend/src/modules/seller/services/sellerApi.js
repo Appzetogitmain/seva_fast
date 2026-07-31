@@ -11,6 +11,10 @@ export const sellerApi = {
     createProduct: (data) => axiosInstance.post('/products', data),
     updateProduct: (id, data) => axiosInstance.put(`/products/${id}`, data),
     deleteProduct: (id) => axiosInstance.delete(`/products/${id}`),
+    downloadBulkTemplate: () =>
+        axiosInstance.get('/products/bulk/template', { responseType: 'blob' }),
+    bulkUploadProducts: (formData) =>
+        axiosInstance.post('/products/bulk', formData),
 
     // Categories (Public)
     getCategories: () => axiosInstance.get('/admin/categories'),

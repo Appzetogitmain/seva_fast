@@ -16,7 +16,8 @@ import { getOrderSocket, onSellerOrderNew, onReturnDropOtp, onOrderStatusUpdate 
 import { getSellerOrderEarning } from '@/shared/utils/sellerOrderEarning';
 import orderAlertSound from '@/assets/sounds/order_alert.mp3';
 
-const POLL_INTERVAL_MS = 15000;
+const POLL_INTERVAL_MS = 30000;
+const MIN_SYNC_GAP_MS = 5000;
 
 /** Match server `sellerPendingExpiresAt` — never reset to a full 60s when the modal opens late. */
 function secondsLeftUntilSellerExpiry(order) {
@@ -76,6 +77,17 @@ const DashboardLayout = ({ children, navItems, title }) => {
     const ringtoneRetryTimerRef = useRef(null);
     const ringtoneUnlockHandlerRef = useRef(null);
     const isAdminApp = role === 'admin' || role === 'sub-admin';
+    const isSellerOrdersRoute = location.pathname.startsWith('/seller/orders');
+    const lastOrdersSyncAtRef = useRef(0);
+
+    const canSyncOrdersNow = () => {
+        const now = Date.now();
+        if (now - lastOrdersSyncAtRef.current < MIN_SYNC_GAP_MS) {
+            return false;
+        }
+        lastOrdersSyncAtRef.current = now;
+        return true;
+    };
 
     const getOrderRingtone = () => {
         if (!orderRingtoneRef.current) {
@@ -161,6 +173,8 @@ const DashboardLayout = ({ children, navItems, title }) => {
         setOrdersLoading(true);
 
         const fetchOrders = async () => {
+            if (isSellerOrdersRoute) return;
+            if (!canSyncOrdersNow()) return;
             if (isOrdersFetchInFlightRef.current) return;
             isOrdersFetchInFlightRef.current = true;
             try {
@@ -201,13 +215,14 @@ const DashboardLayout = ({ children, navItems, title }) => {
 
         fetchOrdersRef.current = fetchOrders;
         fetchOrders();
-    }, [role]);
+    }, [role, isSellerOrdersRoute]);
 
     // Resilient fallback when socket events are missed (tab backgrounded/suspended).
     useEffect(() => {
         if (role !== 'seller') return undefined;
 
         const syncOrders = () => {
+            if (isSellerOrdersRoute) return;
             if (fetchOrdersRef.current) fetchOrdersRef.current();
         };
 
@@ -228,19 +243,20 @@ const DashboardLayout = ({ children, navItems, title }) => {
             document.removeEventListener('visibilitychange', onVisible);
             window.removeEventListener('online', onOnline);
         };
-    }, [role]);
+    }, [role, isSellerOrdersRoute]);
 
     useEffect(() => {
         if (role !== 'seller') return undefined;
         const getToken = () => localStorage.getItem('auth_seller');
         const unSub = onOrderStatusUpdate(getToken, (payload) => {
             console.log("[DashboardLayout] Socket status update event received:", payload);
+            if (isSellerOrdersRoute) return;
             if (fetchOrdersRef.current) fetchOrdersRef.current();
         });
         return () => {
             if (typeof unSub === 'function') unSub();
         };
-    }, [role]);
+    }, [role, isSellerOrdersRoute]);
 
     useEffect(() => {
         if (newOrderAlert) {
@@ -267,6 +283,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
         const getToken = () => localStorage.getItem('auth_seller');
         getOrderSocket(getToken);
         const unsubscribeSellerNew = onSellerOrderNew(getToken, () => {
+            if (isSellerOrdersRoute) return;
             if (fetchOrdersRef.current) fetchOrdersRef.current();
         });
 
@@ -281,7 +298,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
             unsubscribeSellerNew();
             unsubscribeDrop();
         };
-    }, [role]);
+    }, [role, isSellerOrdersRoute]);
 
     // Single earnings fetch when seller is on earnings/withdrawals/transactions – no duplicate calls
     useEffect(() => {

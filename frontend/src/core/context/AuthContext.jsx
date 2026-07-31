@@ -36,27 +36,73 @@ export const AuthProvider = ({ children }) => {
     const currentRole = getCurrentRoleFromUrl();
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [profileRefreshKey, setProfileRefreshKey] = useState(0);
     const token = authData[currentRole];
     const isAuthenticated = !!token;
 
     useEffect(() => {
+        let onlineRefreshTimer = null;
+
+        const readStoredTokens = () => ({
+            customer: getSafeToken('customer'),
+            seller: getSafeToken('seller'),
+            admin: getSafeToken('admin'),
+            delivery: getSafeToken('delivery'),
+        });
+
         const syncStoredTokens = () => {
-            setAuthData({
-                customer: getSafeToken('customer'),
-                seller: getSafeToken('seller'),
-                admin: getSafeToken('admin'),
-                delivery: getSafeToken('delivery'),
-            });
+            setAuthData(readStoredTokens());
+        };
+
+        const refreshProfileAfterReconnect = () => {
+            if (onlineRefreshTimer) {
+                clearTimeout(onlineRefreshTimer);
+            }
+            onlineRefreshTimer = setTimeout(() => {
+                setAuthData(readStoredTokens());
+                setProfileRefreshKey((prev) => prev + 1);
+            }, 1500);
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                // Re-read WebView localStorage without forcing a profile refetch.
+                syncStoredTokens();
+            }
         };
 
         window.addEventListener('focus', syncStoredTokens);
         window.addEventListener('storage', syncStoredTokens);
-        document.addEventListener('visibilitychange', syncStoredTokens);
+        window.addEventListener('online', refreshProfileAfterReconnect);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
+            if (onlineRefreshTimer) {
+                clearTimeout(onlineRefreshTimer);
+            }
             window.removeEventListener('focus', syncStoredTokens);
             window.removeEventListener('storage', syncStoredTokens);
-            document.removeEventListener('visibilitychange', syncStoredTokens);
+            window.removeEventListener('online', refreshProfileAfterReconnect);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
+    // Allow Flutter wrapper to restore JWT from native secure storage into WebView.
+    useEffect(() => {
+        window.SevaFastRestoreAuth = (rawToken, role = 'customer') => {
+            const normalizedRole = String(role || 'customer').toLowerCase();
+            const storageKey = ROLE_STORAGE_KEYS[normalizedRole];
+            const tokenValue = String(rawToken || '').trim();
+            if (!storageKey || !tokenValue) return false;
+
+            localStorage.setItem(storageKey, tokenValue);
+            setAuthData((prev) => ({ ...prev, [normalizedRole]: tokenValue }));
+            setProfileRefreshKey((prev) => prev + 1);
+            return true;
+        };
+
+        return () => {
+            delete window.SevaFastRestoreAuth;
         };
     }, []);
 
@@ -122,8 +168,20 @@ export const AuthProvider = ({ children }) => {
                     setUser(response.data.result);
                 } catch (error) {
                     console.error('Failed to fetch profile:', error);
-                    // Preserve stored tokens on request failures; only manual logout clears auth storage.
-                    setUser(null);
+                    const statusCode = error?.response?.status;
+                    // Only clear session for confirmed auth failures (401).
+                    // 403 can be role/plan restrictions and should not log users out.
+                    if (statusCode === 401) {
+                        const storageKey = ROLE_STORAGE_KEYS[currentRole];
+                        if (storageKey) {
+                            localStorage.removeItem(storageKey);
+                        }
+                        setAuthData((prev) => ({
+                            ...prev,
+                            [currentRole]: null,
+                        }));
+                        setUser(null);
+                    }
                 } finally {
                     setIsLoading(false);
                 }
@@ -134,18 +192,32 @@ export const AuthProvider = ({ children }) => {
         };
 
         fetchProfile();
-    }, [token, currentRole]);
+    }, [token, currentRole, profileRefreshKey]);
 
     const login = (userData) => {
         const role = userData.role?.toLowerCase() || 'customer';
         const storageKey = ROLE_STORAGE_KEYS[role];
 
         if (storageKey && userData.token) {
-            // Save ONLY the token string as requested by the user
             localStorage.setItem(storageKey, userData.token);
 
             setAuthData(prev => ({ ...prev, [role]: userData.token }));
-            setUser(userData); // Set full data initially
+            setUser(userData);
+
+            // Mirror token to Flutter native storage when running inside the wrapper.
+            if (window.Flutter) {
+                try {
+                    window.Flutter.postMessage(
+                        JSON.stringify({
+                            type: 'save_auth_token',
+                            role,
+                            token: userData.token,
+                        })
+                    );
+                } catch (error) {
+                    console.warn('[auth] Failed to persist token to Flutter bridge:', error);
+                }
+            }
         } else {
             console.error('Invalid role or missing token for login:', role);
         }
@@ -190,8 +262,20 @@ export const AuthProvider = ({ children }) => {
             [currentRole]: null,
         }));
 
-        // Clear the current user profile from memory
         setUser(null);
+
+        if (window.Flutter) {
+            try {
+                window.Flutter.postMessage(
+                    JSON.stringify({
+                        type: 'clear_auth_token',
+                        role: currentRole,
+                    })
+                );
+            } catch (error) {
+                console.warn('[auth] Failed to clear token in Flutter bridge:', error);
+            }
+        }
 
         // Final fallback: redirect based on current path if needed
         // (ProtectedRoute usually handles this, but explicit navigation is safer for some UI edge cases)

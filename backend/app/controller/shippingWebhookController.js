@@ -1,46 +1,88 @@
+import crypto from "crypto";
 import Order from "../models/order.js";
-import { WORKFLOW_STATUS, legacyStatusFromWorkflow } from "../constants/orderWorkflow.js";
+import { WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
 import { applyDeliveredSettlement } from "../services/orderSettlement.js";
 import { emitOrderStatusUpdate } from "../services/orderSocketEmitter.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import * as logger from "../services/logger.js";
 
+function verifyWebhookSecret(req) {
+  const expected = process.env.SHIPROCKET_WEBHOOK_SECRET;
+  if (!expected) {
+    logger.warn(
+      "[Shiprocket Webhook] SHIPROCKET_WEBHOOK_SECRET is not set — skipping signature check",
+    );
+    return true;
+  }
+
+  const got = String(req.headers["x-api-key"] || "").trim();
+  if (!got) return false;
+
+  const expectedBuf = Buffer.from(expected);
+  const gotBuf = Buffer.from(got);
+  if (expectedBuf.length !== gotBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, gotBuf);
+}
+
 /**
  * Handles incoming status update webhooks from Shiprocket.
- * Maps courier stages (shipped, out_for_delivery, delivered) to our internal order states.
+ * Mounted at: POST /api/orders/shipping/shiprocket/webhook
  */
 export async function handleShiprocketWebhook(req, res) {
   try {
+    if (!verifyWebhookSecret(req)) {
+      return res.status(401).json({ success: false, message: "Invalid webhook secret" });
+    }
+
     const payload = req.body || {};
     const awbCode = payload.awb || payload.awb_code;
     const shiprocketOrderId = payload.order_id;
-    const rawStatus = (payload.current_status || "").trim().toUpperCase();
+    const shipmentId = payload.shipment_id;
+    const channelOrderId = payload.channel_order_id || payload.order_id;
+    const rawStatus = String(payload.current_status || "").trim().toUpperCase();
 
-    logger.info(`[Shiprocket Webhook] Received webhook update: AWB=${awbCode}, OrderID=${shiprocketOrderId}, Status=${rawStatus}`);
+    logger.info(
+      `[Shiprocket Webhook] AWB=${awbCode}, SR_OrderID=${shiprocketOrderId}, shipment=${shipmentId}, Status=${rawStatus}`,
+    );
 
-    if (!awbCode && !shiprocketOrderId) {
-      return res.status(400).json({ success: false, message: "Missing AWB or Order ID in payload" });
+    if (!awbCode && !shiprocketOrderId && !shipmentId && !channelOrderId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing AWB / order / shipment id in payload" });
     }
 
-    // Find the order
-    let order = null;
-    if (shiprocketOrderId) {
-      order = await Order.findOne({ orderId: shiprocketOrderId });
+    const orClauses = [];
+    if (channelOrderId != null) {
+      orClauses.push({ orderId: String(channelOrderId) });
     }
-    if (!order && awbCode) {
-      order = await Order.findOne({ "shipmentDetails.awbCode": awbCode });
+    if (shiprocketOrderId != null) {
+      orClauses.push({ "shipmentDetails.shiprocketOrderId": shiprocketOrderId });
+      orClauses.push({ "shipmentDetails.shiprocketOrderId": String(shiprocketOrderId) });
     }
+    if (shipmentId != null) {
+      orClauses.push({ "shipmentDetails.shiprocketShipmentId": shipmentId });
+      orClauses.push({ "shipmentDetails.shiprocketShipmentId": String(shipmentId) });
+    }
+    if (awbCode) {
+      orClauses.push({ "shipmentDetails.awbCode": awbCode });
+    }
+
+    let order = orClauses.length
+      ? await Order.findOne({ $or: orClauses })
+      : null;
 
     if (!order) {
-      logger.warn(`[Shiprocket Webhook] Order not found for AWB: ${awbCode} / OrderID: ${shiprocketOrderId}`);
+      logger.warn(
+        `[Shiprocket Webhook] Order not found for AWB=${awbCode} order_id=${shiprocketOrderId} shipment_id=${shipmentId}`,
+      );
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    // Update courier status in shipmentDetails
     order.shipmentDetails = {
       ...(order.shipmentDetails || {}),
       status: rawStatus,
+      lastSyncedStatus: rawStatus,
       updatedAt: new Date(),
     };
 
@@ -48,8 +90,6 @@ export async function handleShiprocketWebhook(req, res) {
     let newStatus = null;
     let newWorkflowStatus = null;
 
-    // Map Shiprocket status to internal status
-    // Common Shiprocket statuses: NEW, PICKED UP, IN TRANSIT, OUT FOR DELIVERY, DELIVERED, CANCELLED, RTO INITIATED, RTO DELIVERED
     if (["PICKED UP", "IN TRANSIT", "SHIPPED"].includes(rawStatus)) {
       newStatus = "out_for_delivery";
       newWorkflowStatus = WORKFLOW_STATUS.OUT_FOR_DELIVERY;
@@ -59,7 +99,7 @@ export async function handleShiprocketWebhook(req, res) {
     } else if (rawStatus === "DELIVERED") {
       newStatus = "delivered";
       newWorkflowStatus = WORKFLOW_STATUS.DELIVERED;
-    } else if (["CANCELLED", "RTO INITIATED", "RTO DELIVERED"].includes(rawStatus)) {
+    } else if (["CANCELLED", "CANCELED", "RTO INITIATED", "RTO DELIVERED"].includes(rawStatus)) {
       newStatus = "cancelled";
       newWorkflowStatus = WORKFLOW_STATUS.CANCELLED;
     }
@@ -73,14 +113,15 @@ export async function handleShiprocketWebhook(req, res) {
         order.deliveredAt = new Date();
         await order.save();
 
-        // Perform financial settlement
         try {
           await applyDeliveredSettlement(order, order.orderId);
         } catch (settlementErr) {
-          logger.error(`[Shiprocket Webhook] Financial settlement failed for Order ${order.orderId}:`, settlementErr.message);
+          logger.error(
+            `[Shiprocket Webhook] Settlement failed for ${order.orderId}:`,
+            settlementErr.message,
+          );
         }
 
-        // Emit notification
         emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_DELIVERED, {
           orderId: order.orderId,
           customerId: order.customer,
@@ -91,7 +132,6 @@ export async function handleShiprocketWebhook(req, res) {
         await order.save();
       }
 
-      // Sockets
       emitOrderStatusUpdate(
         order.orderId,
         {
@@ -103,7 +143,6 @@ export async function handleShiprocketWebhook(req, res) {
         order._id,
       );
 
-      // Event notification for other statuses
       if (newStatus === "out_for_delivery") {
         emitNotificationEvent(NOTIFICATION_EVENTS.OUT_FOR_DELIVERY, {
           orderId: order.orderId,

@@ -33,6 +33,7 @@ const Topbar = ({ onMenuClick }) => {
     const [unreadCount, setUnreadCount] = React.useState(0);
     const [showNotifications, setShowNotifications] = React.useState(false);
     const notificationRef = React.useRef(null);
+    const isFetchingNotificationsRef = React.useRef(false);
 
     const isSeller = location.pathname.startsWith('/seller');
     const isAdmin = location.pathname.startsWith('/admin');
@@ -53,6 +54,8 @@ const Topbar = ({ onMenuClick }) => {
     const fetchNotifications = async () => {
         try {
             if (!isSeller && !isAdmin) return;
+            if (isFetchingNotificationsRef.current) return;
+            isFetchingNotificationsRef.current = true;
             const response = isSeller
                 ? await sellerApi.getNotifications()
                 : await adminApi.getNotifications();
@@ -66,6 +69,8 @@ const Topbar = ({ onMenuClick }) => {
             const status = error?.response?.status;
             if (status === 503) return;
             console.error("Notif Fetch Error:", error);
+        } finally {
+            isFetchingNotificationsRef.current = false;
         }
     };
 

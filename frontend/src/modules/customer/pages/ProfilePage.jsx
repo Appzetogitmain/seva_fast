@@ -30,12 +30,48 @@ function getReferrerDisplayName(referredBy) {
     return null;
 }
 
+function getPlanShortName(plan) {
+    if (!plan) return null;
+    if (typeof plan === 'string') return null; // ObjectId only — no display name
+    const name = String(plan.name || '').trim();
+    if (!name) return null;
+    // Prefer first word for short display (e.g. "Gold Membership" -> "Gold")
+    return name.split(/\s+/)[0];
+}
+
+function getPurchasedPlanNames(user) {
+    const names = [];
+    const seen = new Set();
+
+    const pushName = (plan) => {
+        const shortName = getPlanShortName(plan);
+        if (!shortName) return;
+        const key = shortName.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        names.push(shortName);
+    };
+
+    (user?.planSubscriptions || []).forEach((subscription) => {
+        pushName(subscription?.plan);
+    });
+
+    // Legacy fallback when planSubscriptions is empty
+    if (names.length === 0) {
+        pushName(user?.currentPlan);
+    }
+
+    return names;
+}
+
 const ProfilePage = () => {
     const navigate = useNavigate();
     const { user, role } = useAuth();
     const { requestSignOut, signOutDialog } = useSignOutConfirmation();
     const { settings } = useSettings();
     const appName = settings?.appName || 'App';
+    const purchasedPlanNames = React.useMemo(() => getPurchasedPlanNames(user), [user]);
+    const planShortName = purchasedPlanNames[0] ?? null;
     const [isTestingPush, setIsTestingPush] = React.useState(false);
     const [isCustomOrderModalOpen, setIsCustomOrderModalOpen] = React.useState(false);
     const [isReferralTreeModalOpen, setIsReferralTreeModalOpen] = React.useState(false);
@@ -64,17 +100,18 @@ const ProfilePage = () => {
         };
     }, [isReferralTreeModalOpen, isCustomOrderModalOpen]);
 
-    const handleShare = async () => {
+    const handleShare = async (url, label = appName) => {
+        const shareUrl = url || window.location.origin;
         const shareData = {
             title: appName,
-            text: `Check out ${appName}!`,
-            url: window.location.origin,
+            text: `Check out ${label}!`,
+            url: shareUrl,
         };
         try {
             if (navigator.share) {
                 await navigator.share(shareData);
             } else {
-                await navigator.clipboard.writeText(window.location.origin);
+                await navigator.clipboard.writeText(shareUrl);
                 toast.success('Link copied to clipboard!');
             }
         } catch (error) {
@@ -91,6 +128,23 @@ const ProfilePage = () => {
         if (raw.startsWith('91') && raw.length >= 12) return raw.replace(/^91[\s-]*/, '');
         return raw;
     };
+
+    const referralCode = user?.referralCode || '';
+    const siteReferUrl = referralCode
+        ? `${window.location.origin}/signup?ref=${referralCode}`
+        : window.location.origin;
+    const appReferUrl = settings?.playStoreLink || siteReferUrl;
+    const cardReferUrl = siteReferUrl;
+    const referrerName = getReferrerDisplayName(user?.referredBy);
+    const logoUrl = settings?.logoUrl || '/seva-fast-logo.png';
+    const supportEmail = settings?.supportEmail || 'sevafast2@gmail.com';
+    const siteHost = (typeof window !== 'undefined' ? window.location.host : 'www.sevafast.in') || 'www.sevafast.in';
+    const profilePhotoUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || user?.phone || 'customer')}`;
+    const qrSrc = (data, size = 120) =>
+        `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
+    const goldText =
+        'bg-gradient-to-b from-[#c9a227] via-[#8b6914] to-[#5c4508] bg-clip-text text-transparent';
+    const benefitNames = purchasedPlanNames.length > 0 ? purchasedPlanNames : [];
 
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -182,120 +236,229 @@ const ProfilePage = () => {
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-4">
 
-                {/* User Identity Card */}
-                <div 
+                {/* User Identity Card — SEVAFAST membership layout */}
+                <div
                     onClick={() => setIsReferralTreeModalOpen(true)}
-                    className="group relative overflow-hidden rounded-none mb-2 cursor-pointer transition-all duration-300 hover:brightness-105 active:scale-[0.995] shadow-[0_16px_40px_-18px_rgba(234,88,12,0.45)]"
+                    className="group relative mb-2 cursor-pointer overflow-hidden rounded-3xl border border-slate-300/70 bg-[#ececec] shadow-[0_18px_40px_-20px_rgba(15,23,42,0.4)] transition-all duration-300 hover:brightness-[1.02] active:scale-[0.995]"
                 >
-                    <div className="relative overflow-hidden rounded-none bg-gradient-to-br from-orange-500 via-amber-400 to-green-500 text-white p-3.5 sm:p-4">
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-orange-600/30 via-transparent to-green-600/35" />
-                        <div className="pointer-events-none absolute inset-0 bg-black/10" />
-                        <div className="pointer-events-none absolute inset-0 opacity-25 bg-[repeating-linear-gradient(-45deg,rgba(255,255,255,0.12)_0px,rgba(255,255,255,0.12)_1px,transparent_1px,transparent_8px)]" />
+                    <div className="pointer-events-none absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.07)_1px,transparent_0)] [background-size:10px_10px]" />
 
-                        <div className="relative z-10 flex justify-between items-center mb-2.5">
-                            <div className="flex items-center gap-2">
-                                <div className="h-7 w-9 rounded-none bg-white/25 backdrop-blur-sm shadow-[inset_0_1px_2px_rgba(255,255,255,0.55),0_4px_10px_rgba(0,0,0,0.2)] border border-white/35 relative overflow-hidden">
-                                    <div className="absolute inset-x-1 top-1.5 h-px bg-white/60" />
-                                    <div className="absolute inset-x-1 top-3 h-px bg-white/45" />
-                                    <div className="absolute inset-y-1.5 left-2.5 w-px bg-white/40" />
+                    {/* Right dark curved panel + arcs */}
+                    <div className="pointer-events-none absolute -right-[12%] -top-[18%] h-[140%] w-[52%] rounded-full bg-[#5a5a5a] sm:w-[48%]" />
+                    <div className="pointer-events-none absolute -right-[6%] top-[6%] h-[88%] w-[44%] rounded-full border border-black/25 sm:w-[40%]" />
+                    <div className="pointer-events-none absolute right-[2%] top-[14%] h-[72%] w-[36%] rounded-full border border-black/15 sm:w-[32%]" />
+
+                    <div className="relative z-10 grid grid-cols-[1.22fr_0.78fr] gap-2 p-3 sm:gap-2.5 sm:p-4 min-h-[238px] sm:min-h-[276px]">
+                        {/* Left rounded content panel */}
+                        <div className="relative flex min-w-0 flex-col rounded-[1.35rem] bg-white/42 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-[1px] sm:rounded-[1.75rem] sm:px-4 sm:py-3.5">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <img
+                                        src={logoUrl}
+                                        alt={appName}
+                                        className="h-8 w-8 shrink-0 rounded-md object-contain bg-white/80 p-0.5 sm:h-9 sm:w-9"
+                                    />
+                                    <div className="min-w-0">
+                                        <p className="truncate text-[14px] font-black uppercase tracking-[0.04em] text-slate-900 sm:text-[15px]">
+                                            {(appName || 'SEVAFAST').replace(/\s+/g, '')}
+                                        </p>
+                                        <p className="bg-gradient-to-r from-[#9b7bb8] to-[#e07a3a] bg-clip-text text-[8px] font-extrabold uppercase tracking-[0.11em] text-transparent sm:text-[9px]">
+                                            Big Saving Shopping
+                                        </p>
+                                    </div>
                                 </div>
-                                <span className="text-xs sm:text-sm font-black italic tracking-[0.18em] text-white drop-shadow-sm">
-                                    SEVA FAST
-                                </span>
+                                <div className="flex shrink-0 items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleShare(siteReferUrl, appName);
+                                        }}
+                                        className="rounded-md bg-white/80 p-1.5 text-slate-700 shadow-sm ring-1 ring-slate-200/80 transition hover:bg-white"
+                                        title="Share"
+                                    >
+                                        <Share2 size={12} />
+                                    </button>
+                                    <Link
+                                        to="/profile/edit"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="rounded-md bg-white/80 p-1.5 text-slate-700 shadow-sm ring-1 ring-slate-200/80 transition hover:bg-white"
+                                        title="Edit Profile"
+                                    >
+                                        <Edit2 size={12} />
+                                    </Link>
+                                </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5">
-                                <button 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleShare();
-                                    }}
-                                    className="p-1.5 rounded-none bg-white/10 hover:bg-white/20 border border-white/15 transition-all backdrop-blur-md cursor-pointer active:scale-95 flex items-center justify-center"
-                                    title="Share"
-                                >
-                                    <Share2 size={13} className="text-white" />
-                                </button>
-                                <Link 
-                                    to="/profile/edit" 
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="p-1.5 rounded-none bg-white/10 hover:bg-white/20 border border-white/15 transition-all backdrop-blur-md" 
-                                    title="Edit Profile"
-                                >
-                                    <Edit2 size={13} className="text-white" />
-                                </Link>
+                            <div className="mt-3 flex items-start justify-between gap-2.5">
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-900 sm:text-[11px]">Benefits :</p>
+                                    <ul className="mt-0.5 space-y-0.5">
+                                        {benefitNames.length > 0 ? (
+                                            benefitNames.map((planName) => (
+                                                <li
+                                                    key={planName}
+                                                    className={`font-serif text-[12px] font-bold leading-tight sm:text-[13px] ${goldText}`}
+                                                >
+                                                    {planName}
+                                                </li>
+                                            ))
+                                        ) : planShortName ? (
+                                            <li className={`font-serif text-[12px] font-bold sm:text-[13px] ${goldText}`}>
+                                                {planShortName}
+                                            </li>
+                                        ) : (
+                                            <li className="text-[10px] font-semibold text-slate-500">No plan</li>
+                                        )}
+                                    </ul>
+                                </div>
+                                <p className={`shrink-0 text-right font-serif text-[12px] font-black leading-[1.05] sm:text-[16px] ${goldText}`}>
+                                    UP TO<br />25% OFF
+                                </p>
+                            </div>
+
+                            <div className={`mt-3 space-y-0.5 font-serif text-[11px] font-bold leading-snug sm:text-[13px] ${goldText}`}>
+                                {referrerName ? <p className="truncate">Referred By: {referrerName}</p> : null}
+                                <p className="truncate">{user?.name || 'Customer'}</p>
+                                <p className="truncate">+91 {formatIndiaPhone(user?.phone) || '—'}</p>
+                                <p className="truncate">user ref id: {referralCode || 'N/A'}</p>
+                            </div>
+
+                            <div className="mt-auto flex items-end justify-between gap-2.5 pt-3">
+                                <div className="flex min-w-0 items-end gap-1.5">
+                                    <span className="text-xl leading-none sm:text-2xl" aria-hidden>🛍️</span>
+                                    <div className="min-w-0 text-[8px] font-semibold leading-tight text-slate-700 sm:text-[9px]">
+                                        <p className="truncate">www.{siteHost.replace(/^www\./, '')}</p>
+                                        <p className="truncate">{supportEmail}</p>
+                                    </div>
+                                </div>
+                                {referralCode ? (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigator.clipboard.writeText(referralCode);
+                                            toast.success('Referral code copied to clipboard!');
+                                        }}
+                                        className="inline-flex max-w-[50%] items-center gap-1 rounded-md bg-[#2f6fed]/10 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-[#2f6fed] ring-1 ring-[#2f6fed]/25"
+                                        title="Copy referral code"
+                                    >
+                                        <Share2 size={10} className="shrink-0" />
+                                        <span className="truncate font-mono tracking-wider text-slate-800 normal-case">
+                                            {referralCode}
+                                        </span>
+                                        <Copy size={10} className="shrink-0 text-slate-500" />
+                                    </button>
+                                ) : null}
                             </div>
                         </div>
 
-                        <div className="relative z-10 flex justify-between gap-3">
-                            <div className="flex flex-col flex-1 min-w-0">
-                                <div>
-                                    <h2 className="text-lg leading-tight font-black text-white tracking-wide">
-                                        {user?.name || 'Customer'}
-                                    </h2>
-                                    <p className="text-white/90 text-[11px] font-medium flex items-center gap-1 mt-1 mb-1.5 drop-shadow-sm">
-                                        <span className="bg-black/20 border border-white/20 px-1.5 py-px rounded-none text-[9px] uppercase text-white font-bold tracking-wider">
-                                            India
-                                        </span>
-                                        <span className="truncate">+91 {formatIndiaPhone(user?.phone)}</span>
-                                    </p>
-                                    {getReferrerDisplayName(user?.referredBy) && (
-                                        <div className="flex items-center bg-black/20 border border-white/20 text-white px-2 py-0.5 rounded-none w-fit">
-                                            <span className="text-[9px] font-black uppercase tracking-wider">
-                                                Referred By: {getReferrerDisplayName(user.referredBy)}
-                                            </span>
-                                        </div>
-                                    )}
+                        {/* Right content over dark curve */}
+                        <div className="relative flex min-w-0 flex-col items-center px-1 text-white">
+                            <div className="mt-0.5 flex w-full justify-end gap-2 sm:gap-2.5">
+                                <div className="flex flex-col items-center">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleShare(appReferUrl, 'App referral');
+                                        }}
+                                        className="mb-0.5 self-start text-[#2f6fed]"
+                                        title="Share app referral"
+                                    >
+                                        <Share2 size={11} />
+                                    </button>
+                                    <div className="rounded-[2px] bg-white p-0.5 shadow-sm">
+                                        <img
+                                            src={qrSrc(appReferUrl, 90)}
+                                            alt="App referral QR"
+                                            className="h-9 w-9 object-contain sm:h-10 sm:w-10"
+                                            crossOrigin="anonymous"
+                                        />
+                                    </div>
+                                    <span className="mt-1 text-[7px] font-bold uppercase tracking-wide text-white/95 sm:text-[8px]">
+                                        app refer
+                                    </span>
                                 </div>
-
-                                <div className="mt-3">
-                                    <p className="text-[8px] text-white/85 uppercase tracking-[0.2em] mb-0.5 font-bold drop-shadow-sm">
-                                        Referral Code
-                                    </p>
-                                    {user?.referralCode ? (
-                                        <div 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigator.clipboard.writeText(user.referralCode);
-                                                toast.success("Referral code copied to clipboard!");
-                                            }}
-                                            className="flex items-center gap-1.5 cursor-pointer group w-fit"
-                                        >
-                                            <span className="text-base font-bold font-mono tracking-[0.16em] text-white group-hover:text-white/90 transition-colors drop-shadow-sm">
-                                                {user.referralCode}
-                                            </span>
-                                            <Copy size={12} className="opacity-75 group-hover:opacity-100 text-white transition-opacity" />
-                                        </div>
-                                    ) : (
-                                        <span className="text-xs font-mono opacity-50 tracking-widest">N/A</span>
-                                    )}
+                                <div className="flex flex-col items-center">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleShare(siteReferUrl, 'Site referral');
+                                        }}
+                                        className="mb-0.5 self-start text-[#2f6fed]"
+                                        title="Share site referral"
+                                    >
+                                        <Share2 size={11} />
+                                    </button>
+                                    <div className="rounded-[2px] bg-white p-0.5 shadow-sm">
+                                        <img
+                                            src={qrSrc(siteReferUrl, 90)}
+                                            alt="Site referral QR"
+                                            className="h-9 w-9 object-contain sm:h-10 sm:w-10"
+                                            crossOrigin="anonymous"
+                                        />
+                                    </div>
+                                    <span className="mt-1 text-[7px] font-bold uppercase tracking-wide text-white/95 sm:text-[8px]">
+                                        site refer
+                                    </span>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col items-end justify-between flex-shrink-0">
-                                {user?.referralCode && (
-                                    <div className="flex flex-col items-center">
-                                        <div className="bg-white p-1 rounded-none shadow-md ring-1 ring-white/70">
-                                            <img 
-                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/signup?ref=${user.referralCode}`)}`} 
-                                                alt="Signup QR Code" 
-                                                className="w-[58px] h-[58px] object-contain"
-                                                crossOrigin="anonymous"
-                                            />
-                                        </div>
-                                        <span className="text-[7px] font-black uppercase tracking-[0.16em] text-white/90 mt-1 text-center leading-tight drop-shadow-sm">
-                                            Scan to Join
-                                        </span>
-                                    </div>
-                                )}
-
-                                <div className="text-right mt-2">
-                                    <p className="text-[8px] text-white/85 uppercase tracking-[0.2em] mb-0.5 font-bold drop-shadow-sm">
-                                        Valid Thru
-                                    </p>
-                                    <div className="text-sm font-bold font-mono tracking-[0.14em] text-white drop-shadow-sm">
+                            <div className="relative mt-2.5 flex flex-col items-center">
+                                <div className="absolute -left-[3.25rem] top-5 hidden w-[3rem] text-right text-[8px] font-bold leading-tight text-white/90 sm:block">
+                                    <span>card renewal</span>
+                                    <div className="font-mono text-[9px] tracking-wide text-white">
                                         {user?.currentPlan && user?.planExpiry ? formatDate(user.planExpiry) : 'N / A'}
                                     </div>
                                 </div>
+                                <div className="h-[4.25rem] w-[4.25rem] overflow-hidden rounded-full border-[3px] border-white bg-slate-200 shadow-md sm:h-[5.25rem] sm:w-[5.25rem]">
+                                    <img
+                                        src={profilePhotoUrl}
+                                        alt={user?.name || 'Profile'}
+                                        className="h-full w-full object-cover"
+                                    />
+                                </div>
+                                <span className="mt-1 text-[8px] font-semibold text-white/95 sm:text-[9px]">
+                                    profile photo
+                                </span>
+                            </div>
+
+                            <div className="mt-auto flex w-full flex-col items-center pb-0.5">
+                                <p className="mb-1 text-[8px] font-bold text-white/95 sm:hidden">
+                                    renewal: {user?.currentPlan && user?.planExpiry ? formatDate(user.planExpiry) : 'N / A'}
+                                </p>
+                                {referralCode ? (
+                                    <div className="relative flex flex-col items-center">
+                                        <div className="rounded-[2px] bg-white p-1 shadow-md">
+                                            <img
+                                                src={qrSrc(cardReferUrl, 140)}
+                                                alt="Card referral QR"
+                                                className="h-14 w-14 object-contain sm:h-[4.25rem] sm:w-[4.25rem]"
+                                                crossOrigin="anonymous"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleShare(cardReferUrl, 'Card referral');
+                                            }}
+                                            className="absolute -right-5 bottom-5 text-[#2f6fed] sm:-right-6"
+                                            title="Share card referral"
+                                        >
+                                            <Share2 size={12} />
+                                        </button>
+                                        <span className="mt-1 text-[7px] font-bold uppercase tracking-wide text-white/95 sm:text-[8px]">
+                                            Card refer
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-sm bg-white/85 px-2 py-3 text-center text-[8px] font-semibold text-slate-500">
+                                        Save your URL to create a QR code
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

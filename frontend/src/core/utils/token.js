@@ -15,7 +15,8 @@ export const isTokenExpired = (token) => {
         const now = Date.now() / 1000;
         return decoded.exp < now;
     } catch (error) {
-        return true;
+        // Malformed tokens are validated by the server; don't purge storage client-side.
+        return false;
     }
 };
 

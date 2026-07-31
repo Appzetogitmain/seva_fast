@@ -87,6 +87,22 @@ function getTransporter() {
   return cachedTransporter;
 }
 
+function isSmtpConfigured() {
+  return Boolean(
+    String(process.env.SMTP_HOST || "").trim() &&
+      String(process.env.MAIL_FROM || "").trim(),
+  );
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function sendSellerVerificationOtpEmail({
   email,
   otp,
@@ -118,6 +134,103 @@ export async function sendSellerVerificationOtpEmail({
       </div>
     `,
   });
+
+  return {
+    delivered: true,
+    mode: "real",
+  };
+}
+
+/**
+ * Send seller approval email with Authorized Seller Certificate PDF attached.
+ */
+export async function sendSellerApprovalEmail({
+  email,
+  sellerName,
+  shopName,
+  sellerId,
+  mobile,
+  certificateNo,
+  issueDate,
+  certificatePdf,
+  certificateFilename,
+}) {
+  const safeName = escapeHtml(sellerName || "Seller");
+  const safeShop = escapeHtml(shopName || "-");
+  const safeSellerId = escapeHtml(sellerId || "-");
+  const safeMobile = escapeHtml(mobile || "-");
+  const safeCertNo = escapeHtml(certificateNo || "-");
+  const safeIssueDate = escapeHtml(issueDate || "-");
+
+  const subject = "Your SEVAFAST seller account has been approved";
+  const text = [
+    `Congratulations ${sellerName || "Seller"}!`,
+    "",
+    "Your seller application has been approved. You are now an Authorized Seller and Verified Business Partner of SEVAFAST.",
+    "",
+    `Shop / Business: ${shopName || "-"}`,
+    `Seller ID: ${sellerId || "-"}`,
+    `Mobile: ${mobile || "-"}`,
+    `Certificate No: ${certificateNo || "-"}`,
+    `Issue Date: ${issueDate || "-"}`,
+    "",
+    "Your Authorized Seller Certificate is attached to this email.",
+    "You can now log in to the seller panel and start selling.",
+  ].join("\n");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.5;">
+      <h2 style="margin: 0 0 12px; color: #ea580c;">Congratulations, ${safeName}!</h2>
+      <p style="margin: 0 0 12px;">
+        Your seller application has been <strong>approved</strong>. You are now an
+        <strong>Authorized Seller</strong> and <strong>Verified Business Partner</strong> of SEVAFAST.
+      </p>
+      <table style="border-collapse: collapse; margin: 16px 0; width: 100%; max-width: 520px;">
+        <tr><td style="padding: 6px 0; color: #64748b;">Shop / Business</td><td style="padding: 6px 0; font-weight: 700;">${safeShop}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b;">Seller ID</td><td style="padding: 6px 0; font-weight: 700;">${safeSellerId}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b;">Mobile</td><td style="padding: 6px 0; font-weight: 700;">${safeMobile}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b;">Certificate No.</td><td style="padding: 6px 0; font-weight: 700;">${safeCertNo}</td></tr>
+        <tr><td style="padding: 6px 0; color: #64748b;">Issue Date</td><td style="padding: 6px 0; font-weight: 700;">${safeIssueDate}</td></tr>
+      </table>
+      <p style="margin: 0 0 8px;">Your <strong>Authorized Seller Certificate</strong> is attached as a PDF.</p>
+      <p style="margin: 0;">You can now log in to the seller panel and start selling.</p>
+    </div>
+  `;
+
+  if (!isSmtpConfigured()) {
+    logger.info("Seller approval email skipped (SMTP not configured)", {
+      email,
+      certificateNo,
+      mode: "mock",
+    });
+    return {
+      delivered: false,
+      mode: "mock",
+    };
+  }
+
+  const transporter = getTransporter();
+  const mailOptions = {
+    from: getMailFrom(),
+    to: email,
+    subject,
+    text,
+    html,
+  };
+
+  if (certificatePdf?.length) {
+    mailOptions.attachments = [
+      {
+        filename:
+          certificateFilename ||
+          `SEVAFAST-Authorized-Seller-Certificate-${certificateNo || "approved"}.pdf`,
+        content: certificatePdf,
+        contentType: "application/pdf",
+      },
+    ];
+  }
+
+  await transporter.sendMail(mailOptions);
 
   return {
     delivered: true,

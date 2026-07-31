@@ -315,6 +315,12 @@ const CheckoutPage = () => {
   }, [useWallet, user?.walletBalance, pricingPreview?.grandTotal]);
 
   const finalAmountToPay = Math.max(0, (pricingPreview?.grandTotal ?? cartTotal) - walletAmountToUse);
+  const minimumOrderValue = Number(settings?.minimumOrderValue || 0);
+  const checkoutSubtotal = Number(pricingPreview?.productSubtotal ?? cartTotal ?? 0);
+  const minimumOrderShortfall =
+    minimumOrderValue > 0 ? Math.max(0, minimumOrderValue - checkoutSubtotal) : 0;
+  const isBelowMinimumOrder =
+    minimumOrderValue > 0 && checkoutSubtotal < minimumOrderValue;
   const slideToPayText =
     finalAmountToPay === 0
       ? "Place Free Order"
@@ -814,6 +820,14 @@ const CheckoutPage = () => {
   }, [cartProductIdKey]);
 
   const handlePlaceOrder = async () => {
+    if (isBelowMinimumOrder) {
+      showToast(
+        `Minimum order value is ₹${minimumOrderValue}. Add items worth ₹${Math.ceil(minimumOrderShortfall)} more.`,
+        "error",
+      );
+      return;
+    }
+
     setIsPlacingOrder(true);
     try {
       if (selectedPayment === "online") {
@@ -1237,13 +1251,20 @@ const CheckoutPage = () => {
               walletAmountToUse={walletAmountToUse}
             />
 
+            {isBelowMinimumOrder ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+                Minimum order value is ₹{minimumOrderValue}. Add items worth ₹
+                {Math.ceil(minimumOrderShortfall)} more to place this order.
+              </div>
+            ) : null}
+
             {/* Desktop Slide to Pay */}
             <div className="hidden lg:block">
               <SlideToPay
                 amount={finalAmountToPay}
                 onSuccess={handlePlaceOrder}
                 isLoading={isPlacingOrder || isPreviewLoading}
-                disabled={isPlacingOrder || isPreviewLoading}
+                disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder}
                 text={slideToPayText}
               />
               <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-[0.1em]">
@@ -1263,7 +1284,7 @@ const CheckoutPage = () => {
             amount={finalAmountToPay}
             onSuccess={handlePlaceOrder}
             isLoading={isPlacingOrder || isPreviewLoading}
-            disabled={isPlacingOrder || isPreviewLoading}
+            disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder}
             text={slideToPayText}
           />
         </div>

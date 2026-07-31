@@ -28,6 +28,14 @@ const ProtectedRoute = ({ children }) => {
     }
 
     if (location.pathname.startsWith('/seller')) {
+        if (!user) {
+            return (
+                <div className="flex h-screen w-full items-center justify-center">
+                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+                </div>
+            );
+        }
+
         const applicationStatus =
             user?.applicationStatus || (user?.isVerified ? 'approved' : 'pending');
         const isApprovedSeller =

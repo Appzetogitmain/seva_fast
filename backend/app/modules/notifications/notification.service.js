@@ -18,6 +18,17 @@ const localDedupeStore = new Map();
 let listenerRegistered = false;
 
 function dedupeKeyForNotification(eventType, notification, payload = {}) {
+  if (eventType === NOTIFICATION_EVENTS.BIRTHDAY_WISH) {
+    const year = payload.birthdayYear || new Date().getFullYear();
+    return [
+      "notify",
+      String(eventType),
+      String(notification?.role || "unknown"),
+      String(notification?.userId || "unknown"),
+      String(year),
+    ].join(":");
+  }
+
   const orderRef =
     payload.messageId ||
     payload.messageCreatedAt ||

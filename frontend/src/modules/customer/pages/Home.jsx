@@ -26,7 +26,6 @@ import CardBanner from "@/assets/CardBanner.jpg";
 import SectionRenderer from "../components/experience/SectionRenderer";
 import ExperienceBannerCarousel from "../components/experience/ExperienceBannerCarousel";
 import { useLocation } from "../context/LocationContext";
-import Lottie from "lottie-react";
 import {
   MARQUEE_MESSAGES,
   ICON_COMPONENTS,
@@ -37,6 +36,7 @@ import { mapProductForCustomerListing } from "../utils/productPricing";
 import LowestPriceSection from "../components/home/LowestPriceSection";
 import OfferSections from "../components/home/OfferSections";
 import PlatformBannerSlider from "../components/home/PlatformBannerSlider";
+import ServiceUnavailableSection from "@shared/components/ServiceUnavailableSection";
 
 const DEFAULT_CATEGORY_THEME = {
   gradient: "linear-gradient(to bottom, var(--primary), var(--brand-400))",
@@ -204,24 +204,20 @@ const Home = () => {
   const [isInstantBannerJump, setIsInstantBannerJump] = useState(false);
   const [categoryMap, setCategoryMap] = useState(() => cachedHomePageData?.categoryMap || {});
   const [subcategoryMap, setSubcategoryMap] = useState(() => cachedHomePageData?.subcategoryMap || {});
+  const [headerCategoryMap, setHeaderCategoryMap] = useState(() => cachedHomePageData?.headerCategoryMap || {});
   const [pendingReturn, setPendingReturn] = useState(null);
   const [offerSections, setOfferSections] = useState(() => cachedHomePageData?.offerSections || []);
-  const [noServiceData, setNoServiceData] = useState(null);
+  const activeCategoryFetchRef = useRef(0);
 
   useEffect(() => {
     productsRef.current = products || [];
   }, [products]);
 
-  useEffect(() => {
-    if (products.length === 0 && !isLoading) {
-      import("@/assets/lottie/animation.json").then((m) => setNoServiceData(m.default)).catch(() => {});
-    }
-  }, [products.length, isLoading]);
-
   const applyHomePageData = (data, { cacheKey, persist = true } = {}) => {
     if (!data) return;
     setCategoryMap(data.categoryMap || {});
     setSubcategoryMap(data.subcategoryMap || {});
+    setHeaderCategoryMap(data.headerCategoryMap || {});
     setCategories(data.categories || [ALL_CATEGORY]);
     setQuickCategories(data.quickCategories || []);
     setProducts(data.products || []);
@@ -278,6 +274,7 @@ const Home = () => {
         offerSections: [],
         categoryMap: {},
         subcategoryMap: {},
+        headerCategoryMap: {},
         formattedHeaders: [],
         heroConfig: heroConfigMemoryCache.__home__ || EMPTY_HERO_CONFIG,
       };
@@ -285,9 +282,23 @@ const Home = () => {
         const dbCats = catRes.data.results || catRes.data.result || [];
         const catMap = {};
         const subMap = {};
+        const headerToCategories = {};
         dbCats.forEach((c) => { if (c.type === "category") catMap[c._id] = c; else if (c.type === "subcategory") subMap[c._id] = c; });
+        dbCats
+          .filter((c) => c.type === "category")
+          .forEach((cat) => {
+            const parentHeaderId = String(cat.parentId || "");
+            if (!parentHeaderId) return;
+            if (!headerToCategories[parentHeaderId]) headerToCategories[parentHeaderId] = [];
+            headerToCategories[parentHeaderId].push({
+              id: cat._id,
+              name: cat.name,
+              image: cat.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png",
+            });
+          });
         nextHomeData.categoryMap = catMap;
         nextHomeData.subcategoryMap = subMap;
+        nextHomeData.headerCategoryMap = headerToCategories;
         const formattedHeaders = dbCats.filter((cat) => cat.type === "header").map((cat) => {
           const catName = cat.name;
           const meta = CATEGORY_METADATA[catName] || CATEGORY_METADATA[catName.toUpperCase()] || { icon: Sparkles, theme: DEFAULT_CATEGORY_THEME, banner: { title: catName.toUpperCase(), subtitle: "TOP PICKS", floatingElements: "sparkles" } };
@@ -340,6 +351,51 @@ const Home = () => {
   const heroConfigCache = useRef(heroConfigMemoryCache);
 
   useEffect(() => {
+    const fetchProductsByHeader = async () => {
+      if (!activeCategory) return;
+      const requestId = Date.now();
+      activeCategoryFetchRef.current = requestId;
+
+      try {
+        const hasValidLocation =
+          Number.isFinite(currentLocation?.latitude) &&
+          Number.isFinite(currentLocation?.longitude);
+        const params = { limit: 20 };
+        if (activeCategory._id && activeCategory._id !== "all") {
+          params.headerId = activeCategory._id;
+        }
+        if (hasValidLocation) {
+          params.lat = currentLocation.latitude;
+          params.lng = currentLocation.longitude;
+        }
+
+        const res = await customerApi.getProducts(params);
+        if (activeCategoryFetchRef.current !== requestId) return;
+        if (!res?.data?.success) {
+          setProducts([]);
+          return;
+        }
+
+        const rawResult = res.data.result;
+        const dbProds = Array.isArray(res.data.results)
+          ? res.data.results
+          : Array.isArray(rawResult?.items)
+            ? rawResult.items
+            : Array.isArray(rawResult)
+              ? rawResult
+              : [];
+        setProducts((dbProds || []).map((p) => mapProductForCustomerListing(p)));
+      } catch (error) {
+        if (activeCategoryFetchRef.current === requestId) {
+          setProducts([]);
+        }
+      }
+    };
+
+    fetchProductsByHeader();
+  }, [activeCategory?._id, currentLocation?.latitude, currentLocation?.longitude]);
+
+  useEffect(() => {
     const fetchHeaderSections = async () => {
       if (!activeCategory || activeCategory._id === "all") { setHeaderSections([]); return; }
       const cacheKey = activeCategory._id;
@@ -382,10 +438,14 @@ const Home = () => {
 
   const productsById = useMemo(() => { const map = {}; products.forEach((p) => { map[p._id || p.id] = p; }); return map; }, [products]);
   const effectiveQuickCategories = useMemo(() => {
+    if (activeCategory?._id && activeCategory._id !== "all") {
+      const byHeader = headerCategoryMap[String(activeCategory._id)] || [];
+      if (byHeader.length > 0) return byHeader;
+    }
     const ids = heroConfig.categoryIds || [];
     if (ids.length > 0) { const resolved = ids.map((id) => categoryMap[id]).filter(Boolean).map((c) => ({ id: c._id, name: c.name, image: c.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png" })); if (resolved.length > 0) return resolved; }
     return quickCategories;
-  }, [heroConfig.categoryIds, categoryMap, quickCategories]);
+  }, [activeCategory?._id, headerCategoryMap, heroConfig.categoryIds, categoryMap, quickCategories]);
 
   const sectionsForRenderer = headerSections.length ? headerSections : experienceSections;
   const isMobile = useMemo(() => isMobileOrWebView(), []);
@@ -413,12 +473,7 @@ const Home = () => {
       </div>
 
       {products.length === 0 && !isLoading ? (
-        <div className="flex flex-col items-center justify-center pt-24 pb-48">
-          <div className="w-64 h-64 md:w-96 md:h-96 mb-8">{noServiceData && <Lottie animationData={noServiceData} loop={true} />}</div>
-          <h3 className="text-3xl md:text-5xl font-black text-slate-800 text-center uppercase">Service <span className="text-primary">Unavailable</span></h3>
-          <p className="text-slate-500 font-bold max-w-md text-center px-10 text-sm md:text-lg opacity-80">Ah! We haven't reached your neighborhood yet.</p>
-          <button onClick={() => window.location.reload()} className="mt-12 px-10 py-4 bg-primary text-white font-black rounded-[24px] uppercase text-[13px] tracking-widest transition-all active:scale-95">Check Again</button>
-        </div>
+        <ServiceUnavailableSection embedded />
       ) : (
         <>
             <motion.div ref={heroRef} className="block md:hidden will-change-transform" style={isMobile ? { opacity: 1 } : { opacity, y, scale, pointerEvents }}>
@@ -445,7 +500,7 @@ const Home = () => {
               <PlatformBannerSlider ads={activePlatformAds} />
             </div>
           )}
-          <OfferSections sections={offerSections} noServiceData={noServiceData} />
+          <OfferSections sections={offerSections} />
 
           {sectionsForRenderer.length > 0 && (
             <div className="container mx-auto px-4 md:px-8 lg:px-[50px] py-10 md:py-16">

@@ -65,6 +65,10 @@ const sellerSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    shiprocketPickupLocation: {
+      type: String,
+      trim: true,
+    },
 
     documents: {
       tradeLicense: { type: String, trim: true },

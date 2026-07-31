@@ -67,6 +67,50 @@ function makeProductSku(name, index = 1) {
   return `${prefix}-${String(index).padStart(3, "0")}`;
 }
 
+function parsePositiveNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function parseWeightKgFromString(weightStr) {
+  const raw = String(weightStr || "").trim();
+  if (!raw) return null;
+  let val = parseFloat(raw.replace(/[^\d.]/g, ""));
+  if (!Number.isFinite(val) || val <= 0) return null;
+  if (raw.toLowerCase().includes("gm") || raw.toLowerCase().includes("gram")) {
+    val = val / 1000;
+  }
+  return val;
+}
+
+/**
+ * For scheduled (Shiprocket) products, weight + package L/B/H (cm) are required.
+ * Coerces numeric package fields onto productData when valid.
+ */
+function validateAndNormalizeScheduledPackageFields(productData = {}) {
+  const deliveryType = String(productData.deliveryType || "instant").toLowerCase();
+  if (deliveryType !== "scheduled") {
+    return null;
+  }
+
+  if (!parseWeightKgFromString(productData.weight)) {
+    return "Weight is required for scheduled nationwide delivery products";
+  }
+
+  const length = parsePositiveNumber(productData.packageLength);
+  const breadth = parsePositiveNumber(productData.packageBreadth);
+  const height = parsePositiveNumber(productData.packageHeight);
+
+  if (!length || !breadth || !height) {
+    return "Package length, breadth and height (cm) are required for scheduled nationwide delivery";
+  }
+
+  productData.packageLength = length;
+  productData.packageBreadth = breadth;
+  productData.packageHeight = height;
+  return null;
+}
+
 function parseJsonIfString(value) {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
@@ -420,7 +464,7 @@ export const getProducts = async (req, res) => {
       const [rawProducts, total] = await Promise.all([
         Product.find(finalQuery)
           .select(
-            "name slug description sku price salePrice stock brand weight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
+            "name slug description sku price salePrice stock brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
           )
           // No .populate() — names resolved via cache-backed entityNameCache
           .sort(sortQuery)
@@ -543,7 +587,7 @@ export const getSellerProducts = async (req, res) => {
     ] = await Promise.all([
       Product.find(query)
         .select(
-          "name slug description sku price salePrice stock lowStockAlert brand weight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
+          "name slug description sku price salePrice stock lowStockAlert brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
         )
         .populate("headerId", "name")
         .populate("categoryId", "name")
@@ -762,6 +806,9 @@ export const createProduct = async (req, res) => {
     const stockError = validateNonNegativeStockFields(productData);
     if (stockError) return handleResponse(res, 400, stockError);
 
+    const packageError = validateAndNormalizeScheduledPackageFields(productData);
+    if (packageError) return handleResponse(res, 400, packageError);
+
     let moderationUpdate = {};
     let successMessage = "Product created successfully";
 
@@ -952,6 +999,42 @@ export const updateProduct = async (req, res) => {
     const stockError = validateNonNegativeStockFields(productData);
     if (stockError) return handleResponse(res, 400, stockError);
 
+    const packageError = validateAndNormalizeScheduledPackageFields({
+      deliveryType:
+        productData.deliveryType !== undefined
+          ? productData.deliveryType
+          : product.deliveryType,
+      weight:
+        productData.weight !== undefined ? productData.weight : product.weight,
+      packageLength:
+        productData.packageLength !== undefined
+          ? productData.packageLength
+          : product.packageLength,
+      packageBreadth:
+        productData.packageBreadth !== undefined
+          ? productData.packageBreadth
+          : product.packageBreadth,
+      packageHeight:
+        productData.packageHeight !== undefined
+          ? productData.packageHeight
+          : product.packageHeight,
+    });
+    if (packageError) return handleResponse(res, 400, packageError);
+
+    // Persist coerced numeric dims when scheduled payload included them
+    if (productData.packageLength !== undefined) {
+      const n = parsePositiveNumber(productData.packageLength);
+      if (n) productData.packageLength = n;
+    }
+    if (productData.packageBreadth !== undefined) {
+      const n = parsePositiveNumber(productData.packageBreadth);
+      if (n) productData.packageBreadth = n;
+    }
+    if (productData.packageHeight !== undefined) {
+      const n = parsePositiveNumber(productData.packageHeight);
+      if (n) productData.packageHeight = n;
+    }
+
     let moderationUpdate = {};
     let successMessage = "Product updated successfully";
 
@@ -1097,7 +1180,7 @@ export const getProductById = async (req, res) => {
       async () =>
         Product.findById(id)
           .select(
-            "name slug description sku price salePrice stock lowStockAlert brand weight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
+            "name slug description sku price salePrice stock lowStockAlert brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
           )
           .populate("headerId", "name")
           .populate("categoryId", "name")
@@ -1238,7 +1321,7 @@ export const getModerationProducts = async (req, res) => {
       await Promise.all([
         Product.find(moderatedQuery)
           .select(
-            "name slug description sku price salePrice stock lowStockAlert brand weight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
+            "name slug description sku price salePrice stock lowStockAlert brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
           )
           .populate("headerId", "name")
           .populate("categoryId", "name")
@@ -1371,5 +1454,85 @@ export const rejectProduct = async (req, res) => {
     );
   } catch (error) {
     return handleResponse(res, 500, error.message);
+  }
+};
+
+/* ===============================
+   BULK UPLOAD (seller)
+================================ */
+export const downloadBulkProductTemplate = async (_req, res) => {
+  try {
+    const {
+      buildBulkTemplateBuffer,
+    } = await import("../services/productBulkUploadService.js");
+    const buffer = buildBulkTemplateBuffer();
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="product-bulk-upload-sample.xlsx"',
+    );
+    return res.status(200).send(buffer);
+  } catch (error) {
+    console.error("Bulk template download error:", error);
+    return handleResponse(res, 500, error.message || "Failed to generate template");
+  }
+};
+
+export const bulkUploadProducts = async (req, res) => {
+  try {
+    const role = String(req.user?.role || "").toLowerCase();
+    if (role !== "seller") {
+      return handleResponse(res, 403, "Only sellers can bulk upload products");
+    }
+
+    const file = req.file;
+    if (!file?.buffer) {
+      return handleResponse(res, 400, "Please upload an Excel file (.xlsx)");
+    }
+
+    const name = String(file.originalname || "").toLowerCase();
+    const isExcel =
+      name.endsWith(".xlsx") ||
+      name.endsWith(".xls") ||
+      String(file.mimetype || "").includes("spreadsheet") ||
+      String(file.mimetype || "").includes("excel");
+
+    if (!isExcel) {
+      return handleResponse(res, 400, "Invalid file type. Upload a .xlsx Excel file");
+    }
+
+    const {
+      parseBulkWorkbook,
+      bulkCreateProductsFromRows,
+    } = await import("../services/productBulkUploadService.js");
+
+    let rows;
+    try {
+      rows = parseBulkWorkbook(file.buffer);
+    } catch (parseErr) {
+      return handleResponse(res, 400, parseErr.message || "Could not read Excel file");
+    }
+
+    const result = await bulkCreateProductsFromRows(rows, {
+      sellerId: req.user.id,
+    });
+
+    const message =
+      result.created > 0
+        ? result.requiresApproval
+          ? `${result.created} product(s) submitted for admin approval${result.failed ? `, ${result.failed} failed` : ""}`
+          : `${result.created} product(s) created successfully${result.failed ? `, ${result.failed} failed` : ""}`
+        : result.failed
+          ? `No products created. ${result.failed} row(s) failed`
+          : "No products created";
+
+    const statusCode = result.created > 0 ? 201 : 400;
+    return handleResponse(res, statusCode, message, result);
+  } catch (error) {
+    console.error("Bulk upload products error:", error);
+    return handleResponse(res, 500, error.message || "Bulk upload failed");
   }
 };

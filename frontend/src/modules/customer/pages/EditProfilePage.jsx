@@ -1,10 +1,20 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Phone, Mail, Camera, Save } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Camera, Save, Cake } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@core/context/AuthContext';
 import { customerApi } from '../services/customerApi';
+
+function formatDobForInput(dateOfBirth) {
+    if (!dateOfBirth) return '';
+    const date = new Date(dateOfBirth);
+    if (Number.isNaN(date.getTime())) return '';
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
 
 const EditProfilePage = () => {
     const navigate = useNavigate();
@@ -14,7 +24,8 @@ const EditProfilePage = () => {
         name: user?.name || '',
         phone: user?.phone || '',
         email: user?.email || '',
-        bio: user?.bio || ''
+        bio: user?.bio || '',
+        dateOfBirth: formatDobForInput(user?.dateOfBirth),
     });
 
     const handleChange = (e) => {
@@ -25,7 +36,11 @@ const EditProfilePage = () => {
         e.preventDefault();
         setIsLoading(true);
         try {
-            const response = await customerApi.updateProfile(formData);
+            const response = await customerApi.updateProfile({
+                name: formData.name,
+                email: formData.email,
+                dateOfBirth: formData.dateOfBirth,
+            });
             const updatedUser = response.data.result;
 
             // Update in-memory auth user so profile screen reflects changes instantly.
@@ -111,6 +126,25 @@ const EditProfilePage = () => {
                                     placeholder="Enter email address"
                                 />
                             </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Date of Birth</label>
+                            <div className="flex items-center gap-3 bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10 transition-all">
+                                <Cake size={20} className="text-slate-400 shrink-0" />
+                                <input
+                                    type="date"
+                                    name="dateOfBirth"
+                                    value={formData.dateOfBirth}
+                                    onChange={handleChange}
+                                    required
+                                    max={new Date().toISOString().split('T')[0]}
+                                    className="bg-transparent w-full text-slate-800 font-bold outline-none"
+                                />
+                            </div>
+                            <p className="mt-2 text-[11px] font-medium text-slate-400">
+                                We use this to send you a birthday wish once every year.
+                            </p>
                         </div>
 
                         <div>

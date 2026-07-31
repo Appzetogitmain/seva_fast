@@ -1,7 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
-import Lottie from "lottie-react";
 import ProductCard from "../shared/ProductCard";
 import {
   getBackgroundColorByValue,
@@ -10,7 +9,7 @@ import {
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
 import { mapProductForCustomerListing } from "../../utils/productPricing";
 
-const OfferSections = ({ sections, noServiceData }) => {
+const OfferSections = ({ sections }) => {
   if (!sections || sections.length === 0) return null;
 
   return (
@@ -95,13 +94,6 @@ const OfferSections = ({ sections, noServiceData }) => {
                 <div className="flex overflow-x-auto gap-3 md:gap-4 pb-0 no-scrollbar snap-x snap-mandatory">
                   {sectionProducts.length === 0 ? (
                     <div className="w-full py-10 flex flex-col items-center justify-center text-center">
-                      <div className="w-32 h-32 mb-3">
-                        {noServiceData ? (
-                          <Lottie animationData={noServiceData} loop={true} />
-                        ) : (
-                          <div className="w-32 h-32" />
-                        )}
-                      </div>
                       <p className="text-sm md:text-base text-slate-400 font-bold">
                         Looking for the best items in this category...
                       </p>

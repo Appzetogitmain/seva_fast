@@ -9,6 +9,8 @@ import {
     getModerationProducts,
     approveProduct,
     rejectProduct,
+    downloadBulkProductTemplate,
+    bulkUploadProducts,
 } from "../controller/productController.js";
 import { adjustStock, getStockHistory } from "../controller/stockController.js";
 import Product from "../models/product.js";
@@ -42,6 +44,21 @@ router.get("/", optionalVerifyToken, getProducts);
 router.get("/seller/me", verifyToken, allowRoles("seller"), requireApprovedSeller, getSellerProducts);
 router.get("/stock-history", verifyToken, allowRoles("seller"), requireApprovedSeller, getStockHistory);
 router.post("/adjust-stock", verifyToken, allowRoles("seller"), requireApprovedSeller, adjustStock);
+router.get(
+  "/bulk/template",
+  verifyToken,
+  allowRoles("seller"),
+  requireApprovedSeller,
+  downloadBulkProductTemplate
+);
+router.post(
+  "/bulk",
+  verifyToken,
+  allowRoles("seller"),
+  requireApprovedSeller,
+  upload.single("file"),
+  bulkUploadProducts
+);
 router.get("/moderation", verifyToken, loadSubadminZones, allowRoles("admin"), getModerationProducts);
 router.patch("/moderation/:id/approve", verifyToken, loadSubadminZones, enforceZoneAccess(resolveProductZoneId), allowRoles("admin"), approveProduct);
 router.patch("/moderation/:id/reject", verifyToken, loadSubadminZones, enforceZoneAccess(resolveProductZoneId), allowRoles("admin"), rejectProduct);

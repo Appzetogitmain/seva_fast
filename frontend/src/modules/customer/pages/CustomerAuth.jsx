@@ -17,7 +17,8 @@ import {
     Heart,
     ChevronLeft,
     X,
-    Eye
+    Eye,
+    Cake,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { customerApi } from '../services/customerApi';
@@ -88,6 +89,7 @@ const CustomerAuth = () => {
         phone: location.state?.phone || '',
         otp: '',
         name: '',
+        dateOfBirth: '',
     });
 
     useEffect(() => {
@@ -146,6 +148,10 @@ const CustomerAuth = () => {
             } else {
                 if (!formData.name.trim()) {
                     toast.error('Name is required');
+                    return;
+                }
+                if (!formData.dateOfBirth) {
+                    toast.error('Please enter your date of birth');
                     return;
                 }
                 const res = await customerApi.sendSignupOtp({
@@ -209,6 +215,7 @@ const CustomerAuth = () => {
             const response = await customerApi.verifyOtp({
                 phone: formData.phone,
                 otp: formData.otp,
+                ...(!isLogin && formData.dateOfBirth ? { dateOfBirth: formData.dateOfBirth } : {}),
             });
 
             const responseData = response.data.result || response.data;
@@ -450,6 +457,24 @@ const CustomerAuth = () => {
                                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                                     onFocus={(e) => e.target.style.borderColor = activeCategory.theme}
                                                     onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
+                                                />
+                                            </div>
+                                        )}
+                                        {!isLogin && (
+                                            <div className="relative group">
+                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors">
+                                                    <Cake size={18} />
+                                                </div>
+                                                <input
+                                                    required
+                                                    type="date"
+                                                    name="dateOfBirth"
+                                                    max={new Date().toISOString().split('T')[0]}
+                                                    value={formData.dateOfBirth}
+                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
+                                                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                                                    onFocus={(e) => { e.target.style.borderColor = activeCategory.theme; }}
+                                                    onBlur={(e) => { e.target.style.borderColor = '#F3F4F6'; }}
                                                 />
                                             </div>
                                         )}

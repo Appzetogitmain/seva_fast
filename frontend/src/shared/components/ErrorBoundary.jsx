@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { AlertCircle, RefreshCw, Home, ShoppingBag } from 'lucide-react';
+import ServiceUnavailableSection from './ServiceUnavailableSection';
 
 class ErrorBoundary extends Component {
     constructor(props) {
@@ -17,6 +18,22 @@ class ErrorBoundary extends Component {
 
     render() {
         if (this.state.hasError) {
+            const errorMessage = String(this.state.error?.message || '');
+            const normalizedMessage = errorMessage.toLowerCase();
+            const isServiceUnavailable =
+                normalizedMessage.includes('service unavailable') ||
+                normalizedMessage.includes('failed to fetch') ||
+                normalizedMessage.includes('network error') ||
+                normalizedMessage.includes('load failed');
+
+            if (isServiceUnavailable) {
+                return (
+                    <ServiceUnavailableSection
+                        description="We can't reach the server right now. Please try again in a moment."
+                    />
+                );
+            }
+
             return (
                 <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-outfit">
                     <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-gray-100">

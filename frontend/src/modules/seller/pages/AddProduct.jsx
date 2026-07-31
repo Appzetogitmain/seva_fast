@@ -55,6 +55,9 @@ const AddProduct = () => {
     weight: "",
     weightVal: "",
     weightUnit: "kg",
+    packageLength: "",
+    packageBreadth: "",
+    packageHeight: "",
     deliveryType: "instant",
     brand: "",
     mainImage: null,
@@ -137,6 +140,17 @@ const AddProduct = () => {
         toast.error("Please provide a valid product weight for scheduled nationwide delivery.");
         return;
       }
+      const length = parseFloat(formData.packageLength);
+      const breadth = parseFloat(formData.packageBreadth);
+      const height = parseFloat(formData.packageHeight);
+      if (
+        !formData.packageLength || !formData.packageBreadth || !formData.packageHeight ||
+        Number.isNaN(length) || Number.isNaN(breadth) || Number.isNaN(height) ||
+        length <= 0 || breadth <= 0 || height <= 0
+      ) {
+        toast.error("Please provide package length, breadth and height (cm) for Shiprocket shipping.");
+        return;
+      }
     }
 
     const firstVariant = formData.variants[0] || {};
@@ -165,6 +179,11 @@ const AddProduct = () => {
       data.append("brand", formData.brand);
       data.append("weight", formData.weight);
       data.append("deliveryType", formData.deliveryType || "instant");
+      if (formData.deliveryType === "scheduled") {
+        data.append("packageLength", formData.packageLength);
+        data.append("packageBreadth", formData.packageBreadth);
+        data.append("packageHeight", formData.packageHeight);
+      }
       data.append("status", formData.status);
 
       // Map top-level price/stock from first variant for indexing/listing
@@ -439,6 +458,61 @@ const AddProduct = () => {
                   </div>
                 </div>
               </div>
+
+              {formData.deliveryType === "scheduled" && (
+                <div className="space-y-2 pt-2">
+                  <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                    Package Size (cm) <span className="text-rose-500">*</span>
+                  </label>
+                  <p className="text-[11px] text-slate-500 font-medium ml-1">
+                    Required for Shiprocket delivery rate &amp; AWB calculation.
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1 flex flex-col">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Length</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={formData.packageLength || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, packageLength: e.target.value })
+                        }
+                        className="w-full px-3 py-2.5 bg-slate-100 border-none rounded-md text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/5"
+                        placeholder="cm"
+                      />
+                    </div>
+                    <div className="space-y-1 flex flex-col">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Breadth</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={formData.packageBreadth || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, packageBreadth: e.target.value })
+                        }
+                        className="w-full px-3 py-2.5 bg-slate-100 border-none rounded-md text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/5"
+                        placeholder="cm"
+                      />
+                    </div>
+                    <div className="space-y-1 flex flex-col">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Height</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={formData.packageHeight || ""}
+                        onChange={(e) =>
+                          setFormData({ ...formData, packageHeight: e.target.value })
+                        }
+                        className="w-full px-3 py-2.5 bg-slate-100 border-none rounded-md text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/5"
+                        placeholder="cm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

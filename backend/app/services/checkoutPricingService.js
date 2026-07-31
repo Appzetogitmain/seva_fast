@@ -8,6 +8,7 @@ import {
   hydrateOrderItems,
   recalculateLogisticsEarnings,
 } from "./finance/pricingService.js";
+import { getOrCreateFinanceSettings } from "./finance/financeSettingsService.js";
 
 function normalizeLocation(location = null) {
   const lat = Number(location?.lat);
@@ -79,6 +80,25 @@ function sumField(rows, field) {
 
 function round2(value) {
   return Number((Number(value || 0)).toFixed(2));
+}
+
+export async function assertMinimumOrderValue(productSubtotal) {
+  const settings = await getOrCreateFinanceSettings();
+  const minimumOrderValue = round2(settings.minimumOrderValue || 0);
+  if (minimumOrderValue <= 0) return;
+
+  const subtotal = round2(productSubtotal);
+  if (subtotal < minimumOrderValue) {
+    const shortfall = round2(minimumOrderValue - subtotal);
+    const err = new Error(
+      `Minimum order value is ₹${minimumOrderValue}. Add items worth ₹${shortfall} more to checkout.`,
+    );
+    err.statusCode = 400;
+    err.code = "MINIMUM_ORDER_VALUE";
+    err.minimumOrderValue = minimumOrderValue;
+    err.currentSubtotal = subtotal;
+    throw err;
+  }
 }
 
 function buildAggregateBreakdown(sellerBreakdowns = []) {
@@ -351,6 +371,8 @@ export async function buildCheckoutPricingSnapshot({
     sellerBreakdownEntries.map((entry) => entry.breakdown),
   );
 
+  await assertMinimumOrderValue(aggregateBreakdown.productSubtotal);
+
   return {
     hydratedItems,
     sellerBreakdownEntries,
@@ -362,5 +384,6 @@ export async function buildCheckoutPricingSnapshot({
 
 export default {
   buildCheckoutPricingSnapshot,
+  assertMinimumOrderValue,
   groupHydratedItemsBySeller,
 };

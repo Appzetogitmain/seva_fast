@@ -47,6 +47,11 @@ const orderSchema = new mongoose.Schema(
         },
         variantSlot: String,
         image: String,
+        // Snapshot for Shiprocket (scheduled nationwide shipping)
+        weight: String,
+        packageLength: Number,
+        packageBreadth: Number,
+        packageHeight: Number,
       },
     ],
     address: {
@@ -58,6 +63,8 @@ const orderSchema = new mongoose.Schema(
       name: String,
       address: String,
       city: String,
+      state: String,
+      pincode: String,
       phone: String,
       landmark: String,
       location: {
