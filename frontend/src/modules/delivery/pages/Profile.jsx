@@ -23,11 +23,7 @@ import { useAuth } from "@core/context/AuthContext";
 import { useSettings } from "@core/context/SettingsContext";
 import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 import axiosInstance from '@core/api/axios';
-<<<<<<< HEAD
-import { useEffect } from 'react';
 import { formatDate } from '@shared/utils/formatDate';
-=======
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
 
 const Profile = () => {
   const navigate = useNavigate();

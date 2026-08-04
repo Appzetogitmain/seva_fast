@@ -1282,11 +1282,7 @@ const CheckoutPage = () => {
                 amount={finalAmountToPay}
                 onSuccess={handlePlaceOrder}
                 isLoading={isPlacingOrder || isPreviewLoading}
-<<<<<<< HEAD
-                disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder}
-=======
-                disabled={isPlacingOrder || isPreviewLoading || hasMixedCart}
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
+                disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder || hasMixedCart}
                 text={slideToPayText}
               />
               <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-[0.1em]">
@@ -1306,11 +1302,7 @@ const CheckoutPage = () => {
             amount={finalAmountToPay}
             onSuccess={handlePlaceOrder}
             isLoading={isPlacingOrder || isPreviewLoading}
-<<<<<<< HEAD
-            disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder}
-=======
-            disabled={isPlacingOrder || isPreviewLoading || hasMixedCart}
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
+            disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder || hasMixedCart}
             text={slideToPayText}
           />
         </div>

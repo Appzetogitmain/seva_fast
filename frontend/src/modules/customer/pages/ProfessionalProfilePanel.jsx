@@ -686,8 +686,8 @@ const ProfessionalProfilePanel = () => {
 
             {activeTab === 'directory' && (
                 ad ? (
-                    /* PROFILE DASHBOARD DISPLAY */
                     <div className="space-y-8">
+                        {/* PROFILE DASHBOARD DISPLAY */}
                         {/* ALERT BANNER FOR UNPAID / PENDING APPROVAL */}
                         {(ad.paymentStatus !== 'paid' || ad.approvalStatus !== 'approved') && (
                             <div className="bg-amber-50/60 border border-amber-100 p-6 rounded-[32px] flex items-start gap-4 shadow-sm animate-in slide-in-from-top duration-500">
@@ -830,97 +830,6 @@ const ProfessionalProfilePanel = () => {
                             </div>
                         </div>
 
-                        {/* Catalog Services Editor */}
-                        <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-slate-100 shadow-sm space-y-6">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-955">Service Price Catalog</h2>
-                                    <p className="text-xs text-slate-400 font-bold mt-1">Manage individual service task items you offer to customers.</p>
-                                </div>
-                                {!isEditingCatalog ? (
-                                    <button
-                                        onClick={() => setIsEditingCatalog(true)}
-                                        className="w-full sm:w-auto px-6 py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <Edit2 className="h-4 w-4" /> Edit List
-                                    </button>
-                                ) : (
-<<<<<<< HEAD
-                                    <span className="text-[9px] font-bold text-slate-400 italic">None</span>
-                                )}
-                                <button
-                                    onClick={() => {
-                                        try {
-                                            const ids = (ad.categories && ad.categories.length > 0)
-                                                ? ad.categories.filter(Boolean).map(c => typeof c === 'string' ? c : (c._id || c.id || c))
-                                                : (ad.category ? [typeof ad.category === 'string' ? ad.category : (ad.category._id || ad.category.id)] : []);
-                                            setEditCategoryIds(ids);
-                                            setIsEditingCategories(true);
-                                        } catch (err) {
-                                            console.error("Error setting edit categories:", err);
-                                            setEditCategoryIds([]);
-                                            setIsEditingCategories(true);
-                                        }
-                                    }}
-                                    className="ml-2 inline-flex items-center gap-1 px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 text-[9px] font-black uppercase tracking-wider rounded-full transition-all border border-brand-100/50 shadow-sm"
-                                >
-                                    <Plus className="h-3 w-3" /> Add / Edit Service
-                                </button>
-                            </div>
-                        </div>
-                        <div className="flex flex-col items-start md:items-end gap-1 bg-slate-50 p-4 rounded-3xl border border-slate-100 w-full md:w-auto min-w-[150px]">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Wallet Balance</span>
-                            <span className="text-xl font-black text-slate-900">₹{walletBalance}</span>
-                        </div>
-                    </div>
-
-                    {/* Verification & Subscription Status Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Approval Status Card */}
-                        <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
-                            <div className={`p-4 rounded-2xl ${
-                                ad.approvalStatus === 'approved' ? 'bg-emerald-50 text-emerald-600' :
-                                ad.approvalStatus === 'rejected' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
-                            }`}>
-                                {ad.approvalStatus === 'approved' ? <CheckCircle2 className="h-8 w-8" /> :
-                                 ad.approvalStatus === 'rejected' ? <XCircle className="h-8 w-8" /> : <Clock className="h-8 w-8" />}
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Verification Status</span>
-                                <h3 className="text-lg font-black text-slate-900 capitalize">{ad.approvalStatus}</h3>
-                                {ad.rejectionReason && (
-                                    <p className="text-xs font-bold text-rose-500 mt-1">Reason: {ad.rejectionReason}</p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Subscription Status Card */}
-                        <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <div className={`p-4 rounded-2xl ${
-                                    ad.paymentStatus === 'paid' ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-400'
-                                }`}>
-                                    <DollarSign className="h-8 w-8" />
-                                </div>
-                                <div className="space-y-1">
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ad Subscription Status</span>
-                                    <h3 className="text-lg font-black text-slate-900 capitalize">{ad.paymentStatus}</h3>
-                                    {ad.expiresAt && ad.paymentStatus === 'paid' && (
-                                        <p className="text-xs font-semibold text-slate-400">Expires on: {formatDate(ad.expiresAt)}</p>
-                                    )}
-                                </div>
-                            </div>
-                            {ad.paymentStatus !== 'paid' && (
-                                <button
-                                    onClick={handlePayListing}
-                                    className="px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all hover:scale-105"
-                                >
-                                    {getListingPriceToShow() === 0 ? 'Activate Free Listing' : `Pay ₹${getListingPriceToShow()}`}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
                     {/* Catalog Services Editor */}
                     <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-slate-100 shadow-sm space-y-6">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -956,66 +865,11 @@ const ProfessionalProfilePanel = () => {
                             )}
                         </div>
 
-                        {isEditingCatalog ? (
-                            /* Editing Catalog Inputs */
-                            <div className="space-y-6">
-                                <div className="p-6 bg-slate-50 rounded-[28px] border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                    <div className="space-y-1 md:col-span-4">
-                                        <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Service Title</label>
-                                        <input
-                                            type="text"
-                                            value={newServiceName}
-                                            onChange={(e) => setNewServiceName(e.target.value)}
-                                            placeholder="e.g. Tap Leak Repair"
-                                            className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
-                                        />
-                                    </div>
-                                    <div className="space-y-1 md:col-span-3">
-                                        <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Pricing (₹)</label>
-                                        <input
-                                            type="number"
-                                            value={newServicePrice}
-                                            onChange={(e) => setNewServicePrice(e.target.value)}
-                                            placeholder="e.g. 199"
-                                            className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
-                                        />
-                                    </div>
-                                    <div className="space-y-1 md:col-span-4">
-                                        <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Description</label>
-                                        <input
-                                            type="text"
-                                            value={newServiceDesc}
-                                            onChange={(e) => setNewServiceDesc(e.target.value)}
-                                            placeholder="Brief summary..."
-                                            className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
-                                        />
-                                    </div>
-                                    <div className="md:col-span-1">
-=======
-                                    <div className="flex items-center gap-2 w-full sm:w-auto">
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
-                                        <button
-                                            onClick={handleSaveCatalog}
-                                            className="flex-1 sm:flex-none px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center"
-                                        >
-                                            Save Changes
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setIsEditingCatalog(false);
-                                                setServicesList(ad.services || []);
-                                            }}
-                                            className="flex-1 sm:flex-none px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+
 
                             {isEditingCatalog ? (
-                                /* Editing Catalog Inputs */
                                 <div className="space-y-6">
+                                    {/* Editing Catalog Inputs */}
                                     <div className="p-6 bg-slate-50 rounded-[28px] border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                                         <div className="space-y-1 md:col-span-4">
                                             <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Service Title</label>
@@ -1084,8 +938,8 @@ const ProfessionalProfilePanel = () => {
                                     </div>
                                 </div>
                             ) : (
-                                /* Ready Catalog View Only */
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Ready Catalog View Only */}
                                     {ad.services?.length > 0 ? (
                                         ad.services.map((svc, i) => (
                                             <div key={i} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex justify-between items-center">
@@ -1118,8 +972,8 @@ const ProfessionalProfilePanel = () => {
                         </div>
                     </div>
                 ) : (
-                    /* SERVICE PROFESSIONAL REGISTRATION WIZARD */
                     <div className="bg-white p-8 md:p-12 rounded-[40px] border border-slate-100 shadow-sm space-y-8">
+                        {/* SERVICE PROFESSIONAL REGISTRATION WIZARD */}
                         <div>
                             <h1 className="text-2xl font-black text-slate-950 flex items-center gap-2">
                                 List Your Professional Service

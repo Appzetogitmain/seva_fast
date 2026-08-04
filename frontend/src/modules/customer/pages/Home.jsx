@@ -493,16 +493,6 @@ const Home = () => {
             </motion.div>
 
           <PromoMarquee />
-<<<<<<< HEAD
-          <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => navigate(`/category/${id}`)} />
-          <LowestPriceSection products={products} onSeeAll={() => navigate("/category/all")} />
-          {activePlatformAds && activePlatformAds.length > 0 && (
-            <div className="pt-4 pb-4">
-              <PlatformBannerSlider ads={activePlatformAds} />
-            </div>
-          )}
-          <OfferSections sections={offerSections} />
-=======
           <div className="px-4 lg:px-8 max-w-7xl mx-auto">
             <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => navigate(`/category/${id}`)} />
             <LowestPriceSection products={products} onSeeAll={() => navigate("/category/all")} />
@@ -511,12 +501,11 @@ const Home = () => {
                 <PlatformBannerSlider ads={activePlatformAds} />
               </div>
             )}
-            <OfferSections sections={offerSections} noServiceData={noServiceData} />
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
+            <OfferSections sections={offerSections} />
 
             {sectionsForRenderer.length > 0 && (
               <div className="flex flex-col relative z-20 pb-32">
-                <SectionRenderer sections={sectionsForRenderer} productsById={productsById} categoriesById={categoryMap} subcategoriesById={subcategoryMap} noServiceData={noServiceData} />
+                <SectionRenderer sections={sectionsForRenderer} productsById={productsById} categoriesById={categoryMap} subcategoriesById={subcategoryMap} />
               </div>
             )}
           </div>

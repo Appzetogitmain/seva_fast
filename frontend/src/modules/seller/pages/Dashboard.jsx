@@ -601,34 +601,20 @@ const Dashboard = () => {
                         </span>
                       </div>
                     </div>
-<<<<<<< HEAD
                     {["packed", "out_for_delivery", "delivered"].includes(
                       String(selectedOrder.status || "").toLowerCase(),
                     ) ? (
-=======
-                  </div>
-                  <button
-                    onClick={() => setIsOrderModalOpen(false)}
-                    className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600"
-                  >
-                    <HiOutlineXMark className="h-5 w-5" />
-                  </button>
-                </div>
-
-                <div className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto scrollbar-hide flex-1">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                    <div className="space-y-3 sm:space-y-4">
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
-                      <div>
-                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                          <HiOutlineMapPin className="h-3 w-3 text-primary" />{" "}
-                          Delivery Address
-                        </h4>
-                        <p className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
-                          {selectedOrder.address}
-                        </p>
-                      </div>
-                      <div>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                            <HiOutlineMapPin className="h-3 w-3 text-primary" />{" "}
+                            Delivery Address
+                          </h4>
+                          <p className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
+                            {selectedOrder.address}
+                          </p>
+                        </div>
+                        <div>
                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                           <HiOutlinePhone className="h-3 w-3 text-brand-500" />{" "}
                           Contact Info
@@ -672,46 +658,6 @@ const Dashboard = () => {
                                   <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
                                 </div>
                               </div>
-<<<<<<< HEAD
-                              {String(selectedOrder.status || "").toLowerCase() === "packed" && (
-                                <>
-                                  <div className="h-px bg-slate-200 my-1" />
-                                  <div className="relative">
-                                    <select
-                                      value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}
-                                      onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
-                                      className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
-                                    >
-                                      <option value="">Change Rider...</option>
-                                      {deliveryBoys.map(boy => (
-                                        <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
-                                      ))}
-                                    </select>
-                                    <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          ) : String(selectedOrder.status || "").toLowerCase() === "packed" ? (
-                            <div className="relative">
-                              <select
-                                value=""
-                                onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
-                                className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
-                              >
-                                <option value="">Assign Rider...</option>
-                                {deliveryBoys.map(boy => (
-                                  <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
-                                ))}
-                              </select>
-                              <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
-                            </div>
-                          ) : (
-                            <p className="text-[11px] text-slate-500 font-medium">
-                              No delivery partner assigned.
-                            </p>
-                          )}
-=======
                             ) : (
                               <div className="relative">
                                 <select
@@ -728,10 +674,10 @@ const Dashboard = () => {
                               </div>
                             )}
                           </div>
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
                         </div>
                       )}
                     </div>
+                  ) : null}
                     <div className="space-y-3 sm:space-y-4">
                       <div className="bg-slate-50 p-3 sm:p-4 rounded-3xl border border-slate-100">
                         <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
@@ -895,9 +841,9 @@ const Dashboard = () => {
                           <option value="delivered">Delivered</option>
                           <option value="cancelled">Cancelled</option>
                         </select>
-                        <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
                       </div>
-                    ) : String(selectedOrder.status || "").toLowerCase() === "confirmed" ? (
+                    )}
+                    {String(selectedOrder.status || "").toLowerCase() === "confirmed" && (
                       <div>
                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                           <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
@@ -908,7 +854,7 @@ const Dashboard = () => {
                           </p>
                         </div>
                       </div>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               </motion.div>

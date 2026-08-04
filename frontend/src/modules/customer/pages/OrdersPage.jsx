@@ -4,11 +4,8 @@ import { Package, ChevronRight, Clock, CheckCircle, Loader2, ChevronLeft } from 
 import { customerApi } from '../services/customerApi';
 import { getOrderStatusLabel, getLegacyStatusFromOrder } from '@/shared/utils/orderStatus';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
-<<<<<<< HEAD
 import { formatDate, formatTime } from '@shared/utils/formatDate';
-=======
 import { getOrderSocket, onOrderStatusUpdate } from '@/core/services/orderSocket';
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
 
 const OrdersPage = () => {
     const navigate = useNavigate();
@@ -125,59 +122,25 @@ const OrdersPage = () => {
                                                     month: 'short',
                                                 })}{' '}
                                                 <span className="mx-1 text-slate-400">•</span>
-                                                {new Date(order.createdAt).toLocaleTimeString('en-IN', {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                })}
+                                                {formatTime(order.createdAt)}
                                             </p>
                                         </div>
                                     </div>
-<<<<<<< HEAD
-                                    <div className="min-w-0">
-                                        <h3 className="font-semibold text-slate-900 text-sm tracking-tight leading-snug">
-                                            Order #{order.orderId.slice(-6)}
-                                        </h3>
-                                        <p className="mt-0.5 text-[11px] text-slate-500 font-medium leading-tight">
-                                            {formatDate(order.createdAt)}{' '}
-                                            <span className="mx-1 text-slate-400">•</span>
-                                            {formatTime(order.createdAt)}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex flex-col items-end gap-1 shrink-0 text-right">
-                                    <span
-                                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${
-                                            legacy === 'delivered'
-                                                ? 'bg-brand-50 text-brand-700 border-brand-100'
-                                                : legacy === 'cancelled'
-                                                    ? 'bg-rose-50 text-rose-700 border-rose-100'
-                                                    : 'bg-brand-50 text-brand-700 border-brand-100'
-                                        }`}
-                                    >
-                                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/80">
-                                            <CheckCircle
-                                                size={9}
-                                                className={`${
-                                                    legacy === 'delivered'
-                                                        ? 'text-brand-600'
-                                                        : legacy === 'cancelled'
-                                                            ? 'text-rose-500'
-                                                            : 'text-brand-500'
-=======
                                     <div className="flex flex-col items-end gap-1 shrink-0 text-right">
                                         <span
-                                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${legacy === 'delivered'
+                                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+                                                legacy === 'delivered'
                                                     ? 'bg-brand-50 text-brand-700 border-brand-100'
                                                     : legacy === 'cancelled'
                                                         ? 'bg-rose-50 text-rose-700 border-rose-100'
                                                         : 'bg-brand-50 text-brand-700 border-brand-100'
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
-                                                }`}
+                                            }`}
                                         >
                                             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/80">
                                                 <CheckCircle
                                                     size={9}
-                                                    className={`${legacy === 'delivered'
+                                                    className={`${
+                                                        legacy === 'delivered'
                                                             ? 'text-brand-600'
                                                             : legacy === 'cancelled'
                                                                 ? 'text-rose-500'

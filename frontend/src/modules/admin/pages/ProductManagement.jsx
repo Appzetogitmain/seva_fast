@@ -49,10 +49,7 @@ const ProductManagement = () => {
         rejected: 0,
         lowStock: 0,
         outOfStock: 0,
-<<<<<<< HEAD
-=======
-        active: 0,
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
+
     });
     const [moderatingActionId, setModeratingActionId] = useState('');
 
@@ -130,10 +127,7 @@ const ProductManagement = () => {
                     rejected: Number(payload?.counts?.rejected || 0),
                     lowStock: Number(payload?.counts?.lowStock || 0),
                     outOfStock: Number(payload?.counts?.outOfStock || 0),
-<<<<<<< HEAD
-=======
-                    active: Number(payload?.counts?.active || 0),
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
+
                 });
             }
         } catch (error) {
@@ -397,15 +391,7 @@ const ProductManagement = () => {
     };
 
     const productsList = Array.isArray(products) ? products : [];
-<<<<<<< HEAD
-=======
-    const stats = useMemo(() => ({
-        total: total,
-        lowStock: moderationCounts.lowStock,
-        outOfStock: moderationCounts.outOfStock,
-        active: moderationCounts.active
-    }), [total, moderationCounts]);
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
+
 
     const resolveLowStockThreshold = (product) => {
         const parsed = Number(product?.lowStockAlert);

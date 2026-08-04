@@ -642,13 +642,9 @@ const AddProduct = () => {
                       </label>
                       <input
                         type="number"
-<<<<<<< HEAD
                         min={0}
                         step={1}
                         inputMode="numeric"
-=======
-                        min="0"
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
                         value={variant.stock}
                         onKeyDown={(e) => {
                           if (["-", "+", "e", "E", "."].includes(e.key)) e.preventDefault();

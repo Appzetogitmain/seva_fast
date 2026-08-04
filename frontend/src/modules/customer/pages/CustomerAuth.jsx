@@ -183,18 +183,12 @@ const CustomerAuth = () => {
 
             if (
                 !isLogin &&
-<<<<<<< HEAD
                 (status === 409 || errorCode === 'ACCOUNT_ALREADY_EXISTS')
             ) {
                 toast.error(
                     error?.response?.data?.message ||
                         'An account already exists with this number. Please login.',
                 );
-=======
-                (status === 409 || errorCode === 'ACCOUNT_EXISTS')
-            ) {
-                toast.info('Account already exists, please login.');
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
                 setShowOtp(false);
                 setIsLogin(true);
                 navigate('/login', {

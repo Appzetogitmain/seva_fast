@@ -813,16 +813,10 @@ export const createProduct = async (req, res) => {
             ? variant.sku
             : makeProductSku(productData.name, idx + 1),
       }));
-<<<<<<< HEAD
       productData.stock = productData.variants.reduce(
         (sum, variant) => sum + (Number(variant?.stock) || 0),
         0,
       );
-=======
-      if (productData.variants.length > 0) {
-        productData.stock = productData.variants.reduce((acc, v) => acc + (Number(v.stock) || 0), 0);
-      }
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
     }
 
     const stockError = validateNonNegativeStockFields(productData);
@@ -1011,7 +1005,6 @@ export const updateProduct = async (req, res) => {
             ? variant.sku
             : makeProductSku(skuBaseName, idx + 1),
       }));
-<<<<<<< HEAD
       // Keep top-level stock aligned with variant totals for list/status badges.
       productData.stock = productData.variants.reduce(
         (sum, variant) => sum + (Number(variant?.stock) || 0),
@@ -1056,11 +1049,6 @@ export const updateProduct = async (req, res) => {
     if (productData.packageHeight !== undefined) {
       const n = parsePositiveNumber(productData.packageHeight);
       if (n) productData.packageHeight = n;
-=======
-      if (productData.variants.length > 0) {
-        productData.stock = productData.variants.reduce((acc, v) => acc + (Number(v.stock) || 0), 0);
-      }
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
     }
 
     let moderationUpdate = {};
@@ -1345,7 +1333,6 @@ export const getModerationProducts = async (req, res) => {
       rejectedCount,
       lowStockCount,
       outOfStockCount,
-<<<<<<< HEAD
     ] =
       await Promise.all([
         Product.find(moderatedQuery)
@@ -1382,52 +1369,6 @@ export const getModerationProducts = async (req, res) => {
         }),
         Product.countDocuments({ ...baseQuery, stock: 0 }),
       ]);
-=======
-      activeCount
-    ] = await Promise.all([
-      Product.find(moderatedQuery)
-        .select(
-          "name slug description sku price salePrice stock lowStockAlert brand weight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
-        )
-        .populate("headerId", "name")
-        .populate("categoryId", "name")
-        .populate("subcategoryId", "name")
-        .populate("sellerId", "shopName name")
-        .populate("approvalReviewedBy", "name email")
-        .sort(sortQuery)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Product.countDocuments(moderatedQuery),
-      Product.countDocuments(baseQuery),
-      Product.countDocuments({
-        ...baseQuery,
-        approvalStatus: PRODUCT_APPROVAL_STATUS.PENDING,
-      }),
-      Product.countDocuments({
-        $and: [
-          { ...baseQuery },
-          buildApprovalStatusFilter(PRODUCT_APPROVAL_STATUS.APPROVED),
-        ],
-      }),
-      Product.countDocuments({
-        ...baseQuery,
-        approvalStatus: PRODUCT_APPROVAL_STATUS.REJECTED,
-      }),
-      Product.countDocuments({
-        ...baseQuery,
-        stock: { $gt: 0, $lte: 10 }
-      }),
-      Product.countDocuments({
-        ...baseQuery,
-        stock: 0
-      }),
-      Product.countDocuments({
-        ...baseQuery,
-        status: 'active'
-      }),
-    ]);
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
 
     return handleResponse(res, 200, "Moderation products fetched", {
       items: normalizeProductListModeration(items),
@@ -1442,10 +1383,6 @@ export const getModerationProducts = async (req, res) => {
         rejected: rejectedCount,
         lowStock: lowStockCount,
         outOfStock: outOfStockCount,
-<<<<<<< HEAD
-=======
-        active: activeCount,
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
       },
     });
   } catch (error) {

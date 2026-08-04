@@ -991,38 +991,11 @@ export const updateOrderStatus = async (req, res) => {
     // -----------------------------
 
     const oldStatus = order.status;
-<<<<<<< HEAD
     if (nextStatus) {
       // Shiprocket create runs on seller accept for scheduled orders (see orderWorkflowService).
       // Do not create again on packed — avoids double Shiprocket orders in multi-vendor flow.
       order.status = nextStatus;
       order.orderStatus = nextStatus;
-=======
-    if (status) {
-      if (status === "packed" && order.deliveryType === "scheduled") {
-        try {
-          const populatedOrder = await Order.findById(order._id)
-            .populate("customer", "name phone email")
-            .populate("seller", "shopName address name location");
-
-          const shipment = await createShiprocketOrder(populatedOrder);
-          if (shipment && shipment.success) {
-            order.shipmentDetails = {
-              shipmentId: shipment.shipment_id,
-              awbCode: shipment.awb_code,
-              courierName: shipment.courier_name,
-              status: shipment.status,
-              createdAt: new Date(),
-            };
-          }
-        } catch (shiprocketError) {
-          console.error("[SHIPROCKET_ERROR] Failed to create shipment:", shiprocketError);
-          return handleResponse(res, 400, `Shiprocket Shipment Creation Failed: ${shiprocketError.message}`);
-        }
-      }
-      order.status = status;
-      order.orderStatus = status;
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
       if (order.workflowVersion >= 2) {
         order.workflowStatus = workflowFromLegacyStatus(nextStatus);
       }

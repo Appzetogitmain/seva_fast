@@ -118,20 +118,10 @@ const CashCollection = () => {
     }, [selectedRider]);
 
     const stats = {
-<<<<<<< HEAD
         totalInHand: (ridersCashData || []).reduce((acc, r) => acc + (r.currentCash || 0), 0),
         overLimitCount: (ridersCashData || []).filter(r => (r.currentCash || 0) >= (r.limit || 5000)).length,
         todaySettled: (historyData || []).filter(h => isSameCalendarDay(h.date)).reduce((acc, h) => acc + (h.amount || 0), 0),
         avgBalance: (ridersCashData || []).length ? (ridersCashData || []).reduce((acc, r) => acc + (r.currentCash || 0), 0) / ridersCashData.length : 0
-=======
-        totalInHand: (ridersCashData || []).reduce((acc, r) => acc + Math.max(0, r.currentCash || 0), 0),
-        overLimitCount: (ridersCashData || []).filter(r => Math.max(0, r.currentCash || 0) >= (r.limit || 5000)).length,
-        todaySettled: (historyData || []).filter(h => {
-            const today = new Date().toLocaleDateString();
-            return new Date(h.date).toLocaleDateString() === today;
-        }).reduce((acc, h) => acc + Math.max(0, h.amount || 0), 0),
-        avgBalance: (ridersCashData || []).length ? (ridersCashData || []).reduce((acc, r) => acc + Math.max(0, r.currentCash || 0), 0) / ridersCashData.length : 0
->>>>>>> 5bbbeb2f775cdf138af153ac5f7802ee9d7d5659
     };
 
     const filteredRiders = (ridersCashData || []).filter(r =>
