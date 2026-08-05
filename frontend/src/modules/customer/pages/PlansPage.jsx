@@ -361,20 +361,20 @@ const PlansPage = () => {
                                         <span className="text-amber-600 text-xs font-black">!</span>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-bold text-amber-900/60 uppercase tracking-widest mb-0.5">Default Admin Code</p>
+                                        <p className="text-[10px] font-bold text-amber-900/60 uppercase tracking-widest mb-0.5">No Referral Code?</p>
                                         <p className="text-xs font-bold text-amber-900 leading-tight">
-                                            Referral nahi hai?{' '}
+                                            No worries! Click{' '}
                                             <button
                                                 type="button"
                                                 onClick={() => {
                                                     setReferralCode(DEFAULT_REFERRAL_CODE);
-                                                    toast.success('SEVAFAST code applied');
+                                                    toast.success('SEVAFAST code applied!');
                                                 }}
                                                 className="font-black text-amber-700 tracking-wider hover:underline"
                                             >
                                                 SEVAFAST
                                             </button>{' '}
-                                            use karein — isse admin ko commission milega.
+                                            to enjoy platform support benefits.
                                         </p>
                                     </div>
                                 </div>
