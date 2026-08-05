@@ -161,18 +161,63 @@ const SearchPage = () => {
         }
     };
 
-    // Real-time filtering logic
-    const filteredResults = useMemo(() => {
-        if (!debouncedQuery.trim()) return [];
-        return allProducts.filter(p =>
-            p.name.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
-            p.categoryId?.name?.toLowerCase().includes(debouncedQuery.toLowerCase())
-        );
-    }, [debouncedQuery, allProducts]);
-
+    // Real-time search from backend and local filtering
     useEffect(() => {
-        setResults(filteredResults);
-    }, [filteredResults]);
+        const fetchSearchResults = async () => {
+            if (!debouncedQuery.trim()) {
+                setResults([]);
+                return;
+            }
+            
+            const hasValidLocation =
+                Number.isFinite(currentLocation?.latitude) &&
+                Number.isFinite(currentLocation?.longitude);
+                
+            setIsLoading(true);
+            try {
+                const params = { limit: 50, search: debouncedQuery };
+                if (hasValidLocation) {
+                    params.lat = currentLocation.latitude;
+                    params.lng = currentLocation.longitude;
+                }
+                const response = await customerApi.getProducts(params);
+                let backendMatches = [];
+                if (response.data.success) {
+                    const rawResult = response.data.result;
+                    const dbProds = Array.isArray(response.data.results)
+                        ? response.data.results
+                        : Array.isArray(rawResult?.items)
+                        ? rawResult.items
+                        : Array.isArray(rawResult)
+                        ? rawResult
+                        : [];
+                    backendMatches = dbProds.map((p) => mapProductForCustomerListing(p));
+                }
+                
+                // Keep local matching for category names from the first 100 loaded products
+                const localMatches = allProducts.filter(p =>
+                    p.name.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+                    p.categoryId?.name?.toLowerCase().includes(debouncedQuery.toLowerCase())
+                );
+                
+                // Merge and deduplicate
+                const mergedMap = new Map();
+                [...backendMatches, ...localMatches].forEach(p => {
+                    if (p && (p.id || p._id)) {
+                        mergedMap.set(p.id || p._id, p);
+                    }
+                });
+                
+                setResults(Array.from(mergedMap.values()));
+            } catch (error) {
+                console.error('Error fetching search results:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        
+        fetchSearchResults();
+    }, [debouncedQuery, allProducts, currentLocation?.latitude, currentLocation?.longitude]);
 
     // Lowest Price Section
     const lowestPriceProducts = useMemo(() => {

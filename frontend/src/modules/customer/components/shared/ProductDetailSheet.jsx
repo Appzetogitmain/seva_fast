@@ -346,7 +346,7 @@ const ProductDetailSheet = () => {
                         className="hidden md:flex fixed z-[230] top-[72px] bottom-[16px] left-[3%] right-[3%] lg:left-[6%] lg:right-[6%] xl:left-[12%] xl:right-[12%] bg-white rounded-3xl shadow-[0_40px_100px_rgba(0,0,0,0.25)] overflow-hidden"
                     >
                         {/* Parent flex container that holds both sides together so the whole modal scrolls */}
-                        <div className="flex w-full min-h-full">
+                        <div className="flex w-full h-full">
                                 {/* Left: Image Gallery — sticky to window so it doesn't scroll out of view if you want */}
                                 <div className="relative w-[42%] lg:w-[44%] flex-shrink-0 flex flex-col min-h-full sticky top-0" style={{ background: 'linear-gradient(145deg, #f9fafb 0%, #f1f8f2 50%, #fafbfc 100%)' }}>
                                     {/* Top bar with back + wishlist */}
@@ -461,7 +461,7 @@ const ProductDetailSheet = () => {
                                 </div>
 
                                 {/* Right: Product Info (scrollable naturally) */}
-                                <div className="flex-1 flex flex-col bg-white">
+                                <div className="flex-1 flex flex-col bg-white overflow-y-auto no-scrollbar">
                                     <div className="flex-1 px-7 py-6 lg:px-8 lg:py-7 space-y-3">
 
                                         {/* Top badges row */}
@@ -589,41 +589,7 @@ const ProductDetailSheet = () => {
                                             </motion.div>
                                         )}
 
-                                        {/* Variants */}
-                                        {selectedProduct.variants && selectedProduct.variants.length > 0 && (
-                                            <motion.div
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                transition={{ delay: 0.25 }}
-                                                className="bg-gray-50/60 rounded-xl p-3 border border-gray-100/70"
-                                            >
-                                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2.5">Select Variant</h4>
-                                                <div className="flex gap-3 flex-wrap">
-                                                    {selectedProduct.variants.map((v, idx) => (
-                                                        <motion.button
-                                                            key={idx}
-                                                            whileHover={{ scale: 1.03 }}
-                                                            whileTap={{ scale: 0.97 }}
-                                                            onClick={() => setSelectedVariant(v)}
-                                                            className={cn(
-                                                                'px-4 py-2 font-[600] rounded-lg text-[13px] transition-all border-2',
-                                                                selectedVariant && variantsMatch(selectedVariant, v)
-                                                                    ? 'bg-brand-50 border-primary text-primary shadow-md shadow-brand-100/50'
-                                                                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:shadow-sm'
-                                                            )}
-                                                        >
-                                                            {v.name}
-                                                        </motion.button>
-                                                    ))}
-                                                </div>
-                                            </motion.div>
-                                        )}
 
-                                        {/* Decorative Divider */}
-                                        <div className="relative -mt-1 -mb-1">
-                                            <div className="h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
-                                            <div className="absolute left-1/2 -translate-x-1/2 -top-1 w-2 h-2 bg-white border border-gray-200 rounded-full" />
-                                        </div>
 
                                         {/* Variants Selection (Desktop) */}
                                         {selectedProduct.variants && selectedProduct.variants.length > 0 && (
