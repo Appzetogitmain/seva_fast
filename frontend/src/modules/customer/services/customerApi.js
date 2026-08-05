@@ -111,6 +111,8 @@ export const customerApi = {
   // Support & Reviews
   getProductReviews: (productId) =>
     getWithDedupe(`/reviews/product/${productId}`),
+  canReviewProduct: (productId) =>
+    getWithDedupe(`/reviews/can-review/${productId}`, {}, { ttl: 0 }),
   submitReview: (data) => axiosInstance.post("/reviews/submit", data),
   createTicket: (data) => axiosInstance.post("/tickets/create", data),
   getMyTickets: () => getWithDedupe("/tickets/my-tickets"),

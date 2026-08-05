@@ -3,7 +3,8 @@ import {
     submitReview,
     getProductReviews,
     getPendingReviews,
-    updateReviewStatus
+    updateReviewStatus,
+    canReviewProduct
 } from "../controller/reviewController.js";
 import { verifyToken, allowRoles } from "../middleware/authMiddleware.js";
 
@@ -13,6 +14,7 @@ const router = express.Router();
 router.get("/product/:productId", getProductReviews);
 
 // Authenticated User routes
+router.get("/can-review/:productId", verifyToken, canReviewProduct);
 router.post("/submit", verifyToken, submitReview);
 
 // Admin only routes

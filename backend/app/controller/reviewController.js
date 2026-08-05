@@ -3,6 +3,33 @@ import Order from "../models/order.js";
 import handleResponse from "../utils/helper.js";
 import getPagination from "../utils/pagination.js";
 
+// Check if a user can review a product (has purchased + delivered, not already reviewed)
+export const canReviewProduct = async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const userId = req.user.id;
+
+        const hasPurchased = await Order.findOne({
+            customer: userId,
+            "items.product": productId,
+            status: "delivered"
+        });
+
+        if (!hasPurchased) {
+            return handleResponse(res, 200, "Cannot review", { canReview: false, reason: "not_purchased" });
+        }
+
+        const alreadyReviewed = await Review.findOne({ userId, productId });
+        if (alreadyReviewed) {
+            return handleResponse(res, 200, "Already reviewed", { canReview: false, reason: "already_reviewed" });
+        }
+
+        return handleResponse(res, 200, "Can review", { canReview: true });
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
 // Submit a review (Customer)
 export const submitReview = async (req, res) => {
     try {
