@@ -236,14 +236,17 @@ const AddProduct = () => {
       data.append("variants", JSON.stringify(formData.variants));
 
       const response = await sellerApi.createProduct(data);
+      
+      // Always clear draft on success
+      localStorage.removeItem("seller_add_product_draft");
+      
       const approvalStatus = response?.data?.result?.approvalStatus;
       if (approvalStatus === "pending") {
-        toast.success("Product published successfully!");
-        localStorage.removeItem("seller_add_product_draft");
-        navigate(-1);
+        toast.success("Product published successfully! Pending admin approval.");
       } else {
         toast.success(response?.data?.message || "Product saved successfully!");
       }
+      
       navigate("/seller/products");
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to save product");
