@@ -39,6 +39,8 @@ const ProductDetailSheet = () => {
     const [reviewLoading, setReviewLoading] = useState(true);
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
     const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
+    const [canReview, setCanReview] = useState(null); // null = loading, true/false
+    const [canReviewReason, setCanReviewReason] = useState(null);
     const [expandedSections, setExpandedSections] = useState(['description']); // Start with description open
 
     const toggleSection = (section) => {
@@ -89,6 +91,7 @@ const ProductDetailSheet = () => {
 
         if (selectedProduct?.id) {
             fetchReviews(selectedProduct.id);
+            fetchCanReview(selectedProduct.id);
         }
     }, [selectedProduct]);
 
@@ -103,6 +106,21 @@ const ProductDetailSheet = () => {
             console.error("Fetch reviews error:", error);
         } finally {
             setReviewLoading(false);
+        }
+    };
+
+    const fetchCanReview = async (productId) => {
+        try {
+            setCanReview(null);
+            const res = await customerApi.canReviewProduct(productId);
+            if (res.data.success) {
+                setCanReview(res.data.data?.canReview ?? false);
+                setCanReviewReason(res.data.data?.reason ?? null);
+            }
+        } catch {
+            // If not logged in or any error, don't show form
+            setCanReview(false);
+            setCanReviewReason('not_purchased');
         }
     };
 
@@ -678,7 +696,8 @@ const ProductDetailSheet = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Review Form */}
+                                                    {/* Review Form - only if customer has purchased & delivered */}
+                                                    {canReview === true ? (
                                                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
                                                         <h4 className="font-black text-slate-800 text-xs mb-3 flex items-center gap-2">
                                                             <MessageSquare size={13} className="text-primary" />
@@ -708,6 +727,16 @@ const ProductDetailSheet = () => {
                                                                 </Button>
                                                         </form>
                                                     </div>
+                                                    ) : canReview === false ? (
+                                                    <div className="bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-200 mb-6 flex items-start gap-3">
+                                                        <Star size={14} className="text-slate-300 mt-0.5 flex-shrink-0" />
+                                                        <p className="text-[11px] font-semibold text-slate-400 leading-relaxed">
+                                                            {canReviewReason === 'already_reviewed'
+                                                                ? 'You have already submitted a review for this product. Thank you!'
+                                                                : 'Only customers who have purchased and received this product can leave a review.'}
+                                                        </p>
+                                                    </div>
+                                                    ) : null}
 
                                                     {/* Reviews List */}
                                                     <div className="space-y-3">
@@ -983,7 +1012,8 @@ const ProductDetailSheet = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Review Form */}
+                                            {/* Review Form - only if customer has purchased & delivered */}
+                                            {canReview === true ? (
                                             <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 mb-6">
                                                 <h4 className="font-black text-slate-800 text-sm mb-1">Rate this product</h4>
                                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-4">Reviews are moderated</p>
@@ -1009,6 +1039,16 @@ const ProductDetailSheet = () => {
                                                     </Button>
                                                 </form>
                                             </div>
+                                            ) : canReview === false ? (
+                                            <div className="bg-slate-50 p-5 rounded-3xl border border-dashed border-slate-200 mb-6 flex items-start gap-3">
+                                                <Star size={16} className="text-slate-300 mt-0.5 flex-shrink-0" />
+                                                <p className="text-xs font-semibold text-slate-400 leading-relaxed">
+                                                    {canReviewReason === 'already_reviewed'
+                                                        ? 'You have already submitted a review for this product. Thank you!'
+                                                        : 'Only customers who have purchased and received this product can leave a review.'}
+                                                </p>
+                                            </div>
+                                            ) : null}
 
                                             {/* Reviews List */}
                                             <div className="space-y-4">
