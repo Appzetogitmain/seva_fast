@@ -56,6 +56,10 @@ const settingSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
+        returnPolicy: {
+            type: String,
+            default: "",
+        },
         sellerTermsAndConditions: {
             type: String,
             default: "",

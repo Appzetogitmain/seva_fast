@@ -3,7 +3,6 @@ import Header from './Header';
 import Footer from './Footer';
 import BottomNav from './BottomNav';
 import MiniCart from '../shared/MiniCart';
-import ProductDetailSheet from '../shared/ProductDetailSheet';
 import MobileFooterMessage from './MobileFooterMessage';
 import BirthdayHeaderCelebration from '../shared/BirthdayHeaderCelebration';
 import { useProductDetail } from '../../context/ProductDetailContext';
@@ -97,7 +96,7 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
 
     // Hide elements on mobile only when product detail is open
     // On desktop, we want to keep the header visible even if the modal is open
-    const finalShowHeaderMobile = showHeader && !isProductDetailOpen;
+    const finalShowHeaderMobile = showHeader && !isProductDetailOpen && !path.startsWith('/product');
     const finalShowBottomNavMobile = showBottomNav && !isProductDetailOpen;
     const finalShowFooterMessageMobile = showFooterMessage && !isProductDetailOpen;
 
@@ -123,7 +122,6 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
             </main>
 
             {showCart && <MiniCart />}
-            <ProductDetailSheet />
 
             <div className="hidden md:block">
                 <Footer />

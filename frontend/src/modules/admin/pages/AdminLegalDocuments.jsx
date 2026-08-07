@@ -14,7 +14,10 @@ import {
   Loader2,
   ScrollText,
   Shield,
+  RotateCcw,
 } from "lucide-react";
+import ReactQuill from "react-quill-new";
+import "react-quill-new/dist/quill.snow.css";
 
 const AUDIENCES = [
   {
@@ -24,6 +27,7 @@ const AUDIENCES = [
     icon: Users,
     termsKey: "termsAndConditions",
     privacyKey: "privacyPolicy",
+    returnKey: "returnPolicy",
   },
   {
     id: "seller",
@@ -50,6 +54,7 @@ const emptyDocs = {
   sellerPrivacyPolicy: "",
   deliveryTermsAndConditions: "",
   deliveryPrivacyPolicy: "",
+  returnPolicy: "",
 };
 
 const AdminLegalDocuments = () => {
@@ -67,7 +72,14 @@ const AdminLegalDocuments = () => {
   );
 
   const activeKey =
-    docType === "terms" ? audience.termsKey : audience.privacyKey;
+    docType === "terms" ? audience.termsKey : docType === "privacy" ? audience.privacyKey : audience.returnKey;
+
+  // Reset docType to terms if audience changes and doesn't support the current docType
+  useEffect(() => {
+    if (docType === "return" && !audience.returnKey) {
+      setDocType("terms");
+    }
+  }, [audience, docType]);
 
   useEffect(() => {
     const load = async () => {
@@ -82,6 +94,7 @@ const AdminLegalDocuments = () => {
           sellerPrivacyPolicy: data.sellerPrivacyPolicy || "",
           deliveryTermsAndConditions: data.deliveryTermsAndConditions || "",
           deliveryPrivacyPolicy: data.deliveryPrivacyPolicy || "",
+          returnPolicy: data.returnPolicy || "",
         });
       } catch (error) {
         console.error(error);
@@ -222,6 +235,21 @@ const AdminLegalDocuments = () => {
                 <Shield className="h-3.5 w-3.5" />
                 Privacy
               </button>
+              {audience.returnKey && (
+                <button
+                  type="button"
+                  onClick={() => setDocType("return")}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all",
+                    docType === "return"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800",
+                  )}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Return Policy
+                </button>
+              )}
             </div>
           </div>
 
@@ -233,24 +261,43 @@ const AdminLegalDocuments = () => {
             ) : (
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  {docType === "terms" ? "Terms & Conditions" : "Privacy Policy"}{" "}
+                  {docType === "terms" ? "Terms & Conditions" : docType === "privacy" ? "Privacy Policy" : "Return Policy"}{" "}
                   — {audience.label}
                 </label>
-                <textarea
-                  rows={18}
-                  value={docs[activeKey] || ""}
-                  onChange={(e) =>
-                    setDocs((prev) => ({
-                      ...prev,
-                      [activeKey]: e.target.value,
-                    }))
-                  }
-                  placeholder={`Write ${docType === "terms" ? "terms & conditions" : "privacy policy"} for ${audience.label.toLowerCase()}s...`}
-                  className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all resize-y min-h-[360px] leading-relaxed"
-                />
-                <p className="text-[11px] text-slate-400 font-medium">
-                  Plain text is fine. Line breaks are preserved on the public pages.
-                </p>
+                {docType === "return" ? (
+                  <div className="bg-white rounded-2xl overflow-hidden border border-slate-100 quill-container">
+                      <ReactQuill
+                        theme="snow"
+                        value={docs[activeKey] || ""}
+                        onChange={(val) =>
+                          setDocs((prev) => ({
+                            ...prev,
+                            [activeKey]: val,
+                          }))
+                        }
+                        placeholder="Write return policy..."
+                        className="h-[300px] pb-10"
+                      />
+                  </div>
+                ) : (
+                  <textarea
+                    rows={18}
+                    value={docs[activeKey] || ""}
+                    onChange={(e) =>
+                      setDocs((prev) => ({
+                        ...prev,
+                        [activeKey]: e.target.value,
+                      }))
+                    }
+                    placeholder={`Write ${docType === "terms" ? "terms & conditions" : "privacy policy"} for ${audience.label.toLowerCase()}s...`}
+                    className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all resize-y min-h-[360px] leading-relaxed"
+                  />
+                )}
+                {docType !== "return" && (
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    Plain text is fine. Line breaks are preserved on the public pages.
+                  </p>
+                )}
               </div>
             )}
           </div>

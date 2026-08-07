@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 
 import ProductCard from '../components/shared/ProductCard';
-import ProductDetailSheet from '../components/shared/ProductDetailSheet';
 import { useProductDetail } from '../context/ProductDetailContext';
 import { customerApi } from '../services/customerApi';
 import { mapProductForCustomerListing } from '../utils/productPricing';
@@ -190,7 +189,6 @@ const CategoryProductsPage = () => {
             </div>
 
             <MiniCart />
-            <ProductDetailSheet />
 
             <style dangerouslySetInnerHTML={{
                 __html: `

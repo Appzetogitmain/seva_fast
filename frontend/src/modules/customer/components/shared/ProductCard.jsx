@@ -7,7 +7,7 @@ import { useToast } from "@shared/components/ui/Toast";
 import { useCartAnimation } from "../../context/CartAnimationContext";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
 import { motion, AnimatePresence } from "framer-motion";
-import { useProductDetail } from "../../context/ProductDetailContext";
+import { useNavigate } from "react-router-dom";
 import {
   hasProductVariants,
   variantIdentityKey,
@@ -23,7 +23,7 @@ const ProductCard = React.memo(
     const { showToast } = useToast();
     const { animateAddToCart, animateRemoveFromCart } = useCartAnimation();
 
-    const { openProduct } = useProductDetail();
+    const navigate = useNavigate();
     const [showHeartPopup, setShowHeartPopup] = React.useState(false);
 
     const imageRef = React.useRef(null);
@@ -87,12 +87,10 @@ const ProductCard = React.memo(
 
     const handleProductClick = React.useCallback(
       (e) => {
-        if (openProduct) {
           e.preventDefault();
-          openProduct(product);
-        }
+          navigate(`/product/${product.id || product._id}`);
       },
-      [openProduct, product],
+      [navigate, product],
     );
 
     const toggleWishlist = React.useCallback(
@@ -122,7 +120,7 @@ const ProductCard = React.memo(
         e.stopPropagation();
 
         if (requiresVariantSelection && !defaultVariant) {
-          openProduct?.(product);
+          navigate(`/product/${product.id || product._id}`);
           return;
         }
 
@@ -144,7 +142,8 @@ const ProductCard = React.memo(
         requiresVariantSelection,
         defaultVariant,
         defaultVariantSku,
-        openProduct,
+        defaultVariantSku,
+        navigate,
       ],
     );
 
