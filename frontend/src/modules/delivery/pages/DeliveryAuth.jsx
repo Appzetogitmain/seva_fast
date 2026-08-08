@@ -274,8 +274,8 @@ const DeliveryAuth = () => {
 
   return (
     <div className="min-h-screen bg-[#F0F4FF] flex flex-col items-center justify-center p-5 pt-20 font-['Outfit',_sans-serif]">
-      {/* Fixed Logo Bar - outside the card */}
-      <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4">
+      {/* Absolute Logo Bar - outside the card */}
+      <div className="absolute top-0 left-0 right-0 z-50 flex justify-center pt-4">
         <div className="w-14 h-14 rounded-2xl bg-white/85 backdrop-blur-sm border border-brand-100 shadow-sm flex items-center justify-center overflow-hidden">
           {logoUrl ? (
             <img

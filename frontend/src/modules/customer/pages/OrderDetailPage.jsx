@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import InvoiceModal from "../components/order/InvoiceModal";
 import HelpModal from "../components/order/HelpModal";
+import WriteReviewSheet from "../components/shared/WriteReviewSheet";
 import LiveTrackingMap from "../components/order/LiveTrackingMap";
 import DeliveryOtpDisplay from "../components/DeliveryOtpDisplay";
 import OrderProgressTracker from "../components/order/OrderProgressTracker";
@@ -150,6 +151,8 @@ const OrderDetailPage = () => {
   const [routePolyline, setRoutePolyline] = useState(null);
   const [handoffOtp, setHandoffOtp] = useState(null);
   const [clockTick, setClockTick] = useState(Date.now());
+  const [reviewProduct, setReviewProduct] = useState(null);
+  const [reviewedMap, setReviewedMap] = useState({}); // productId -> review object
   const parsedReturnWindowMinutes = parseInt(
     import.meta.env.VITE_RETURN_WINDOW_MINUTES || String(24 * 60),
     10,
@@ -211,6 +214,14 @@ const OrderDetailPage = () => {
           }
         } catch {
           setReturnDetails(null);
+        }
+
+        // Fetch customer's existing reviews for this order's products
+        try {
+          const revRes = await customerApi.getMyReviewsForOrder(ord._id || orderId);
+          setReviewedMap(revRes.data?.result || {});
+        } catch {
+          // Non-critical — silently ignore
         }
       } catch (error) {
         console.error("Failed to fetch order details:", error);
@@ -1185,10 +1196,36 @@ const OrderDetailPage = () => {
                     Qty: {item.quantity}
                   </p>
                 </div>
-                <div className="text-right flex-shrink-0">
+                <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                   <p className="font-bold text-slate-900">
                     ₹{item.price * item.quantity}
                   </p>
+                  {status === "delivered" && (() => {
+                    const productId = String(item.product?._id || item.product || "");
+                    const myReview = reviewedMap[productId];
+                    if (myReview) {
+                      return (
+                        <div className="mt-1 flex flex-col items-end gap-0.5">
+                          <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md flex items-center gap-1">
+                            ✓ Reviewed
+                          </span>
+                          <div className="flex items-center gap-0.5">
+                            {[1,2,3,4,5].map(s => (
+                              <span key={s} className={`text-[10px] ${s <= myReview.rating ? 'text-amber-400' : 'text-gray-300'}`}>★</span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        onClick={() => setReviewProduct(item)}
+                        className="text-[10px] font-bold text-primary uppercase tracking-widest border border-primary/30 bg-primary/5 px-2 py-1 rounded-md hover:bg-primary hover:text-white transition-colors mt-1"
+                      >
+                        Review
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -1420,6 +1457,29 @@ const OrderDetailPage = () => {
         order={order}
       />
       <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+      <AnimatePresence>
+        {reviewProduct && (
+          <WriteReviewSheet
+            isOpen={!!reviewProduct}
+            onClose={(submittedReview) => {
+              if (submittedReview) {
+                const productId = String(
+                  submittedReview.productId ||
+                  reviewProduct?.product?._id ||
+                  reviewProduct?.product ||
+                  ""
+                );
+                if (productId) {
+                  setReviewedMap(prev => ({ ...prev, [productId]: submittedReview }));
+                }
+              }
+              setReviewProduct(null);
+            }}
+            product={reviewProduct}
+            orderId={order._id}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Return Request Modal */}
       {showReturnModal && (

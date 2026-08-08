@@ -171,6 +171,10 @@ export const adminApi = {
     updateZone: (id, data) => axiosInstance.put(`/admin/zones/${id}`, data),
     deleteZone: (id) => axiosInstance.delete(`/admin/zones/${id}`),
 
+    // Product Reviews
+    getPendingReviews: (params) => axiosInstance.get('/reviews/admin/pending', { params }),
+    updateReviewStatus: (id, data) => axiosInstance.patch(`/reviews/admin/status/${id}`, data),
+
     uploadMedia: (formData) => axiosInstance.post('/media/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     }),

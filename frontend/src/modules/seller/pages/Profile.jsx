@@ -367,9 +367,21 @@ const SellerProfile = () => {
                         Service Radius
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-black text-slate-900">
-                          {formData.radius}
-                        </span>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            name="radius"
+                            value={formData.radius}
+                            onChange={handleChange}
+                            min="1"
+                            max="50"
+                            className="w-16 px-2 py-1 bg-white border-2 border-slate-200 rounded-md text-sm font-bold text-slate-900 outline-none focus:border-brand-400 transition-all text-center"
+                          />
+                        ) : (
+                          <span className="text-lg font-black text-slate-900">
+                            {formData.radius}
+                          </span>
+                        )}
                         <span className="text-xs font-bold text-slate-500 bg-slate-200/50 px-2 py-0.5 rounded-md">
                           KM
                         </span>

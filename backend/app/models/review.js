@@ -12,6 +12,11 @@ const reviewSchema = new mongoose.Schema(
             ref: "Product",
             required: true,
         },
+        orderId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Order",
+            required: true,
+        },
         rating: {
             type: Number,
             required: true,
@@ -23,6 +28,12 @@ const reviewSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
+        images: [{
+            type: String,
+        }],
+        video: {
+            type: String,
+        },
         status: {
             type: String,
             enum: ["pending", "approved", "rejected"],
@@ -32,7 +43,8 @@ const reviewSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-// Prevent multiple reviews from same user for same product
-reviewSchema.index({ userId: 1, productId: 1 }, { unique: true });
+// Prevent multiple reviews from the same user for the same product within one order
+// (a user can review a product again after re-purchasing it in a new order)
+reviewSchema.index({ userId: 1, productId: 1, orderId: 1 }, { unique: true });
 
 export default mongoose.model("Review", reviewSchema);

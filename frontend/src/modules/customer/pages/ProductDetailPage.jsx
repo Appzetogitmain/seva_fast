@@ -9,6 +9,7 @@ import { useSettings } from '@core/context/SettingsContext';
 import { cn } from '@/lib/utils';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 import { customerApi } from '../services/customerApi';
+import WriteReviewSheet from '../components/shared/WriteReviewSheet';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { formatDate } from '@shared/utils/formatDate';
@@ -42,10 +43,9 @@ const ProductDetailPage = () => {
 
     const [reviews, setReviews] = useState([]);
     const [reviewLoading, setReviewLoading] = useState(true);
-    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-    const [newReview, setNewReview] = useState({ rating: 5, comment: '' });
     const [canReview, setCanReview] = useState(null); // null = loading, true/false
     const [canReviewReason, setCanReviewReason] = useState(null);
+    const [showReviewSheet, setShowReviewSheet] = useState(false);
     const [expandedSections, setExpandedSections] = useState(['description']); // Start with description open
 
     const toggleSection = (section) => {
@@ -169,28 +169,6 @@ const ProductDetailPage = () => {
             // If not logged in or any error, don't show form
             setCanReview(false);
             setCanReviewReason('not_purchased');
-        }
-    };
-
-    const handleReviewSubmit = async (e) => {
-        e.preventDefault();
-        if (!newReview.comment.trim()) return;
-
-        try {
-            setIsSubmittingReview(true);
-            const res = await customerApi.submitReview({
-                productId: selectedProduct.id,
-                rating: newReview.rating,
-                comment: newReview.comment
-            });
-            if (res.data.success) {
-                showToast("Review submitted for moderation", "success");
-                setNewReview({ rating: 5, comment: '' });
-            }
-        } catch (error) {
-            showToast(error.response?.data?.message || "Failed to submit review", "error");
-        } finally {
-            setIsSubmittingReview(false);
         }
     };
 
@@ -722,29 +700,13 @@ const ProductDetailPage = () => {
                                                             <MessageSquare size={13} className="text-primary" />
                                                             Rate this product
                                                         </h4>
-                                                        <form onSubmit={handleReviewSubmit} className="space-y-3">
-                                                            <div className="flex gap-1.5">
-                                                                {[1, 2, 3, 4, 5].map((s) => (
-                                                                    <motion.button
-                                                                        key={s}
-                                                                        type="button"
-                                                                        whileHover={{ scale: 1.1 }}
-                                                                        whileTap={{ scale: 0.9 }}
-                                                                        onClick={() => setNewReview({ ...newReview, rating: s })}
-                                                                        className={cn(
-                                                                            'h-9 w-9 rounded-xl flex items-center justify-center transition-all shadow-sm',
-                                                                            newReview.rating >= s ? 'bg-brand-50 text-primary border border-brand-100' : 'bg-white text-slate-300 border border-slate-100'
-                                                                        )}
-                                                                    >
-                                                                        <Star size={15} className={cn(newReview.rating >= s && 'fill-current')} />
-                                                                    </motion.button>
-                                                                ))}
-                                                            </div>
-                                                            <textarea value={newReview.comment} onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })} placeholder="Share your experience..." className="w-full bg-white border border-slate-100 rounded-xl p-3 text-xs font-medium min-h-[80px] outline-none focus:border-primary transition-all resize-none shadow-sm" />
-                                                            <Button type="submit" disabled={isSubmittingReview} className="w-full h-10 bg-primary hover:opacity-90 text-white font-black rounded-xl text-[11px] uppercase tracking-[0.1em] transition-all shadow-lg shadow-brand-100">
-                                                                {isSubmittingReview ? 'Submitting...' : 'Post Review'}
-                                                                </Button>
-                                                        </form>
+                                                        <Button
+                                                            type="button"
+                                                            onClick={() => setShowReviewSheet(true)}
+                                                            className="w-full h-10 bg-primary hover:opacity-90 text-white font-black rounded-xl text-[11px] uppercase tracking-[0.1em] transition-all shadow-lg shadow-brand-100"
+                                                        >
+                                                            Write a Review
+                                                        </Button>
                                                     </div>
                                                     ) : canReview === false ? (
                                                     <div className="bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-200 mb-6 flex items-start gap-3">
@@ -774,7 +736,22 @@ const ProductDetailPage = () => {
                                                                         </div>
                                                                         <span className="text-[10px] font-bold text-slate-400">{formatDate(r.createdAt)}</span>
                                                                     </div>
-                                                                    <p className="text-[12px] text-slate-600 font-medium leading-relaxed pl-10">{r.comment}</p>
+                                                                    <div className="pl-10">
+                                                                        <p className="text-[12px] text-slate-600 font-medium leading-relaxed">{r.comment}</p>
+                                                                        
+                                                                        {((r.images && r.images.length > 0) || r.video) && (
+                                                                            <div className="flex gap-2 mt-3 overflow-x-auto pb-2 custom-scrollbar">
+                                                                                {r.images?.map((img, i) => (
+                                                                                    <a href={img} target="_blank" rel="noopener noreferrer" key={i} className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-slate-100 bg-slate-50 cursor-zoom-in hover:opacity-90 transition-opacity block">
+                                                                                        <img src={applyCloudinaryTransform(img)} alt={`Review ${i}`} className="w-full h-full object-cover" />
+                                                                                    </a>
+                                                                                ))}
+                                                                                {r.video && (
+                                                                                    <video src={r.video} controls preload="metadata" className="h-16 w-auto max-w-[160px] rounded-xl border border-slate-100 bg-black flex-shrink-0 object-contain" />
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             ))
                                                         ) : (
@@ -796,6 +773,23 @@ const ProductDetailPage = () => {
                         </div>
                 </>
             )}
+
+            <AnimatePresence>
+                {showReviewSheet && selectedProduct && (
+                    <WriteReviewSheet
+                        isOpen={showReviewSheet}
+                        onClose={(submittedReview) => {
+                            setShowReviewSheet(false);
+                            if (submittedReview) {
+                                setCanReview(false);
+                                setCanReviewReason('already_reviewed');
+                                fetchReviews(selectedProduct.id);
+                            }
+                        }}
+                        product={{ ...selectedProduct, productId: selectedProduct.id }}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 };

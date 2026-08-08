@@ -29,6 +29,7 @@ import {
   History,
   PieChart,
   FileText,
+  Star,
 } from "lucide-react";
 
 const Dashboard = React.lazy(() => import("../pages/Dashboard"));
@@ -108,6 +109,7 @@ const EnvSettings = React.lazy(() => import("../pages/EnvSettings"));
 const AuthActivityLogs = React.lazy(() => import("../pages/AuthActivityLogs"));
 const AdminProfile = React.lazy(() => import("../pages/AdminProfile"));
 const PlanManagement = React.lazy(() => import("../pages/PlanManagement"));
+const AdminReviews = React.lazy(() => import("../pages/AdminReviews"));
 
 const navItems = [
   {
@@ -135,6 +137,7 @@ const navItems = [
     color: "teal",
   },
   { label: "Products", path: "/admin/products", icon: Box, color: "amber" },
+  { label: "Product Reviews", path: "/admin/reviews", icon: Star, color: "yellow" },
   {
     label: "Marketing Tools",
     icon: Sparkles,
@@ -327,6 +330,7 @@ const AdminRoutes = () => {
         <Route path="/categories/sub" element={<SubadminRoute permission="Categories"><SubCategories /></SubadminRoute>} />
         <Route path="/categories/hierarchy" element={<SubadminRoute permission="Categories"><CategoryHierarchy /></SubadminRoute>} />
         <Route path="/products" element={<SubadminRoute permission="Products"><ProductManagement /></SubadminRoute>} />
+        <Route path="/reviews" element={<SubadminRoute permission="Products"><AdminReviews /></SubadminRoute>} />
         <Route path="/sellers/active" element={<SubadminRoute permission="Sellers"><ActiveSellers /></SubadminRoute>} />
         <Route path="/sellers/active/:id" element={<SubadminRoute permission="Sellers"><SellerDetail /></SubadminRoute>} />
         <Route path="/support-tickets" element={<SubadminRoute permission="Customer Support"><SupportTickets /></SubadminRoute>} />

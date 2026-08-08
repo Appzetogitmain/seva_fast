@@ -4,7 +4,8 @@ import {
     getProductReviews,
     getPendingReviews,
     updateReviewStatus,
-    canReviewProduct
+    canReviewProduct,
+    getMyReviewsForOrder
 } from "../controller/reviewController.js";
 import { verifyToken, allowRoles } from "../middleware/authMiddleware.js";
 
@@ -15,6 +16,7 @@ router.get("/product/:productId", getProductReviews);
 
 // Authenticated User routes
 router.get("/can-review/:productId", verifyToken, canReviewProduct);
+router.get("/my-order/:orderId", verifyToken, getMyReviewsForOrder);
 router.post("/submit", verifyToken, submitReview);
 
 // Admin only routes
