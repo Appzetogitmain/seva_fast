@@ -29,6 +29,9 @@ const LenisScroll = () => {
             },
         });
 
+        // Expose Lenis instance globally so modals can call stop()/start()
+        window.__lenis = lenis;
+
         let rafId;
 
         function raf(time) {
@@ -41,6 +44,7 @@ const LenisScroll = () => {
         return () => {
             cancelAnimationFrame(rafId);
             lenis.destroy();
+            delete window.__lenis;
         };
     }, []);
 

@@ -308,35 +308,38 @@ const Orders = () => {
     };
 
     const handleThermalPrint = (order) => {
-        const printWindow = window.open('', '_blank', 'width=350,height=600');
+        const printWindow = window.open('', '_blank', 'width=550,height=800');
         if (!printWindow) {
             showToast("Please allow popups to print receipt", "warning");
             return;
         }
 
         const itemsHtml = order.items.map(item => {
-            const name = item.name.length > 22 ? item.name.substring(0, 20) + '..' : item.name;
+            const name = item.name;
             const qtyStr = `x${item.qty}`;
             const priceStr = `₹${(item.price * item.qty).toFixed(0)}`;
-            const left = `${name} ${qtyStr}`;
-            const spacesCount = Math.max(1, 32 - left.length - priceStr.length);
-            const spaces = ' '.repeat(spacesCount);
-            return `<div style="font-family: monospace; font-size: 12px; white-space: pre;">${left}${spaces}${priceStr}</div>`;
+            const left = `${name} <span style="font-weight: 800; color: #000;">${qtyStr}</span>`;
+            return `<div style="font-size: 18px; font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dotted #ccc;">
+                <div style="padding-right: 12px; color: #000;">${left}</div>
+                <div style="white-space: nowrap; font-weight: 900; color: #000;">${priceStr}</div>
+            </div>`;
         }).join('');
 
         const { subtotal, deliveryFee, platformFee, gst, discount, tip, grandTotal } =
             getCustomerOrderBill(order);
 
         const formatRow = (label, value) => {
-            const spacesCount = Math.max(1, 32 - label.length - value.length);
-            const spaces = ' '.repeat(spacesCount);
-            return `<div style="font-family: monospace; font-size: 12px; white-space: pre;">${label}${spaces}${value}</div>`;
+            return `<div style="font-size: 18px; font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 5px; color: #000;">
+                <div>${label}</div>
+                <div style="white-space: nowrap; font-weight: 800;">${value}</div>
+            </div>`;
         };
 
         const formatBoldRow = (label, value) => {
-            const spacesCount = Math.max(1, 32 - label.length - value.length);
-            const spaces = ' '.repeat(spacesCount);
-            return `<div style="font-family: monospace; font-size: 13px; font-weight: bold; white-space: pre;">${label}${spaces}${value}</div>`;
+            return `<div style="font-size: 22px; font-weight: 900; display: flex; justify-content: space-between; margin-top: 10px; margin-bottom: 10px; color: #000;">
+                <div>${label}</div>
+                <div style="white-space: nowrap;">${value}</div>
+            </div>`;
         };
 
         let pricingRows = '';
@@ -358,70 +361,131 @@ const Orders = () => {
         }
 
         const html = `
+            <!DOCTYPE html>
             <html>
             <head>
                 <title>Receipt ${order.id}</title>
                 <style>
-                    @page {
-                        size: 80mm auto;
-                        margin: 0;
+                    * {
+                        box-sizing: border-box;
                     }
                     body {
-                        width: 72mm;
-                        margin: 0 auto;
-                        padding: 10px 2px;
-                        font-family: 'Courier New', Courier, monospace;
-                        font-size: 12px;
-                        line-height: 1.3;
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, 'Courier New', monospace;
                         color: #000;
-                        background-color: #fff;
+                        margin: 0;
+                        padding: 0;
+                        -webkit-font-smoothing: antialiased;
                     }
-                    .text-center { text-align: center; }
-                    .bold { font-weight: bold; }
                     .divider {
-                        margin: 6px 0;
-                        border-top: 1px dashed #000;
+                        margin: 12px 0;
+                        border-top: 2px dashed #000;
                     }
                     .title {
-                        font-size: 16px;
-                        font-weight: bold;
-                        margin-bottom: 2px;
+                        font-size: 28px;
+                        font-weight: 900;
+                        letter-spacing: 1px;
+                        margin-bottom: 4px;
+                    }
+                    .subtitle {
+                        font-size: 18px;
+                        font-weight: 800;
+                        margin-bottom: 6px;
+                    }
+                    .info-row {
+                        font-size: 18px;
+                        font-weight: 700;
+                        margin-bottom: 5px;
+                        word-break: break-word;
+                        color: #000;
+                    }
+
+                    @media screen {
+                        body {
+                            background-color: #f1f5f9;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            min-height: 100vh;
+                            padding: 24px;
+                        }
+                        .receipt-card {
+                            background: #ffffff;
+                            width: 100%;
+                            max-width: 480px;
+                            padding: 28px 24px;
+                            border-radius: 20px;
+                            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+                            border: 2px solid #cbd5e1;
+                        }
+                    }
+
+                    @media print {
+                        @page {
+                            size: 80mm auto;
+                            margin: 0;
+                        }
+                        body {
+                            width: 76mm;
+                            margin: 0 auto;
+                            padding: 4px 2px;
+                            background-color: #fff;
+                        }
+                        .receipt-card {
+                            box-shadow: none;
+                            border: none;
+                            padding: 0;
+                            width: 100%;
+                        }
                     }
                 </style>
             </head>
             <body>
-                <div class="text-center title">SEVA FAST</div>
-                <div class="text-center bold" style="font-size: 11px;">CUSTOMER INVOICE</div>
-                <div class="divider"></div>
-                <div style="font-family: monospace;"><strong>Order:</strong> #${order.id}</div>
-                <div style="font-family: monospace;"><strong>Status:</strong> ${order.status.toUpperCase()}</div>
-                <div style="font-family: monospace;"><strong>Date:</strong> ${order.date} ${order.time}</div>
-                <div style="font-family: monospace;"><strong>Payment:</strong> ${order.payment}</div>
-                <div class="divider"></div>
-                <div style="font-family: monospace;"><strong>Customer:</strong> ${order.customer.name}</div>
-                <div style="font-family: monospace;"><strong>Phone:</strong> ${order.customer.phone}</div>
-                <div style="word-break: break-all; font-family: monospace;"><strong>Addr:</strong> ${order.address}</div>
-                <div class="divider"></div>
-                <div class="bold" style="margin-bottom: 4px; font-family: monospace;">ITEMS</div>
-                ${itemsHtml}
-                <div class="divider"></div>
-                ${pricingRows}
-                <div class="divider"></div>
-                ${formatBoldRow('TOTAL AMOUNT:', '₹' + grandTotal.toFixed(0))}
-                <div class="divider"></div>
-                <div class="text-center" style="margin-top: 15px; font-size: 10px; font-family: monospace;">Thank you for ordering!</div>
-                <script>
-                    window.onload = function() {
-                        window.print();
-                        setTimeout(function() { window.close(); }, 500);
-                    }
-                </script>
+                <div class="receipt-card">
+                    <div style="text-align: center;" class="title">SEVA FAST</div>
+                    <div style="text-align: center;" class="subtitle">CUSTOMER INVOICE</div>
+                    <div class="divider"></div>
+                    <div class="info-row"><strong>Order:</strong> #${order.id}</div>
+                    <div class="info-row"><strong>Status:</strong> ${order.status.toUpperCase()}</div>
+                    <div class="info-row"><strong>Date:</strong> ${order.date} ${order.time}</div>
+                    <div class="info-row"><strong>Payment:</strong> ${order.payment}</div>
+                    <div class="divider"></div>
+                    <div class="info-row"><strong>Customer:</strong> ${order.customer.name}</div>
+                    <div class="info-row"><strong>Phone:</strong> ${order.customer.phone}</div>
+                    <div class="info-row"><strong>Addr:</strong> ${order.address}</div>
+                    <div class="divider"></div>
+                    <div class="subtitle" style="text-align: center; margin-bottom: 12px;">ITEMS</div>
+                    ${itemsHtml}
+                    <div class="divider"></div>
+                    ${pricingRows}
+                    <div class="divider"></div>
+                    ${formatBoldRow('TOTAL AMOUNT:', '₹' + grandTotal.toFixed(0))}
+                    <div class="divider"></div>
+                    <div style="text-align: center; margin-top: 20px; font-size: 18px; font-weight: 800;">Thank you for ordering!</div>
+                </div>
             </body>
             </html>
         `;
 
+        printWindow.document.open();
         printWindow.document.write(html);
         printWindow.document.close();
+
+        printWindow.focus();
+        setTimeout(() => {
+            try {
+                printWindow.print();
+            } catch (e) {
+                console.error("Print error:", e);
+            }
+        }, 400);
+
+        printWindow.onafterprint = () => {
+            try {
+                printWindow.close();
+            } catch (e) {
+                // ignore
+            }
+        };
     };
 
     const handleNormalPrint = (order) => {
@@ -602,18 +666,30 @@ const Orders = () => {
                         Thank you for your business! For any queries, please contact support.
                     </div>
                 </div>
-                <script>
-                    window.onload = function() {
-                        window.print();
-                        setTimeout(function() { window.close(); }, 500);
-                    }
-                </script>
             </body>
             </html>
         `;
 
+        printWindow.document.open();
         printWindow.document.write(html);
         printWindow.document.close();
+
+        printWindow.focus();
+        setTimeout(() => {
+            try {
+                printWindow.print();
+            } catch (e) {
+                console.error("Print error:", e);
+            }
+        }, 300);
+
+        printWindow.onafterprint = () => {
+            try {
+                printWindow.close();
+            } catch (e) {
+                // ignore
+            }
+        };
     };
 
     const STATUS_RANK = { pending: 0, confirmed: 1, packed: 2, out_for_delivery: 3, delivered: 4, cancelled: 99 };
@@ -1169,21 +1245,20 @@ const Orders = () => {
                     {createPortal(
                         <AnimatePresence>
                             {isQuickViewModalOpen && (
-                                <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-4 overflow-hidden overscroll-none">
+                                <div
+                                    data-lenis-prevent
+                                    data-lenis-prevent-wheel
+                                    className="fixed inset-0 z-[250] overflow-y-auto bg-slate-900/40 backdrop-blur-sm p-3 sm:p-4 flex items-center justify-center min-h-full"
+                                    onClick={() => setIsQuickViewModalOpen(false)}
+                                >
                                     <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm touch-none"
-                                        onClick={() => setIsQuickViewModalOpen(false)}
-                                        onWheel={preventBackdropScroll}
-                                        onTouchMove={preventBackdropScroll}
-                                    />
-                                    <motion.div
+                                        data-lenis-prevent
+                                        data-lenis-prevent-wheel
                                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                        className="w-full max-w-lg relative z-10 bg-white rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+                                        className="w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-auto text-left relative z-10"
+                                        onClick={(e) => e.stopPropagation()}
                                     >
                                         <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                                             <div className="flex items-center gap-3 min-w-0">
@@ -1234,24 +1309,25 @@ const Orders = () => {
                     {createPortal(
                         <AnimatePresence>
                             {isDetailsModalOpen && selectedOrder && (
-                                <div className="fixed inset-0 z-[250] flex items-stretch sm:items-center justify-center p-3 sm:p-6 lg:p-12 overflow-hidden overscroll-none">
+                                <div
+                                    className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-6 lg:p-12"
+                                    data-lenis-prevent
+                                >
                                     <motion.div
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
-                                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md touch-none"
+                                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-md"
                                         onClick={() => setIsDetailsModalOpen(false)}
-                                        onWheel={preventBackdropScroll}
-                                        onTouchMove={preventBackdropScroll}
                                     />
                                     <motion.div
                                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                        className="w-full max-w-lg sm:max-w-2xl relative z-10 bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                                        className="w-full max-w-lg sm:max-w-2xl relative z-10 bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh]"
                                     >
-                                        {/* Modal Header - sticky */}
-                                        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex-shrink-0">
+                                        {/* Modal Header - pinned */}
+                                        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex-shrink-0 bg-white">
                                             <div className="flex items-center space-x-3">
                                                 <div className="h-10 w-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg">
                                                     <HiOutlineTruck className="h-5 w-5" />
@@ -1282,8 +1358,8 @@ const Orders = () => {
                                             </button>
                                         </div>
 
-                                        {/* Modal Body - scrollable */}
-                                        <div className="overflow-y-auto flex-1 px-4 py-4 sm:px-6 sm:py-5 space-y-4 sm:space-y-6">
+                                        {/* Modal Body - scrollable in the middle */}
+                                        <div className="overflow-y-auto flex-1 min-h-0 px-4 py-4 sm:px-6 sm:py-5 space-y-4 sm:space-y-6 overscroll-contain">
 
                                             {/* Address & Contact Grid */}
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1496,7 +1572,7 @@ const Orders = () => {
                                             </div>
                                         </div>
 
-                                        {/* Modal Footer - sticky */}
+                                        {/* Modal Footer - pinned */}
                                         <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 sm:gap-0 sm:items-center justify-between flex-shrink-0">
                                             <button
                                                 onClick={() => handleThermalPrint(selectedOrder)}
