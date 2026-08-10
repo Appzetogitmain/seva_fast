@@ -28,6 +28,7 @@ import sellerPhotoOrderRoute from "./sellerPhotoOrderRoutes.js";
 import professionalRoute from "./professionalRoutes.js";
 import adminProfessionalRoute from "./adminProfessionalRoutes.js";
 import authActivityRoute from "./authActivityRoutes.js";
+import { whatsappAdminRouter, whatsappWebhookRouter } from "../modules/whatsapp/whatsapp.routes.js";
 
 
 import express from "express";
@@ -71,6 +72,8 @@ const setupRoutes = (app) => {
     router.use("/seller-photo-orders", sellerPhotoOrderRoute);
     router.use("/professionals", professionalRoute);
     router.use("/admin/professionals", adminProfessionalRoute);
+    router.use("/admin/whatsapp", whatsappAdminRouter);
+    router.use("/whatsapp", whatsappWebhookRouter);
 
     app.use("/api", router);
 }

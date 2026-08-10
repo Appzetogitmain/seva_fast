@@ -136,7 +136,19 @@ async function validateDependencies() {
       result.errors.push(`Required environment variable ${varName} is not set`);
     }
   }
-  
+
+  // WhatsApp is an optional integration — warn only, never block boot,
+  // since order/birthday flows must keep working even if it's misconfigured.
+  const whatsappEnabled = String(process.env.WHATSAPP_ENABLED || "false").toLowerCase() === "true";
+  if (whatsappEnabled) {
+    const missingWhatsAppVars = ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"].filter(
+      (key) => !String(process.env[key] || "").trim(),
+    );
+    result.checks.whatsapp = missingWhatsAppVars.length
+      ? { status: "WARN", message: `WHATSAPP_ENABLED=true but missing: ${missingWhatsAppVars.join(", ")}` }
+      : { status: "UP", message: "Configured" };
+  }
+
   return result;
 }
 

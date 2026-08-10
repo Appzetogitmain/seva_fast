@@ -134,6 +134,15 @@ function createApp() {
     }),
   );
 
+  // WhatsApp (Meta) webhook needs raw body for X-Hub-Signature-256 verification
+  app.use(
+    "/api/whatsapp/webhook",
+    express.raw({
+      type: "application/json",
+      limit: process.env.WHATSAPP_WEBHOOK_MAX_PAYLOAD || "1mb",
+    }),
+  );
+
   app.use(express.json({ limit: process.env.API_JSON_LIMIT || "1mb" }));
   app.use(express.urlencoded({ limit: process.env.API_URLENCODED_LIMIT || "1mb", extended: true }));
 
@@ -294,7 +303,21 @@ async function startScheduler() {
       getPayoutBatchJobHandler()
     );
   }
-  
+
+  // Register WhatsApp campaign dispatch job (sends due scheduled campaigns)
+  const {
+    getWhatsAppCampaignJobInterval,
+    getWhatsAppCampaignJobHandler,
+    isWhatsAppCampaignJobEnabled,
+  } = await import("./app/jobs/whatsappCampaignJob.js");
+  if (isWhatsAppCampaignJobEnabled()) {
+    registerScheduledJob(
+      'whatsappCampaignJob',
+      getWhatsAppCampaignJobInterval(),
+      getWhatsAppCampaignJobHandler()
+    );
+  }
+
   // Start all registered jobs
   await startScheduledJobs();
   registerSchedulerStopper(stopScheduledJobs);
