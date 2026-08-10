@@ -44,6 +44,16 @@ const settingSchema = new mongoose.Schema(
             default: "#64748b",
         },
 
+        // Seller certificate — global signatory signature & official seal, used on every seller's certificate
+        signatureImageUrl: {
+            type: String,
+            default: "",
+        },
+        sealImageUrl: {
+            type: String,
+            default: "",
+        },
+
         // Legal
         companyName: String,
         taxId: String,

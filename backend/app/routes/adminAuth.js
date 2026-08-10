@@ -1,4 +1,10 @@
 import express from "express";
+import multer from "multer";
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 }
+});
 import {
     bootstrapAdmin,
     signupAdmin,
@@ -22,6 +28,7 @@ import {
     getPendingSellers,
     approveSellerApplication,
     rejectSellerApplication,
+    uploadSellerKycDocument,
     getSellerWithdrawals,
     getDeliveryWithdrawals,
     updateWithdrawalStatus,
@@ -50,6 +57,13 @@ import {
     deleteSubadmin,
     getSubadminWalletController,
 } from "../controller/adminController.js";
+import {
+    createSellerPlan,
+    getAdminSellerPlans,
+    updateSellerPlan,
+    deleteSellerPlan,
+    assignSellerPlanToSeller,
+} from "../controller/sellerPlanController.js";
 import { getAuthActivityLogs } from "../controller/authActivityController.js";
 import {
     exportAdminFinanceStatementController,
@@ -186,10 +200,18 @@ router.get("/sellers", verifyToken, allowRoles("admin"), getSellers);
 router.get("/sellers/locations", verifyToken, allowRoles("admin"), getSellerLocations);
 router.get("/sellers/active", verifyToken, allowRoles("admin"), getActiveSellers);
 router.get("/sellers/pending", verifyToken, allowRoles("admin"), getPendingSellers);
-router.put("/sellers/:id", verifyToken, allowRoles("admin"), updateSellerDetails);
 router.patch("/sellers/approve/:id", verifyToken, allowRoles("admin"), approveSellerApplication);
 router.delete("/sellers/reject/:id", verifyToken, allowRoles("admin"), rejectSellerApplication);
+router.post("/sellers/:id/kyc-document", verifyToken, allowRoles("admin", "sub-admin"), upload.single("kycDocument"), uploadSellerKycDocument);
+router.put("/sellers/:id", verifyToken, allowRoles("admin", "sub-admin"), updateSellerDetails);
 router.delete("/sellers/:id", verifyToken, allowRoles("admin"), deleteSeller);
+
+// Seller Subscription Plans (Admin)
+router.post("/seller-plans", verifyToken, allowRoles("admin"), createSellerPlan);
+router.get("/seller-plans", verifyToken, allowRoles("admin"), getAdminSellerPlans);
+router.put("/seller-plans/:id", verifyToken, allowRoles("admin"), updateSellerPlan);
+router.delete("/seller-plans/:id", verifyToken, allowRoles("admin"), deleteSellerPlan);
+router.post("/sellers/:id/assign-plan", verifyToken, allowRoles("admin"), assignSellerPlanToSeller);
 
 
 router.get(

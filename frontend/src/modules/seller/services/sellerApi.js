@@ -28,6 +28,7 @@ export const sellerApi = {
     getWalletSummary: () => axiosInstance.get('/seller/wallet/summary'),
     getProfile: () => axiosInstance.get('/seller/profile'),
     updateProfile: (data) => axiosInstance.put('/seller/profile', data),
+    acceptCertificate: () => axiosInstance.post('/seller/accept-certificate'),
     getCodCashSummary: () => axiosInstance.get('/seller/cod/summary'),
     payCodCashToAdmin: (data) => axiosInstance.post('/seller/cod/pay', data),
 
@@ -52,4 +53,11 @@ export const sellerApi = {
 
     // Delivery Boys
     getDeliveryPartners: (params) => axiosInstance.get('/admin/delivery-partners', { params }),
+
+    // Subscription Plans
+    getPlans: () => axiosInstance.get('/seller/plans'),
+    initiatePlanPurchase: (data) => axiosInstance.post('/seller/plans/subscribe/initiate', data),
+    verifyPlanPurchase: (data) => axiosInstance.post('/seller/plans/subscribe/verify', data),
+    getSubscriptionStatus: () => axiosInstance.get('/seller/subscription-status'),
+    switchToCategoryCommission: () => axiosInstance.post('/seller/switch-to-commission'),
 };

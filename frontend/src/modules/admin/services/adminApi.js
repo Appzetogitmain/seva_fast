@@ -12,8 +12,10 @@ export const adminApi = {
     getSellerLocations: (params) => axiosInstance.get('/admin/sellers/locations', { params }),
     getPendingSellers: (params) => axiosInstance.get('/admin/sellers/pending', { params }),
     updateSellerDetails: (id, data) => axiosInstance.put(`/admin/sellers/${id}`, data),
-    approveSeller: (id) => axiosInstance.patch(`/admin/sellers/approve/${id}`),
+    approveSeller: (id, data) => axiosInstance.patch(`/admin/sellers/approve/${id}`, data),
     rejectSeller: (id, data) => axiosInstance.delete(`/admin/sellers/reject/${id}`, { data }),
+    uploadSellerKycDocument: (id, formData) =>
+        axiosInstance.post(`/admin/sellers/${id}/kyc-document`, formData),
     deleteSeller: (id) => axiosInstance.delete(`/admin/sellers/${id}`),
     getAdminWalletData: (params) => axiosInstance.get('/admin/wallet-data', { params }),
     getReports: () => axiosInstance.get('/admin/reports'),
@@ -178,4 +180,11 @@ export const adminApi = {
     uploadMedia: (formData) => axiosInstance.post('/media/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     }),
+
+    // Seller Subscription Plans
+    getSellerPlans: () => axiosInstance.get('/admin/seller-plans'),
+    createSellerPlan: (data) => axiosInstance.post('/admin/seller-plans', data),
+    updateSellerPlan: (id, data) => axiosInstance.put(`/admin/seller-plans/${id}`, data),
+    deleteSellerPlan: (id) => axiosInstance.delete(`/admin/seller-plans/${id}`),
+    assignSellerPlan: (sellerId, data) => axiosInstance.post(`/admin/sellers/${sellerId}/assign-plan`, data),
 };

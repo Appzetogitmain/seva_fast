@@ -19,7 +19,8 @@ import {
     Linkedin,
     Youtube,
     Loader2,
-    X
+    X,
+    Award
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@shared/components/ui/Toast';
@@ -43,9 +44,13 @@ const AdminSettings = () => {
     const [logoUploading, setLogoUploading] = useState(false);
     const [faviconUploading, setFaviconUploading] = useState(false);
     const [qrUploading, setQrUploading] = useState(false);
+    const [signatureUploading, setSignatureUploading] = useState(false);
+    const [sealUploading, setSealUploading] = useState(false);
     const logoInputRef = useRef(null);
     const faviconInputRef = useRef(null);
     const qrInputRef = useRef(null);
+    const signatureInputRef = useRef(null);
+    const sealInputRef = useRef(null);
 
     const [settings, setSettings] = useState({
         appName: '',
@@ -58,6 +63,8 @@ const AdminSettings = () => {
         faviconUrl: '',
         primaryColor: 'var(--primary)',
         secondaryColor: '#64748b',
+        signatureImageUrl: '',
+        sealImageUrl: '',
         companyName: '',
         taxId: '',
         address: '',
@@ -240,9 +247,62 @@ const AdminSettings = () => {
         }
     };
 
+    const handleSignatureUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select an image file (PNG, JPG, etc.)', 'error');
+            return;
+        }
+        setSignatureUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('image', file);
+            const res = await adminApi.uploadSettingsImage(fd, 'signature');
+            const url = res.data?.result?.url || res.data?.url;
+            if (url) {
+                handleInputChange('signatureImageUrl', url);
+                showToast('Signature uploaded. Click Save Changes to apply.', 'success');
+            } else throw new Error('No URL returned');
+        } catch (err) {
+            console.error(err);
+            showToast(err.response?.data?.message || 'Failed to upload signature', 'error');
+        } finally {
+            setSignatureUploading(false);
+            e.target.value = '';
+        }
+    };
+
+    const handleSealUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select an image file (PNG, JPG, etc.)', 'error');
+            return;
+        }
+        setSealUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('image', file);
+            const res = await adminApi.uploadSettingsImage(fd, 'seal');
+            const url = res.data?.result?.url || res.data?.url;
+            if (url) {
+                handleInputChange('sealImageUrl', url);
+                showToast('Seal uploaded. Click Save Changes to apply.', 'success');
+            } else throw new Error('No URL returned');
+        } catch (err) {
+            console.error(err);
+            showToast(err.response?.data?.message || 'Failed to upload seal', 'error');
+        } finally {
+            setSealUploading(false);
+            e.target.value = '';
+        }
+    };
+
     const tabs = [
         { id: 'general', label: 'General', icon: Settings },
         { id: 'branding', label: 'Branding', icon: Globe },
+        { id: 'certificate', label: 'Seller Certificate', icon: Award },
         { id: 'payments', label: 'COD Payments', icon: CreditCard },
         { id: 'legal', label: 'Legal & Contact', icon: Building2 },
         { id: 'pricing', label: 'Advertising Pricing', icon: CreditCard },
@@ -554,6 +614,92 @@ const AdminSettings = () => {
                                             onChange={(e) => handleInputChange('secondaryColor', e.target.value)}
                                             className="w-full px-5 py-3 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all font-mono"
                                         />
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Seller Certificate — global signature & seal */}
+                    {activeTab === 'certificate' && (
+                        <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
+                            <div className="p-6 border-b border-slate-50 bg-slate-50/30">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
+                                    Authorised Seller Certificate
+                                </h3>
+                                <p className="text-xs text-slate-400 font-medium mt-1">
+                                    This signature and seal are used on every seller's Authorised Seller Certificate.
+                                </p>
+                            </div>
+                            <div className="p-8 space-y-8">
+                                <input type="file" ref={signatureInputRef} accept="image/*" className="hidden" onChange={handleSignatureUpload} />
+                                <input type="file" ref={sealInputRef} accept="image/*" className="hidden" onChange={handleSealUpload} />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Authorised Signatory Signature</label>
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => !signatureUploading && signatureInputRef.current?.click()}
+                                            onKeyDown={(e) => e.key === 'Enter' && !signatureUploading && signatureInputRef.current?.click()}
+                                            className={cn(
+                                                "h-40 w-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all group overflow-hidden",
+                                                settings.signatureImageUrl ? "border-slate-200 bg-slate-50/50" : "border-slate-200 hover:border-brand-500/50 hover:bg-brand-50/10 cursor-pointer"
+                                            )}
+                                        >
+                                            {signatureUploading ? (
+                                                <Loader2 className="h-10 w-10 text-brand-600 animate-spin" />
+                                            ) : settings.signatureImageUrl ? (
+                                                <>
+                                                    <img src={settings.signatureImageUrl} alt="Signatory signature" className="max-h-24 w-auto object-contain" />
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-slate-500">Click to replace</span>
+                                                        <button type="button" onClick={(e) => { e.stopPropagation(); handleInputChange('signatureImageUrl', ''); }} className="p-1 rounded hover:bg-red-100 text-slate-400 hover:text-red-600" title="Remove signature"><X className="h-4 w-4" /></button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                        <Upload className="h-5 w-5 text-slate-400 group-hover:text-brand-600" />
+                                                    </div>
+                                                    <span className="text-xs font-bold text-slate-400 group-hover:text-brand-600">Click to upload signature</span>
+                                                </>
+                                            )}
+                                        </div>
+                                        <input type="url" value={settings.signatureImageUrl} onChange={(e) => handleInputChange('signatureImageUrl', e.target.value)} placeholder="Or paste signature image URL" className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500/20" />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Official Seal / Stamp</label>
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => !sealUploading && sealInputRef.current?.click()}
+                                            onKeyDown={(e) => e.key === 'Enter' && !sealUploading && sealInputRef.current?.click()}
+                                            className={cn(
+                                                "h-40 w-full rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all group overflow-hidden",
+                                                settings.sealImageUrl ? "border-slate-200 bg-slate-50/50" : "border-slate-200 hover:border-brand-500/50 hover:bg-brand-50/10 cursor-pointer"
+                                            )}
+                                        >
+                                            {sealUploading ? (
+                                                <Loader2 className="h-10 w-10 text-brand-600 animate-spin" />
+                                            ) : settings.sealImageUrl ? (
+                                                <>
+                                                    <img src={settings.sealImageUrl} alt="Official seal" className="max-h-24 w-auto object-contain" />
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-slate-500">Click to replace</span>
+                                                        <button type="button" onClick={(e) => { e.stopPropagation(); handleInputChange('sealImageUrl', ''); }} className="p-1 rounded hover:bg-red-100 text-slate-400 hover:text-red-600" title="Remove seal"><X className="h-4 w-4" /></button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                        <Upload className="h-5 w-5 text-slate-400 group-hover:text-brand-600" />
+                                                    </div>
+                                                    <span className="text-xs font-bold text-slate-400 group-hover:text-brand-600">Click to upload seal</span>
+                                                </>
+                                            )}
+                                        </div>
+                                        <input type="url" value={settings.sealImageUrl} onChange={(e) => handleInputChange('sealImageUrl', e.target.value)} placeholder="Or paste seal image URL" className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500/20" />
                                     </div>
                                 </div>
                             </div>

@@ -128,7 +128,49 @@ export async function getPendingSellerApplications({
   };
 }
 
-export async function approveSellerApplicationById({ sellerId, reviewedBy }) {
+export async function approveSellerApplicationById({ sellerId, reviewedBy, certificateDetails }) {
+  const existingSeller = await Seller.findById(sellerId);
+  if (!existingSeller) {
+    return null;
+  }
+
+  const sellerCode = existingSeller.sellerCode || buildSellerCode();
+  const certNo =
+    certificateDetails?.certificateNo ||
+    `SF-AS-${sellerCode.replace(/[^a-zA-Z0-9]/g, "")}-${Date.now().toString().slice(-6)}`;
+
+  const todayStr = new Date().toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const nextYearDate = new Date();
+  nextYearDate.setFullYear(nextYearDate.getFullYear() + 1);
+  const nextYearStr = nextYearDate.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  const certificateData = {
+    certificateNo: certNo,
+    sellerId: certificateDetails?.sellerId || sellerCode,
+    sellerName: certificateDetails?.sellerName || existingSeller.name || "",
+    shopName: certificateDetails?.shopName || existingSeller.shopName || "",
+    category: certificateDetails?.category || existingSeller.category || "General",
+    cityLocation:
+      certificateDetails?.cityLocation ||
+      existingSeller.city ||
+      existingSeller.address ||
+      "Registered Location",
+    issueDate: certificateDetails?.issueDate || todayStr,
+    validFrom: certificateDetails?.validFrom || todayStr,
+    validUntil: certificateDetails?.validUntil || nextYearStr,
+    signatoryName: certificateDetails?.signatoryName || "SEVAFAST Operations",
+    issuedAt: new Date(),
+    accepted: false,
+  };
+
   const seller = await Seller.findByIdAndUpdate(
     sellerId,
     {
@@ -139,6 +181,8 @@ export async function approveSellerApplicationById({ sellerId, reviewedBy }) {
         reviewedAt: new Date(),
         reviewedBy,
         rejectionReason: null,
+        sellerCode,
+        certificate: certificateData,
       },
     },
     { new: true },
@@ -155,31 +199,6 @@ export async function approveSellerApplicationById({ sellerId, reviewedBy }) {
         `[SellerApprove] Shiprocket pickup sync failed for ${seller._id}:`,
         err.message,
       );
-    });
-  });
-
-  // Send approval email + filled Authorized Seller Certificate (non-blocking)
-  setImmediate(() => {
-    (async () => {
-      const sellerForCertificate = await ensureSellerCodeForCertificate(seller);
-      const certificate = await generateSellerCertificatePdf(sellerForCertificate);
-      await sendSellerApprovalEmail({
-        email: sellerForCertificate.email,
-        sellerName: sellerForCertificate.name,
-        shopName: sellerForCertificate.shopName,
-        sellerId: sellerForCertificate.sellerCode || String(sellerForCertificate._id),
-        mobile: sellerForCertificate.phone,
-        certificateNo: certificate.certificateNo,
-        issueDate: certificate.issueDate,
-        certificatePdf: certificate.buffer,
-        certificateFilename: certificate.filename,
-      });
-    })().catch((err) => {
-      logger.warn("Seller approval email/certificate failed", {
-        sellerId: String(seller._id),
-        email: seller.email,
-        error: err?.message || String(err),
-      });
     });
   });
 

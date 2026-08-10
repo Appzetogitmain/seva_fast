@@ -43,9 +43,13 @@ const createInitialVerificationState = () => ({
 });
 
 const REQUIRED_DOCUMENT_CONFIG = [
+  { id: "addressProof", label: "Address Proof" },
+  { id: "cancelledCheque", label: "Cancelled Cheque" },
   { id: "tradeLicense", label: "Trade License" },
-  { id: "gstCertificate", label: "GST Certificate" },
-  { id: "idProof", label: "ID Proof" },
+];
+
+const OPTIONAL_DOCUMENT_CONFIG = [
+  { id: "gstCertificate", label: "GST Certificate (Optional)" },
 ];
 
 const Auth = () => {
@@ -84,6 +88,20 @@ const Auth = () => {
     lng: null,
     radius: 5,
     address: "",
+    whatsappNumber: "",
+    businessType: "Proprietorship",
+    sellerType: "Retailer",
+    panNumber: "",
+    aadhaarNumber: "",
+    gstinNumber: "",
+    udyamNumber: "",
+    yearsInBusiness: "",
+    expectedMonthlyOrders: "",
+    accountHolderName: "",
+    bankName: "",
+    branch: "",
+    accountNumber: "",
+    ifscCode: "",
   });
 
   const handleLocationSelect = (location) => {
@@ -104,10 +122,18 @@ const Auth = () => {
     tradeLicense: null,
     gstCertificate: null,
     idProof: null,
+    panCard: null,
+    addressProof: null,
+    cancelledCheque: null,
   });
 
-  const getMissingRequiredDocuments = () =>
-    REQUIRED_DOCUMENT_CONFIG.filter((doc) => !documents[doc.id]);
+  const getMissingRequiredDocuments = () => {
+    const missing = REQUIRED_DOCUMENT_CONFIG.filter((doc) => !documents[doc.id]);
+    if (!documents.panCard && !documents.idProof) {
+      missing.push({ id: "panCard", label: "PAN Card or Aadhaar Card" });
+    }
+    return missing;
+  };
 
   const updateVerificationState = (field, updates) => {
     setVerifications((prev) => ({
@@ -136,13 +162,14 @@ const Auth = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "name") {
-      // Owner name: only alphabets and spaces
+      // Owner name: only alphabets and spaces, max 50
       let cleaned = value.replace(/[^a-zA-Z\s]/g, "");
-      cleaned = cleaned.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+      cleaned = cleaned.replace(/^\s+/, "").replace(/\s{2,}/g, " ").slice(0, 50);
       if (cleaned.trim() === "") cleaned = "";
       setFormData({ ...formData, [name]: cleaned });
     } else if (name === "shopName") {
-      const cleaned = value.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+      // Shop name: max 50
+      const cleaned = value.replace(/^\s+/, "").replace(/\s{2,}/g, " ").slice(0, 50);
       setFormData({ ...formData, [name]: cleaned });
     } else if (name === "email") {
       // Business email: trim leading spaces, disallow spaces inside
@@ -151,10 +178,10 @@ const Auth = () => {
         resetVerificationState("email");
       }
       setFormData({ ...formData, [name]: cleaned });
-    } else if (name === "phone") {
-      // Contact number: only digits, max 10 characters
+    } else if (name === "phone" || name === "whatsappNumber") {
+      // Contact number/WhatsApp: only digits, max 10 characters
       const digitsOnly = value.replace(/[^0-9]/g, "").slice(0, 10);
-      if (digitsOnly !== formData.phone) {
+      if (name === "phone" && digitsOnly !== formData.phone) {
         resetVerificationState("phone");
       }
       setFormData({ ...formData, [name]: digitsOnly });
@@ -172,6 +199,32 @@ const Auth = () => {
     } else if (name === "password") {
       // Password: allow any characters, min length 6
       setFormData({ ...formData, [name]: value });
+    } else if (name === "accountHolderName" || name === "bankName") {
+      let cleaned = value.replace(/[^a-zA-Z\s]/g, "");
+      cleaned = cleaned.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+      setFormData({ ...formData, [name]: cleaned });
+    } else if (name === "branch") {
+      let cleaned = value.replace(/[^a-zA-Z0-9\s-]/g, "");
+      cleaned = cleaned.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+      setFormData({ ...formData, [name]: cleaned });
+    } else if (name === "accountNumber") {
+      const digitsOnly = value.replace(/[^0-9]/g, "");
+      setFormData({ ...formData, [name]: digitsOnly });
+    } else if (name === "aadhaarNumber") {
+      const digitsOnly = value.replace(/[^0-9]/g, "").slice(0, 12);
+      setFormData({ ...formData, [name]: digitsOnly });
+    } else if (name === "panNumber") {
+      const alphanumeric = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10);
+      setFormData({ ...formData, [name]: alphanumeric });
+    } else if (name === "gstinNumber") {
+      const alphanumeric = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 15);
+      setFormData({ ...formData, [name]: alphanumeric });
+    } else if (name === "udyamNumber") {
+      const cleaned = value.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase().slice(0, 19);
+      setFormData({ ...formData, [name]: cleaned });
+    } else if (name === "ifscCode") {
+      const cleaned = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 11);
+      setFormData({ ...formData, [name]: cleaned });
     } else {
       setFormData({ ...formData, [name]: value });
     }
@@ -313,10 +366,44 @@ const Auth = () => {
           isProcessing.current = false;
           return;
         }
-        if (signupStep === 2 && formData.locality && !/^[a-zA-Z0-9]/.test(formData.locality)) {
+        if (signupStep === 2) {
+          if (formData.ifscCode && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.ifscCode)) {
+            toast.error("Please enter a valid IFSC Code.");
+            isProcessing.current = false;
+            return;
+          }
+        }
+        if (signupStep === 3 && formData.locality && !/^[a-zA-Z0-9]/.test(formData.locality)) {
           toast.error("Locality must start with an alphabet or number.");
           isProcessing.current = false;
           return;
+        }
+        if (signupStep === 4) {
+          if (!formData.panNumber && !formData.aadhaarNumber) {
+            toast.error("Either PAN Number or Aadhaar Number is compulsory.");
+            isProcessing.current = false;
+            return;
+          }
+          if (formData.panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber)) {
+            toast.error("Please enter a valid PAN Number.");
+            isProcessing.current = false;
+            return;
+          }
+          if (formData.aadhaarNumber && !/^[0-9]{12}$/.test(formData.aadhaarNumber)) {
+            toast.error("Aadhaar Number must be exactly 12 digits.");
+            isProcessing.current = false;
+            return;
+          }
+          if (formData.gstinNumber && !/^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}$/.test(formData.gstinNumber)) {
+            toast.error("Please enter a valid GSTIN Number.");
+            isProcessing.current = false;
+            return;
+          }
+          if (formData.udyamNumber && !/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/.test(formData.udyamNumber)) {
+            toast.error("Please enter a valid Udyam Number (e.g. UDYAM-MH-12-1234567).");
+            isProcessing.current = false;
+            return;
+          }
         }
       }
       // Password: min 6 characters
@@ -329,8 +416,8 @@ const Auth = () => {
         return;
       }
 
-      if (!isLogin && signupStep < 3) {
-        setSignupStep((prev) => (prev < 3 ? prev + 1 : prev));
+      if (!isLogin && signupStep < 4) {
+        setSignupStep((prev) => (prev < 4 ? prev + 1 : prev));
         isProcessing.current = false;
         return;
       }
@@ -369,9 +456,25 @@ const Auth = () => {
         : await (() => {
           const signupPayload = new FormData();
 
+          const bankDetails = JSON.stringify({
+            accountHolderName: formData.accountHolderName,
+            bankName: formData.bankName,
+            branch: formData.branch,
+            accountNumber: formData.accountNumber,
+            ifscCode: formData.ifscCode,
+          });
+
+          const businessInfo = JSON.stringify({
+            yearsInBusiness: formData.yearsInBusiness,
+            expectedMonthlyOrders: formData.expectedMonthlyOrders,
+            pickupAddress: address,
+          });
+
           Object.entries({
             ...formData,
             address,
+            bankDetails,
+            businessInfo,
             lat: formData.lat,
             lng: formData.lng,
             radius: formData.radius,
@@ -408,6 +511,9 @@ const Auth = () => {
           tradeLicense: null,
           gstCertificate: null,
           idProof: null,
+          panCard: null,
+          addressProof: null,
+          cancelledCheque: null,
         });
         setVerifications({
           email: createInitialVerificationState(),
@@ -538,7 +644,7 @@ const Auth = () => {
                 <span className="inline-block px-4 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200 text-center whitespace-normal w-full sm:w-auto">
                   {isLogin
                     ? "Welcome Back"
-                    : `New Partnership - Step ${signupStep} of 3`}
+                    : `New Partnership - Step ${signupStep} of 4`}
                 </span>
                 <h1 className="text-3xl font-black text-slate-900 tracking-tighter">
                   Seller{" "}
@@ -552,8 +658,10 @@ const Auth = () => {
                     : signupStep === 1
                       ? "Register your store and start selling instantly."
                       : signupStep === 2
-                        ? "Set your shop address and service area precisely."
-                        : "Upload verification documents to complete your application."}
+                        ? "Enter your business and bank details for payouts."
+                        : signupStep === 3
+                          ? "Set your shop address and service area precisely."
+                          : "Enter KYC numbers and upload verification documents."}
                 </p>
               </div>
 
@@ -740,6 +848,23 @@ const Auth = () => {
                       </>
                     )}
 
+                    {!isLogin && (
+                      <div className="relative group">
+                        <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
+                          <Phone size={18} />
+                        </div>
+                        <input
+                          type="tel"
+                          name="whatsappNumber"
+                          inputMode="numeric"
+                          placeholder="WhatsApp Number (Optional)"
+                          className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                          value={formData.whatsappNumber}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    )}
+
                     <div className="relative group">
                       <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
                         <Lock size={18} />
@@ -783,8 +908,131 @@ const Auth = () => {
                   </>
                 )}
 
-                {/* SIGNUP STEP 2 (Shop address and service area) */}
+                {/* SIGNUP STEP 2 (Business & Bank Details) */}
                 {!isLogin && signupStep === 2 && (
+                  <div className="space-y-4">
+                    <p className="text-sm font-black text-slate-600 uppercase tracking-widest mb-3">
+                      Business Details
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="relative group">
+                        <select
+                          name="businessType"
+                          required
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all appearance-none"
+                          value={formData.businessType}
+                          onChange={handleChange}
+                        >
+                          <option value="Proprietorship">Proprietorship</option>
+                          <option value="Partnership">Partnership</option>
+                          <option value="LLP">LLP</option>
+                          <option value="Pvt. Ltd.">Pvt. Ltd.</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                          ▼
+                        </div>
+                      </div>
+                      <div className="relative group">
+                        <select
+                          name="sellerType"
+                          required
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all appearance-none"
+                          value={formData.sellerType}
+                          onChange={handleChange}
+                        >
+                          <option value="Retailer">Retailer</option>
+                          <option value="Wholesaler">Wholesaler</option>
+                          <option value="Manufacturer">Manufacturer</option>
+                          <option value="Service Provider">Service Provider</option>
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                          ▼
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="relative group">
+                        <input
+                          type="number"
+                          name="yearsInBusiness"
+                          placeholder="Years in Business"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                          value={formData.yearsInBusiness}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      <div className="relative group">
+                        <input
+                          type="text"
+                          name="expectedMonthlyOrders"
+                          placeholder="Expected Monthly Orders"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                          value={formData.expectedMonthlyOrders}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-sm font-black text-slate-600 uppercase tracking-widest mt-6 mb-3">
+                      Bank Details
+                    </p>
+                    <div className="space-y-4">
+                      <input
+                        type="text"
+                        name="accountHolderName"
+                        required
+                        placeholder="Account Holder Name"
+                        className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                        value={formData.accountHolderName}
+                        onChange={handleChange}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          type="text"
+                          name="bankName"
+                          required
+                          placeholder="Bank Name"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                          value={formData.bankName}
+                          onChange={handleChange}
+                        />
+                        <input
+                          type="text"
+                          name="branch"
+                          required
+                          placeholder="Branch Name"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                          value={formData.branch}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          type="text"
+                          name="accountNumber"
+                          required
+                          placeholder="Account Number"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                          value={formData.accountNumber}
+                          onChange={handleChange}
+                        />
+                        <input
+                          type="text"
+                          name="ifscCode"
+                          required
+                          placeholder="IFSC Code"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400 uppercase"
+                          value={formData.ifscCode}
+                          onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* SIGNUP STEP 3 (Shop address and service area) */}
+                {!isLogin && signupStep === 3 && (
                   <div className="space-y-4">
                     <div className="pt-2">
                       <p className="text-sm font-black text-slate-600 uppercase tracking-widest mb-3">
@@ -909,15 +1157,140 @@ const Auth = () => {
                   </div>
                 )}
 
-                {/* SIGNUP STEP 3 (Verification documents) */}
-                {!isLogin && signupStep === 3 && (
+                {/* SIGNUP STEP 4 (Verification documents) */}
+                {!isLogin && signupStep === 4 && (
                   <div className="space-y-4">
                     <div className="pt-2">
                       <p className="text-sm font-black text-slate-600 uppercase tracking-widest mb-3">
+                        KYC Details
+                      </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          type="text"
+                          name="panNumber"
+                          placeholder="PAN Number"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400 uppercase"
+                          value={formData.panNumber}
+                          onChange={(e) => setFormData({ ...formData, panNumber: e.target.value.toUpperCase() })}
+                        />
+                        <input
+                          type="text"
+                          name="aadhaarNumber"
+                          placeholder="Aadhaar Number"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                          value={formData.aadhaarNumber}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <input
+                          type="text"
+                          name="gstinNumber"
+                          placeholder="GSTIN (Optional)"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400 uppercase"
+                          value={formData.gstinNumber}
+                          onChange={(e) => setFormData({ ...formData, gstinNumber: e.target.value.toUpperCase() })}
+                        />
+                        <input
+                          type="text"
+                          name="udyamNumber"
+                          placeholder="Udyam / Shop Act (Optional)"
+                          className="w-full px-4 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                          value={formData.udyamNumber}
+                          onChange={handleChange}
+                        />
+                      </div>
+
+                      <p className="text-sm font-black text-slate-600 uppercase tracking-widest mt-6 mb-3">
                         Verification Documents
                       </p>
                       <div className="space-y-3">
+                        {/* Dynamic ID Proof Upload */}
+                        <div className="relative">
+                          <input
+                            type="file"
+                            id="panAadhaarCard"
+                            className="hidden"
+                            accept="image/*,.pdf"
+                            onChange={(e) => {
+                              if (formData.panNumber) {
+                                handleDocumentChange(e, "panCard");
+                              } else {
+                                handleDocumentChange(e, "idProof");
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor="panAadhaarCard"
+                            className={`flex items-center justify-between p-3.5 rounded-lg border-2 border-dashed transition-all cursor-pointer ${(documents.panCard || documents.idProof)
+                              ? "border-brand-200 bg-brand-50/50"
+                              : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                              }`}>
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`p-2 rounded-md ${(documents.panCard || documents.idProof) ? "bg-brand-100 text-brand-600" : "bg-white text-slate-600 shadow-sm"}`}>
+                                {(documents.panCard || documents.idProof) ? (
+                                  <CheckCircle className="w-4 h-4" />
+                                ) : (
+                                  <Upload className="w-4 h-4" />
+                                )}
+                              </div>
+                              <div className="text-left">
+                                <p
+                                  className={`text-xs font-bold ${(documents.panCard || documents.idProof) ? "text-brand-700" : "text-slate-600"}`}>
+                                  PAN / Aadhaar Card
+                                </p>
+                                <p className="text-xs text-slate-600 font-medium truncate max-w-[150px]">
+                                  {(documents.panCard || documents.idProof)
+                                    ? (documents.panCard || documents.idProof).name
+                                    : "Upload secure PDF or image"}
+                                </p>
+                              </div>
+                            </div>
+                          </label>
+                        </div>
+
                         {REQUIRED_DOCUMENT_CONFIG.map((doc) => (
+                          <div key={doc.id} className="relative">
+                            <input
+                              type="file"
+                              id={doc.id}
+                              className="hidden"
+                              accept="image/*,.pdf"
+                              onChange={(e) => handleDocumentChange(e, doc.id)}
+                            />
+                            <label
+                              htmlFor={doc.id}
+                              className={`flex items-center justify-between p-3.5 rounded-lg border-2 border-dashed transition-all cursor-pointer ${documents[doc.id]
+                                ? "border-brand-200 bg-brand-50/50"
+                                : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                                }`}>
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`p-2 rounded-md ${documents[doc.id] ? "bg-brand-100 text-brand-600" : "bg-white text-slate-600 shadow-sm"}`}>
+                                  {documents[doc.id] ? (
+                                    <CheckCircle className="w-4 h-4" />
+                                  ) : (
+                                    <Upload className="w-4 h-4" />
+                                  )}
+                                </div>
+                                <div className="text-left">
+                                  <p
+                                    className={`text-xs font-bold ${documents[doc.id] ? "text-brand-700" : "text-slate-600"}`}>
+                                    {doc.label}
+                                  </p>
+                                  <p className="text-xs text-slate-600 font-medium truncate max-w-[150px]">
+                                    {documents[doc.id]
+                                      ? documents[doc.id].name
+                                      : "Upload secure PDF or image"}
+                                  </p>
+                                </div>
+                              </div>
+                            </label>
+                          </div>
+                        ))}
+
+                        {OPTIONAL_DOCUMENT_CONFIG.map((doc) => (
                           <div key={doc.id} className="relative">
                             <input
                               type="file"
@@ -978,7 +1351,7 @@ const Auth = () => {
                       ? "WORKING..."
                       : isLogin
                         ? "ENTER DASHBOARD"
-                        : signupStep < 3
+                        : signupStep < 4
                           ? "NEXT STEP"
                           : "SUBMIT APPLICATION"}
                     <ArrowRight

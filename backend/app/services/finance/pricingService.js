@@ -204,7 +204,14 @@ export function calculateCategoryCommission(item, categoryConfig, sellerConfig =
   const quantity = normalizeLineQuantity(item.quantity);
   const itemSubtotal = roundCurrency(normalizeLinePrice(item.price) * quantity);
   
-  if (sellerConfig?.commissionModel === "ONE_TIME" && sellerConfig?.oneTimeChargePaid) {
+  const now = new Date();
+  const isSubscriptionActive =
+    sellerConfig?.commissionModel === "PLAN_BASED" &&
+    sellerConfig?.subscription?.status === "active" &&
+    sellerConfig?.subscription?.expiresAt &&
+    new Date(sellerConfig.subscription.expiresAt) > now;
+
+  if (isSubscriptionActive || (sellerConfig?.commissionModel === "ONE_TIME" && sellerConfig?.oneTimeChargePaid)) {
     return {
       itemSubtotal,
       adminCommission: 0,
@@ -537,7 +544,7 @@ export async function generateOrderPaymentBreakdown({
 
   let sellerConfig = null;
   if (sellerIds.length === 1 && mongoose.Types.ObjectId.isValid(sellerIds[0])) {
-    sellerConfig = await Seller.findById(sellerIds[0]).select("commissionModel oneTimeChargePaid categoryCommissionOverrides").lean();
+    sellerConfig = await Seller.findById(sellerIds[0]).select("commissionModel oneTimeChargePaid subscription categoryCommissionOverrides").lean();
   }
 
   const headerIds = Array.from(
@@ -633,7 +640,16 @@ export async function generateOrderPaymentBreakdown({
   const membershipDiscountAmount = roundCurrency((productSubtotal * membershipDiscountPercent) / 100);
 
   // Compute splits
-  const isExempt = sellerConfig?.commissionModel === "ONE_TIME" && sellerConfig?.oneTimeChargePaid;
+  const now = new Date();
+  const isSubscriptionActive =
+    sellerConfig?.commissionModel === "PLAN_BASED" &&
+    sellerConfig?.subscription?.status === "active" &&
+    sellerConfig?.subscription?.expiresAt &&
+    new Date(sellerConfig.subscription.expiresAt) > now;
+
+  const isExempt =
+    isSubscriptionActive ||
+    (sellerConfig?.commissionModel === "ONE_TIME" && sellerConfig?.oneTimeChargePaid);
 
   const lineItems = normalizedItems.map((item) => {
     const category = categoryById.get(String(item.headerCategoryId));

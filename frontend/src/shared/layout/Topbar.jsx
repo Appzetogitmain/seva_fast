@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 
 import { useSettings } from '@core/context/SettingsContext';
 import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
+import verifiedSeal from '@/assets/verified-seal.png';
 
 const Topbar = ({ onMenuClick }) => {
     const { user, role } = useAuth();
@@ -26,7 +27,7 @@ const Topbar = ({ onMenuClick }) => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const appName = settings?.appName || 'App';
+    const appName = settings?.appName || 'SevaFast';
     const logoUrl = settings?.logoUrl || '';
 
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -291,8 +292,13 @@ const Topbar = ({ onMenuClick }) => {
                             </div>
                         )}
                     </div>
-                    <div>
-                        <p className="text-xs font-bold text-gray-900 leading-tight">{user?.name || 'Demo User'}</p>
+                    <div className="flex flex-col items-start">
+                        <div className="flex items-center gap-1">
+                            <p className="text-xs font-bold text-gray-900 leading-tight">{user?.name || 'Demo User'}</p>
+                            {user?.role === 'seller' && user?.isVerified && user?.applicationStatus === 'approved' && (
+                                <img src={verifiedSeal} alt="Verified" className="w-3.5 h-3.5 object-contain drop-shadow-sm" title="Verified Seller" />
+                            )}
+                        </div>
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{user?.role || 'Member'}</p>
                     </div>
                 </button>

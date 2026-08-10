@@ -30,15 +30,21 @@ const getImageUploadOptions = () => {
 export const uploadToCloudinary = async (fileBuffer, folder = 'categories', options = {}) => {
     const mimeType = String(options.mimeType || '').trim().toLowerCase();
     const resourceType = String(options.resourceType || '').trim().toLowerCase();
+    const isPdf = mimeType === 'application/pdf' || resourceType === 'raw' || resourceType === 'document';
     const shouldOptimizeImage =
+        !isPdf &&
         options.optimize !== false &&
         (resourceType === 'image' || isImageMimeType(mimeType));
+
+    const cloudResourceType = isPdf ? 'raw' : (shouldOptimizeImage ? 'image' : 'auto');
+    const publicId = options.public_id || (isPdf ? `${Date.now()}_seller_kyc.pdf` : undefined);
 
     return new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 folder,
-                resource_type: shouldOptimizeImage ? 'image' : 'auto',
+                resource_type: cloudResourceType,
+                ...(publicId ? { public_id: publicId } : {}),
                 ...(shouldOptimizeImage ? getImageUploadOptions() : {}),
             },
             (error, result) => {

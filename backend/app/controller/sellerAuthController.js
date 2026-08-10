@@ -25,9 +25,12 @@ const SELLER_DOCUMENT_FIELDS = {
     tradeLicense: "Trade License",
     gstCertificate: "GST Certificate",
     idProof: "ID Proof",
+    panCard: "PAN Card",
+    addressProof: "Address Proof",
+    cancelledCheque: "Cancelled Cheque",
 };
 
-const REQUIRED_SELLER_DOCUMENT_FIELDS = Object.keys(SELLER_DOCUMENT_FIELDS);
+const ALLOWED_SELLER_DOCUMENT_FIELDS = Object.keys(SELLER_DOCUMENT_FIELDS);
 
 const parseDocumentsPayload = (documents) => {
     if (!documents) {
@@ -61,6 +64,9 @@ const resolveSellerDocuments = (body = {}, parsedDocuments = {}) => {
         tradeLicense: body.tradeLicenseUrl || body.tradeLicense,
         gstCertificate: body.gstCertificateUrl || body.gstCertificate,
         idProof: body.idProofUrl || body.idProof,
+        panCard: body.panCardUrl || body.panCard,
+        addressProof: body.addressProofUrl || body.addressProof,
+        cancelledCheque: body.cancelledChequeUrl || body.cancelledCheque,
     };
 
     for (const [field, candidate] of Object.entries(directFields)) {
@@ -73,10 +79,20 @@ const resolveSellerDocuments = (body = {}, parsedDocuments = {}) => {
     return resolved;
 };
 
-const getMissingRequiredSellerDocuments = (documents = {}) =>
-    REQUIRED_SELLER_DOCUMENT_FIELDS.filter(
-        (fieldName) => !isValidUploadedDocumentReference(documents[fieldName]),
+const getMissingRequiredSellerDocuments = (documents = {}) => {
+    // tradeLicense and gstCertificate were previously required, keep them required.
+    // addressProof and cancelledCheque are new required fields.
+    const strictlyRequired = ["tradeLicense", "addressProof", "cancelledCheque"];
+    const missing = strictlyRequired.filter(
+        (fieldName) => !isValidUploadedDocumentReference(documents[fieldName])
     );
+    
+    // Either PAN Card OR ID Proof (Aadhaar) is required
+    if (!isValidUploadedDocumentReference(documents.panCard) && !isValidUploadedDocumentReference(documents.idProof)) {
+        missing.push("panCard"); // Add one to trigger the error message clearly
+    }
+    return missing;
+};
 
 /* ===============================
    SELLER SIGNUP
@@ -102,7 +118,16 @@ export const signupSeller = async (req, res) => {
             lat,
             lng,
             radius,
-            referralCode
+            referralCode,
+            whatsappNumber,
+            businessType,
+            sellerType,
+            panNumber,
+            aadhaarNumber,
+            gstinNumber,
+            udyamNumber,
+            bankDetails,
+            businessInfo
         } = req.body || {};
 
         // 1. Handle file uploads if they exist in req.files (multipart form)
@@ -113,7 +138,7 @@ export const signupSeller = async (req, res) => {
             for (const file of documentFiles) {
                 try {
                     const fieldName = file.fieldname;
-                    if (fieldName && REQUIRED_SELLER_DOCUMENT_FIELDS.includes(fieldName)) {
+                    if (fieldName && ALLOWED_SELLER_DOCUMENT_FIELDS.includes(fieldName)) {
                         const url = await uploadToCloudinary(file.buffer, "docs", {
                             mimeType: file.mimetype,
                         });
@@ -137,6 +162,10 @@ export const signupSeller = async (req, res) => {
 
         if (!name || !email || !phone || !password || !shopName) {
             return handleResponse(res, 400, "All fields are required");
+        }
+
+        if (!panNumber && !aadhaarNumber) {
+            return handleResponse(res, 400, "Either PAN Number or Aadhaar Number is compulsory.");
         }
 
         verifySellerVerificationToken({
@@ -184,14 +213,30 @@ export const signupSeller = async (req, res) => {
             );
         }
 
+        let parsedBankDetails = {};
+        let parsedBusinessInfo = {};
+        try {
+            parsedBankDetails = typeof bankDetails === "string" ? JSON.parse(bankDetails) : (bankDetails || {});
+            parsedBusinessInfo = typeof businessInfo === "string" ? JSON.parse(businessInfo) : (businessInfo || {});
+        } catch(e) {}
+
         const sellerData = {
             name,
             email,
             phone,
+            whatsappNumber,
             password,
             shopName,
+            businessType,
+            sellerType,
             category,
             description,
+            panNumber,
+            aadhaarNumber,
+            gstinNumber,
+            udyamNumber,
+            bankDetails: parsedBankDetails,
+            businessInfo: parsedBusinessInfo,
             address,
             locality,
             pincode,
@@ -394,6 +439,41 @@ export const loginSeller = async (req, res) => {
         return handleResponse(res, 200, "Login successful", {
             token,
             seller,
+        });
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
+/* ===============================
+   ACCEPT SELLER CERTIFICATE
+================================ */
+export const acceptSellerCertificate = async (req, res) => {
+    try {
+        const sellerId = req.user?.id;
+        if (!sellerId) {
+            return handleResponse(res, 401, "Unauthorized");
+        }
+
+        const seller = await Seller.findById(sellerId);
+        if (!seller) {
+            return handleResponse(res, 404, "Seller not found");
+        }
+
+        if (!seller.certificate) {
+            return handleResponse(res, 400, "No certificate found for this seller");
+        }
+
+        if (!seller.certificate.accepted) {
+            seller.certificate.accepted = true;
+            seller.certificate.acceptedAt = new Date();
+            seller.certificate.acceptedIp = req.ip || req.headers["x-forwarded-for"] || "";
+            await seller.save();
+        }
+
+        return handleResponse(res, 200, "Authorised seller certificate accepted successfully", {
+            seller,
+            certificate: seller.certificate,
         });
     } catch (error) {
         return handleResponse(res, 500, error.message);

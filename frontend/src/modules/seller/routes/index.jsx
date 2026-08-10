@@ -4,6 +4,8 @@ import DashboardLayout from "@shared/layout/DashboardLayout";
 import Orders from "../pages/Orders";
 import { socketService } from "@core/services/socket";
 import { toast } from "sonner";
+import { useAuth } from "@core/context/AuthContext";
+import SellerCertificateModal from "../components/SellerCertificateModal";
 import {
   HiOutlineSquares2X2,
   HiOutlineCube,
@@ -15,7 +17,11 @@ import {
   HiOutlineCreditCard,
   HiOutlineMapPin,
   HiOutlinePhoto,
+  HiOutlineSparkles,
 } from "react-icons/hi2";
+
+const SellerPlans = React.lazy(() => import("../pages/Plans"));
+import SubscriptionExpiryModal from "../components/SubscriptionExpiryModal";
 
 const Dashboard = React.lazy(() => import("../pages/Dashboard"));
 const ProductManagement = React.lazy(
@@ -87,6 +93,11 @@ const navItems = [
     path: "/seller/cod-cash",
     icon: HiOutlineCurrencyDollar,
   },
+  {
+    label: "Subscription Plans",
+    path: "/seller/plans",
+    icon: HiOutlineSparkles,
+  },
   { label: "Profile", path: "/seller/profile", icon: HiOutlineUser },
 ];
 
@@ -113,6 +124,7 @@ const playBeep = () => {
 
 const SellerRoutes = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     const handleNewPhotoOrder = (order) => {
@@ -147,6 +159,10 @@ const SellerRoutes = () => {
 
   return (
     <DashboardLayout navItems={navItems} title="Seller Panel">
+      <SubscriptionExpiryModal />
+      {user && user.certificate && !user.certificate.accepted && (
+        <SellerCertificateModal seller={user} />
+      )}
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/products" element={<ProductManagement />} />
@@ -166,6 +182,7 @@ const SellerRoutes = () => {
         <Route path="/earnings" element={<Earnings />} />
         <Route path="/cod-cash" element={<CodCash />} />
         <Route path="/withdrawals" element={<Withdrawals />} />
+        <Route path="/plans" element={<SellerPlans />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

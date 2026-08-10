@@ -15,8 +15,10 @@ import {
   HiOutlineClock,
   HiOutlineArrowPath,
   HiOutlineDocumentText,
+  HiOutlineCloudArrowUp,
+  HiOutlineArrowTopRightOnSquare,
 } from "react-icons/hi2";
-import { Store } from "lucide-react";
+import { Store, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -96,6 +98,7 @@ const ActiveSellers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [modelFilter, setModelFilter] = useState("all"); // 'all', 'subscription', 'commission'
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortBy, setSortBy] = useState("recent");
@@ -108,6 +111,40 @@ const ActiveSellers = () => {
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [selectedSeller, setSelectedSeller] = useState(null);
+  const [isUploadingKyc, setIsUploadingKyc] = useState(false);
+
+  const handleKycFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSeller) return;
+    if (file.type !== 'application/pdf') {
+      toast.error('Please upload a PDF document only.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('File size exceeds 2 MB limit. Please select a smaller PDF document.');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('kycDocument', file);
+
+    setIsUploadingKyc(true);
+    try {
+      const res = await adminApi.uploadSellerKycDocument(selectedSeller.id || selectedSeller._id, formData);
+      const updated = res.data?.result || res.data;
+      setSelectedSeller((prev) => ({
+        ...prev,
+        officialKycDocumentUrl: updated.officialKycDocumentUrl || updated.officialKycDocumentUrl,
+        kycUploadedAt: updated.kycUploadedAt
+      }));
+      toast.success('Official KYC Document PDF uploaded successfully! Seller notified.');
+      setRefreshTick((t) => t + 1);
+    } catch (err) {
+      console.error('Failed to upload KYC document', err);
+      toast.error(err.response?.data?.message || 'Failed to upload KYC document');
+    } finally {
+      setIsUploadingKyc(false);
+    }
+  };
   const [headerCategories, setHeaderCategories] = useState([]);
 
   useEffect(() => {
@@ -197,6 +234,26 @@ const ActiveSellers = () => {
 
     loadSellers();
   }, [debouncedSearch, categoryFilter, dateFrom, dateTo, sortBy, page, pageSize, refreshTick]);
+
+  const displayedSellers = useMemo(() => {
+    if (modelFilter === "subscription") {
+      return sellers.filter(
+        (s) =>
+          s.commissionModel === "PLAN_BASED" &&
+          s.subscription?.expiresAt &&
+          new Date(s.subscription.expiresAt) > new Date(),
+      );
+    }
+    if (modelFilter === "commission") {
+      return sellers.filter(
+        (s) =>
+          s.commissionModel !== "PLAN_BASED" ||
+          !s.subscription?.expiresAt ||
+          new Date(s.subscription.expiresAt) <= new Date(),
+      );
+    }
+    return sellers;
+  }, [sellers, modelFilter]);
 
   const summaryCards = useMemo(
     () => [
@@ -321,6 +378,16 @@ const ActiveSellers = () => {
             </select>
 
             <select
+              value={modelFilter}
+              onChange={(event) => setModelFilter(event.target.value)}
+              className="px-4 py-3 bg-white ring-1 ring-slate-200 rounded-2xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+            >
+              <option value="all">All Charging Models</option>
+              <option value="subscription">Subscription Based (0% Comm)</option>
+              <option value="commission">Commission Based (%)</option>
+            </select>
+
+            <select
               value={sortBy}
               onChange={(event) => setSortBy(event.target.value)}
               className="px-4 py-3 bg-white ring-1 ring-slate-200 rounded-2xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
@@ -394,8 +461,8 @@ const ActiveSellers = () => {
                     </div>
                   </td>
                 </tr>
-              ) : sellers.length > 0 ? (
-                sellers.map((seller) => (
+              ) : displayedSellers.length > 0 ? (
+                displayedSellers.map((seller) => (
                   <tr key={seller.id} className="hover:bg-slate-50/30 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
@@ -421,6 +488,22 @@ const ActiveSellers = () => {
                             <span className="text-[10px] font-bold text-primary uppercase tracking-widest">
                               {seller.category || "General"}
                             </span>
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            {seller.commissionModel === 'PLAN_BASED' && seller.subscription?.expiresAt && new Date(seller.subscription.expiresAt) > new Date() ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                                <Sparkles className="h-3 w-3 text-emerald-500 shrink-0" />
+                                0% Pass: {seller.subscription?.planName || 'Active'}
+                              </span>
+                            ) : seller.commissionModel === 'PLAN_BASED' ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[9px] font-black uppercase tracking-wider">
+                                Plan Expired (%)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[9px] font-black uppercase tracking-wider">
+                                Commission Based (%)
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -625,6 +708,109 @@ const ActiveSellers = () => {
 
                     <div className="space-y-3">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                        KYC & Registration
+                      </p>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">Business Type</span>
+                          <span className="text-xs font-bold text-slate-700 capitalize">{selectedSeller.businessType || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">Seller Type</span>
+                          <span className="text-xs font-bold text-slate-700 capitalize">{selectedSeller.sellerType || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">WhatsApp</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedSeller.whatsappNumber || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">PAN Number</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedSeller.panNumber || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">Aadhaar Number</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedSeller.aadhaarNumber || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">GSTIN</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedSeller.gstinNumber || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">Udyam No.</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedSeller.udyamNumber || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                        Bank Account Details
+                      </p>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">Bank Name</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedSeller.bankDetails?.bankName || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">Account No.</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedSeller.bankDetails?.accountNumber || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">IFSC Code</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedSeller.bankDetails?.ifscCode || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-xs text-slate-500">Branch</span>
+                          <span className="text-xs font-bold text-slate-700">{selectedSeller.bankDetails?.branch || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Official Seller KYC PDF Upload Section */}
+                    <div className="p-4 bg-slate-900 rounded-2xl text-white space-y-3 shadow-lg">
+                      <div className="flex items-center gap-2">
+                        <HiOutlineCloudArrowUp className="h-5 w-5 text-brand-400" />
+                        <span className="text-xs font-black uppercase tracking-wider">Official KYC Form (PDF)</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                        Upload or replace the verified 2-page KYC document (max 2 MB). The seller can view it anytime from their profile.
+                      </p>
+                      <div className="space-y-2">
+                        {selectedSeller.officialKycDocumentUrl && (
+                          <button
+                            type="button"
+                            onClick={() => window.open(selectedSeller.officialKycDocumentUrl, '_blank', 'noopener,noreferrer')}
+                            className="w-full py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors inline-flex items-center justify-center gap-1.5 ring-1 ring-white/10"
+                          >
+                            <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5 text-brand-400" />
+                            <span>View Uploaded KYC PDF</span>
+                          </button>
+                        )}
+                        <label className="cursor-pointer w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2">
+                          {isUploadingKyc ? (
+                            <>
+                              <HiOutlineArrowPath className="h-3.5 w-3.5 animate-spin" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <HiOutlineCloudArrowUp className="h-3.5 w-3.5" />
+                              <span>{selectedSeller.officialKycDocumentUrl ? 'Replace KYC PDF' : 'Upload KYC PDF'}</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            onChange={handleKycFileUpload}
+                            disabled={isUploadingKyc}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                         Store Health
                       </p>
                       <div className="p-4 bg-white rounded-2xl ring-1 ring-slate-100">
@@ -768,95 +954,52 @@ const ActiveSellers = () => {
                                     toast.error("Failed to update commission model");
                                   }
                                 }}
-                                className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", selectedSeller.commissionModel !== 'ONE_TIME' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:bg-slate-200")}
+                                className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", selectedSeller.commissionModel === 'CATEGORY_WISE' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:bg-slate-200")}
                             >
-                                Category Wise
+                                Category Wise (%)
                             </button>
                             <button 
                                 onClick={async () => {
                                   try {
-                                    await adminApi.updateSellerDetails(selectedSeller.id || selectedSeller._id, { commissionModel: 'ONE_TIME' });
-                                    setSelectedSeller(prev => ({ ...prev, commissionModel: 'ONE_TIME' }));
-                                    toast.success("Updated to One-Time Charge Model");
+                                    await adminApi.updateSellerDetails(selectedSeller.id || selectedSeller._id, { commissionModel: 'PLAN_BASED' });
+                                    setSelectedSeller(prev => ({ ...prev, commissionModel: 'PLAN_BASED' }));
+                                    toast.success("Updated to Subscription Plan Model");
                                     setRefreshTick(t => t + 1);
                                   } catch (e) {
                                     toast.error("Failed to update commission model");
                                   }
                                 }}
-                                className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", selectedSeller.commissionModel === 'ONE_TIME' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:bg-slate-200")}
+                                className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", selectedSeller.commissionModel === 'PLAN_BASED' ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:bg-slate-200")}
                             >
-                                One-Time Charge
+                                Subscription Plan
                             </button>
                         </div>
                       </div>
                       
-                      {selectedSeller.commissionModel === 'ONE_TIME' && (
+                      {selectedSeller.commissionModel === 'PLAN_BASED' && (
                         <div>
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Payment Configuration</label>
-                          <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 space-y-3">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-amber-900 whitespace-nowrap">Amount (₹):</span>
-                                <input 
-                                    type="number" 
-                                    min="0"
-                                    defaultValue={selectedSeller.oneTimeChargeAmount || 0}
-                                    onBlur={async (e) => {
-                                        const amount = Math.max(0, Number(e.target.value));
-                                        if (amount === selectedSeller.oneTimeChargeAmount) return;
-                                        try {
-                                            await adminApi.updateSellerDetails(selectedSeller.id || selectedSeller._id, { oneTimeChargeAmount: amount });
-                                            setSelectedSeller(prev => ({ ...prev, oneTimeChargeAmount: amount }));
-                                            toast.success("Amount saved successfully!");
-                                            setRefreshTick(t => t + 1);
-                                        } catch (err) {
-                                            toast.error("Failed to save amount");
-                                        }
-                                    }}
-                                    className="w-full bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20"
-                                />
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Subscription Details</label>
+                          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 space-y-2 font-['Outfit']">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-emerald-900">{selectedSeller.subscription?.planName || 'Plan Active'}</span>
+                              <span className={`px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full ${
+                                selectedSeller.subscription?.expiresAt && new Date(selectedSeller.subscription.expiresAt) > new Date()
+                                  ? 'bg-emerald-500 text-white'
+                                  : 'bg-rose-500 text-white'
+                              }`}>
+                                {selectedSeller.subscription?.expiresAt && new Date(selectedSeller.subscription.expiresAt) > new Date() ? 'ACTIVE 0% COMM' : 'EXPIRED'}
+                              </span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-amber-900 whitespace-nowrap">Interval:</span>
-                                <select 
-                                    value={selectedSeller.oneTimeChargeInterval || 'monthly'}
-                                    onChange={async (e) => {
-                                        const interval = e.target.value;
-                                        try {
-                                            await adminApi.updateSellerDetails(selectedSeller.id || selectedSeller._id, { oneTimeChargeInterval: interval });
-                                            setSelectedSeller(prev => ({ ...prev, oneTimeChargeInterval: interval }));
-                                            toast.success("Interval saved successfully!");
-                                            setRefreshTick(t => t + 1);
-                                        } catch (err) {
-                                            toast.error("Failed to save interval");
-                                        }
-                                    }}
-                                    className="w-full bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer"
-                                >
-                                    <option value="monthly">Monthly</option>
-                                    <option value="quarterly">Quarterly</option>
-                                    <option value="half_yearly">Half Yearly</option>
-                                    <option value="yearly">Yearly</option>
-                                </select>
-                            </div>
-                            <div className="flex items-center justify-between pt-2 border-t border-amber-200/50">
-                                <p className="text-[10px] font-bold text-amber-900 uppercase tracking-widest">0% Commission</p>
-                                <button 
-                                    onClick={async () => {
-                                      try {
-                                        const newVal = !selectedSeller.oneTimeChargePaid;
-                                        await adminApi.updateSellerDetails(selectedSeller.id || selectedSeller._id, { oneTimeChargePaid: newVal });
-                                        setSelectedSeller(prev => ({ ...prev, oneTimeChargePaid: newVal }));
-                                        toast.success(newVal ? "Marked as Paid!" : "Marked as Unpaid");
-                                        setRefreshTick(t => t + 1);
-                                      } catch (e) {
-                                        toast.error("Failed to update payment status");
-                                      }
-                                    }}
-                                    className={cn("px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all", selectedSeller.oneTimeChargePaid ? "bg-emerald-500 text-white shadow-md shadow-emerald-200" : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50")}
-                                >
-                                    {selectedSeller.oneTimeChargePaid ? '✓ PAID' : 'MARK AS PAID'}
-                                </button>
-                            </div>
+                            {selectedSeller.subscription?.expiresAt && (
+                              <p className="text-[11px] font-bold text-slate-600">
+                                Expires At: <span className="text-slate-900 font-mono">{new Date(selectedSeller.subscription.expiresAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                              </p>
+                            )}
+                            {selectedSeller.subscription?.purchasedAt && (
+                              <p className="text-[10px] text-slate-400 font-medium">
+                                Purchased: {new Date(selectedSeller.subscription.purchasedAt).toLocaleDateString('en-IN')} | Ref: {selectedSeller.subscription?.paymentReference || 'N/A'}
+                              </p>
+                            )}
                           </div>
                         </div>
                       )}

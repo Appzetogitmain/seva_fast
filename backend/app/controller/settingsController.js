@@ -20,6 +20,8 @@ const ALLOWED_KEYS = [
   "faviconUrl",
   "primaryColor",
   "secondaryColor",
+  "signatureImageUrl",
+  "sealImageUrl",
   "companyName",
   "taxId",
   "address",
@@ -120,6 +122,8 @@ const updateSettingsSchema = Joi.object({
   faviconUrl: Joi.string().allow("").max(2000),
   primaryColor: Joi.string().allow("").max(50),
   secondaryColor: Joi.string().allow("").max(50),
+  signatureImageUrl: Joi.string().allow("").max(2000),
+  sealImageUrl: Joi.string().allow("").max(2000),
   companyName: Joi.string().allow("").max(200),
   taxId: Joi.string().allow("").max(100),
   address: Joi.string().allow("").max(500),
@@ -209,7 +213,7 @@ export const getPublicSettings = async (req, res) => {
       async () => {
         const existing = await Setting.findOne(filter)
           .select(
-            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm createdAt updatedAt",
+            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm createdAt updatedAt",
           )
           .lean();
         return existing || null;
@@ -293,14 +297,14 @@ export const updateSettings = async (req, res) => {
 
 /**
  * POST /api/settings/upload (admin only)
- * Uploads logo or favicon image to Cloudinary. Returns the public URL.
- * Request: multipart/form-data with field "image". Optional query ?type=logo|favicon for folder naming.
+ * Uploads a settings image (logo, favicon, payment QR, seller-certificate signature/seal) to Cloudinary. Returns the public URL.
+ * Request: multipart/form-data with field "image". Query ?type=logo|favicon|payment-qr|signature|seal.
  */
 export const uploadSettingsImage = async (req, res) => {
   try {
     const type = (req.query.type || "logo").toLowerCase();
-    if (!["logo", "favicon", "payment-qr"].includes(type)) {
-      return handleResponse(res, 400, "type must be logo, favicon, or payment-qr");
+    if (!["logo", "favicon", "payment-qr", "signature", "seal"].includes(type)) {
+      return handleResponse(res, 400, "type must be logo, favicon, payment-qr, signature, or seal");
     }
 
     if (req.file) {

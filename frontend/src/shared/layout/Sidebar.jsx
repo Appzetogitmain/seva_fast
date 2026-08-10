@@ -222,7 +222,7 @@ const SidebarContent = ({ items, title, onClose, openMenu, handleToggle, hovered
   const { settings } = useSettings();
   const { role } = useAuth();
   const navigate = useNavigate();
-  const appName = settings?.appName || 'App';
+  const appName = settings?.appName || 'SevaFast';
   const dashboardPath =
     items.find((item) => item.label === "Dashboard")?.path ||
     (role === "admin" ? "/admin" : role === "seller" ? "/seller" : "/");

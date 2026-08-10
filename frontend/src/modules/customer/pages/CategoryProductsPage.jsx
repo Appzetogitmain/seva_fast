@@ -115,27 +115,35 @@ const CategoryProductsPage = () => {
     }, [safeProducts]);
 
     return (
-        <div className="flex flex-col min-h-screen bg-white max-w-md mx-auto relative font-sans">
+        <div className="flex flex-col min-h-screen bg-slate-50 relative font-sans w-full">
             {/* Header */}
             <header className={cn(
-                "sticky top-0 z-50 bg-white border-b border-gray-50 px-4 py-4 flex items-center justify-between",
+                "sticky top-0 z-50 bg-white border-b border-slate-100 px-4 sm:px-6 py-3 flex items-center justify-between shadow-xs",
                 isProductDetailOpen && "hidden md:flex"
             )}>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="p-1 hover:bg-gray-50 rounded-full transition-colors"
-                    >
-                        <ChevronLeft size={24} className="text-gray-900" />
-                    </button>
-                    <h1 className="text-[18px] font-bold text-gray-800 tracking-tight">
-                        {category?.name || catId}
-                    </h1>
+                <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-800"
+                        >
+                            <ChevronLeft size={22} />
+                        </button>
+                        <div>
+                            <h1 className="text-base sm:text-xl font-extrabold text-slate-900 tracking-tight">
+                                {category?.name || catId}
+                            </h1>
+                            {filteredProducts.length > 0 && (
+                                <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
+                                    Showing {filteredProducts.length} items
+                                </p>
+                            )}
+                        </div>
+                    </div>
                 </div>
-
             </header>
 
-            <div className="flex flex-1 relative items-start">
+            <div className="flex flex-1 w-full max-w-7xl mx-auto relative items-start">
                 {(safeProducts.length === 0 && !isLoading) ? (
                     <div className="w-full flex-1">
                         <ServiceUnavailableSection
@@ -148,27 +156,27 @@ const CategoryProductsPage = () => {
                 ) : (
                     <>
                         {/* Sidebar */}
-                        <aside className="w-[70px] border-r border-gray-50 flex flex-col bg-white overflow-y-auto hide-scrollbar sticky top-[60px] h-[calc(100vh-60px)] pb-32 flex-shrink-0">
+                        <aside className="w-[75px] md:w-56 lg:w-64 border-r border-slate-100 flex flex-col bg-white overflow-y-auto hide-scrollbar sticky top-[57px] h-[calc(100vh-57px)] pb-32 shrink-0">
                             {subCategories.map((cat) => (
                                 <button
                                     key={cat.id}
                                     onClick={() => setSelectedSubCategory(cat.id)}
                                     className={cn(
-                                        "flex flex-col items-center py-4 px-1 gap-2 transition-all relative border-l-4",
+                                        "flex flex-col md:flex-row items-center py-3.5 px-1 md:px-4 gap-2 transition-all relative border-l-4 md:border-l-4 md:rounded-r-xl my-0.5",
                                         selectedSubCategory === cat.id
-                                            ? "bg-[#F7FCF5] border-primary"
-                                            : "border-transparent hover:bg-gray-50"
+                                            ? "bg-[#F7FCF5] border-primary text-primary font-bold"
+                                            : "border-transparent text-slate-700 hover:bg-slate-50"
                                     )}
                                 >
                                     <div className={cn(
-                                        "w-14 h-14 rounded-2xl flex items-center justify-center p-1.5 transition-all duration-300",
-                                        selectedSubCategory === cat.id ? "scale-110" : "opacity-100"
+                                        "w-12 h-12 md:w-9 md:h-9 rounded-2xl flex items-center justify-center p-1 transition-all duration-300 shrink-0",
+                                        selectedSubCategory === cat.id ? "scale-105" : "opacity-90"
                                     )}>
                                         <img src={applyCloudinaryTransform(cat.icon)} alt={cat.name} loading="lazy" className="w-full h-full object-contain" />
                                     </div>
                                     <span className={cn(
-                                        "text-[10px] text-center font-bold font-sans leading-tight px-1",
-                                        selectedSubCategory === cat.id ? "text-primary" : "text-gray-600"
+                                        "text-[10px] md:text-xs text-center md:text-left font-bold font-sans leading-tight px-1 min-w-0 truncate",
+                                        selectedSubCategory === cat.id ? "text-primary font-extrabold" : "text-slate-700"
                                     )}>
                                         {cat.name}
                                     </span>
@@ -177,12 +185,24 @@ const CategoryProductsPage = () => {
                         </aside>
 
                         {/* Content */}
-                        <main className="flex-1 p-2 pb-24 bg-white space-y-4 overflow-x-hidden">
-                            <div className="grid grid-cols-2 gap-x-2 gap-y-3">
-                                {filteredProducts.map((product) => (
-                                    <ProductCard key={product.id} product={product} compact={true} />
-                                ))}
-                            </div>
+                        <main className="flex-1 p-2 sm:p-4 md:p-6 pb-28 bg-white min-h-[calc(100vh-57px)]">
+                            {isLoading ? (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                                        <div key={n} className="h-64 bg-slate-100 animate-pulse rounded-2xl" />
+                                    ))}
+                                </div>
+                            ) : filteredProducts.length === 0 ? (
+                                <div className="text-center py-16 text-slate-500 font-medium">
+                                    No products found in this subcategory.
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-4">
+                                    {filteredProducts.map((product) => (
+                                        <ProductCard key={product.id} product={product} compact={true} />
+                                    ))}
+                                </div>
+                            )}
                         </main>
                     </>
                 )}

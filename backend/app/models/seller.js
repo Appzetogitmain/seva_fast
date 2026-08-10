@@ -22,6 +22,10 @@ const sellerSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    whatsappNumber: {
+      type: String,
+      trim: true,
+    },
 
     password: {
       type: String,
@@ -42,6 +46,18 @@ const sellerSchema = new mongoose.Schema(
 
     description: {
       type: String,
+      trim: true,
+    },
+
+    businessType: {
+      type: String,
+      enum: ["Proprietorship", "Partnership", "LLP", "Pvt. Ltd.", "Other"],
+      trim: true,
+    },
+
+    sellerType: {
+      type: String,
+      enum: ["Retailer", "Wholesaler", "Manufacturer", "Service Provider"],
       trim: true,
     },
 
@@ -70,10 +86,32 @@ const sellerSchema = new mongoose.Schema(
       trim: true,
     },
 
+    panNumber: { type: String, trim: true, uppercase: true },
+    aadhaarNumber: { type: String, trim: true },
+    gstinNumber: { type: String, trim: true, uppercase: true },
+    udyamNumber: { type: String, trim: true },
+
+    bankDetails: {
+      accountHolderName: { type: String, trim: true },
+      bankName: { type: String, trim: true },
+      branch: { type: String, trim: true },
+      accountNumber: { type: String, trim: true },
+      ifscCode: { type: String, trim: true, uppercase: true },
+    },
+
+    businessInfo: {
+      yearsInBusiness: { type: Number },
+      expectedMonthlyOrders: { type: String, trim: true },
+      pickupAddress: { type: String, trim: true },
+    },
+
     documents: {
       tradeLicense: { type: String, trim: true },
       gstCertificate: { type: String, trim: true },
       idProof: { type: String, trim: true },
+      panCard: { type: String, trim: true },
+      addressProof: { type: String, trim: true },
+      cancelledCheque: { type: String, trim: true },
       businessRegistration: { type: String, trim: true },
       fssaiLicense: { type: String, trim: true },
       other: { type: String, trim: true },
@@ -119,6 +157,32 @@ const sellerSchema = new mongoose.Schema(
       trim: true,
     },
 
+    officialKycDocumentUrl: {
+      type: String,
+      trim: true,
+    },
+
+    kycUploadedAt: {
+      type: Date,
+    },
+
+    certificate: {
+      certificateNo: { type: String, trim: true },
+      sellerId: { type: String, trim: true },
+      sellerName: { type: String, trim: true },
+      shopName: { type: String, trim: true },
+      category: { type: String, trim: true },
+      cityLocation: { type: String, trim: true },
+      issueDate: { type: String, trim: true },
+      validFrom: { type: String, trim: true },
+      validUntil: { type: String, trim: true },
+      signatoryName: { type: String, trim: true, default: "SEVAFAST Operations" },
+      issuedAt: { type: Date, default: Date.now },
+      accepted: { type: Boolean, default: false },
+      acceptedAt: { type: Date },
+      acceptedIp: { type: String, trim: true },
+    },
+
     isActive: {
       type: Boolean,
       default: false,
@@ -161,7 +225,7 @@ const sellerSchema = new mongoose.Schema(
     },
     commissionModel: {
       type: String,
-      enum: ['CATEGORY_WISE', 'ONE_TIME'],
+      enum: ['CATEGORY_WISE', 'PLAN_BASED', 'ONE_TIME'],
       default: 'CATEGORY_WISE',
     },
     oneTimeChargeAmount: {
@@ -176,6 +240,16 @@ const sellerSchema = new mongoose.Schema(
       type: String,
       enum: ['monthly', 'quarterly', 'half_yearly', 'yearly'],
       default: 'monthly',
+    },
+    subscription: {
+      planId: { type: mongoose.Schema.Types.ObjectId, ref: "SellerPlan" },
+      planName: { type: String, trim: true },
+      pricePaid: { type: Number, default: 0 },
+      validityDays: { type: Number, default: 30 },
+      purchasedAt: { type: Date },
+      expiresAt: { type: Date },
+      paymentReference: { type: String, trim: true },
+      status: { type: String, enum: ['active', 'expired', 'none'], default: 'none' },
     },
     categoryCommissionOverrides: {
       type: Map,

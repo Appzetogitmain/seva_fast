@@ -24,12 +24,16 @@ import {
     XCircle,
     RotateCw,
     Search,
-    Download
+    Download,
+    UploadCloud,
+    FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@shared/components/ui/Toast';
 import Modal from '@shared/components/ui/Modal';
 import { motion } from 'framer-motion';
+
+import { adminApi } from '../services/adminApi';
 
 const SellerDetail = () => {
     const { id } = useParams();
@@ -37,6 +41,39 @@ const SellerDetail = () => {
     const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState('orders');
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isUploadingKyc, setIsUploadingKyc] = useState(false);
+
+    const handleKycFileUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.type !== 'application/pdf') {
+            showToast('Please upload a PDF document only.', 'error');
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            showToast('File size exceeds 2 MB limit. Please select a smaller PDF document.', 'error');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('kycDocument', file);
+
+        setIsUploadingKyc(true);
+        try {
+            const res = await adminApi.uploadSellerKycDocument(id || seller.id, formData);
+            const updated = res.data?.result || res.data;
+            setSeller((prev) => ({
+                ...prev,
+                officialKycDocumentUrl: updated.officialKycDocumentUrl || updated.officialKycDocumentUrl,
+                kycUploadedAt: updated.kycUploadedAt
+            }));
+            showToast('Official KYC Document PDF uploaded successfully! Seller notified.', 'success');
+        } catch (error) {
+            console.error('Failed to upload KYC document', error);
+            showToast(error.response?.data?.message || 'Failed to upload KYC document', 'error');
+        } finally {
+            setIsUploadingKyc(false);
+        }
+    };
 
     // Mock Data for Seller
     const [seller, setSeller] = useState({
@@ -70,16 +107,22 @@ const SellerDetail = () => {
 
     const handleCommissionModelUpdate = async (newModel, isPaid) => {
         setIsSavingModel(true);
-        // Simulate API call to updateSellerDetails
-        setTimeout(() => {
+        try {
+            await adminApi.updateSellerDetails(id, {
+                commissionModel: newModel,
+                oneTimeChargePaid: isPaid
+            });
             setSeller(prev => ({
                 ...prev,
                 commissionModel: newModel,
                 oneTimeChargePaid: isPaid
             }));
-            setIsSavingModel(false);
             showToast('Commission model updated successfully', 'success');
-        }, 1000);
+        } catch (error) {
+            showToast(error.response?.data?.message || 'Failed to update commission model', 'error');
+        } finally {
+            setIsSavingModel(false);
+        }
     };
 
     const handleRefresh = () => {
@@ -412,33 +455,38 @@ const SellerDetail = () => {
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Commission Model</label>
                                                     <div className="flex bg-white rounded-xl p-1 border border-slate-200">
                                                         <button 
-                                                            onClick={() => handleCommissionModelUpdate('CATEGORY_WISE', seller.oneTimeChargePaid)}
+                                                            onClick={() => handleCommissionModelUpdate('CATEGORY_WISE', false)}
                                                             className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", seller.commissionModel === 'CATEGORY_WISE' ? "bg-primary text-white shadow-sm" : "text-slate-500 hover:bg-slate-50")}
                                                         >
                                                             Category Wise (%)
                                                         </button>
                                                         <button 
-                                                            onClick={() => handleCommissionModelUpdate('ONE_TIME', seller.oneTimeChargePaid)}
-                                                            className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", seller.commissionModel === 'ONE_TIME' ? "bg-primary text-white shadow-sm" : "text-slate-500 hover:bg-slate-50")}
+                                                            onClick={() => handleCommissionModelUpdate('PLAN_BASED', false)}
+                                                            className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", seller.commissionModel === 'PLAN_BASED' ? "bg-primary text-white shadow-sm" : "text-slate-500 hover:bg-slate-50")}
                                                         >
-                                                            One-Time Charge
+                                                            Subscription Plan
                                                         </button>
                                                     </div>
                                                 </div>
                                                 
-                                                {seller.commissionModel === 'ONE_TIME' && (
-                                                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 flex items-center justify-between">
-                                                        <div>
-                                                            <p className="text-xs font-bold text-amber-900">One-Time Payment Status</p>
-                                                            <p className="text-[10px] text-amber-700/80 mt-1">If paid, 0% commission is applied to all orders.</p>
+                                                {seller.commissionModel === 'PLAN_BASED' && (
+                                                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 font-['Outfit'] space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <p className="text-xs font-black text-emerald-900">{seller.subscription?.planName || 'Seller Subscription Active'}</p>
+                                                            <span className={cn("px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full text-white", seller.subscription?.expiresAt && new Date(seller.subscription.expiresAt) > new Date() ? "bg-emerald-500" : "bg-rose-500")}>
+                                                                {seller.subscription?.expiresAt && new Date(seller.subscription.expiresAt) > new Date() ? 'ACTIVE 0% COMM' : 'EXPIRED'}
+                                                            </span>
                                                         </div>
-                                                        <button 
-                                                            onClick={() => handleCommissionModelUpdate(seller.commissionModel, !seller.oneTimeChargePaid)}
-                                                            disabled={isSavingModel}
-                                                            className={cn("px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all", seller.oneTimeChargePaid ? "bg-emerald-500 text-white shadow-lg shadow-emerald-200" : "bg-slate-200 text-slate-600")}
-                                                        >
-                                                            {seller.oneTimeChargePaid ? '✓ PAID' : 'MARK AS PAID'}
-                                                        </button>
+                                                        {seller.subscription?.expiresAt && (
+                                                            <p className="text-xs font-bold text-slate-700">
+                                                                Valid Until: <span className="font-mono font-black text-slate-900">{new Date(seller.subscription.expiresAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                                                            </p>
+                                                        )}
+                                                        {seller.subscription?.purchasedAt && (
+                                                            <p className="text-[10px] text-slate-500">
+                                                                Purchased: {new Date(seller.subscription.purchasedAt).toLocaleDateString('en-IN')} | Ref: {seller.subscription?.paymentReference || 'N/A'}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 )}
                                                 
@@ -511,6 +559,51 @@ const SellerDetail = () => {
                         <button className="w-full mt-8 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all">
                             MESSAGE OWNER
                         </button>
+                    </Card>
+
+                    {/* Official Seller KYC Form (PDF) */}
+                    <Card className="p-5 border-none shadow-xl ring-1 ring-slate-100 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-xl">
+                        <div className="flex items-center gap-2 mb-3">
+                            <UploadCloud className="h-5 w-5 text-brand-400" />
+                            <h4 className="text-xs font-black uppercase tracking-wider text-white">Official KYC Document</h4>
+                        </div>
+                        <p className="text-[10px] font-medium text-slate-400 leading-relaxed mb-4">
+                            Upload or update the official verified 2-page KYC PDF for this merchant.
+                        </p>
+
+                        <div className="space-y-3">
+                            {seller.officialKycDocumentUrl && (
+                                <button
+                                    type="button"
+                                    onClick={() => window.open(seller.officialKycDocumentUrl, '_blank', 'noopener,noreferrer')}
+                                    className="w-full py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ring-1 ring-white/10"
+                                >
+                                    <FileText className="h-4 w-4 text-brand-400" />
+                                    <span>View Uploaded KYC PDF</span>
+                                </button>
+                            )}
+
+                            <label className="cursor-pointer w-full py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2">
+                                {isUploadingKyc ? (
+                                    <>
+                                        <RotateCw className="h-4 w-4 animate-spin" />
+                                        <span>Uploading...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <UploadCloud className="h-4 w-4" />
+                                        <span>{seller.officialKycDocumentUrl ? 'Replace Official KYC PDF' : 'Upload Official KYC PDF'}</span>
+                                    </>
+                                )}
+                                <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    onChange={handleKycFileUpload}
+                                    disabled={isUploadingKyc}
+                                    className="hidden"
+                                />
+                            </label>
+                        </div>
                     </Card>
 
                     {/* Quick Notifications */}

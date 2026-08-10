@@ -138,6 +138,36 @@ export const getSellerProfile = async (req, res) => {
     if (!seller) {
       return handleResponse(res, 404, "Seller not found");
     }
+
+    if (seller.isVerified || seller.applicationStatus === "approved") {
+      let needsSave = false;
+      if (!seller.certificate) {
+        seller.certificate = {};
+        needsSave = true;
+      }
+      const cert = seller.certificate;
+      if (!cert.sellerName || cert.sellerName === "-") { cert.sellerName = seller.name || ""; needsSave = true; }
+      if (!cert.shopName || cert.shopName === "-") { cert.shopName = seller.shopName || ""; needsSave = true; }
+      if (!cert.category || cert.category === "-") { cert.category = seller.category || "General"; needsSave = true; }
+      if (!cert.cityLocation || cert.cityLocation === "-") { cert.cityLocation = seller.city || seller.address || seller.locality || seller.state || "Registered Location"; needsSave = true; }
+      if (!cert.sellerId || cert.sellerId === "SF-PENDING") { cert.sellerId = seller.sellerCode || `SF-${seller._id.toString().slice(-6).toUpperCase()}`; needsSave = true; }
+      if (!cert.certificateNo || cert.certificateNo === "SF-AS-PENDING") { cert.certificateNo = `SF-AS-${cert.sellerId.replace(/[^a-zA-Z0-9]/g, "")}-${Date.now().toString().slice(-4)}`; needsSave = true; }
+      if (!cert.issueDate || cert.issueDate === "-") { cert.issueDate = seller.reviewedAt ? new Date(seller.reviewedAt).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN"); needsSave = true; }
+      if (!cert.validFrom || cert.validFrom === "-") { cert.validFrom = cert.issueDate; needsSave = true; }
+      if (!cert.validUntil || cert.validUntil === "-") {
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        cert.validUntil = nextYear.toLocaleDateString("en-IN");
+        needsSave = true;
+      }
+      if (!cert.signatoryName) { cert.signatoryName = "SEVAFAST Operations"; needsSave = true; }
+
+      if (needsSave) {
+        seller.markModified("certificate");
+        await seller.save();
+      }
+    }
+
     return handleResponse(
       res,
       200,

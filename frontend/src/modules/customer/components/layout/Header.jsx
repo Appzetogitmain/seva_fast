@@ -104,7 +104,7 @@ const Header = () => {
                     {/* Logo */}
                     <div className="flex items-center gap-6 mr-4 md:mr-12">
                         <Link to="/" className="flex items-center gap-1">
-                            <span className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: settings?.primaryColor || 'var(--primary)' }}>{settings?.appName || 'App'}</span>
+                            <span className="text-2xl md:text-3xl font-black tracking-tight" style={{ color: settings?.primaryColor || 'var(--primary)' }}>{settings?.appName || 'SevaFast'}</span>
                         </Link>
 
                         {/* Location Selector (Desktop ONLY) */}

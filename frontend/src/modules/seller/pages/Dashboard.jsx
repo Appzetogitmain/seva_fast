@@ -14,6 +14,8 @@ import {
   ArrowUpRight,
   Plus,
   Eye,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import {
   HiOutlineTruck,
@@ -53,6 +55,21 @@ const Dashboard = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [deliveryBoys, setDeliveryBoys] = useState([]);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+
+  useEffect(() => {
+    const fetchSubStatus = async () => {
+      try {
+        const res = await sellerApi.getSubscriptionStatus();
+        if (res.data?.success) {
+          setSubscriptionStatus(res.data.result);
+        }
+      } catch (err) {
+        console.error("Failed to fetch sub status", err);
+      }
+    };
+    fetchSubStatus();
+  }, []);
 
   const fetchDeliveryBoys = async () => {
     try {
@@ -313,6 +330,45 @@ const Dashboard = () => {
         title="Dashboard"
         description="Welcome back! Here's what's happening with your store today."
       />
+
+      {/* 0% Commission Promotional Banner for Commission-Based Sellers */}
+      {subscriptionStatus && (subscriptionStatus.status !== "active" || subscriptionStatus.commissionModel !== "PLAN_BASED") && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white rounded-2xl shadow-xl border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative overflow-hidden my-4"
+        >
+          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center gap-3.5 relative z-10">
+            <div className="h-11 w-11 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 shadow-inner">
+              <Sparkles size={22} className="text-emerald-400 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-black tracking-widest uppercase border border-emerald-500/30">
+                  SPECIAL OFFER
+                </span>
+                <h4 className="text-xs sm:text-sm font-black text-white">
+                  Want 0% Order Commission?
+                </h4>
+              </div>
+              <p className="text-xs text-slate-300 font-medium mt-1">
+                Switch to a 0% Seller Pass &amp; keep 100% of your earnings! Zero hidden cuts.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/seller/plans')}
+            className="w-full sm:w-auto px-5 py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all shrink-0 cursor-pointer whitespace-nowrap z-10"
+          >
+            <Sparkles size={15} className="text-slate-950" />
+            <span>Browse 0% Plans</span>
+            <ArrowRight size={14} className="text-slate-950" />
+          </button>
+        </motion.div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

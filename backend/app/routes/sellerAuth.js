@@ -4,10 +4,18 @@ import {
     loginSeller,
     sendSellerSignupOtp,
     verifySellerSignupOtp,
+    acceptSellerCertificate,
 } from "../controller/sellerAuthController.js";
 import { getSellerProfile, updateSellerProfile, requestWithdrawal, getNearbySellers, getSellerCodCashSummary, submitSellerCodCashToAdmin } from "../controller/sellerController.js";
 import { getSellerStats, getSellerEarnings } from "../controller/sellerStatsController.js";
 import { getSellerWalletSummaryController } from "../controller/adminFinanceController.js";
+import {
+    getPublicSellerPlans,
+    initiateSellerPlanPurchase,
+    verifySellerPlanPurchase,
+    getSellerSubscriptionStatus,
+    switchToCategoryCommission,
+} from "../controller/sellerPlanController.js";
 import { verifyToken, allowRoles, requireApprovedSeller } from "../middleware/authMiddleware.js";
 import {
     authRouteRateLimiter,
@@ -61,6 +69,13 @@ router.put(
     updateSellerProfile
 );
 
+router.post(
+    "/accept-certificate",
+    verifyToken,
+    allowRoles("seller"),
+    acceptSellerCertificate
+);
+
 // Analytics & Financials
 router.get("/stats", verifyToken, allowRoles("seller"), getSellerStats);
 router.get("/earnings", verifyToken, allowRoles("seller"), getSellerEarnings);
@@ -81,5 +96,12 @@ router.post(
   requireApprovedSeller,
   submitSellerCodCashToAdmin,
 );
+
+// Seller Subscription Plan routes
+router.get("/plans", getPublicSellerPlans);
+router.post("/plans/subscribe/initiate", verifyToken, allowRoles("seller"), initiateSellerPlanPurchase);
+router.post("/plans/subscribe/verify", verifyToken, allowRoles("seller"), verifySellerPlanPurchase);
+router.get("/subscription-status", verifyToken, allowRoles("seller"), getSellerSubscriptionStatus);
+router.post("/switch-to-commission", verifyToken, allowRoles("seller"), switchToCategoryCommission);
 
 export default router;
