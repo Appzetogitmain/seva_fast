@@ -82,6 +82,15 @@ export const adminApi = {
     getBroadcastAudienceStats: () => axiosInstance.get('/notifications/broadcast/audience-stats'),
     getAuthActivityLogs: (params) => axiosInstance.get('/admin/auth-activity', { params }),
 
+    // WhatsApp campaigns
+    getWhatsAppConfigStatus: () => axiosInstance.get('/admin/whatsapp/config-status'),
+    createWhatsAppCampaign: (data) => axiosInstance.post('/admin/whatsapp/campaigns', data),
+    getWhatsAppCampaigns: (params) => axiosInstance.get('/admin/whatsapp/campaigns', { params }),
+    getWhatsAppCampaign: (id) => axiosInstance.get(`/admin/whatsapp/campaigns/${id}`),
+    cancelWhatsAppCampaign: (id) => axiosInstance.post(`/admin/whatsapp/campaigns/${id}/cancel`),
+    getWhatsAppCampaignMessages: (id, params) => axiosInstance.get(`/admin/whatsapp/campaigns/${id}/messages`, { params }),
+    getWhatsAppMessages: (params) => axiosInstance.get('/admin/whatsapp/messages', { params }),
+
     // Reviews
     // Delivery Partners
     getDeliveryPartners: (params) => axiosInstance.get('/admin/delivery-partners', { params }),

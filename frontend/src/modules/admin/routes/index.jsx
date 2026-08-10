@@ -110,6 +110,7 @@ const AuthActivityLogs = React.lazy(() => import("../pages/AuthActivityLogs"));
 const AdminProfile = React.lazy(() => import("../pages/AdminProfile"));
 const PlanManagement = React.lazy(() => import("../pages/PlanManagement"));
 const AdminReviews = React.lazy(() => import("../pages/AdminReviews"));
+const WhatsAppCampaigns = React.lazy(() => import("../pages/WhatsAppCampaigns"));
 
 const navItems = [
   {
@@ -146,6 +147,7 @@ const navItems = [
       { label: "Create Sections", path: "/admin/experience-studio" },
       { label: "Hero & categories per page", path: "/admin/hero-categories" },
       { label: "Send Notifications", path: "/admin/notifications" },
+      { label: "WhatsApp Campaigns", path: "/admin/whatsapp-campaigns" },
       { label: "Coupons & Promos", path: "/admin/coupons" },
       { label: "Offer Sections", path: "/admin/offer-sections" },
       { label: "Shop by Store", path: "/admin/shop-by-store" },
@@ -338,6 +340,7 @@ const AdminRoutes = () => {
         <Route path="/experience-studio" element={<SubadminRoute permission="Marketing Tools"><ContentManager /></SubadminRoute>} />
         <Route path="/hero-categories" element={<SubadminRoute permission="Marketing Tools"><HeroCategoriesPerPage /></SubadminRoute>} />
         <Route path="/notifications" element={<SubadminRoute permission="Marketing Tools"><NotificationComposer /></SubadminRoute>} />
+        <Route path="/whatsapp-campaigns" element={<SubadminRoute permission="Marketing Tools"><WhatsAppCampaigns /></SubadminRoute>} />
         <Route path="/offers" element={<SubadminRoute permission="Marketing Tools"><OffersManagement /></SubadminRoute>} />
         <Route path="/offer-sections" element={<SubadminRoute permission="Marketing Tools"><OfferSectionsManagement /></SubadminRoute>} />
         <Route path="/shop-by-store" element={<SubadminRoute permission="Marketing Tools"><ShopByStoreManagement /></SubadminRoute>} />
