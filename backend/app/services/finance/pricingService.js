@@ -451,7 +451,7 @@ export async function hydrateOrderItems(
     .filter(Boolean);
 
   const productQuery = Product.find({ _id: { $in: productIds } })
-    .select("_id name salePrice price mainImage headerId sellerId status approvalStatus variants deliveryType weight packageLength packageBreadth packageHeight")
+    .select("_id name salePrice price costPrice mainImage headerId sellerId status approvalStatus variants deliveryType weight packageLength packageBreadth packageHeight")
     .lean();
   if (session) productQuery.session(session);
   const products = await productQuery;
@@ -496,12 +496,18 @@ export async function hydrateOrderItems(
     const inferredUnitPrice = enforceServerPricing
       ? serverUnitPrice
       : normalizeLinePrice(item.price) || serverUnitPrice;
+    const resolvedCostPrice = normalizeLinePrice(
+      resolvedVariant && resolvedVariant.costPrice != null
+        ? resolvedVariant.costPrice
+        : product.costPrice || 0,
+    );
 
     return {
       productId,
       productName: item.name || product.name,
       quantity,
       price: inferredUnitPrice,
+      costPrice: resolvedCostPrice,
       image: item.image || product.mainImage,
       headerCategoryId: String(product.headerId),
       sellerId: String(product.sellerId),
@@ -676,14 +682,20 @@ export async function generateOrderPaymentBreakdown({
       ? 0
       : roundCurrency((itemCommissionBase * appliedPercent) / 100);
     const itemSellerPayout = Math.max(itemSubtotal - itemCommission, 0);
+    const itemCostPrice = Number(item.costPrice || 0);
+    const itemCostTotal = roundCurrency(itemCostPrice * item.quantity);
+    const itemNetProfit = roundCurrency(itemSellerPayout - itemCostTotal);
 
     return {
       productId: item.productId,
       productName: item.productName,
       quantity: item.quantity,
       unitPrice: item.price,
+      costPrice: itemCostPrice,
+      itemCostTotal,
       itemSubtotal,
       sellerPayout: itemSellerPayout,
+      sellerNetProfit: itemNetProfit,
       adminProductCommission: itemCommission,
       headerCategoryId: item.headerCategoryId,
       headerCategoryName: category?.name || "Unknown",
@@ -786,6 +798,10 @@ export async function generateOrderPaymentBreakdown({
   const sellerPayoutTotal = roundCurrency(
     Math.max(productSubtotal - totalCommissionAmount, 0) + sellerDeliveryFeeShare,
   );
+  const totalCostPrice = roundCurrency(
+    lineItems.reduce((sum, line) => sum + Number(line.itemCostTotal || 0), 0),
+  );
+  const sellerNetProfit = roundCurrency(sellerPayoutTotal - totalCostPrice);
 
   const snapshots = {
     deliverySettings: {
@@ -819,6 +835,8 @@ export async function generateOrderPaymentBreakdown({
     taxTotal: normalizedTax,
     grandTotal,
     sellerPayoutTotal,
+    totalCostPrice,
+    sellerNetProfit,
     adminProductCommissionTotal,
     sellerDeliveryFeeShare,
     adminDeliveryFeeShare,

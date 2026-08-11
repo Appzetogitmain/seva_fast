@@ -8,6 +8,8 @@ import {
   sellerDeliveredOrderMatch,
   sellerOrderEarningAmount,
   sellerOrderRevenueAmount,
+  sellerOrderCostAmount,
+  sellerOrderProfitAmount,
 } from "../utils/sellerRevenue.js";
 import { releaseExpiredHeldSellerPayouts } from "../services/finance/orderFinanceService.js";
 import { formatDate, formatTime } from "../utils/formatDate.js";
@@ -64,6 +66,9 @@ export const getSellerStats = async (req, res) => {
                             $group: {
                                 _id: null,
                                 totalSales: { $sum: sellerOrderRevenueAmount() },
+                                totalEarnings: { $sum: sellerOrderEarningAmount() },
+                                totalCostPrice: { $sum: sellerOrderCostAmount() },
+                                totalNetProfit: { $sum: sellerOrderProfitAmount() },
                                 totalOrders: { $sum: 1 },
                             }
                         }
@@ -97,6 +102,7 @@ export const getSellerStats = async (req, res) => {
                             $group: {
                                 _id: { $dateToString: { format: aggregationFormat, date: "$revenueDate" } },
                                 sales: { $sum: sellerOrderRevenueAmount() },
+                                profit: { $sum: sellerOrderProfitAmount() },
                                 orders: { $sum: 1 }
                             }
                         },
@@ -153,10 +159,13 @@ export const getSellerStats = async (req, res) => {
         ]);
 
         // Extract facet results
-        const overviewRaw = statsResult.overview[0] || { totalSales: 0, totalOrders: 0 };
+        const overviewRaw = statsResult.overview[0] || { totalSales: 0, totalOrders: 0, totalCostPrice: 0, totalNetProfit: 0 };
         const totalSales = overviewRaw.totalSales;
         const totalOrders = overviewRaw.totalOrders;
+        const totalCostPrice = overviewRaw.totalCostPrice || 0;
+        const totalNetProfit = overviewRaw.totalNetProfit || 0;
         const avgOrderValue = totalOrders > 0 ? (totalSales / totalOrders) : 0;
+        const netProfitMargin = totalSales > 0 ? Number(((totalNetProfit / totalSales) * 100).toFixed(1)) : 0;
 
         const currentSales = statsResult.currentWeek[0]?.sales || 0;
         const prevSalesVal = statsResult.prevWeek[0]?.sales || 0;
@@ -179,6 +188,7 @@ export const getSellerStats = async (req, res) => {
                 chartData.push({
                     name: monthNames[d.getMonth()],
                     sales: data ? data.sales : 0,
+                    profit: data ? data.profit : 0,
                     orders: data ? data.orders : 0,
                     traffic: 0
                 });
@@ -187,6 +197,7 @@ export const getSellerStats = async (req, res) => {
             chartData = salesTrend.map((item, idx) => ({
                 name: `Week ${idx + 1}`,
                 sales: item.sales,
+                profit: item.profit,
                 orders: item.orders,
                 traffic: 0
             })).slice(-4);
@@ -200,6 +211,7 @@ export const getSellerStats = async (req, res) => {
                 chartData.push({
                     name: dayNames[d.getDay()],
                     sales: data ? data.sales : 0,
+                    profit: data ? data.profit : 0,
                     orders: data ? data.orders : 0,
                     traffic: 0
                 });
@@ -287,6 +299,9 @@ export const getSellerStats = async (req, res) => {
             overview: {
                 totalSales: `₹${totalSales.toLocaleString()}`,
                 totalOrders: totalOrders.toLocaleString(),
+                totalNetProfit: `₹${totalNetProfit.toLocaleString()}`,
+                totalCostPrice: `₹${totalCostPrice.toLocaleString()}`,
+                netProfitMargin: `${netProfitMargin}%`,
                 avgOrderValue: `₹${Math.round(avgOrderValue).toLocaleString()}`,
                 conversionRate: totalOrders > 0 ? "4.2%" : "0%",
                 salesTrend: `${salesTrendPerc > 0 ? '+' : ''}${salesTrendPerc}%`,
@@ -335,7 +350,7 @@ export const getSellerEarnings = async (req, res) => {
         const totalWalletBalance = availableBalance + onHoldBalance;
         const withdrawableBalance = Math.max(0, availableBalance);
 
-        // Total revenue = sum of delivered order amounts only
+        // Total revenue, cost, profit = sum of delivered order amounts only
         const [orderRevenueAgg] = await Order.aggregate([
             {
                 $match: sellerDeliveredOrderMatch(sellerOid),
@@ -344,10 +359,15 @@ export const getSellerEarnings = async (req, res) => {
                 $group: {
                     _id: null,
                     totalRevenue: { $sum: sellerOrderRevenueAmount() },
+                    totalCostPrice: { $sum: sellerOrderCostAmount() },
+                    totalNetProfit: { $sum: sellerOrderProfitAmount() },
                 },
             },
         ]);
         const totalRevenue = Number(orderRevenueAgg?.totalRevenue || 0);
+        const totalCostPrice = Number(orderRevenueAgg?.totalCostPrice || 0);
+        const totalNetProfit = Number(orderRevenueAgg?.totalNetProfit || 0);
+        const netProfitMargin = totalRevenue > 0 ? Number(((totalNetProfit / totalRevenue) * 100).toFixed(1)) : 0;
 
         const totalWithdrawn = transactions
             .filter(t => t.type === 'Withdrawal' && t.status === 'Settled')
@@ -368,6 +388,7 @@ export const getSellerEarnings = async (req, res) => {
                 $group: {
                     _id: { $dateToString: { format: "%Y-%m", date: "$deliveredAt" } },
                     revenue: { $sum: sellerOrderEarningAmount() },
+                    profit: { $sum: sellerOrderProfitAmount() },
                 },
             },
             { $sort: { _id: 1 } }
@@ -382,7 +403,8 @@ export const getSellerEarnings = async (req, res) => {
             const data = monthlyAggregation.find(m => m._id === dateStr);
             chartData.push({
                 name: monthNames[d.getMonth()],
-                revenue: data ? data.revenue : 0
+                revenue: data ? data.revenue : 0,
+                profit: data ? data.profit : 0
             });
         }
 
@@ -395,6 +417,9 @@ export const getSellerEarnings = async (req, res) => {
                 pendingOrderEarnings,
                 totalWalletBalance,
                 totalRevenue: totalRevenue,
+                totalCostPrice: totalCostPrice,
+                totalNetProfit: totalNetProfit,
+                netProfitMargin: netProfitMargin,
                 totalWithdrawn: totalWithdrawn
             },
             monthlyChart: chartData,

@@ -123,21 +123,43 @@ const Earnings = () => {
         </div>
       </BlurFade>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <BlurFade delay={0.2}>
           <Card className="bg-gradient-to-br from-brand-600 to-teal-700 text-white border-none shadow-lg h-full">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-brand-100 font-medium">Total Revenue</p>
-                <h3 className="text-4xl font-bold mt-2">₹{Number(data?.balances?.totalRevenue ?? 0).toLocaleString()}</h3>
+                <h3 className="text-3xl font-bold mt-2">₹{Number(data?.balances?.totalRevenue ?? 0).toLocaleString()}</h3>
               </div>
               <div className="p-3 bg-white/20 rounded-xl">
-                <DollarSign className="h-8 w-8 text-white" />
+                <DollarSign className="h-7 w-7 text-white" />
               </div>
             </div>
-            <div className="mt-8 flex items-center text-brand-100 bg-white/10 w-fit px-3 py-1 rounded-full text-sm">
-              <TrendingUp className="mr-2" />
-              <span>Real-time earnings data</span>
+            <div className="mt-6 flex items-center text-brand-100 bg-white/10 w-fit px-3 py-1 rounded-full text-xs">
+              <TrendingUp className="mr-2 h-4 w-4" />
+              <span>Gross Sales Value</span>
+            </div>
+          </Card>
+        </BlurFade>
+
+        <BlurFade delay={0.25}>
+          <Card className="bg-gradient-to-br from-emerald-600 to-teal-800 text-white border-none shadow-lg h-full">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-emerald-100 font-medium">Actual Net Profit</p>
+                <h3 className="text-3xl font-bold mt-2">₹{Number(data?.balances?.totalNetProfit ?? 0).toLocaleString()}</h3>
+              </div>
+              <div className="p-3 bg-white/20 rounded-xl">
+                <TrendingUp className="h-7 w-7 text-white" />
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="bg-white/20 text-white px-2.5 py-1 rounded-full font-bold">
+                Margin: {data?.balances?.netProfitMargin ?? 0}%
+              </span>
+              <span className="text-emerald-100 font-medium">
+                COGS: ₹{Number(data?.balances?.totalCostPrice ?? 0).toLocaleString()}
+              </span>
             </div>
           </Card>
         </BlurFade>
@@ -149,7 +171,7 @@ const Earnings = () => {
                 <p className="text-xs font-black text-slate-600 uppercase tracking-widest mb-1">
                   Total Withdrawn
                 </p>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">
                   ₹{Number(data?.balances?.totalWithdrawn ?? 0).toLocaleString()}
                 </h2>
               </div>
@@ -181,12 +203,22 @@ const Earnings = () => {
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-brand-500" />
-              Monthly Revenue Performance
+              Monthly Performance (Revenue vs Profit)
             </h3>
+            <div className="flex items-center gap-4 text-xs font-bold">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-brand-500" />
+                <span className="text-slate-600">Revenue</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-emerald-500" />
+                <span className="text-slate-600">Net Profit</span>
+              </div>
+            </div>
           </div>
           <div className="h-[300px] w-full min-h-[200px] flex items-center justify-center">
             {(Array.isArray(data?.monthlyChart) ? data.monthlyChart : []).length === 0 ? (
-              <p className="text-slate-600 text-sm font-medium">No monthly revenue data yet.</p>
+              <p className="text-slate-600 text-sm font-medium">No monthly performance data yet.</p>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.monthlyChart}>
@@ -217,20 +249,20 @@ const Earnings = () => {
                       fontSize: "12px",
                       fontWeight: "700",
                     }}
-                    formatter={(value) => [`₹${value.toLocaleString()}`, "Revenue"]}
+                    formatter={(value, name) => [`₹${value.toLocaleString()}`, name === "revenue" ? "Revenue" : "Net Profit"]}
                   />
                   <Bar
                     dataKey="revenue"
-                    fill="url(#colorRevenue)"
+                    fill="#6366f1"
                     radius={[6, 6, 0, 0]}
-                    barSize={40}
+                    barSize={20}
                   />
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={1} />
-                      <stop offset="95%" stopColor="#818cf8" stopOpacity={1} />
-                    </linearGradient>
-                  </defs>
+                  <Bar
+                    dataKey="profit"
+                    fill="#10b981"
+                    radius={[6, 6, 0, 0]}
+                    barSize={20}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}

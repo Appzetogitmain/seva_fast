@@ -31,6 +31,11 @@ const productSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+        costPrice: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
         stock: {
             type: Number,
             required: true,
@@ -133,6 +138,11 @@ const productSchema = new mongoose.Schema(
                 name: String,
                 price: Number,
                 salePrice: Number,
+                costPrice: {
+                    type: Number,
+                    default: 0,
+                    min: 0,
+                },
                 stock: {
                     type: Number,
                     min: [0, "Variant stock cannot be negative"],

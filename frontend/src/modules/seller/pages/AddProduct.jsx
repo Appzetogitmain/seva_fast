@@ -55,6 +55,7 @@ const AddProduct = () => {
     description: "",
     price: "",
     salePrice: "",
+    costPrice: "",
     stock: "",
     lowStockAlert: 5,
     category: "",
@@ -78,6 +79,7 @@ const AddProduct = () => {
         name: "",
         price: "",
         salePrice: "",
+        costPrice: "",
         stock: "",
         sku: "",
       },
@@ -211,6 +213,7 @@ const AddProduct = () => {
       // Map top-level price/stock from first variant for indexing/listing
       data.append("price", firstVariant.price);
       data.append("salePrice", firstVariant.salePrice || 0);
+      data.append("costPrice", firstVariant.costPrice || 0);
       data.append("stock", firstVariant.stock);
 
       // Category IDs
@@ -565,6 +568,7 @@ const AddProduct = () => {
                           name: "",
                           price: "",
                           salePrice: "",
+                          costPrice: "",
                           stock: "",
                           sku: makeSku(prev.name, prev.variants.length + 1),
                         },
@@ -640,6 +644,23 @@ const AddProduct = () => {
                       />
                     </div>
                     <div className="col-span-6 md:col-span-2 space-y-1">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest ml-1">
+                        Cost Price (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={variant.costPrice || ""}
+                        onChange={(e) => {
+                          const newVariants = [...formData.variants];
+                          newVariants[index].costPrice = e.target.value;
+                          setFormData({ ...formData, variants: newVariants });
+                        }}
+                        placeholder="300"
+                        className="w-full px-3 py-2 bg-emerald-50/50 ring-1 ring-emerald-100 border-none rounded-xl text-xs font-bold text-emerald-800 outline-none focus:ring-2 focus:ring-emerald-200"
+                      />
+                    </div>
+                    <div className="col-span-6 md:col-span-2 space-y-1">
                       <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
                         Stock
                       </label>
@@ -684,6 +705,22 @@ const AddProduct = () => {
                         className="w-full px-3 py-2 bg-white ring-1 ring-slate-200 border-none rounded-xl text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-primary/10"
                       />
                     </div>
+                    {/* Live Estimated Profit Calculator per variant */}
+                    {(() => {
+                      const selling = Number(variant.salePrice || variant.price || 0);
+                      const cost = Number(variant.costPrice || 0);
+                      if (selling > 0 && cost > 0) {
+                        const estProfit = selling - cost;
+                        const margin = Math.round((estProfit / selling) * 100);
+                        return (
+                          <div className="col-span-12 mt-1 p-2 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between text-xs font-bold text-emerald-800">
+                            <span>Estimated Gross Profit: <strong className="text-emerald-900">₹{estProfit.toFixed(2)}</strong></span>
+                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] uppercase font-black tracking-wider">Margin: {margin}%</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                     <div className="col-span-1 flex justify-end pb-1">
                       <button
                         onClick={() => {

@@ -1511,32 +1511,51 @@ const Orders = () => {
                                                 <div className="bg-slate-50 p-3 sm:p-4 rounded-3xl border border-slate-100">
                                                     <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Order Amount (Customer)</h4>
                                                     <p className="text-lg font-black text-slate-900">₹{getCustomerOrderBill(selectedOrder).grandTotal.toFixed(2)}</p>
-                                                </div>
-                                                <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
-                                                    <h4 className="text-xs font-black text-primary uppercase tracking-widest mb-3">Your Earning</h4>
-                                                    <div className="space-y-2">
-                                                        {(() => {
-                                                            const { productEarning, deliveryShare, total } = getSellerEarningBreakdown(selectedOrder);
-                                                            return (
-                                                                <>
-                                                                    <div className="flex justify-between text-xs">
-                                                                        <span className="font-bold text-slate-600">Product</span>
-                                                                        <span className="font-black text-slate-900">₹{productEarning.toFixed(2)}</span>
-                                                                    </div>
-                                                                    {deliveryShare > 0 && (
+                                                    <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10 space-y-3 mt-4">
+                                                        <h4 className="text-xs font-black text-primary uppercase tracking-widest">Financial Breakdown & Net Profit</h4>
+                                                        <div className="space-y-2">
+                                                            {(() => {
+                                                                const { productSubtotal, adminCommission, productEarning, deliveryShare, total, totalCostPrice, sellerNetProfit, profitMarginPercent } = getSellerEarningBreakdown(selectedOrder);
+                                                                return (
+                                                                    <>
                                                                         <div className="flex justify-between text-xs">
-                                                                            <span className="font-bold text-slate-600">Delivery (80%)</span>
-                                                                            <span className="font-black text-brand-600">₹{deliveryShare.toFixed(2)}</span>
+                                                                            <span className="font-semibold text-slate-600">Product Subtotal</span>
+                                                                            <span className="font-bold text-slate-900">₹{productSubtotal.toFixed(2)}</span>
                                                                         </div>
-                                                                    )}
-                                                                    <div className="h-px bg-primary/10 my-2" />
-                                                                    <div className="flex justify-between text-sm">
-                                                                        <span className="font-black text-slate-900">Your Earning</span>
-                                                                        <span className="font-black text-primary">₹{total.toFixed(2)}</span>
-                                                                    </div>
-                                                                </>
-                                                            );
-                                                        })()}
+                                                                        {adminCommission > 0 && (
+                                                                            <div className="flex justify-between text-xs text-rose-600">
+                                                                                <span className="font-semibold">Platform Commission</span>
+                                                                                <span className="font-bold">-₹{adminCommission.toFixed(2)}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {deliveryShare > 0 && (
+                                                                            <div className="flex justify-between text-xs text-brand-600">
+                                                                                <span className="font-semibold">Delivery Share (80%)</span>
+                                                                                <span className="font-bold">+₹{deliveryShare.toFixed(2)}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="flex justify-between text-xs font-bold text-slate-800 bg-white/60 p-2 rounded-xl border border-slate-100">
+                                                                            <span>Payout (Your Earning)</span>
+                                                                            <span className="text-primary">₹{total.toFixed(2)}</span>
+                                                                        </div>
+                                                                        {totalCostPrice > 0 && (
+                                                                            <div className="flex justify-between text-xs text-slate-600">
+                                                                                <span className="font-semibold">Product Cost (COGS)</span>
+                                                                                <span className="font-bold text-rose-700">-₹{totalCostPrice.toFixed(2)}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="h-px bg-primary/10 my-2" />
+                                                                        <div className="flex justify-between items-center text-sm p-2.5 bg-emerald-50 rounded-2xl border border-emerald-200">
+                                                                            <div>
+                                                                                <p className="font-black text-emerald-900">Actual Net Profit</p>
+                                                                                <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Margin: {profitMarginPercent}%</p>
+                                                                            </div>
+                                                                            <span className="font-black text-lg text-emerald-700">₹{sellerNetProfit.toFixed(2)}</span>
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="bg-slate-900 p-3 sm:p-4 rounded-3xl text-white shadow-xl shadow-slate-900/10">

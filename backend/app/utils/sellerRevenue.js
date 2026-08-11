@@ -49,3 +49,40 @@ export function sellerOrderEarningAmount() {
     ],
   };
 }
+
+export function sellerOrderCostAmount() {
+  return {
+    $ifNull: [
+      "$paymentBreakdown.totalCostPrice",
+      {
+        $sum: {
+          $map: {
+            input: { $ifNull: ["$items", []] },
+            as: "item",
+            in: {
+              $multiply: [
+                { $ifNull: ["$$item.costPrice", 0] },
+                { $ifNull: ["$$item.quantity", 0] },
+              ],
+            },
+          },
+        },
+      },
+    ],
+  };
+}
+
+export function sellerOrderProfitAmount() {
+  return {
+    $ifNull: [
+      "$paymentBreakdown.sellerNetProfit",
+      {
+        $subtract: [
+          sellerOrderEarningAmount(),
+          sellerOrderCostAmount(),
+        ],
+      },
+    ],
+  };
+}
+

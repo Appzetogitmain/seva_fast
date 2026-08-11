@@ -38,15 +38,6 @@ export function getSellerOrderEarning(order) {
 }
 
 export function getSellerEarningBreakdown(order) {
-  const api = order?.sellerEarningBreakdown;
-  if (api && Number.isFinite(Number(api.total))) {
-    return {
-      total: roundMoney(api.total),
-      deliveryShare: roundMoney(api.deliveryShare || 0),
-      productEarning: roundMoney(api.productEarning || 0),
-    };
-  }
-
   const total = getSellerOrderEarning(order);
   const deliveryFee = Number(
     order?.pricing?.deliveryFee ?? order?.paymentBreakdown?.deliveryFeeCharged ?? 0,
@@ -54,7 +45,49 @@ export function getSellerEarningBreakdown(order) {
   const deliveryShare = roundMoney(deliveryFee * DELIVERY_FEE_SELLER_SHARE);
   const productEarning = roundMoney(Math.max(total - deliveryShare, 0));
 
-  return { total, deliveryShare, productEarning };
+  const items = Array.isArray(order?.items) ? order.items : (order?.paymentBreakdown?.lineItems || []);
+  const itemsSubtotal = items.reduce((sum, item) => {
+    const price = Number(item?.price ?? item?.unitPrice ?? 0);
+    const qty = Number(item?.qty ?? item?.quantity ?? 1);
+    return sum + (Number.isFinite(price) && Number.isFinite(qty) ? price * qty : 0);
+  }, 0);
+  const productSubtotal = Number(
+    order?.pricing?.subtotal ?? order?.paymentBreakdown?.productSubtotal ?? itemsSubtotal,
+  );
+
+  const adminCommission = Number(
+    order?.paymentBreakdown?.adminProductCommissionTotal ?? Math.max(productSubtotal - productEarning, 0),
+  );
+
+  let totalCostPrice = Number(order?.paymentBreakdown?.totalCostPrice ?? 0);
+  if (!totalCostPrice && items.length > 0) {
+    totalCostPrice = items.reduce((sum, item) => {
+      const cost = Number(item?.costPrice || 0);
+      const qty = Number(item?.qty ?? item?.quantity ?? 1);
+      return sum + (Number.isFinite(cost) && Number.isFinite(qty) ? cost * qty : 0);
+    }, 0);
+  }
+  totalCostPrice = roundMoney(totalCostPrice);
+
+  let sellerNetProfit = Number(order?.paymentBreakdown?.sellerNetProfit);
+  if (!Number.isFinite(sellerNetProfit)) {
+    sellerNetProfit = roundMoney(total - totalCostPrice);
+  } else {
+    sellerNetProfit = roundMoney(sellerNetProfit);
+  }
+
+  const profitMarginPercent = total > 0 ? roundMoney((sellerNetProfit / total) * 100) : 0;
+
+  return {
+    total,
+    deliveryShare,
+    productEarning,
+    productSubtotal: roundMoney(productSubtotal),
+    adminCommission: roundMoney(adminCommission),
+    totalCostPrice,
+    sellerNetProfit,
+    profitMarginPercent,
+  };
 }
 
 export function getCustomerOrderBill(order) {

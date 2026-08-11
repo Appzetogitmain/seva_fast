@@ -21,6 +21,8 @@ import HelpSupport from "../pages/profile/HelpSupport";
 import Withdrawals from "../pages/profile/Withdrawals";
 import Notifications from "../pages/Notifications";
 
+import IdCard from "../pages/IdCard";
+
 const DeliveryRoutes = () => {
   return (
     <Routes>
@@ -36,6 +38,8 @@ const DeliveryRoutes = () => {
         <Route path="cod-cash" element={<CodCash />} />
         <Route path="history" element={<OrderHistory />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="profile/id-card" element={<IdCard />} />
+        <Route path="id-card" element={<IdCard />} />
         <Route path="profile/personal-details" element={<PersonalDetails />} />
         <Route path="profile/vehicle-info" element={<VehicleInfo />} />
         <Route path="profile/bank-account" element={<BankAccount />} />

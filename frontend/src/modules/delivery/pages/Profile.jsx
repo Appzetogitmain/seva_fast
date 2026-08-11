@@ -15,6 +15,7 @@ import {
   IndianRupee,
   ChevronDown,
   ChevronUp,
+  BadgeCheck,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Button from "@/shared/components/ui/Button";
@@ -62,6 +63,13 @@ const Profile = () => {
   const getJoinedDate = (dateString) => formatDate(dateString, "N/A");
 
   const menuItems = [
+    {
+      icon: BadgeCheck,
+      label: "Digital Partner ID Card",
+      sub: "Official SEVAFAST Authorized Badge & Verification",
+      color: "text-red-600 bg-red-50 font-bold",
+      path: "/delivery/profile/id-card",
+    },
     {
       icon: User,
       label: "Personal Details",

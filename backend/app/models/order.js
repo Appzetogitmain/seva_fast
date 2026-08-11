@@ -45,6 +45,10 @@ const orderSchema = new mongoose.Schema(
           type: Number,
           required: true,
         },
+        costPrice: {
+          type: Number,
+          default: 0,
+        },
         variantSlot: String,
         image: String,
         // Snapshot for Shiprocket (scheduled nationwide shipping)
@@ -236,6 +240,8 @@ const orderSchema = new mongoose.Schema(
       taxTotal: { type: Number, default: 0 },
       grandTotal: { type: Number, default: 0 },
       sellerPayoutTotal: { type: Number, default: 0 },
+      totalCostPrice: { type: Number, default: 0 },
+      sellerNetProfit: { type: Number, default: 0 },
       adminProductCommissionTotal: { type: Number, default: 0 },
       riderPayoutBase: { type: Number, default: 0 },
       riderPayoutDistance: { type: Number, default: 0 },

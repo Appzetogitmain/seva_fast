@@ -371,9 +371,11 @@ const ProductManagement = () => {
       data.append("slug", formData.slug);
       data.append("sku", formData.sku);
       data.append("description", formData.description);
-      data.append("price", Number(formData.price));
-      data.append("salePrice", Number(formData.salePrice) || 0);
-      data.append("stock", Number(formData.stock));
+      const firstVariant = formData.variants[0] || {};
+      data.append("price", Number(firstVariant.price || formData.price));
+      data.append("salePrice", Number(firstVariant.salePrice || formData.salePrice || 0));
+      data.append("costPrice", Number(firstVariant.costPrice || formData.costPrice || 0));
+      data.append("stock", Number(firstVariant.stock || formData.stock));
       data.append("headerId", formData.header);
       data.append("categoryId", formData.category);
       data.append("subcategoryId", formData.subcategory);
@@ -476,6 +478,7 @@ const ProductManagement = () => {
         description: item.description || "",
         price: item.price || "",
         salePrice: item.salePrice || "",
+        costPrice: item.costPrice || "",
         stock: item.stock || "",
         lowStockAlert: item.lowStockAlert || 5,
         header: item.headerId?._id || item.headerId || "",
@@ -493,12 +496,13 @@ const ProductManagement = () => {
         brand: item.brand || "",
         mainImage: item.mainImage || null,
         galleryImages: item.galleryImages || [],
-        variants: (item.variants && item.variants.length > 0) ? item.variants.map(v => ({ ...v, id: v._id || Date.now() })) : [
+        variants: (item.variants && item.variants.length > 0) ? item.variants.map(v => ({ ...v, id: v._id || Date.now(), costPrice: v.costPrice || "" })) : [
           {
             id: Date.now(),
             name: "",
             price: item.price || "",
             salePrice: item.salePrice || "",
+            costPrice: item.costPrice || "",
             stock: item.stock || "",
             sku: item.sku || "",
           },
@@ -513,6 +517,7 @@ const ProductManagement = () => {
         description: "",
         price: "",
         salePrice: "",
+        costPrice: "",
         stock: "",
         lowStockAlert: 5,
         category: "",
@@ -535,6 +540,7 @@ const ProductManagement = () => {
             name: "",
             price: "",
             salePrice: "",
+            costPrice: "",
             stock: "",
             sku: "",
           },
@@ -1407,6 +1413,7 @@ const ProductManagement = () => {
                                   name: "",
                                   price: "",
                                   salePrice: "",
+                                  costPrice: "",
                                   stock: "",
                                   sku: makeSku(prev.name, prev.variants.length + 1),
                                 },
@@ -1441,6 +1448,14 @@ const ProductManagement = () => {
                                 news[i].salePrice = e.target.value;
                                 setFormData({ ...formData, variants: news });
                               }} placeholder="Sale" className="w-full bg-brand-50/50 px-3 py-2 rounded-xl text-xs ring-1 ring-brand-100 text-brand-700 outline-none" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-bold text-emerald-600 uppercase tracking-widest ml-1">Cost Price (₹)</label>
+                              <input type="number" value={v.costPrice || ""} onChange={e => {
+                                const news = [...formData.variants];
+                                news[i].costPrice = e.target.value;
+                                setFormData({ ...formData, variants: news });
+                              }} placeholder="Cost" className="w-full bg-emerald-50/50 px-3 py-2 rounded-xl text-xs ring-1 ring-emerald-100 text-emerald-800 outline-none" />
                             </div>
                             <div className="space-y-1">
                               <label className="text-[8px] font-bold text-slate-600 uppercase tracking-widest ml-1">Stock</label>

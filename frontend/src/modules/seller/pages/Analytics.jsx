@@ -111,6 +111,14 @@ const Analytics = () => {
       bg: "bg-brand-50",
     },
     {
+      label: "Actual Net Profit",
+      value: statsData?.overview?.totalNetProfit || "₹0",
+      trend: statsData?.overview?.netProfitMargin || "0%",
+      icon: HiOutlineArrowTrendingUp,
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+    },
+    {
       label: "Total Orders",
       value: statsData?.overview?.totalOrders || "0",
       trend: statsData?.overview?.ordersTrend || "0%",
@@ -121,18 +129,10 @@ const Analytics = () => {
     {
       label: "Avg Order Value",
       value: statsData?.overview?.avgOrderValue || "₹0",
-      trend: "0%", // Trend for AOV can be added later
+      trend: "0%",
       icon: HiOutlineUsers,
       color: "text-amber-600",
       bg: "bg-amber-50",
-    },
-    {
-      label: "Conversion Rate",
-      value: statsData?.overview?.conversionRate || "0%",
-      trend: "0%",
-      icon: HiOutlineChartBar,
-      color: "text-rose-600",
-      bg: "bg-rose-50",
     },
   ];
 
