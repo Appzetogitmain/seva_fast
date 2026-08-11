@@ -99,6 +99,36 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
             </motion.div>
           )}
 
+          {pricingPreview?.firstOrderDiscountAmount > 0 && (
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex justify-between items-center px-3 py-2 bg-amber-50 rounded-xl border border-amber-100">
+              <span className="text-amber-600 font-black text-xs flex items-center gap-2 uppercase tracking-wider">
+                <Tag size={14} />
+                New Customer Discount
+              </span>
+              <span className="font-black text-amber-600">
+                -₹{pricingPreview.firstOrderDiscountAmount}
+              </span>
+            </motion.div>
+          )}
+
+          {pricingPreview?.deliveryFeeCharged === 0 && pricingPreview?.deliveryFeeBase > 0 && (
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex justify-between items-center px-3 py-2 bg-amber-50 rounded-xl border border-amber-100">
+              <span className="text-amber-600 font-black text-xs flex items-center gap-2 uppercase tracking-wider">
+                <Tag size={14} />
+                Free Delivery
+              </span>
+              <span className="font-black text-amber-600 line-through opacity-60">
+                ₹{pricingPreview.deliveryFeeBase}
+              </span>
+            </motion.div>
+          )}
+
           {pricingPreview?.estimatedCashback > 0 && pricingPreview?.cashbackPercentage > 0 && (
             <motion.div
               initial={{ opacity: 0, x: -10 }}

@@ -1080,6 +1080,7 @@ export const updateOrderStatus = async (req, res) => {
           pickup,
           drop,
           total: orderRich?.pricing?.total ?? 0,
+          earnings: Number(orderRich?.paymentBreakdown?.riderPayoutTotal) || 0,
         };
         const assignExpiresAt =
           orderRich?.deliverySearchExpiresAt || new Date(Date.now() + 60000);
@@ -1616,7 +1617,7 @@ export const assignReturnDelivery = async (req, res) => {
           pickup: order.address?.completeAddress || "Customer Address",
           drop: order.sellerBranchArea || "Seller Store",
           total: order.pricing?.total || 0,
-          earnings: order.riderEarnings || 0,
+          earnings: order.returnDeliveryCommission || 0,
         },
         deliverySearchExpiresAt: new Date(Date.now() + 60 * 1000).toISOString(),
       };

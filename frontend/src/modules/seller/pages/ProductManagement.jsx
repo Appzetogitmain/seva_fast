@@ -329,7 +329,7 @@ const ProductManagement = () => {
 
   const handleSave = async () => {
     try {
-      if (!formData.name || !formData.price || !formData.stock || !formData.header || !formData.category) {
+      if (!formData.name || formData.price === "" || formData.price == null || formData.stock === "" || formData.stock == null || !formData.header || !formData.category) {
         toast.error("Please fill all required fields, including Main Group and Specific Category");
         return;
       }

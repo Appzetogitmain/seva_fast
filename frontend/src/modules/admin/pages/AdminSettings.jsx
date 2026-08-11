@@ -20,7 +20,9 @@ import {
     Youtube,
     Loader2,
     X,
-    Award
+    Award,
+    Gift,
+    Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@shared/components/ui/Toast';
@@ -96,6 +98,9 @@ const AdminSettings = () => {
         adminPaymentQrUrl: '',
         adminUpiId: '',
         adminUpiName: '',
+        firstOrderDiscountPercent: 10,
+        firstOrderFreeDelivery: true,
+        welcomeScratchCardEnabled: true,
     });
 
     useEffect(() => {
@@ -110,6 +115,9 @@ const AdminSettings = () => {
                         productApproval: normalizeProductApprovalConfig(data || {}),
                         keywords: Array.isArray(data.keywords) ? data.keywords : (data.metaKeywords ? data.metaKeywords.split(',').map(k => k.trim()).filter(Boolean) : []),
                         returnDeliveryCommission: data.returnDeliveryCommission ?? 0,
+                        firstOrderDiscountPercent: data.firstOrderDiscountPercent ?? 10,
+                        firstOrderFreeDelivery: data.firstOrderFreeDelivery ?? true,
+                        welcomeScratchCardEnabled: data.welcomeScratchCardEnabled ?? true,
                     }));
                 }
             } catch (error) {
@@ -301,6 +309,7 @@ const AdminSettings = () => {
 
     const tabs = [
         { id: 'general', label: 'General', icon: Settings },
+        { id: 'welcomeOffer', label: 'Welcome Scratch Card & Offer', icon: Gift },
         { id: 'branding', label: 'Branding', icon: Globe },
         { id: 'certificate', label: 'Seller Certificate', icon: Award },
         { id: 'payments', label: 'COD Payments', icon: CreditCard },
@@ -1029,6 +1038,94 @@ const AdminSettings = () => {
                                         placeholder="keyword1, keyword2, keyword3"
                                     />
                                     <p className="text-[10px] font-bold text-slate-400 italic text-right">Separate keywords with commas</p>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Welcome Scratch Card & First Order Offer Settings */}
+                    {activeTab === 'welcomeOffer' && (
+                        <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
+                            <div className="p-6 border-b border-slate-50 bg-gradient-to-r from-amber-500/10 via-purple-500/5 to-transparent">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
+                                    <Sparkles className="h-5 w-5 text-amber-500" />
+                                    First Order Welcome Scratch Card & Discount Settings
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-1 font-medium">
+                                    Configure the interactive welcome popup scratch card shown to new customers and the first order perks.
+                                </p>
+                            </div>
+                            <div className="p-8 space-y-6">
+                                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5 flex items-center justify-between gap-4">
+                                    <div>
+                                        <p className="text-sm font-black text-slate-900">Show Digital Scratch Card Modal</p>
+                                        <p className="text-xs font-bold text-slate-500 mt-1">
+                                            When enabled, new customers see an attractive welcome scratch card modal upon first opening the app.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={settings.welcomeScratchCardEnabled}
+                                        onClick={() => handleInputChange('welcomeScratchCardEnabled', !settings.welcomeScratchCardEnabled)}
+                                        className={cn(
+                                            "relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-200",
+                                            settings.welcomeScratchCardEnabled ? "bg-emerald-500" : "bg-slate-300"
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                "inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200",
+                                                settings.welcomeScratchCardEnabled ? "translate-x-7" : "translate-x-1"
+                                            )}
+                                        />
+                                    </button>
+                                </div>
+
+                                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5 flex items-center justify-between gap-4">
+                                    <div>
+                                        <p className="text-sm font-black text-slate-900">Free Delivery on First Order</p>
+                                        <p className="text-xs font-bold text-slate-500 mt-1">
+                                            Customer pays ₹0 delivery fee on 1st order. Rider still gets 100% of their distance payout paid by platform.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={settings.firstOrderFreeDelivery}
+                                        onClick={() => handleInputChange('firstOrderFreeDelivery', !settings.firstOrderFreeDelivery)}
+                                        className={cn(
+                                            "relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-200",
+                                            settings.firstOrderFreeDelivery ? "bg-emerald-500" : "bg-slate-300"
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                "inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200",
+                                                settings.firstOrderFreeDelivery ? "translate-x-7" : "translate-x-1"
+                                            )}
+                                        />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        First Order Discount Percentage (%)
+                                    </label>
+                                    <div className="relative group max-w-sm">
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={settings.firstOrderDiscountPercent}
+                                            onChange={(e) => handleInputChange('firstOrderDiscountPercent', Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                                            className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        />
+                                        <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">% OFF</span>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 italic">
+                                        Fallback default is 10%. If a product already has a discount, this percentage applies extra on top of the discounted price.
+                                    </p>
                                 </div>
                             </div>
                         </Card>

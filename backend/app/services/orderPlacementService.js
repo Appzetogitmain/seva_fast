@@ -437,6 +437,16 @@ export async function placeOrderAtomic({
       else if (planName.includes("bronze")) membershipTier = "bronze";
     }
 
+    let isFirstOrder = false;
+    if (customerId) {
+      const previousOrderCount = await Order.countDocuments(
+        { customer: customerId, orderStatus: { $ne: "cancelled" } },
+        null,
+        { session }
+      );
+      isFirstOrder = previousOrderCount === 0;
+    }
+
     const pricingSnapshot = await buildCheckoutPricingSnapshot({
       orderItems: orderItemsInput,
       address: normalizedAddress,
@@ -447,6 +457,8 @@ export async function placeOrderAtomic({
       hasFreeHandling,
       cashbackPercentage,
       membershipTier,
+      isFirstOrder,
+      isExpressDelivery: Boolean(normalizedPayload.isExpressDelivery),
     });
 
     const checkoutGroupId = await generateUniqueCheckoutGroupId({ session });

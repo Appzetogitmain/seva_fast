@@ -6,6 +6,7 @@ export const customerApi = {
   sendSignupOtp: (data) =>
     axiosInstance.post("/customer/send-signup-otp", data),
   verifyOtp: (data) => axiosInstance.post("/customer/verify-otp", data),
+  getFirstOrderEligibility: () => getWithDedupe("/customer/first-order-eligibility", {}, { ttl: 5000 }),
   getProfile: () => getWithDedupe("/customer/profile", {}, { ttl: 5000 }), // Short cache for profile
   updateProfile: (data) => {
     invalidateCache("/customer/profile");
@@ -189,5 +190,7 @@ export const customerApi = {
   initiatePayPlatformAd: (id) => axiosInstance.post(`/professionals/platform-ads/${id}/pay/initiate`),
   verifyPayPlatformAd: (id, data) => axiosInstance.post(`/professionals/platform-ads/${id}/pay/verify`, data),
   getActivePlatformAds: (params) => axiosInstance.get("/professionals/platform-ads/active", { params }),
-};
 
+  // Product Demands
+  registerProductDemand: (data) => axiosInstance.post("/product-demands/register", data),
+};

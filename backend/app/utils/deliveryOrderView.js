@@ -62,6 +62,11 @@ export function sanitizeOrderForDeliveryView(order) {
           finalAmountToPay,
         }
       : undefined,
+    // What this delivery partner actually earns for a regular (non-return)
+    // delivery, per the admin-configured slab structure. Exposed as its own
+    // flat field since paymentBreakdown above is deliberately stripped down
+    // to customer-facing totals only.
+    riderEarnings: Number(order.paymentBreakdown?.riderPayoutTotal) || 0,
     // Bug 222: Include distance/time for history cards
     distanceKm: order.distanceKm ?? order.routeDistanceKm ?? null,
     estimatedMinutes: order.estimatedMinutes ?? order.routeEstimatedMinutes ?? null,

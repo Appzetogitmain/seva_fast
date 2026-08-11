@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import BottomNav from './BottomNav';
 import MiniCart from '../shared/MiniCart';
 import MobileFooterMessage from './MobileFooterMessage';
 import BirthdayHeaderCelebration from '../shared/BirthdayHeaderCelebration';
+import WelcomeScratchCardModal from '../WelcomeScratchCardModal';
+import { customerApi } from '../../services/customerApi';
 import { useProductDetail } from '../../context/ProductDetailContext';
 import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
@@ -19,6 +21,36 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
     const { isOpen: isProductDetailOpen } = useProductDetail();
     const { user, token } = useAuth();
     const isBirthday = !!user?.dateOfBirth && isBirthdayToday(user.dateOfBirth);
+
+    const [welcomeOffer, setWelcomeOffer] = useState({
+        isOpen: false,
+        discountPercent: 10,
+        freeDelivery: true,
+    });
+
+    useEffect(() => {
+        const fetchEligibility = async () => {
+            try {
+                const res = await customerApi.getFirstOrderEligibility();
+                const data = res.data?.result ?? res.data;
+                if (data && data.isFirstOrder && data.welcomeScratchCardEnabled !== false) {
+                    const userIdKey = user?._id || user?.id || 'guest';
+                    const storageKey = `welcome_scratch_card_done_${userIdKey}`;
+                    if (localStorage.getItem(storageKey) !== 'true') {
+                        setWelcomeOffer({
+                            isOpen: true,
+                            discountPercent: data.firstOrderDiscountPercent ?? 10,
+                            freeDelivery: data.firstOrderFreeDelivery !== false,
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("[CustomerLayout] Error checking first order eligibility:", err);
+            }
+        };
+        if (!user) return;
+        fetchEligibility();
+    }, [user]);
 
     // Listen for Return OTPs (Real-time Alert for Customer)
     useEffect(() => {
@@ -137,9 +169,14 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                 {finalShowBottomNavMobile && <BottomNav />}
             </div>
             {/* Desktop Bottom Nav doesn't exist usually, but just in case of future changes */}
-            <div className="hidden md:block">
-                {showBottomNav && <BottomNav />}
-            </div>
+            {/* Welcome Scratch Card Popup */}
+            <WelcomeScratchCardModal
+                isOpen={welcomeOffer.isOpen}
+                onClose={() => setWelcomeOffer((prev) => ({ ...prev, isOpen: false }))}
+                discountPercent={welcomeOffer.discountPercent}
+                freeDelivery={welcomeOffer.freeDelivery}
+                userId={user?._id || user?.id || 'guest'}
+            />
         </div>
     );
 };

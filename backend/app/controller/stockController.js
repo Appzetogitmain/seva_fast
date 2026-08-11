@@ -7,6 +7,7 @@ import {
     createLowStockAlertCandidate,
     isLowStockAlertsEnabled,
 } from "../services/lowStockAlertService.js";
+import { notifyPendingDemandsForRestock } from "../services/productDemandService.js";
 
 /* ===============================
    ADJUST STOCK MANUALLY
@@ -43,6 +44,10 @@ export const adjustStock = async (req, res) => {
         });
 
         await historyEntry.save();
+
+        if (previousStock <= 0 && finalStock > 0) {
+            notifyPendingDemandsForRestock(productId).catch(() => {});
+        }
 
         if (
             type !== 'Restock' &&

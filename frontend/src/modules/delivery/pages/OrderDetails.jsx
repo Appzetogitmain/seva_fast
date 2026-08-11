@@ -739,6 +739,11 @@ const OrderDetails = () => {
                   "Delivered"
             )}
           </span>
+          {!isReturn && (
+            <span className="mt-1 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm bg-brand-600">
+              EARNING: ₹{order.riderEarnings ?? 0}
+            </span>
+          )}
           {(order.payment?.method?.toLowerCase() === "cash" ||
             order.payment?.method?.toLowerCase() === "cod") &&
             !isReturn &&

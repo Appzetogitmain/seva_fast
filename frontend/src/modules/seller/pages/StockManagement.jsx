@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Card from '@shared/components/ui/Card';
 import Button from '@shared/components/ui/Button';
 import Badge from '@shared/components/ui/Badge';
@@ -30,6 +30,7 @@ import { formatDate, formatTime } from '@shared/utils/formatDate';
 
 const StockManagement = () => {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [activeView, setActiveView] = useState('inventory'); // 'inventory' or 'history'
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('All');
@@ -122,6 +123,25 @@ const StockManagement = () => {
             fetchHistory();
         }
     }, [activeView, filterStatus]);
+
+    // Deep-link support: notifications (low-stock alerts, "notify me" demands)
+    // link here with ?productId=... so the seller lands straight in the
+    // restock modal for that item instead of an unfiltered list.
+    useEffect(() => {
+        const targetProductId = searchParams.get('productId');
+        if (!targetProductId || inventory.length === 0) return;
+
+        const item = inventory.find((i) => i.id === targetProductId);
+        if (item) {
+            openAdjustModal(item);
+            setAdjustType('Restock');
+        }
+
+        const next = new URLSearchParams(searchParams);
+        next.delete('productId');
+        setSearchParams(next, { replace: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [inventory, searchParams]);
 
     const stats = useMemo(() => [
         { label: 'Total Inventory', value: inventory.reduce((acc, item) => acc + item.stock, 0), icon: HiOutlineCube, color: 'text-brand-600', bg: 'bg-brand-50', status: 'All' },

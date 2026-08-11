@@ -7,8 +7,9 @@ import {
     updateCustomerProfile,
     getCustomerTransactions,
     getCustomerReferralTree,
+    checkFirstOrderEligibility,
 } from "../controller/customerAuthController.js";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyToken, optionalVerifyToken } from "../middleware/authMiddleware.js";
 import {
     authRouteRateLimiter,
     createContentLengthGuard,
@@ -24,7 +25,8 @@ router.post("/send-signup-otp", authRouteRateLimiter, otpRouteRateLimiter, small
 router.post("/send-login-otp", authRouteRateLimiter, otpRouteRateLimiter, smallAuthPayload, loginCustomer);
 router.post("/verify-otp", authRouteRateLimiter, otpRouteRateLimiter, smallAuthPayload, verifyCustomerOTP);
 
-// Profile routes
+// Profile & Welcome Offer routes
+router.get("/first-order-eligibility", optionalVerifyToken, checkFirstOrderEligibility);
 router.get("/profile", verifyToken, getCustomerProfile);
 router.put("/profile", verifyToken, updateCustomerProfile);
 router.get("/referrals/tree", verifyToken, getCustomerReferralTree);

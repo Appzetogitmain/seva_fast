@@ -106,9 +106,12 @@ function buildAggregateBreakdown(sellerBreakdowns = []) {
     currency: sellerBreakdowns[0]?.currency || "INR",
     productSubtotal: sumField(sellerBreakdowns, "productSubtotal"),
     deliveryFeeCharged: sumField(sellerBreakdowns, "deliveryFeeCharged"),
+    deliveryFeeBase: sumField(sellerBreakdowns, "deliveryFeeBase"),
     handlingFeeCharged: sumField(sellerBreakdowns, "handlingFeeCharged"),
     tipTotal: sumField(sellerBreakdowns, "tipTotal"),
     discountTotal: sumField(sellerBreakdowns, "discountTotal"),
+    membershipDiscountAmount: sumField(sellerBreakdowns, "membershipDiscountAmount"),
+    firstOrderDiscountAmount: sumField(sellerBreakdowns, "firstOrderDiscountAmount"),
     taxTotal: sumField(sellerBreakdowns, "taxTotal"),
     grandTotal: sumField(sellerBreakdowns, "grandTotal"),
     sellerPayoutTotal: sumField(sellerBreakdowns, "sellerPayoutTotal"),
@@ -252,6 +255,7 @@ function applyGlobalHandlingFeeToSellerBreakdowns(
 
     const productSubtotal = Number(breakdown.productSubtotal || 0);
     const deliveryFeeCharged = Number(breakdown.deliveryFeeCharged || 0);
+    const deliveryFeeBase = Number(breakdown.deliveryFeeBase ?? deliveryFeeCharged);
     const discountTotal = Number(breakdown.discountTotal || 0);
     const taxTotal = Number(breakdown.taxTotal || 0);
     const adminProductCommissionTotal = Number(breakdown.adminProductCommissionTotal || 0);
@@ -262,9 +266,17 @@ function applyGlobalHandlingFeeToSellerBreakdowns(
 
     const logistics = recalculateLogisticsEarnings({
       deliveryFeeCharged,
+      deliveryFeeBase,
       handlingFeeCharged,
       adminProductCommissionTotal,
       tipTotal: breakdown.tipTotal || 0,
+      // Rider payout was already computed by generateOrderPaymentBreakdown and
+      // doesn't depend on handling fee — carry it through unchanged instead
+      // of letting this recalculation reset it to 0.
+      riderPayoutBase: breakdown.riderPayoutBase || 0,
+      riderPayoutDistance: breakdown.riderPayoutDistance || 0,
+      riderPayoutBonus: breakdown.riderPayoutBonus || 0,
+      riderPayoutTotal: breakdown.riderPayoutTotal || 0,
     });
     Object.assign(breakdown, logistics);
     breakdown.sellerPayoutTotal = round2(
@@ -284,6 +296,8 @@ export async function buildCheckoutPricingSnapshot({
   hasFreeHandling = false,
   cashbackPercentage = 0,
   membershipTier = "none",
+  isFirstOrder = false,
+  isExpressDelivery = false,
 }) {
   const hydratedItems = await hydrateOrderItems(orderItems, {
     session,
@@ -343,8 +357,10 @@ export async function buildCheckoutPricingSnapshot({
       hasFreeDelivery,
       hasFreeHandling,
       membershipTier,
+      isFirstOrder,
+      isExpressDelivery,
     });
-    
+
     if (cashbackPercentage > 0) {
       breakdown.estimatedCashback = round2(
         (breakdown.productSubtotal * cashbackPercentage) / 100,

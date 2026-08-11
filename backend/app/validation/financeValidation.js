@@ -37,6 +37,7 @@ export const checkoutPreviewSchema = Joi.object({
   paymentMode: Joi.string().valid("ONLINE", "COD").default("COD"),
   timeSlot: Joi.string().allow("", null),
   couponId: Joi.string().allow("", null).optional(),
+  isExpressDelivery: Joi.boolean().default(false),
 });
 
 export const createFinanceOrderSchema = checkoutPreviewSchema.keys({
@@ -151,6 +152,34 @@ export const updateDeliverySettingsSchema = Joi.object({
   siteCashbackPercent: Joi.number().min(0).max(100).optional(),
   otherMaintenancePercent: Joi.number().min(0).max(100).optional(),
   affiliateMarketingPercent: Joi.number().min(0).max(100).optional(),
+  deliveryFeeSlabs: Joi.array()
+    .items(
+      Joi.object({
+        minKm: Joi.number().min(0).required(),
+        maxKm: Joi.number().min(0).allow(null),
+        fee: Joi.number().min(0).required(),
+        freeAboveOrderValue: Joi.number().min(0).allow(null),
+      }),
+    )
+    .optional(),
+  deliveryFeeBaseWeightKg: Joi.number().min(0).optional(),
+  deliveryFeeExtraFeePerKg: Joi.number().min(0).optional(),
+  expressDeliveryEnabled: Joi.boolean().optional(),
+  expressDeliveryFee: Joi.number().min(0).optional(),
+  expressDeliveryMaxWeightKg: Joi.number().min(0).optional(),
+  riderEarningSlabs: Joi.array()
+    .items(
+      Joi.object({
+        minKm: Joi.number().min(0).required(),
+        maxKm: Joi.number().min(0).allow(null),
+        earning: Joi.number().min(0).required(),
+      }),
+    )
+    .optional(),
+  riderEarningBaseWeightKg: Joi.number().min(0).optional(),
+  riderEarningExtraFeePerKg: Joi.number().min(0).optional(),
+  riderExpressEarning: Joi.number().min(0).optional(),
+  riderExtraEarningPerKmBeyondSlabs: Joi.number().min(0).optional(),
 }).or(
   "deliveryPricingMode",
   "pricingMode",
@@ -179,5 +208,16 @@ export const updateDeliverySettingsSchema = Joi.object({
   "advertiseChargePercent",
   "siteCashbackPercent",
   "otherMaintenancePercent",
-  "affiliateMarketingPercent"
+  "affiliateMarketingPercent",
+  "deliveryFeeSlabs",
+  "deliveryFeeBaseWeightKg",
+  "deliveryFeeExtraFeePerKg",
+  "expressDeliveryEnabled",
+  "expressDeliveryFee",
+  "expressDeliveryMaxWeightKg",
+  "riderEarningSlabs",
+  "riderEarningBaseWeightKg",
+  "riderEarningExtraFeePerKg",
+  "riderExpressEarning",
+  "riderExtraEarningPerKmBeyondSlabs"
 );

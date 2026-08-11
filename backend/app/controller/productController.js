@@ -27,6 +27,7 @@ import {
 import { getAdminIds } from "../utils/adminIds.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
+import { notifyPendingDemandsForRestock } from "../services/productDemandService.js";
 
 function buildProductListKey(queryParams) {
   const sorted = Object.keys(queryParams)
@@ -1093,6 +1094,38 @@ export const updateProduct = async (req, res) => {
       { $set: productData },
       { new: true, runValidators: true },
     );
+
+    if (updatedProduct) {
+      // Notify customers waiting on a restock. Compare against the
+      // pre-update `product` doc so this only fires on an actual
+      // out-of-stock -> in-stock transition, not just any edit.
+      try {
+        const prevStock = Number(product.stock || 0);
+        const newStock = Number(updatedProduct.stock || 0);
+        if (prevStock <= 0 && newStock > 0) {
+          notifyPendingDemandsForRestock(updatedProduct._id).catch(() => {});
+        }
+
+        const newVariants = Array.isArray(updatedProduct.variants) ? updatedProduct.variants : [];
+        if (newVariants.length) {
+          const prevVariants = Array.isArray(product.variants) ? product.variants : [];
+          const prevStockBySku = new Map(
+            prevVariants.map((variant) => [String(variant.sku), Number(variant.stock || 0)]),
+          );
+          for (const variant of newVariants) {
+            const sku = String(variant.sku || "").trim();
+            if (!sku) continue;
+            const prevVariantStock = prevStockBySku.has(sku) ? prevStockBySku.get(sku) : 0;
+            const newVariantStock = Number(variant.stock || 0);
+            if (prevVariantStock <= 0 && newVariantStock > 0) {
+              notifyPendingDemandsForRestock(updatedProduct._id, { variantSku: sku }).catch(() => {});
+            }
+          }
+        }
+      } catch (restockNotifyErr) {
+        console.error("Failed to check/notify product demand restock:", restockNotifyErr);
+      }
+    }
 
     if (role !== "admin" && updatedProduct) {
       try {

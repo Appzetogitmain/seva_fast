@@ -38,6 +38,9 @@ const SellerProfile = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isCertModalOpen, setIsCertModalOpen] = useState(false);
+  const [isEditingRadius, setIsEditingRadius] = useState(false);
+  const [radiusDraft, setRadiusDraft] = useState(5);
+  const [isSavingRadius, setIsSavingRadius] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     shopName: "",
@@ -126,6 +129,25 @@ const SellerProfile = () => {
       toast.error(error.response?.data?.message || "Failed to update profile");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveRadius = async () => {
+    const value = Number(radiusDraft);
+    if (!value || value < 1 || value > 50) {
+      toast.error("Radius must be between 1 and 50 km");
+      return;
+    }
+    setIsSavingRadius(true);
+    try {
+      await sellerApi.updateProfile({ radius: value });
+      toast.success("Service radius updated");
+      setIsEditingRadius(false);
+      fetchProfile();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update radius");
+    } finally {
+      setIsSavingRadius(false);
     }
   };
 
@@ -466,51 +488,89 @@ const SellerProfile = () => {
                   )}
                 </div>
 
-                {formData.lat && (
-                  <div className="pt-4 sm:pt-6 border-t border-slate-200/60 flex flex-wrap gap-4 sm:gap-8">
-                    <div className="space-y-1">
-                      <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                        Service Radius
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {isEditing ? (
+                <div className="pt-4 sm:pt-6 border-t border-slate-200/60 flex flex-wrap gap-4 sm:gap-8">
+                  <div className="space-y-1">
+                    <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                      Service Radius
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {isEditingRadius ? (
+                        <>
                           <input
                             type="number"
-                            name="radius"
-                            value={formData.radius}
-                            onChange={handleChange}
+                            value={radiusDraft}
+                            onChange={(e) => setRadiusDraft(e.target.value)}
                             min="1"
                             max="50"
+                            autoFocus
                             className="w-16 px-2 py-1 bg-white border-2 border-slate-200 rounded-md text-sm font-bold text-slate-900 outline-none focus:border-brand-400 transition-all text-center"
                           />
-                        ) : (
+                          <span className="text-[10px] sm:text-xs font-bold text-slate-500 bg-slate-200/50 px-2 py-0.5 rounded-md">
+                            KM
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleSaveRadius}
+                            disabled={isSavingRadius}
+                            title="Save radius"
+                            className="p-1.5 rounded-md bg-emerald-500 text-white hover:bg-emerald-600 transition-all disabled:opacity-60">
+                            <CheckCircle size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingRadius(false);
+                              setRadiusDraft(formData.radius);
+                            }}
+                            disabled={isSavingRadius}
+                            title="Cancel"
+                            className="p-1.5 rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all">
+                            <X size={14} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
                           <span className="text-base sm:text-lg font-black text-slate-900">
                             {formData.radius}
                           </span>
-                        )}
-                        <span className="text-[10px] sm:text-xs font-bold text-slate-500 bg-slate-200/50 px-2 py-0.5 rounded-md">
-                          KM
-                        </span>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                        Latitude
-                      </span>
-                      <span className="text-xs sm:text-sm font-bold text-slate-700 tabular-nums">
-                        {formData.lat.toFixed(6)}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                        Longitude
-                      </span>
-                      <span className="text-xs sm:text-sm font-bold text-slate-700 tabular-nums">
-                        {formData.lng.toFixed(6)}
-                      </span>
+                          <span className="text-[10px] sm:text-xs font-bold text-slate-500 bg-slate-200/50 px-2 py-0.5 rounded-md">
+                            KM
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRadiusDraft(formData.radius);
+                              setIsEditingRadius(true);
+                            }}
+                            title="Edit radius"
+                            className="p-1.5 rounded-md bg-slate-100 text-slate-500 hover:bg-slate-900 hover:text-white transition-all">
+                            <Edit2 size={12} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
-                )}
+                  {formData.lat && (
+                    <>
+                      <div className="space-y-1">
+                        <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                          Latitude
+                        </span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-700 tabular-nums">
+                          {formData.lat.toFixed(6)}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                          Longitude
+                        </span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-700 tabular-nums">
+                          {formData.lng.toFixed(6)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-start gap-3 p-3.5 sm:p-4 bg-amber-50 rounded-xl border border-amber-100">

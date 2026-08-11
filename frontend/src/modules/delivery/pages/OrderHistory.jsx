@@ -250,7 +250,9 @@ const OrderHistory = () => {
                       </div>
                       <div className="text-left sm:text-right shrink-0">
                         <span className="block font-bold text-lg text-brand-600 whitespace-nowrap">
-                          ₹{Math.round((order.pricing?.total || 0) * 0.1)}
+                          ₹{displayOrderStatus(order) === "return"
+                            ? (order.returnDeliveryCommission ?? 0)
+                            : (order.riderEarnings ?? 0)}
                         </span>
                         <span className="ds-caption text-gray-400">Earnings</span>
                       </div>
@@ -303,13 +305,13 @@ const OrderHistory = () => {
                         {/* Bug 231: Return commission badge */}
                         {displayOrderStatus(order) === "return" && (
                           <span className="flex items-center bg-purple-50 px-2 py-1 rounded border border-purple-100 text-purple-700 font-bold">
-                            Commission: ₹{order.returnDeliveryCommission ?? Math.round((order.pricing?.total || 0) * 0.1)}
+                            Commission: ₹{order.returnDeliveryCommission ?? 0}
                           </span>
                         )}
                         {/* Bug 231: Hide cash for return, show it only for normal orders */}
                         {displayOrderStatus(order) !== "return" && (
                           <span className="block font-bold text-sm text-brand-600 whitespace-nowrap">
-                            ₹{order.returnDeliveryCommission ?? Math.round((order.pricing?.total || 0) * 0.1)} earned
+                            ₹{order.riderEarnings ?? 0} earned
                           </span>
                         )}
                       </div>

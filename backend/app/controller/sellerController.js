@@ -4,6 +4,8 @@ import { handleResponse, calculateDistance } from "../utils/helper.js";
 import mongoose from "mongoose";
 import { invalidateSellerName } from "../services/entityNameCache.js";
 import { registerOrUpdateSellerPickupLocation } from "../services/shiprocket/shiprocketOrderService.js";
+import { invalidate } from "../services/cacheService.js";
+import { geocodeAddress } from "../services/mapsGeocodeService.js";
 
 /* ===============================
    GET NEARBY SELLERS
@@ -203,6 +205,7 @@ export const updateSellerProfile = async (req, res) => {
     if (state !== undefined) seller.state = state;
 
     // Validate and update geo data
+    let locationChanged = false;
     if (lat !== undefined && lng !== undefined) {
       if (lat < -90 || lat > 90)
         return handleResponse(res, 400, "Invalid latitude");
@@ -214,6 +217,39 @@ export const updateSellerProfile = async (req, res) => {
         coordinates: [Number(lng), Number(lat)],
       };
       seller.markModified("location");
+      locationChanged = true;
+    } else {
+      // No map pin in this request. If the seller still has no real location
+      // saved (e.g. the map failed to load and they never placed a pin),
+      // fall back to geocoding the free-text address they've submitted so
+      // they aren't invisible to nearby customers. A precise map pin always
+      // takes priority over this fallback and is never overwritten by it.
+      const coords = seller.location?.coordinates;
+      const hasRealLocation =
+        Array.isArray(coords) && (coords[0] !== 0 || coords[1] !== 0);
+      const addressText = [
+        seller.address,
+        seller.locality,
+        seller.city,
+        seller.state,
+        seller.pincode,
+      ]
+        .filter((part) => part && String(part).trim())
+        .join(", ");
+
+      if (!hasRealLocation && addressText) {
+        try {
+          const geocoded = await geocodeAddress(addressText, { country: "IN" });
+          seller.location = {
+            type: "Point",
+            coordinates: [geocoded.lng, geocoded.lat],
+          };
+          seller.markModified("location");
+          locationChanged = true;
+        } catch (err) {
+          console.warn("[Seller] Address fallback geocoding failed:", err.message);
+        }
+      }
     }
 
     if (radius !== undefined) {
@@ -223,6 +259,14 @@ export const updateSellerProfile = async (req, res) => {
     }
 
     const updatedSeller = await seller.save();
+
+    // Invalidate cached nearby-seller lookups so customers see the new
+    // location/radius immediately instead of the stale 5-minute cache
+    if (locationChanged || radius !== undefined) {
+      invalidate("cache:sellers:nearby:*").catch((err) => {
+        console.warn("[Seller] Nearby sellers cache invalidation failed:", err.message);
+      });
+    }
 
     // Invalidate cached seller name in case shopName changed
     invalidateSellerName(req.user.id).catch((err) => {

@@ -42,8 +42,14 @@ const CategoryManagement = () => {
         description: '',
         status: 'active',
         type: 'header',
-        parentId: ''
+        parentId: '',
+        hsnCode: '',
+        gstRate: 0
     });
+
+    // Standard Indian GST slabs — offered as quick picks, but the field stays
+    // a free-form number so non-standard rates can still be entered.
+    const GST_RATE_PRESETS = [0, 5, 12, 18, 28];
 
     const [imageFile, setImageFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
@@ -231,7 +237,9 @@ const CategoryManagement = () => {
                 description: item.description || '',
                 status: item.status || 'active',
                 type: item.type,
-                parentId: item.parentId || ''
+                parentId: item.parentId || '',
+                hsnCode: item.hsnCode || '',
+                gstRate: item.gstRate ?? 0
             });
             setEditingItem(item);
             setPreviewUrl(item.image || null);
@@ -243,7 +251,9 @@ const CategoryManagement = () => {
                 description: '',
                 status: 'active',
                 type: type,
-                parentId: parentId || ''
+                parentId: parentId || '',
+                hsnCode: '',
+                gstRate: 0
             });
             setEditingItem(null);
             setPreviewUrl(null);
@@ -525,6 +535,7 @@ const CategoryManagement = () => {
                                         <tr className="border-b border-slate-50">
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Subcategory</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Parent Category</th>
+                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">GST / HSN</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                                             <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
                                         </tr>
@@ -555,6 +566,18 @@ const CategoryManagement = () => {
                                                         <Badge variant="outline" className="text-[9px] font-bold bg-brand-50/50 text-brand-600 border-brand-100">
                                                             {sub.parentCategory || 'Unknown'}
                                                         </Badge>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {sub.gstRate > 0 || sub.hsnCode ? (
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <span className="text-[10px] font-black text-slate-700">{sub.gstRate || 0}% GST</span>
+                                                                {sub.hsnCode && (
+                                                                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">HSN {sub.hsnCode}</span>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wider">Not Set</span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <Badge variant={sub.status === 'active' ? 'emerald' : 'gray'} className="text-[9px] font-black uppercase tracking-widest">
@@ -725,6 +748,56 @@ const CategoryManagement = () => {
                                                 </select>
                                                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {formData.type === 'subcategory' && (
+                                        <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-100 space-y-3">
+                                            <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Tax Configuration (Product Type)</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">HSN Code</label>
+                                                    <input
+                                                        value={formData.hsnCode}
+                                                        onChange={(e) => setFormData({ ...formData, hsnCode: e.target.value })}
+                                                        className="w-full px-4 py-2.5 bg-white border-none rounded-xl text-xs font-bold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary/30 placeholder:text-slate-300"
+                                                        placeholder="e.g. 1905"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">GST Rate (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        step="0.01"
+                                                        value={formData.gstRate}
+                                                        onChange={(e) => setFormData({ ...formData, gstRate: e.target.value })}
+                                                        className="w-full px-4 py-2.5 bg-white border-none rounded-xl text-xs font-bold outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary/30 placeholder:text-slate-300"
+                                                        placeholder="e.g. 18"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {GST_RATE_PRESETS.map((rate) => (
+                                                    <button
+                                                        key={rate}
+                                                        type="button"
+                                                        onClick={() => setFormData({ ...formData, gstRate: rate })}
+                                                        className={cn(
+                                                            "px-2.5 py-1 rounded-lg text-[10px] font-black transition-all",
+                                                            Number(formData.gstRate) === rate
+                                                                ? "bg-slate-900 text-white"
+                                                                : "bg-white text-slate-500 ring-1 ring-slate-200 hover:ring-primary/50"
+                                                        )}
+                                                    >
+                                                        {rate}%
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <p className="text-[9px] text-amber-700/80 font-semibold leading-relaxed">
+                                                Applies to every product placed under this Product Type. Products without a Product Type assigned won't have a GST rate resolved from here.
+                                            </p>
                                         </div>
                                     )}
 

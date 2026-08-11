@@ -8,6 +8,7 @@ import { useWishlist } from "../context/WishlistContext";
 import { customerApi } from "../services/customerApi";
 import { useLocation as useAppLocation } from "../context/LocationContext";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
+import { cn } from "@/lib/utils";
 import {
   loadRazorpayScript,
   launchOrderRazorpayPayment,
@@ -150,6 +151,7 @@ const CheckoutPage = () => {
 
   // State management
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("now");
+  const [isExpressDelivery, setIsExpressDelivery] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState("cash");
   const [showAllCartItems, setShowAllCartItems] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -771,6 +773,7 @@ const CheckoutPage = () => {
       tipAmount: 0,
       paymentMode: selectedPayment === "online" ? "ONLINE" : "COD",
       timeSlot: selectedTimeSlot,
+      isExpressDelivery,
     });
 
     const fetchPreview = async () => {
@@ -796,6 +799,7 @@ const CheckoutPage = () => {
     cart,
     selectedPayment,
     selectedTimeSlot,
+    isExpressDelivery,
     discountAmount,
     savedRecipient,
     currentAddress,
@@ -857,6 +861,7 @@ const CheckoutPage = () => {
         taxTotal: taxAmount,
         tipAmount: 0,
         timeSlot: selectedTimeSlot,
+        isExpressDelivery,
         walletAmount: walletAmountToUse,
         items: cart.map((item) => ({
           product: item.id || item._id,
@@ -1161,17 +1166,41 @@ const CheckoutPage = () => {
 
           {/* Left Column */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-6 pb-8">
-            {/* Delivery Time Banner */}
+            {/* Delivery Speed Selector */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mt-3">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 mb-3">
                 <div className="h-12 w-12 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0">
                   <Clock size={24} className="text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-black text-slate-800 text-lg">Delivery in 12-15 mins</h3>
+                  <h3 className="font-black text-slate-800 text-lg">
+                    {isExpressDelivery ? "Express Delivery" : "Delivery in 12-15 mins"}
+                  </h3>
                   <p className="text-sm text-slate-500">Shipment of {cartCount} items</p>
                 </div>
               </div>
+              {settings?.expressDeliveryEnabled !== false && !hasMixedCart && !hasScheduled && (
+                <div className="flex p-1 bg-slate-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setIsExpressDelivery(false)}
+                    className={cn(
+                      "flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all",
+                      !isExpressDelivery ? "bg-white text-primary shadow-sm" : "text-slate-400"
+                    )}>
+                    Standard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsExpressDelivery(true)}
+                    className={cn(
+                      "flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all",
+                      isExpressDelivery ? "bg-white text-primary shadow-sm" : "text-slate-400"
+                    )}>
+                    Express (1-2 hrs){settings?.expressDeliveryFee ? ` • ₹${settings.expressDeliveryFee}` : ""}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Address Section */}

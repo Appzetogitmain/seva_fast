@@ -308,6 +308,115 @@ const settingSchema = new mongoose.Schema(
             type: Number,
             default: 15,
         },
+        /**
+         * Slab-based customer delivery fee (distance x weight x order value).
+         * Replaces the old linear base+per-km formula for `distance_based` mode.
+         * maxKm: null means open-ended (e.g. "15+ km"). freeAboveOrderValue: null
+         * means this slab is never free regardless of order value.
+         */
+        deliveryFeeSlabs: {
+            type: [
+                {
+                    _id: false,
+                    minKm: { type: Number, required: true, min: 0 },
+                    maxKm: { type: Number, default: null, min: 0 },
+                    fee: { type: Number, required: true, min: 0 },
+                    freeAboveOrderValue: { type: Number, default: null, min: 0 },
+                },
+            ],
+            default: () => [
+                { minKm: 0, maxKm: 5, fee: 40, freeAboveOrderValue: 500 },
+                { minKm: 5, maxKm: 10, fee: 60, freeAboveOrderValue: null },
+                { minKm: 10, maxKm: 15, fee: 80, freeAboveOrderValue: null },
+                { minKm: 15, maxKm: null, fee: 100, freeAboveOrderValue: null },
+            ],
+        },
+        deliveryFeeBaseWeightKg: {
+            type: Number,
+            default: 2,
+            min: 0,
+        },
+        deliveryFeeExtraFeePerKg: {
+            type: Number,
+            default: 10,
+            min: 0,
+        },
+        expressDeliveryEnabled: {
+            type: Boolean,
+            default: true,
+        },
+        expressDeliveryFee: {
+            type: Number,
+            default: 150,
+            min: 0,
+        },
+        expressDeliveryMaxWeightKg: {
+            type: Number,
+            default: 5,
+            min: 0,
+        },
+
+        /**
+         * Slab-based delivery partner earning. Independently configured from
+         * the customer fee above — admin sets the platform's margin by how
+         * these two tables differ. Always paid in full regardless of any
+         * customer-side discount/free-delivery promo; admin absorbs the gap.
+         */
+        riderEarningSlabs: {
+            type: [
+                {
+                    _id: false,
+                    minKm: { type: Number, required: true, min: 0 },
+                    maxKm: { type: Number, default: null, min: 0 },
+                    earning: { type: Number, required: true, min: 0 },
+                },
+            ],
+            default: () => [
+                { minKm: 0, maxKm: 5, earning: 30 },
+                { minKm: 5, maxKm: 10, earning: 45 },
+                { minKm: 10, maxKm: 15, earning: 60 },
+                { minKm: 15, maxKm: null, earning: 80 },
+            ],
+        },
+        riderEarningBaseWeightKg: {
+            type: Number,
+            default: 2,
+            min: 0,
+        },
+        riderEarningExtraFeePerKg: {
+            type: Number,
+            default: 10,
+            min: 0,
+        },
+        riderExpressEarning: {
+            type: Number,
+            default: 100,
+            min: 0,
+        },
+        // Additional per-km earning for distance beyond the last defined
+        // rider slab's maxKm (e.g. beyond 15km). 0 = rider earns only the
+        // last slab's flat amount no matter how far beyond it the delivery is.
+        riderExtraEarningPerKmBeyondSlabs: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
+        // First Order Welcome Offer & Scratch Card Config
+        firstOrderDiscountPercent: {
+            type: Number,
+            default: 10,
+            min: 0,
+            max: 100,
+        },
+        firstOrderFreeDelivery: {
+            type: Boolean,
+            default: true,
+        },
+        welcomeScratchCardEnabled: {
+            type: Boolean,
+            default: true,
+        },
     },
     {
         timestamps: true,

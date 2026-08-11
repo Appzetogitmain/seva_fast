@@ -154,7 +154,7 @@ const ProductManagement = () => {
             return toast.error('Only product editing is allowed for admins');
         }
 
-        if (!formData.name || !formData.price || !formData.header || !formData.categoryId) {
+        if (!formData.name || formData.price === "" || formData.price == null || !formData.header || !formData.categoryId) {
             return toast.error('Please fill all required fields, including Main Group and Specific Category');
         }
 
@@ -1009,6 +1009,22 @@ const ProductManagement = () => {
                                                     ))}
                                                 </select>
                                             </div>
+                                            {(() => {
+                                                const selectedSubcategory = categories
+                                                    .find(h => h._id === formData.header)?.children
+                                                    ?.find(c => c._id === formData.categoryId)?.children
+                                                    ?.find(sc => sc._id === formData.subcategoryId);
+                                                if (!selectedSubcategory) return null;
+                                                return (
+                                                    <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 rounded-xl border border-amber-100 text-[11px] font-bold text-amber-700">
+                                                        <span>Tax for this Product Type:</span>
+                                                        <span className="font-black">{selectedSubcategory.gstRate || 0}% GST</span>
+                                                        {selectedSubcategory.hsnCode && (
+                                                            <span className="text-amber-500">• HSN {selectedSubcategory.hsnCode}</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     )}
 

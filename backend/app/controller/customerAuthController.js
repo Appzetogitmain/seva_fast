@@ -2,6 +2,7 @@ import crypto from "crypto";
 import Customer from "../models/customer.js";
 import Transaction from "../models/transaction.js";
 import Order from "../models/order.js";
+import Setting from "../models/setting.js";
 import jwt from "jsonwebtoken";
 import handleResponse from "../utils/helper.js";
 import {
@@ -355,6 +356,39 @@ export const getCustomerTransactions = async (req, res) => {
             total,
             page: parseInt(page, 10),
             totalPages: Math.ceil(total / perPage) || 1,
+        });
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
+/* ===============================
+   CHECK FIRST ORDER ELIGIBILITY
+================================ */
+export const checkFirstOrderEligibility = async (req, res) => {
+    try {
+        const settings = await Setting.findOne()
+            .select("firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled")
+            .lean();
+
+        const firstOrderDiscountPercent = settings?.firstOrderDiscountPercent ?? 10;
+        const firstOrderFreeDelivery = settings?.firstOrderFreeDelivery ?? true;
+        const welcomeScratchCardEnabled = settings?.welcomeScratchCardEnabled ?? true;
+
+        let isFirstOrder = false;
+        if (req.user?.id) {
+            const orderCount = await Order.countDocuments({
+                customer: req.user.id,
+                orderStatus: { $ne: "cancelled" },
+            });
+            isFirstOrder = orderCount === 0;
+        }
+
+        return handleResponse(res, 200, "First order eligibility checked", {
+            isFirstOrder,
+            firstOrderDiscountPercent,
+            firstOrderFreeDelivery,
+            welcomeScratchCardEnabled,
         });
     } catch (error) {
         return handleResponse(res, 500, error.message);

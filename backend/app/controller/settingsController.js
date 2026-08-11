@@ -83,6 +83,20 @@ const ALLOWED_KEYS = [
   "platformAdListingFee",
   "professionalAdValidityDays",
   "professionalAdSearchRadiusKm",
+  "firstOrderDiscountPercent",
+  "firstOrderFreeDelivery",
+  "welcomeScratchCardEnabled",
+  "deliveryFeeSlabs",
+  "deliveryFeeBaseWeightKg",
+  "deliveryFeeExtraFeePerKg",
+  "expressDeliveryEnabled",
+  "expressDeliveryFee",
+  "expressDeliveryMaxWeightKg",
+  "riderEarningSlabs",
+  "riderEarningBaseWeightKg",
+  "riderEarningExtraFeePerKg",
+  "riderExpressEarning",
+  "riderExtraEarningPerKmBeyondSlabs",
 ];
 
 function flattenForMongoSet(prefix, value, target) {
@@ -191,8 +205,35 @@ const updateSettingsSchema = Joi.object({
   platformAdFeePhoto: Joi.number().min(0),
   platformAdFeeVideo: Joi.number().min(0),
   platformAdListingFee: Joi.number().min(0),
-  professionalAdValidityDays: Joi.number().min(1),
-  professionalAdSearchRadiusKm: Joi.number().min(1),
+  "professionalAdValidityDays": Joi.number().min(1),
+  "professionalAdSearchRadiusKm": Joi.number().min(1),
+  "firstOrderDiscountPercent": Joi.number().min(0).max(100),
+  "firstOrderFreeDelivery": Joi.boolean(),
+  "welcomeScratchCardEnabled": Joi.boolean(),
+  deliveryFeeSlabs: Joi.array().items(
+    Joi.object({
+      minKm: Joi.number().min(0).required(),
+      maxKm: Joi.number().min(0).allow(null),
+      fee: Joi.number().min(0).required(),
+      freeAboveOrderValue: Joi.number().min(0).allow(null),
+    }),
+  ),
+  deliveryFeeBaseWeightKg: Joi.number().min(0),
+  deliveryFeeExtraFeePerKg: Joi.number().min(0),
+  expressDeliveryEnabled: Joi.boolean(),
+  expressDeliveryFee: Joi.number().min(0),
+  expressDeliveryMaxWeightKg: Joi.number().min(0),
+  riderEarningSlabs: Joi.array().items(
+    Joi.object({
+      minKm: Joi.number().min(0).required(),
+      maxKm: Joi.number().min(0).allow(null),
+      earning: Joi.number().min(0).required(),
+    }),
+  ),
+  riderEarningBaseWeightKg: Joi.number().min(0),
+  riderEarningExtraFeePerKg: Joi.number().min(0),
+  riderExpressEarning: Joi.number().min(0),
+  riderExtraEarningPerKmBeyondSlabs: Joi.number().min(0),
 }).unknown(false);
 
 /**
@@ -213,7 +254,7 @@ export const getPublicSettings = async (req, res) => {
       async () => {
         const existing = await Setting.findOne(filter)
           .select(
-            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm createdAt updatedAt",
+            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg createdAt updatedAt",
           )
           .lean();
         return existing || null;
@@ -228,6 +269,9 @@ export const getPublicSettings = async (req, res) => {
     }
 
     settings.productApproval = normalizeProductApprovalConfig(settings || {});
+    settings.firstOrderDiscountPercent = settings.firstOrderDiscountPercent ?? 10;
+    settings.firstOrderFreeDelivery = settings.firstOrderFreeDelivery ?? true;
+    settings.welcomeScratchCardEnabled = settings.welcomeScratchCardEnabled ?? true;
 
     return handleResponse(res, 200, "Settings fetched successfully", settings);
   } catch (error) {

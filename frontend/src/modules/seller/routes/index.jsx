@@ -52,10 +52,13 @@ const PendingDeliveryBoys = React.lazy(
 const DeliveryFunds = React.lazy(() => import("../../admin/pages/DeliveryFunds"));
 const FleetTracking = React.lazy(() => import("../../admin/pages/FleetTracking"));
 
+const ProductDemands = React.lazy(() => import("../pages/ProductDemands"));
+
 const navItems = [
   { label: "Dashboard", path: "/seller", icon: HiOutlineSquares2X2, end: true },
   { label: "🚀 Boost Store", path: "/seller/promotions", icon: HiOutlineSparkles },
   { label: "Products", path: "/seller/products", icon: HiOutlineCube },
+  { label: "Customer Demands", path: "/seller/demands", icon: HiOutlineCube },
   { label: "Stock", path: "/seller/inventory", icon: HiOutlineArchiveBox },
   { label: "Orders", path: "/seller/orders", icon: HiOutlineTruck },
   { label: "Photo Orders", path: "/seller/photo-orders", icon: HiOutlinePhoto },
@@ -172,6 +175,7 @@ const SellerRoutes = () => {
         <Route path="/products" element={<ProductManagement />} />
         <Route path="/products/add" element={<AddProduct />} />
         <Route path="/products/bulk" element={<BulkUploadProducts />} />
+        <Route path="/demands" element={<ProductDemands />} />
         <Route path="/inventory" element={<StockManagement />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/photo-orders" element={<CustomOrders />} />

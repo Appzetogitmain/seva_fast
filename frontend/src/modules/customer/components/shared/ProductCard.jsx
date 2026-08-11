@@ -5,6 +5,7 @@ import { useWishlist } from "../../context/WishlistContext";
 import { useCart } from "../../context/CartContext";
 import { useToast } from "@shared/components/ui/Toast";
 import { useCartAnimation } from "../../context/CartAnimationContext";
+import { useFirstOrderOffer } from "../../context/FirstOrderOfferContext";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +15,8 @@ import {
   variantEffectiveUnitPrice,
   pickListingVariant,
 } from "../../utils/productPricing";
+import { customerApi } from "../../services/customerApi";
+import { useAuth } from "@core/context/AuthContext";
 
 const ProductCard = React.memo(
   ({ product, badge, className, compact = false, neutralBg = false }) => {
@@ -24,7 +27,9 @@ const ProductCard = React.memo(
     const { animateAddToCart, animateRemoveFromCart } = useCartAnimation();
 
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [showHeartPopup, setShowHeartPopup] = React.useState(false);
+    const [isDemanding, setIsDemanding] = React.useState(false);
 
     const imageRef = React.useRef(null);
 
@@ -62,6 +67,10 @@ const ProductCard = React.memo(
       ? variantIdentityKey(defaultVariant)
       : "";
 
+    const isOutOfStock = defaultVariant 
+      ? (defaultVariant.stock <= 0) 
+      : (product.stock <= 0);
+
     const displayPrice = defaultVariant
       ? (Number(defaultVariant.salePrice) > 0 && Number(defaultVariant.salePrice) < Number(defaultVariant.price)
         ? Number(defaultVariant.salePrice)
@@ -71,6 +80,36 @@ const ProductCard = React.memo(
     const displayOriginalPrice = defaultVariant
       ? Number(defaultVariant.price || 0)
       : Number(product.originalPrice || product.basePrice || product.mrp || 0);
+
+    const { isFirstOrder, firstOrderDiscountPercent } = useFirstOrderOffer();
+    const firstOrderDiscount = isFirstOrder ? Number(firstOrderDiscountPercent ?? 10) : 0;
+
+    const existingDiscountPercent = displayOriginalPrice > displayPrice
+      ? Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100)
+      : 0;
+
+    const finalPrice = (isFirstOrder && firstOrderDiscount > 0)
+      ? Math.round(displayPrice * (1 - firstOrderDiscount / 100))
+      : displayPrice;
+
+    const strikePrice = displayOriginalPrice > displayPrice
+      ? displayOriginalPrice
+      : ((isFirstOrder && firstOrderDiscount > 0) ? displayPrice : 0);
+
+    const computedBadgeText = React.useMemo(() => {
+      if (badge) return badge;
+      if (product.discount) return product.discount;
+      if (isFirstOrder && firstOrderDiscount > 0) {
+        if (existingDiscountPercent > 0) {
+          return `${existingDiscountPercent}% + ${firstOrderDiscount}% EXTRA OFF`;
+        }
+        return `${firstOrderDiscount}% OFF`;
+      }
+      if (existingDiscountPercent > 0) {
+        return `${existingDiscountPercent}% OFF`;
+      }
+      return null;
+    }, [badge, product.discount, isFirstOrder, firstOrderDiscount, existingDiscountPercent]);
 
     const cartKey = `${productId}::${requiresVariantSelection ? defaultVariantSku : ""}`;
 
@@ -113,6 +152,30 @@ const ProductCard = React.memo(
       },
       [isWishlisted, toggleWishlistGlobal, product, showToast],
     );
+
+    const handleNotifyMe = React.useCallback(async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!user) {
+        showToast("Please login to get notified", "error");
+        navigate("/customer/auth");
+        return;
+      }
+
+      setIsDemanding(true);
+      try {
+        await customerApi.registerProductDemand({
+          productId: product.id || product._id,
+          variantSku: defaultVariantSku || "",
+        });
+        showToast("We will notify you when it's back in stock!", "success");
+      } catch (error) {
+        showToast(error.response?.data?.message || "Failed to register request", "error");
+      } finally {
+        setIsDemanding(false);
+      }
+    }, [user, navigate, product, defaultVariantSku, showToast]);
 
     const handleAddToCart = React.useCallback(
       (e) => {
@@ -192,19 +255,15 @@ const ProductCard = React.memo(
         )}
         onClick={handleProductClick}>
         <div className="relative">
-          {(badge ||
-            product.discount ||
-            displayOriginalPrice > displayPrice) && (
+          {computedBadgeText && (
               <div
                 className={cn(
-                  "absolute z-10 bg-primary text-primary-foreground font-[900] rounded-md shadow-sm uppercase tracking-wider flex items-center justify-center",
+                  "absolute z-10 bg-primary text-primary-foreground font-[900] rounded-md shadow-sm uppercase tracking-wider flex items-center justify-center text-center",
                   compact
                     ? "top-2 left-2 px-1.5 py-0.5 text-[7px]"
                     : "top-2 left-2 px-1 py-0.5 text-[7px] sm:top-3 sm:left-3 sm:px-2 sm:py-1 sm:text-[9px]",
                 )}>
-                {badge ||
-                  product.discount ||
-                  `${Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100)}% OFF`}
+                {computedBadgeText}
               </div>
             )}
 
@@ -253,7 +312,7 @@ const ProductCard = React.memo(
               src={applyCloudinaryTransform(product.image)}
               alt={product.name}
               loading="lazy"
-              className="w-full h-full object-cover mix-blend-multiply"
+              className={cn("w-full h-full object-cover mix-blend-multiply", isOutOfStock && "grayscale opacity-60")}
             />
           </div>
         </div>
@@ -315,21 +374,33 @@ const ProductCard = React.memo(
                   "font-[1000] text-[#1A1A1A]",
                   compact ? "text-[11px]" : "text-[13px] sm:text-sm",
                 )}>
-                ₹{displayPrice}
+                ₹{finalPrice}
               </span>
-              {displayOriginalPrice > displayPrice && (
+              {strikePrice > finalPrice && (
                 <span
                   className={cn(
                     "font-medium text-gray-400 line-through leading-none",
                     compact ? "text-[8px]" : "text-[9px] sm:text-[10px]",
                   )}>
-                  ₹{displayOriginalPrice}
+                  ₹{strikePrice}
                 </span>
               )}
             </div>
 
             <div className="flex">
-              {quantity > 0 ? (
+              {isOutOfStock ? (
+                <button
+                  onClick={handleNotifyMe}
+                  disabled={isDemanding}
+                  className={cn(
+                    "bg-gray-100 border-[1.5px] border-gray-300 text-gray-500 rounded-lg font-black shadow-sm transition-all uppercase tracking-wide leading-none",
+                    compact
+                      ? "px-2 py-1 text-[9px]"
+                      : "px-2 py-1.5 text-[10px] sm:px-4 sm:py-2 sm:text-[11px] md:text-xs md:px-5 md:py-2.5",
+                  )}>
+                  {isDemanding ? "..." : "NOTIFY ME"}
+                </button>
+              ) : quantity > 0 ? (
                 <div
                   className={cn(
                     "flex items-center bg-white border-[1.5px] border-primary rounded-lg p-0.5 justify-between",

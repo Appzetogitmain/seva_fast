@@ -2,6 +2,7 @@ import React from "react";
 import { Plus, Minus } from "lucide-react";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
 import { effectiveUnitPrice } from "../../../utils/productPricing";
+import { cn } from "@/lib/utils";
 
 /**
  * CheckoutCartSummary
@@ -31,7 +32,7 @@ const CheckoutCartSummary = React.memo(function CheckoutCartSummary({
               src={applyCloudinaryTransform(item.image)}
               alt={item.name}
               loading="lazy"
-              className="h-full w-full object-cover"
+              className={cn("h-full w-full object-cover", item.stock != null && item.stock <= 0 && "grayscale opacity-60")}
             />
           </div>
           <div className="flex-1 min-w-0">
@@ -71,17 +72,24 @@ const CheckoutCartSummary = React.memo(function CheckoutCartSummary({
               const mrp = Number(item.price || 0);
               const sale = Number(item.salePrice || 0);
               const qty = Math.max(0, Number(item.quantity || 0));
+              const isOutOfStock = item.stock != null && item.stock <= 0;
               const unit = effectiveUnitPrice(mrp, sale);
               const hasDiscount = sale > 0 && sale < mrp;
               const total = Math.round(unit * qty);
               const totalMrp = Math.round(mrp * qty);
               return (
-                <div className="text-right leading-tight">
-                  <p className="text-base font-black text-slate-800">₹{total}</p>
-                  {hasDiscount && (
-                    <p className="text-[11px] font-bold text-slate-400 line-through">
-                      ₹{totalMrp}
-                    </p>
+                <div className="text-right leading-tight flex flex-col items-end">
+                  {isOutOfStock ? (
+                    <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded uppercase tracking-wider mb-1 border border-red-200">Out of Stock</span>
+                  ) : (
+                    <>
+                      <p className="text-base font-black text-slate-800">₹{total}</p>
+                      {hasDiscount && (
+                        <p className="text-[11px] font-bold text-slate-400 line-through">
+                          ₹{totalMrp}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               );

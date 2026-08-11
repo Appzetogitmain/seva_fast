@@ -116,6 +116,18 @@ export const previewCheckoutFinance = async (req, res) => {
       else if (planName.includes("bronze")) membershipTier = "bronze";
     }
 
+    // Must mirror the isFirstOrder check in orderPlacementService.js (placeOrderAtomic)
+    // and customerAuthController.js (checkFirstOrderEligibility) — otherwise the price
+    // shown here at preview time won't match what the customer is actually charged.
+    let isFirstOrder = false;
+    if (customer?._id) {
+      const previousOrderCount = await Order.countDocuments({
+        customer: customer._id,
+        orderStatus: { $ne: "cancelled" },
+      });
+      isFirstOrder = previousOrderCount === 0;
+    }
+
     const pricingSnapshot = await buildCheckoutPricingSnapshot({
       orderItems: payload.items,
       address: payload.address,
@@ -125,6 +137,8 @@ export const previewCheckoutFinance = async (req, res) => {
       hasFreeHandling,
       cashbackPercentage,
       membershipTier,
+      isFirstOrder,
+      isExpressDelivery: Boolean(payload.isExpressDelivery),
     });
 
     const sellerBreakdowns = pricingSnapshot.sellerBreakdownEntries.map((entry) => ({
@@ -173,6 +187,7 @@ export const createOrderWithFinancialSnapshot = async (req, res) => {
       walletAmount: validated.walletAmount || 0,
       discountTotal: validated.discountTotal || 0,
       couponId: validated.couponId || null,
+      isExpressDelivery: Boolean(validated.isExpressDelivery),
     };
     const idempotencyKey = String(req.headers["idempotency-key"] || "").trim() || null;
 

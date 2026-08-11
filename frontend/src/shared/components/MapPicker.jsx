@@ -78,9 +78,21 @@ const MapPicker = ({
   const [radius, setRadius] = useState(initialRadius);
   const [address, setAddress] = useState("");
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [authFailed, setAuthFailed] = useState(false);
   const mapRef = useRef(null);
   const autocompleteRef = useRef(null);
   const circleRef = useRef(null);
+
+  useEffect(() => {
+    // Google calls this global when the Maps JS API key is invalid, unauthorized
+    // for this domain, or the required API isn't enabled/billed. Without this hook
+    // the map silently renders a broken, non-interactive fallback (no roads, no
+    // click handling) with no visible error in the UI.
+    window.gm_authFailure = () => setAuthFailed(true);
+    return () => {
+      delete window.gm_authFailure;
+    };
+  }, []);
 
   const clearCircleOverlay = useCallback(() => {
     if (circleRef.current) {
@@ -280,6 +292,19 @@ const MapPicker = ({
       <Modal isOpen={isOpen} onClose={onClose} title="Select Location">
         <div className="p-8 text-center text-red-500">
           Failed to load Google Maps. Please check your API key and connection.
+        </div>
+      </Modal>
+    );
+  }
+
+  if (authFailed) {
+    return (
+      <Modal isOpen={isOpen} onClose={onClose} title="Select Location">
+        <div className="p-8 text-center text-red-500">
+          Google Maps rejected the API key for this site. Check that the Maps
+          JavaScript API, Places API, and Geocoding API are enabled and billed
+          in Google Cloud Console, and that this domain is allowed under the
+          key's HTTP referrer restrictions.
         </div>
       </Modal>
     );

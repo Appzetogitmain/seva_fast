@@ -300,7 +300,7 @@ const CustomerAuth = () => {
             </div>
 
             {/* Premium Centered Card Container */}
-            <div className="w-[92%] max-w-[400px] h-[80vh] min-h-[520px] max-h-[780px] bg-white relative z-10 overflow-hidden rounded-[40px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] border border-white/40 flex flex-col transition-colors duration-1000">
+            <div className="w-[92%] max-w-[400px] max-h-[90vh] bg-white relative z-10 overflow-hidden rounded-[36px] sm:rounded-[40px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] border border-white/40 flex flex-col transition-colors duration-1000">
 
                 {/* FIXED HEADER SECTION */}
                 <div className="w-full shrink-0 relative">
@@ -308,15 +308,15 @@ const CustomerAuth = () => {
                     <motion.div
                         animate={{ backgroundColor: activeCategory.theme }}
                         transition={{ duration: 1 }}
-                        className="relative h-48 w-full overflow-hidden"
+                        className="relative h-36 sm:h-44 w-full overflow-hidden"
                     >
                         {/* Fixed Top Branding Bar inside Header */}
-                        <div className="absolute top-8 left-0 w-full px-6 flex items-center justify-between z-50">
+                        <div className="absolute top-4 sm:top-6 left-0 w-full px-6 flex items-center justify-between z-50">
                             <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 bg-black/20 backdrop-blur-xl rounded-xl flex items-center justify-center border border-white/30 shadow-sm">
-                                    <ShoppingBag size={20} className="text-white drop-shadow-sm" />
+                                <div className="w-9 h-9 bg-black/20 backdrop-blur-xl rounded-xl flex items-center justify-center border border-white/30 shadow-sm">
+                                    <ShoppingBag size={18} className="text-white drop-shadow-sm" />
                                 </div>
-                                <span className="text-white font-black tracking-tighter text-xl drop-shadow-md">{appName.toUpperCase()}</span>
+                                <span className="text-white font-black tracking-tighter text-lg sm:text-xl drop-shadow-md">{appName.toUpperCase()}</span>
                             </div>
                         </div>
 
@@ -341,21 +341,21 @@ const CustomerAuth = () => {
 
 
                         {/* Centered App Message */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 text-white pt-10">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 text-white pt-6 sm:pt-8">
                             <motion.h2
                                 key={carouselIndex}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="text-2xl font-black tracking-tight leading-none mb-2"
+                                className="text-xl sm:text-2xl font-black tracking-tight leading-none mb-1.5"
                             >
                                 {activeCategory.title.toUpperCase()} INSIDE
                             </motion.h2>
-                            <p className="text-[10px] font-bold uppercase tracking-[4px] opacity-70">Everything delivered fast</p>
+                            <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[3px] opacity-75">Everything delivered fast</p>
                         </div>
 
                         {/* S-Curve Divider */}
                         <div className="absolute -bottom-1 left-0 w-full leading-[0]">
-                            <svg viewBox="0 0 1440 320" preserveAspectRatio="none" className="w-full h-24">
+                            <svg viewBox="0 0 1440 320" preserveAspectRatio="none" className="w-full h-16 sm:h-20">
                                 <path
                                     fill="#ffffff"
                                     d="M0,224L40,213.3C80,203,160,181,240,186.7C320,192,400,224,480,240C560,256,640,256,720,234.7C800,213,880,171,960,165.3C1040,160,1120,192,1200,208C1280,224,1360,224,1400,224L1440,224L1440,320L1400,320C1360,320,1280,320,1200,320C1120,320,1040,320,960,320C880,320,800,320,720,320C640,320,560,320,480,320C400,320,320,320,240,320C160,320,80,320,40,320L0,320Z"
@@ -365,8 +365,8 @@ const CustomerAuth = () => {
                     </motion.div>
 
                     {/* Circular Carousel Control */}
-                    <div className="relative -mt-14 flex justify-center z-20">
-                        <div className="w-28 h-28 rounded-full bg-white border-4 border-white shadow-[0_15px_40px_rgba(97,218,251,0.2)] flex items-center justify-center overflow-hidden transition-shadow duration-1000" style={{ boxShadow: `0 15px 40px ${activeCategory.shadow}` }}>
+                    <div className="relative -mt-10 sm:-mt-12 flex justify-center z-20">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white border-4 border-white shadow-[0_15px_40px_rgba(97,218,251,0.2)] flex items-center justify-center overflow-hidden transition-shadow duration-1000" style={{ boxShadow: `0 15px 40px ${activeCategory.shadow}` }}>
                             <AnimatePresence mode="wait">
                                     <motion.div
                                         key={carouselIndex}
@@ -397,7 +397,7 @@ const CustomerAuth = () => {
                 {/* SCROLLABLE FORM SECTION */}
                 <div className="flex-1 w-full overflow-y-auto custom-scrollbar flex flex-col">
                     {/* Authentication Form Block */}
-                    <div className="px-6 pt-2 pb-10">
+                    <div className="px-5 sm:px-6 pt-1 pb-6">
                         <AnimatePresence mode="wait">
                             {!showOtp ? (
                                 <motion.div
@@ -405,7 +405,7 @@ const CustomerAuth = () => {
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
-                                    className="space-y-5"
+                                    className="space-y-3.5"
                                 >
                                     {/* App Style Tab Switcher */}
                                     <div className="flex bg-gray-50 rounded-2xl p-1.5 border border-gray-100">
@@ -444,7 +444,7 @@ const CustomerAuth = () => {
                                         </p>
                                     </div>
 
-                                    <form onSubmit={handleSendOtp} className="space-y-4">
+                                    <form onSubmit={handleSendOtp} className="space-y-3">
                                         {!isLogin && (
                                             <div className="relative group">
                                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors" style={{ color: 'inherit' }}>
@@ -455,7 +455,7 @@ const CustomerAuth = () => {
                                                     name="name"
                                                     value={formData.name || ""}
                                                     placeholder="Full Name"
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
+                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
                                                     style={{ '--theme-color': activeCategory.theme }}
                                                     onChange={(e) => {
                                                         const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
@@ -477,7 +477,7 @@ const CustomerAuth = () => {
                                                     name="dateOfBirth"
                                                     max={new Date().toISOString().split('T')[0]}
                                                     value={formData.dateOfBirth}
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
+                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
                                                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                                                     onFocus={(e) => { e.target.style.borderColor = activeCategory.theme; }}
                                                     onBlur={(e) => { e.target.style.borderColor = '#F3F4F6'; }}
@@ -496,7 +496,7 @@ const CustomerAuth = () => {
                                                 name="phone"
                                                 maxLength={10}
                                                 placeholder="Mobile Number"
-                                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-20 pr-4 py-4 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
+                                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-20 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
                                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
                                                 onFocus={(e) => e.target.style.borderColor = activeCategory.theme}
                                                 onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
@@ -506,7 +506,7 @@ const CustomerAuth = () => {
                                         <button
                                             type="submit"
                                             disabled={isLoading}
-                                            className="w-full text-white py-5 rounded-[24px] text-xs font-black tracking-[4px] flex items-center justify-center gap-3 active:scale-95 transition-all uppercase"
+                                            className="w-full text-white py-4 rounded-[24px] text-xs font-black tracking-[4px] flex items-center justify-center gap-3 active:scale-95 transition-all uppercase"
                                             style={{ backgroundColor: activeCategory.theme, boxShadow: `0 20px 40px ${activeCategory.shadow}` }}
                                         >
                                             {isLoading ? 'Verifying...' : 'Continue'}
@@ -515,7 +515,7 @@ const CustomerAuth = () => {
                                         <button
                                             type="button"
                                             onClick={handleViewPlans}
-                                            className="w-full py-4 rounded-[24px] text-xs font-black tracking-[2px] flex items-center justify-center gap-2 transition-all uppercase border-2"
+                                            className="w-full py-3 rounded-[24px] text-xs font-black tracking-[2px] flex items-center justify-center gap-2 transition-all uppercase border-2"
                                             style={{ color: activeCategory.theme, borderColor: activeCategory.theme }}
                                         >
                                             <Eye size={16} />

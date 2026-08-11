@@ -4,6 +4,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { X, ChevronDown, Share2, Heart, Search, Clock, Minus, Plus, ShoppingBag, Star, MessageSquare, ArrowLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { useFirstOrderOffer } from '../context/FirstOrderOfferContext';
 import { useToast } from '@shared/components/ui/Toast';
 import { useSettings } from '@core/context/SettingsContext';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,7 @@ import {
   variantsMatch,
   pickListingVariant,
 } from '../utils/productPricing';
+import { useAuth } from '@core/context/AuthContext';
 
 const ProductDetailPage = () => {
     const { id } = useParams();
@@ -40,6 +42,8 @@ const ProductDetailPage = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [activeImageIndex, setActiveImageIndex] = useState(0);
+    const { user } = useAuth();
+    const [isDemanding, setIsDemanding] = useState(false);
 
     const [reviews, setReviews] = useState([]);
     const [reviewLoading, setReviewLoading] = useState(true);
@@ -201,6 +205,34 @@ const ProductDetailPage = () => {
                 : { unitPrice: 0, originalPrice: 0, hasDiscount: false },
         [selectedProduct, selectedVariant],
     );
+
+    const { isFirstOrder, firstOrderDiscountPercent } = useFirstOrderOffer();
+    const firstOrderDiscount = isFirstOrder ? Number(firstOrderDiscountPercent ?? 10) : 0;
+    const baseUnitPrice = activePricing.unitPrice;
+    const originalPrice = activePricing.hasDiscount ? activePricing.originalPrice : baseUnitPrice;
+    const existingDiscountPercent = activePricing.hasDiscount
+      ? Math.round(((originalPrice - baseUnitPrice) / originalPrice) * 100)
+      : 0;
+
+    const finalUnitPrice = (isFirstOrder && firstOrderDiscount > 0)
+      ? Math.round(baseUnitPrice * (1 - firstOrderDiscount / 100))
+      : baseUnitPrice;
+
+    const strikeThroughPrice = originalPrice > finalUnitPrice ? originalPrice : 0;
+
+    const detailBadgeText = React.useMemo(() => {
+      if (isFirstOrder && firstOrderDiscount > 0) {
+        if (existingDiscountPercent > 0) {
+          return `${existingDiscountPercent}% + ${firstOrderDiscount}% EXTRA OFF`;
+        }
+        return `${firstOrderDiscount}% OFF`;
+      }
+      if (existingDiscountPercent > 0) {
+        return `${existingDiscountPercent}% OFF`;
+      }
+      return null;
+    }, [isFirstOrder, firstOrderDiscount, existingDiscountPercent]);
+
     const cartItem = selectedProduct
         ? cart.find(
             (item) =>
@@ -210,6 +242,10 @@ const ProductDetailPage = () => {
         : null;
     const quantity = cartItem ? cartItem.quantity : 0;
     const isWishlisted = selectedProduct ? isInWishlist(selectedProduct.id) : false;
+
+    const isOutOfStock = selectedVariant
+        ? (selectedVariant.stock <= 0)
+        : (selectedProduct?.stock <= 0);
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -267,6 +303,30 @@ const ProductDetailPage = () => {
             variantSku: variantKey,
         });
         showToast(`${selectedProduct.name} added to cart`, 'success');
+    };
+
+    const handleNotifyMe = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+  
+        if (!user) {
+          showToast("Please login to get notified", "error");
+          navigate("/customer/auth");
+          return;
+        }
+  
+        setIsDemanding(true);
+        try {
+          await customerApi.registerProductDemand({
+            productId: selectedProduct.id || selectedProduct._id,
+            variantSku: variantKey || "",
+          });
+          showToast("We will notify you when it's back in stock!", "success");
+        } catch (error) {
+          showToast(error.response?.data?.message || "Failed to register request", "error");
+        } finally {
+          setIsDemanding(false);
+        }
     };
 
     const handleIncrement = () =>
@@ -444,7 +504,7 @@ const ProductDetailPage = () => {
                                                     transition={{ duration: 0.15 }}
                                                     src={applyCloudinaryTransform(allImages[activeImageIndex], "f_auto,q_auto:best,w_1200,dpr_auto")}
                                                     alt={`${selectedProduct.name} ${activeImageIndex + 1}`}
-                                                    className="w-full h-full object-contain mix-blend-multiply drop-shadow-2xl hover:scale-[1.03] transition-transform duration-500 absolute inset-0 m-auto p-0"
+                                                    className={cn("w-full h-full object-contain mix-blend-multiply drop-shadow-2xl hover:scale-[1.03] transition-transform duration-500 absolute inset-0 m-auto p-0", isOutOfStock && "grayscale opacity-60")}
                                                 />
                                             </AnimatePresence>
                                         </div>
@@ -534,22 +594,32 @@ const ProductDetailPage = () => {
                                                 <div className="flex flex-col gap-1">
                                                     <div className="flex items-baseline gap-2">
                                                         <span className="text-[28px] lg:text-[32px] font-[800] text-primary tracking-tight leading-none">
-                                                            ₹{activePricing.unitPrice}
+                                                            ₹{finalUnitPrice}
                                                         </span>
-                                                        {activePricing.hasDiscount && (
-                                                            <span className="text-sm font-bold text-slate-400 line-through">₹{activePricing.originalPrice}</span>
+                                                        {strikeThroughPrice > finalUnitPrice && (
+                                                            <span className="text-sm font-bold text-slate-400 line-through">₹{strikeThroughPrice}</span>
                                                         )}
                                                     </div>
-                                                    {activePricing.hasDiscount && (
+                                                    {detailBadgeText && (
                                                         <div className="mt-1">
-                                                            <span className="bg-green-100 text-green-700 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider inline-block">
-                                                                {Math.round(((activePricing.originalPrice - activePricing.unitPrice) / activePricing.originalPrice) * 100)}% OFF
+                                                            <span className="bg-green-100 text-green-700 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider inline-block border border-green-200">
+                                                                🎉 {detailBadgeText}
                                                             </span>
                                                         </div>
                                                     )}
                                                 </div>
                                                 <div>
-                                                    {quantity > 0 ? (
+                                                    {isOutOfStock ? (
+                                                        <motion.button
+                                                            whileHover={{ scale: 1.02, y: -2 }}
+                                                            whileTap={{ scale: 0.98 }}
+                                                            onClick={handleNotifyMe}
+                                                            disabled={isDemanding}
+                                                            className="bg-gray-100 text-gray-500 h-10 px-5 rounded-xl font-black text-[11px] flex items-center gap-2 shadow-sm transition-all uppercase tracking-widest border border-gray-200"
+                                                        >
+                                                            {isDemanding ? "..." : "NOTIFY ME"}
+                                                        </motion.button>
+                                                    ) : quantity > 0 ? (
                                                         <div className="flex items-center gap-1 bg-white border border-brand-200 rounded-xl p-1 shadow-sm">
                                                             <motion.button whileTap={{ scale: 0.85 }} onClick={handleDecrement} className="w-9 h-9 bg-brand-50 rounded-lg flex items-center justify-center text-brand-700 hover:bg-brand-100 transition-colors">
                                                                 <Minus size={16} strokeWidth={2.5} />

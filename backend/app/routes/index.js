@@ -30,7 +30,7 @@ import adminProfessionalRoute from "./adminProfessionalRoutes.js";
 import authActivityRoute from "./authActivityRoutes.js";
 import { whatsappAdminRouter, whatsappWebhookRouter } from "../modules/whatsapp/whatsapp.routes.js";
 import storePromotionRoute from "./storePromotionRoutes.js";
-
+import productDemandRoute from "./productDemandRoutes.js";
 
 import express from "express";
 import { ensureDatabaseConnected } from "../middleware/databaseMiddleware.js";
@@ -76,6 +76,7 @@ const setupRoutes = (app) => {
     router.use("/admin/whatsapp", whatsappAdminRouter);
     router.use("/whatsapp", whatsappWebhookRouter);
     router.use("/store-promotions", storePromotionRoute);
+    router.use("/product-demands", productDemandRoute);
 
     app.use("/api", router);
 }

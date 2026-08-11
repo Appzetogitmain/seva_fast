@@ -68,4 +68,8 @@ export const sellerApi = {
     payStorePromotionWithWallet: (data) => axiosInstance.post('/store-promotions/subscribe/wallet', data),
     getMyStorePromotions: () => axiosInstance.get('/store-promotions/seller/my-promotions'),
     getStorePromotionStatus: () => axiosInstance.get('/store-promotions/seller/status'),
+
+    // Product Demands
+    getProductDemands: () => axiosInstance.get('/product-demands/seller'),
 };
+

@@ -78,6 +78,17 @@ const categorySchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    hsnCode: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    gstRate: {
+      type: Number,
+      default: 0, // Percentage (e.g. 5, 12, 18, 28)
+      min: 0,
+      max: 100,
+    },
     headerColor: {
       type: String,
       trim: true, // Hex color selected in admin panel (e.g. #ff0000)

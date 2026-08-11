@@ -80,6 +80,11 @@ function buildAdminProductsLink(productId) {
     : buildAppPath("/admin/products");
 }
 
+function buildProductDetailLink(productId) {
+  const id = String(productId || "").trim();
+  return id ? buildAppPath(`/product/${encodeURIComponent(id)}`) : buildAppPath("/");
+}
+
 function eventDefinition(eventType) {
   switch (eventType) {
     case NOTIFICATION_EVENTS.ORDER_PLACED:
@@ -450,6 +455,26 @@ function eventDefinition(eventType) {
         title: () => "Application Update",
         body: () => "Your delivery partner application has been reviewed and unfortunately rejected at this time.",
       };
+    case NOTIFICATION_EVENTS.PRODUCT_DEMAND_REGISTERED:
+      return {
+        role: NOTIFICATION_ROLES.SELLER,
+        recipientIds: (payload) => normalizeIdList(payload.sellerId),
+        title: () => "Customer Wants This Product 🙋",
+        body: (payload) => {
+          const productName = String(payload.productName || "a product").trim() || "a product";
+          return `A customer is waiting for ${productName} to come back in stock. Restock soon to win the sale.`;
+        },
+      };
+    case NOTIFICATION_EVENTS.PRODUCT_BACK_IN_STOCK:
+      return {
+        role: NOTIFICATION_ROLES.CUSTOMER,
+        recipientIds: (payload) => normalizeIdList(payload.customerId || payload.userId),
+        title: () => "Back In Stock! 🎉",
+        body: (payload) => {
+          const productName = String(payload.productName || "An item").trim() || "An item";
+          return `${productName} you wanted is back in stock. Grab it before it sells out again!`;
+        },
+      };
     case NOTIFICATION_EVENTS.BIRTHDAY_WISH:
       return {
         role: NOTIFICATION_ROLES.CUSTOMER,
@@ -542,6 +567,28 @@ function eventData(eventType, payload = {}, role) {
       eventType,
       deliveryId,
       link: buildAppPath("/delivery"),
+      ...(payload.data || {}),
+    };
+  }
+
+  if (eventType === NOTIFICATION_EVENTS.PRODUCT_DEMAND_REGISTERED) {
+    const productId = String(payload.productId || "").trim() || undefined;
+    return {
+      eventType,
+      productId,
+      variantSku: String(payload.variantSku || "").trim() || undefined,
+      link: buildAppPath("/seller/demands"),
+      ...(payload.data || {}),
+    };
+  }
+
+  if (eventType === NOTIFICATION_EVENTS.PRODUCT_BACK_IN_STOCK) {
+    const productId = String(payload.productId || "").trim() || undefined;
+    return {
+      eventType,
+      productId,
+      variantSku: String(payload.variantSku || "").trim() || undefined,
+      link: buildProductDetailLink(productId),
       ...(payload.data || {}),
     };
   }

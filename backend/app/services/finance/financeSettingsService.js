@@ -5,6 +5,20 @@ import {
 } from "../../constants/finance.js";
 import { roundCurrency } from "../../utils/money.js";
 
+const DEFAULT_DELIVERY_FEE_SLABS = [
+  { minKm: 0, maxKm: 5, fee: 40, freeAboveOrderValue: 500 },
+  { minKm: 5, maxKm: 10, fee: 60, freeAboveOrderValue: null },
+  { minKm: 10, maxKm: 15, fee: 80, freeAboveOrderValue: null },
+  { minKm: 15, maxKm: null, fee: 100, freeAboveOrderValue: null },
+];
+
+const DEFAULT_RIDER_EARNING_SLABS = [
+  { minKm: 0, maxKm: 5, earning: 30 },
+  { minKm: 5, maxKm: 10, earning: 45 },
+  { minKm: 10, maxKm: 15, earning: 60 },
+  { minKm: 15, maxKm: null, earning: 80 },
+];
+
 const DEFAULT_FINANCE_SETTINGS = {
   deliveryPricingMode: DELIVERY_PRICING_MODE.DISTANCE_BASED,
   customerBaseDeliveryFee: 30,
@@ -15,6 +29,17 @@ const DEFAULT_FINANCE_SETTINGS = {
   fixedDeliveryFee: 30,
   minimumOrderValue: 0,
   freeDeliveryThreshold: 0,
+  deliveryFeeSlabs: DEFAULT_DELIVERY_FEE_SLABS,
+  deliveryFeeBaseWeightKg: 2,
+  deliveryFeeExtraFeePerKg: 10,
+  expressDeliveryEnabled: true,
+  expressDeliveryFee: 150,
+  expressDeliveryMaxWeightKg: 5,
+  riderEarningSlabs: DEFAULT_RIDER_EARNING_SLABS,
+  riderEarningBaseWeightKg: 2,
+  riderEarningExtraFeePerKg: 10,
+  riderExpressEarning: 100,
+  riderExtraEarningPerKmBeyondSlabs: 0,
   handlingFeeStrategy: HANDLING_FEE_STRATEGY.HIGHEST_CATEGORY_FEE,
   codEnabled: true,
   onlineEnabled: true,
@@ -76,6 +101,16 @@ export function normalizeFinanceSettings(raw = {}) {
   const handlingFeeStrategy =
     raw.handlingFeeStrategy || DEFAULT_FINANCE_SETTINGS.handlingFeeStrategy;
 
+  const deliveryFeeSlabs =
+    Array.isArray(raw.deliveryFeeSlabs) && raw.deliveryFeeSlabs.length > 0
+      ? raw.deliveryFeeSlabs
+      : DEFAULT_DELIVERY_FEE_SLABS;
+
+  const riderEarningSlabs =
+    Array.isArray(raw.riderEarningSlabs) && raw.riderEarningSlabs.length > 0
+      ? raw.riderEarningSlabs
+      : DEFAULT_RIDER_EARNING_SLABS;
+
   return {
     deliveryPricingMode,
     pricingMode: deliveryPricingMode,
@@ -91,6 +126,17 @@ export function normalizeFinanceSettings(raw = {}) {
     fixedDeliveryFee,
     minimumOrderValue,
     freeDeliveryThreshold,
+    deliveryFeeSlabs,
+    deliveryFeeBaseWeightKg: Number(raw.deliveryFeeBaseWeightKg ?? DEFAULT_FINANCE_SETTINGS.deliveryFeeBaseWeightKg),
+    deliveryFeeExtraFeePerKg: roundCurrency(raw.deliveryFeeExtraFeePerKg ?? DEFAULT_FINANCE_SETTINGS.deliveryFeeExtraFeePerKg),
+    expressDeliveryEnabled: raw.expressDeliveryEnabled ?? DEFAULT_FINANCE_SETTINGS.expressDeliveryEnabled,
+    expressDeliveryFee: roundCurrency(raw.expressDeliveryFee ?? DEFAULT_FINANCE_SETTINGS.expressDeliveryFee),
+    expressDeliveryMaxWeightKg: Number(raw.expressDeliveryMaxWeightKg ?? DEFAULT_FINANCE_SETTINGS.expressDeliveryMaxWeightKg),
+    riderEarningSlabs,
+    riderEarningBaseWeightKg: Number(raw.riderEarningBaseWeightKg ?? DEFAULT_FINANCE_SETTINGS.riderEarningBaseWeightKg),
+    riderEarningExtraFeePerKg: roundCurrency(raw.riderEarningExtraFeePerKg ?? DEFAULT_FINANCE_SETTINGS.riderEarningExtraFeePerKg),
+    riderExpressEarning: roundCurrency(raw.riderExpressEarning ?? DEFAULT_FINANCE_SETTINGS.riderExpressEarning),
+    riderExtraEarningPerKmBeyondSlabs: roundCurrency(raw.riderExtraEarningPerKmBeyondSlabs ?? DEFAULT_FINANCE_SETTINGS.riderExtraEarningPerKmBeyondSlabs),
     handlingFeeStrategy,
     codEnabled: raw.codEnabled ?? DEFAULT_FINANCE_SETTINGS.codEnabled,
     onlineEnabled: raw.onlineEnabled ?? DEFAULT_FINANCE_SETTINGS.onlineEnabled,

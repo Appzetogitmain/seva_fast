@@ -25,12 +25,20 @@ import { getOrCreateFinanceSettings } from "./financeSettingsService.js";
 export const DELIVERY_FEE_SELLER_SHARE = 0.8;
 export const DELIVERY_FEE_ADMIN_SHARE = 0.2;
 
-export function splitDeliveryFee(deliveryFeeCharged = 0) {
+/**
+ * Splits the delivery fee between seller and admin. `deliveryFeeBase` is the fee
+ * that would have been charged with no promo applied — when omitted it defaults
+ * to `deliveryFeeCharged` (the normal, non-promotional case). Sellers are always
+ * paid their share of the base fee; admin absorbs the gap when a promo (first
+ * order, membership plan, etc.) reduces what the customer actually pays, so the
+ * discount is funded by admin instead of coming out of the seller's earnings.
+ */
+export function splitDeliveryFee(deliveryFeeCharged = 0, deliveryFeeBase = null) {
   const fee = roundCurrency(deliveryFeeCharged || 0);
-  return {
-    sellerDeliveryFeeShare: roundCurrency(fee * DELIVERY_FEE_SELLER_SHARE),
-    adminDeliveryFeeShare: roundCurrency(fee * DELIVERY_FEE_ADMIN_SHARE),
-  };
+  const base = roundCurrency(deliveryFeeBase != null ? deliveryFeeBase : fee);
+  const sellerDeliveryFeeShare = roundCurrency(base * DELIVERY_FEE_SELLER_SHARE);
+  const adminDeliveryFeeShare = roundCurrency(fee - sellerDeliveryFeeShare);
+  return { sellerDeliveryFeeShare, adminDeliveryFeeShare };
 }
 
 export function resolveSellerOrderEarning(order) {
@@ -59,12 +67,22 @@ export function resolveSellerOrderEarning(order) {
 
 export function recalculateLogisticsEarnings({
   deliveryFeeCharged = 0,
+  deliveryFeeBase = null,
   handlingFeeCharged = 0,
   adminProductCommissionTotal = 0,
   tipTotal = 0,
+  // Rider payout is computed separately (calculateRiderPayout) and doesn't
+  // depend on handling fee — this function just carries those values
+  // through unchanged so a later recalculation (e.g. after redistributing
+  // the global handling fee across sellers) doesn't wipe them back to 0.
+  riderPayoutBase = 0,
+  riderPayoutDistance = 0,
+  riderPayoutBonus = 0,
+  riderPayoutTotal = 0,
 } = {}) {
   const { sellerDeliveryFeeShare, adminDeliveryFeeShare } = splitDeliveryFee(
     deliveryFeeCharged,
+    deliveryFeeBase,
   );
   const handling = roundCurrency(handlingFeeCharged || 0);
   const tip = roundCurrency(tipTotal || 0);
@@ -79,11 +97,11 @@ export function recalculateLogisticsEarnings({
     adminDeliveryFeeShare,
     platformLogisticsMargin,
     platformTotalEarning,
-    riderPayoutBase: 0,
-    riderPayoutDistance: 0,
-    riderPayoutBonus: 0,
+    riderPayoutBase: roundCurrency(riderPayoutBase),
+    riderPayoutDistance: roundCurrency(riderPayoutDistance),
+    riderPayoutBonus: roundCurrency(riderPayoutBonus),
     riderTipAmount: tip,
-    riderPayoutTotal: 0,
+    riderPayoutTotal: roundCurrency(riderPayoutTotal),
   };
 }
 import {
@@ -336,7 +354,62 @@ export function calculateHandlingFee(cartItems, options = {}) {
   };
 }
 
-export function calculateCustomerDeliveryFee(distanceKm, deliverySettings, hasFreeDelivery = false) {
+/**
+ * Picks the slab whose band contains `distanceKm`. Slabs are treated as
+ * half-open on the low end and inclusive on the high end — e.g. a "0-5" /
+ * "5-10" pair means exactly 5km belongs to the "0-5" slab, 5.01km belongs to
+ * "5-10". A slab with maxKm: null is open-ended ("15+ km").
+ */
+function resolveDistanceSlab(slabs, distanceKm) {
+  if (!Array.isArray(slabs) || slabs.length === 0) return null;
+  const sorted = [...slabs]
+    .map((slab) => ({
+      ...slab,
+      minKm: Number(slab.minKm) || 0,
+      maxKm: slab.maxKm == null ? null : Number(slab.maxKm),
+    }))
+    .sort((a, b) => a.minKm - b.minKm);
+
+  const distance = Number(distanceKm) || 0;
+  for (const slab of sorted) {
+    const max = slab.maxKm == null ? Infinity : slab.maxKm;
+    if (distance <= max) return slab;
+  }
+  return sorted[sorted.length - 1];
+}
+
+/** Charge for weight above the free allowance, rounded up to the next whole kg. */
+function computeWeightSurcharge(weightKg, baseWeightKg, extraFeePerKg) {
+  const extraKg = Number(weightKg || 0) - Number(baseWeightKg || 0);
+  if (!Number.isFinite(extraKg) || extraKg <= 0) return 0;
+  return roundCurrency(Math.ceil(extraKg) * Number(extraFeePerKg || 0));
+}
+
+/**
+ * Total cart weight in kg, reusing the same "parse the free-text weight
+ * string, default to 0.5kg if unparseable" convention already used for
+ * scheduled/nationwide orders.
+ */
+export function computeTotalWeightKg(items = []) {
+  let totalWeightKg = 0;
+  for (const item of items) {
+    const wStr = item.weight || "";
+    let wVal = parseFloat(String(wStr).replace(/[^\d.]/g, ""));
+    if (!Number.isFinite(wVal) || wVal <= 0) wVal = 0.5;
+    if (String(wStr).toLowerCase().includes("gm") || String(wStr).toLowerCase().includes("gram")) {
+      wVal = wVal / 1000;
+    }
+    totalWeightKg += wVal * Number(item.quantity || 1);
+  }
+  return totalWeightKg;
+}
+
+export function calculateCustomerDeliveryFee(
+  distanceKm,
+  deliverySettings,
+  hasFreeDelivery = false,
+  { weightKg = 0, isExpressDelivery = false, orderValue = 0 } = {},
+) {
   const mode =
     deliverySettings.deliveryPricingMode || DELIVERY_PRICING_MODE.DISTANCE_BASED;
   const actualDistance = Number(distanceKm || 0);
@@ -353,6 +426,9 @@ export function calculateCustomerDeliveryFee(distanceKm, deliverySettings, hasFr
     }
     return {
       deliveryFeeCharged: fixedFee,
+      deliveryFeeBase: roundCurrency(
+        deliverySettings.fixedDeliveryFee ?? deliverySettings.customerBaseDeliveryFee ?? 0,
+      ),
       distanceKmActual: normalizedDistance,
       distanceKmRounded: roundCurrency(normalizedDistance),
       roundedExtraKm: 0,
@@ -362,47 +438,59 @@ export function calculateCustomerDeliveryFee(distanceKm, deliverySettings, hasFr
     };
   }
 
-  const baseFee = roundCurrency(deliverySettings.customerBaseDeliveryFee ?? 0);
-  const baseDistance = Math.max(Number(deliverySettings.baseDistanceCapacityKm || 0), 0);
-  const surcharge = roundCurrency(deliverySettings.incrementalKmSurcharge ?? 0);
-
-  if (normalizedDistance <= baseDistance) {
-    let chargedBaseFee = baseFee;
-    if (hasFreeDelivery) {
-        chargedBaseFee = 0;
-    }
+  const expressMaxWeight = Number(deliverySettings.expressDeliveryMaxWeightKg ?? 5);
+  if (
+    isExpressDelivery &&
+    deliverySettings.expressDeliveryEnabled !== false &&
+    Number(weightKg || 0) <= expressMaxWeight
+  ) {
+    const expressFee = roundCurrency(deliverySettings.expressDeliveryFee ?? 150);
     return {
-      deliveryFeeCharged: chargedBaseFee,
+      deliveryFeeCharged: hasFreeDelivery ? 0 : expressFee,
+      deliveryFeeBase: expressFee,
       distanceKmActual: normalizedDistance,
-      distanceKmRounded: roundCurrency(baseDistance),
+      distanceKmRounded: normalizedDistance,
       roundedExtraKm: 0,
-      mode,
-      baseFee,
+      mode: "EXPRESS",
+      baseFee: expressFee,
       extraFee: 0,
+      isExpress: true,
     };
   }
 
-  const extraKm = normalizedDistance - baseDistance;
-  const roundedExtraKm = ceilKm(extraKm);
-  const extraFee = roundCurrency(roundedExtraKm * surcharge);
-  let total = addMoney(baseFee, extraFee);
+  const slab = resolveDistanceSlab(deliverySettings.deliveryFeeSlabs, normalizedDistance);
+  const baseFee = roundCurrency(slab?.fee ?? 0);
+  const weightSurcharge = computeWeightSurcharge(
+    weightKg,
+    deliverySettings.deliveryFeeBaseWeightKg ?? 2,
+    deliverySettings.deliveryFeeExtraFeePerKg ?? 10,
+  );
+  const fullFee = roundCurrency(baseFee + weightSurcharge);
 
-  if (hasFreeDelivery) {
-    total = 0;
-  }
+  const freeAboveOrderValue = slab?.freeAboveOrderValue;
+  const qualifiesForSlabFreeDelivery =
+    freeAboveOrderValue != null && Number(orderValue || 0) >= Number(freeAboveOrderValue);
+
+  const chargedFee = hasFreeDelivery || qualifiesForSlabFreeDelivery ? 0 : fullFee;
 
   return {
-    deliveryFeeCharged: total,
+    deliveryFeeCharged: chargedFee,
+    deliveryFeeBase: fullFee,
     distanceKmActual: normalizedDistance,
-    distanceKmRounded: roundCurrency(baseDistance + roundedExtraKm),
-    roundedExtraKm,
+    distanceKmRounded: normalizedDistance,
+    roundedExtraKm: 0,
     mode,
     baseFee,
-    extraFee,
+    extraFee: weightSurcharge,
+    slabApplied: slab ? { minKm: slab.minKm, maxKm: slab.maxKm } : null,
   };
 }
 
-export function calculateRiderPayout(distanceKm, deliverySettings) {
+export function calculateRiderPayout(
+  distanceKm,
+  deliverySettings,
+  { weightKg = 0, isExpressDelivery = false } = {},
+) {
   const mode =
     deliverySettings.deliveryPricingMode || DELIVERY_PRICING_MODE.DISTANCE_BASED;
   const actualDistance = Number(distanceKm || 0);
@@ -410,24 +498,54 @@ export function calculateRiderPayout(distanceKm, deliverySettings) {
     ? Math.max(actualDistance, 0)
     : 0;
 
-  const riderBase = roundCurrency(deliverySettings.riderBasePayout ?? deliverySettings.customerBaseDeliveryFee ?? 0);
-  const baseDistance = Math.max(Number(deliverySettings.baseDistanceCapacityKm || 0), 0);
-  const perExtraKm = roundCurrency(deliverySettings.deliveryPartnerRatePerKm ?? 0);
-
-  if (mode === DELIVERY_PRICING_MODE.FIXED_PRICE || normalizedDistance <= baseDistance) {
+  const expressMaxWeight = Number(deliverySettings.expressDeliveryMaxWeightKg ?? 5);
+  if (
+    isExpressDelivery &&
+    deliverySettings.expressDeliveryEnabled !== false &&
+    Number(weightKg || 0) <= expressMaxWeight
+  ) {
+    const expressEarning = roundCurrency(deliverySettings.riderExpressEarning ?? 100);
     return {
-      riderPayoutBase: riderBase,
+      riderPayoutBase: expressEarning,
       riderPayoutDistance: 0,
       riderPayoutBonus: 0,
-      riderPayoutTotal: riderBase,
+      riderPayoutTotal: expressEarning,
       roundedExtraKm: 0,
+      mode: "EXPRESS",
     };
   }
 
-  const extraKm = normalizedDistance - baseDistance;
-  const roundedExtraKm = ceilKm(extraKm);
-  const riderDistance = roundCurrency(roundedExtraKm * perExtraKm);
-  const riderTotal = addMoney(riderBase, riderDistance);
+  const slabs = Array.isArray(deliverySettings.riderEarningSlabs)
+    ? deliverySettings.riderEarningSlabs
+    : [];
+  const slab = resolveDistanceSlab(slabs, normalizedDistance);
+  const riderBase = roundCurrency(slab?.earning ?? 0);
+
+  const weightSurcharge = computeWeightSurcharge(
+    weightKg,
+    deliverySettings.riderEarningBaseWeightKg ?? 2,
+    deliverySettings.riderEarningExtraFeePerKg ?? 10,
+  );
+
+  // Extra per-km earning for distance beyond the start of the open-ended
+  // final slab (e.g. beyond 15km, on top of its flat base earning) —
+  // separate admin-configured rate, defaults to 0. The matched slab IS the
+  // open-ended one whenever distance falls past every finite band.
+  let extraDistanceEarning = 0;
+  let roundedExtraKm = 0;
+  if (slab && slab.maxKm == null) {
+    const extraKm = normalizedDistance - Number(slab.minKm || 0);
+    if (extraKm > 0) {
+      roundedExtraKm = ceilKm(extraKm);
+      const perKmRate = Number(deliverySettings.riderExtraEarningPerKmBeyondSlabs ?? 0);
+      extraDistanceEarning = roundCurrency(roundedExtraKm * perKmRate);
+    }
+  }
+
+  // riderPayoutDistance carries "everything beyond the flat base slab" —
+  // weight surcharge plus any open-ended extra-distance earning.
+  const riderDistance = roundCurrency(weightSurcharge + extraDistanceEarning);
+  const riderTotal = roundCurrency(riderBase + riderDistance);
 
   return {
     riderPayoutBase: riderBase,
@@ -435,6 +553,7 @@ export function calculateRiderPayout(distanceKm, deliverySettings) {
     riderPayoutBonus: 0,
     riderPayoutTotal: riderTotal,
     roundedExtraKm,
+    mode,
   };
 }
 
@@ -535,6 +654,8 @@ export async function generateOrderPaymentBreakdown({
   hasFreeDelivery = false,
   hasFreeHandling = false,
   membershipTier = "none",
+  isFirstOrder = false,
+  isExpressDelivery = false,
 }) {
   const normalizedItems = Array.isArray(preHydratedItems) && preHydratedItems.length > 0
     ? preHydratedItems
@@ -571,33 +692,31 @@ export async function generateOrderPaymentBreakdown({
   const effectiveHandlingStrategy =
     handlingFeeStrategy || effectiveSettings.handlingFeeStrategy;
 
+  // Product subtotal is needed up-front now — the slab-based customer fee's
+  // "free above ₹X order value" rule depends on it.
+  let productSubtotal = 0;
+  for (const item of normalizedItems) {
+    productSubtotal = addMoney(productSubtotal, roundCurrency(item.price * item.quantity));
+  }
+
+  const totalWeightKg = computeTotalWeightKg(normalizedItems);
+
   let delivery;
   let rider;
   const isScheduled = normalizedItems.some(item => item.deliveryType === "scheduled");
 
   if (isScheduled) {
-    let totalWeightKg = 0;
-    for (const item of normalizedItems) {
-      const wStr = item.weight || "";
-      let wVal = parseFloat(String(wStr).replace(/[^\d.]/g, ""));
-      if (!Number.isFinite(wVal) || wVal <= 0) wVal = 0.5;
-      if (String(wStr).toLowerCase().includes("gm") || String(wStr).toLowerCase().includes("gram")) {
-        wVal = wVal / 1000;
-      }
-      totalWeightKg += wVal * item.quantity;
+    let baseDeliveryFee = 0;
+    if (totalWeightKg <= 0.5) {
+      baseDeliveryFee = 60;
+    } else {
+      baseDeliveryFee = 60 + Math.ceil((totalWeightKg - 0.5) / 0.5) * 40;
     }
-
-    let deliveryFee = 0;
-    if (!hasFreeDelivery) {
-      if (totalWeightKg <= 0.5) {
-        deliveryFee = 60;
-      } else {
-        deliveryFee = 60 + Math.ceil((totalWeightKg - 0.5) / 0.5) * 40;
-      }
-    }
+    const deliveryFee = hasFreeDelivery ? 0 : baseDeliveryFee;
 
     delivery = {
       deliveryFeeCharged: deliveryFee,
+      deliveryFeeBase: baseDeliveryFee,
       distanceKmActual: distanceKm,
       distanceKmRounded: distanceKm,
       roundedExtraKm: 0,
@@ -614,20 +733,20 @@ export async function generateOrderPaymentBreakdown({
       roundedExtraKm: 0,
     };
   } else {
-    delivery = calculateCustomerDeliveryFee(distanceKm, effectiveSettings, hasFreeDelivery);
-    rider = {
-      riderPayoutBase: 0,
-      riderPayoutDistance: 0,
-      riderPayoutBonus: 0,
-      riderPayoutTotal: 0,
-      roundedExtraKm: 0,
+    const effectiveFreeDelivery = hasFreeDelivery || (isFirstOrder && effectiveSettings.firstOrderFreeDelivery !== false);
+    const deliveryOptions = {
+      weightKg: totalWeightKg,
+      isExpressDelivery,
+      orderValue: productSubtotal,
     };
-  }
-
-  // Calculate Product Subtotal
-  let productSubtotal = 0;
-  for (const item of normalizedItems) {
-    productSubtotal = addMoney(productSubtotal, roundCurrency(item.price * item.quantity));
+    delivery = calculateCustomerDeliveryFee(distanceKm, effectiveSettings, effectiveFreeDelivery, deliveryOptions);
+    // Rider is always paid the full slab/express earning regardless of any
+    // customer-side discount or "free above ₹X" promo — admin absorbs the
+    // gap, mirroring how the seller's delivery-fee share already works.
+    rider = calculateRiderPayout(distanceKm, effectiveSettings, {
+      weightKg: totalWeightKg,
+      isExpressDelivery,
+    });
   }
 
   const shippingChargeToDeduct = 0;
@@ -765,7 +884,10 @@ export async function generateOrderPaymentBreakdown({
     handling.handlingFeeCharged = 0;
   }
 
-  const finalDiscountTotal = roundCurrency(discountTotal + membershipDiscountAmount);
+  const firstOrderDiscountPercent = isFirstOrder ? Number(effectiveSettings.firstOrderDiscountPercent ?? 10) : 0;
+  const firstOrderDiscountAmount = isFirstOrder ? roundCurrency((productSubtotal * firstOrderDiscountPercent) / 100) : 0;
+
+  const finalDiscountTotal = roundCurrency(discountTotal + membershipDiscountAmount + firstOrderDiscountAmount);
   const normalizedTax = roundCurrency(taxTotal || 0);
   const normalizedTip = roundCurrency(tipTotal || 0);
 
@@ -781,9 +903,14 @@ export async function generateOrderPaymentBreakdown({
   const riderTipAmount = normalizedTip;
   const logisticsEarnings = recalculateLogisticsEarnings({
     deliveryFeeCharged: delivery.deliveryFeeCharged,
+    deliveryFeeBase: delivery.deliveryFeeBase,
     handlingFeeCharged: handling.handlingFeeCharged,
     adminProductCommissionTotal: totalCommissionAmount,
     tipTotal: riderTipAmount,
+    riderPayoutBase: rider.riderPayoutBase,
+    riderPayoutDistance: rider.riderPayoutDistance,
+    riderPayoutBonus: rider.riderPayoutBonus,
+    riderPayoutTotal: rider.riderPayoutTotal,
   });
 
   const adminProductCommissionTotal = totalCommissionAmount;
@@ -792,6 +919,9 @@ export async function generateOrderPaymentBreakdown({
     adminDeliveryFeeShare,
     platformLogisticsMargin,
     platformTotalEarning,
+    riderPayoutBase,
+    riderPayoutDistance,
+    riderPayoutBonus,
     riderPayoutTotal,
   } = logisticsEarnings;
 
@@ -829,9 +959,13 @@ export async function generateOrderPaymentBreakdown({
     currency: "INR",
     productSubtotal,
     deliveryFeeCharged: delivery.deliveryFeeCharged,
+    deliveryFeeBase: delivery.deliveryFeeBase,
     handlingFeeCharged: handling.handlingFeeCharged,
     tipTotal: normalizedTip,
     discountTotal: finalDiscountTotal,
+    membershipDiscountAmount,
+    firstOrderDiscountAmount,
+    firstOrderDiscountPercent,
     taxTotal: normalizedTax,
     grandTotal,
     sellerPayoutTotal,
@@ -840,9 +974,9 @@ export async function generateOrderPaymentBreakdown({
     adminProductCommissionTotal,
     sellerDeliveryFeeShare,
     adminDeliveryFeeShare,
-    riderPayoutBase: 0,
-    riderPayoutDistance: 0,
-    riderPayoutBonus: 0,
+    riderPayoutBase,
+    riderPayoutDistance,
+    riderPayoutBonus,
     riderTipAmount,
     riderPayoutTotal,
     platformLogisticsMargin,
