@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { adminApi } from "../services/adminApi";
+import { Rocket } from "lucide-react";
 
 const MAP_LIBRARIES = ["geometry"];
 const DEFAULT_CENTER = { lat: 20.5937, lng: 78.9629 };
@@ -623,7 +624,13 @@ const SellerLocations = () => {
                             className="h-2 w-2 rounded-full shrink-0 shadow-sm"
                             style={{ backgroundColor: sellerColor }}
                           />
-                          {seller.shopName}
+                          <span className="truncate">{seller.shopName}</span>
+                          {seller.isPromoted && (
+                            <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-indigo-600 text-white text-[8px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-xs">
+                              <Rocket className="h-2.5 w-2.5 animate-bounce" />
+                              PROMOTED
+                            </span>
+                          )}
                         </p>
                       <p
                         className={cn(

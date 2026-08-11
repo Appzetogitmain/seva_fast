@@ -1,6 +1,7 @@
 import Seller from "../../models/seller.js";
 import Order from "../../models/order.js";
 import Product from "../../models/product.js";
+import SellerStorePromotion from "../../models/sellerStorePromotion.js";
 import { formatDate } from "../../utils/formatDate.js";
 import {
   computeMapBounds,
@@ -107,38 +108,50 @@ export async function getSellerLocationsData({
   const activeStatuses = ["pending", "confirmed", "packed", "out_for_delivery"];
   const recentWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const ordersBySeller = sellerIds.length
-    ? await Order.aggregate([
-        { $match: { seller: { $in: sellerIds } } },
-        {
-          $group: {
-            _id: "$seller",
-            totalOrders: { $sum: 1 },
-            activeOrders: {
-              $sum: {
-                $cond: [{ $in: ["$status", activeStatuses] }, 1, 0],
+  const [ordersBySeller, activePromotions] = await Promise.all([
+    sellerIds.length
+      ? Order.aggregate([
+          { $match: { seller: { $in: sellerIds } } },
+          {
+            $group: {
+              _id: "$seller",
+              totalOrders: { $sum: 1 },
+              activeOrders: {
+                $sum: {
+                  $cond: [{ $in: ["$status", activeStatuses] }, 1, 0],
+                },
               },
-            },
-            deliveredOrders: {
-              $sum: {
-                $cond: [{ $eq: ["$status", "delivered"] }, 1, 0],
+              deliveredOrders: {
+                $sum: {
+                  $cond: [{ $eq: ["$status", "delivered"] }, 1, 0],
+                },
               },
-            },
-            ordersLast24h: {
-              $sum: {
-                $cond: [{ $gte: ["$createdAt", recentWindowStart] }, 1, 0],
+              ordersLast24h: {
+                $sum: {
+                  $cond: [{ $gte: ["$createdAt", recentWindowStart] }, 1, 0],
+                },
               },
+              lastOrderAt: { $max: "$createdAt" },
             },
-            lastOrderAt: { $max: "$createdAt" },
           },
-        },
-      ])
-    : [];
+        ])
+      : Promise.resolve([]),
+    sellerIds.length
+      ? SellerStorePromotion.find({
+          seller: { $in: sellerIds },
+          campaignStatus: "Active",
+          $or: [{ expiresAt: { $gt: new Date() } }, { expiresAt: null }],
+        }).select("seller planName").lean()
+      : Promise.resolve([]),
+  ]);
 
   const orderMap = new Map(ordersBySeller.map((row) => [String(row._id), row]));
+  const promoMap = new Map((activePromotions || []).map((row) => [String(row.seller), row.planName]));
 
   const rows = filteredByCity.map((seller) => {
     const orderStats = orderMap.get(String(seller._id)) || {};
+    const activePromoPlanName = promoMap.get(String(seller._id)) || null;
+    const isPromoted = Boolean(activePromoPlanName);
     const activeOrders = Number(orderStats.activeOrders || 0);
     const totalOrders = Number(orderStats.totalOrders || 0);
     const deliveredOrders = Number(orderStats.deliveredOrders || 0);
@@ -164,6 +177,8 @@ export async function getSellerLocationsData({
       city: seller.city,
       lifecycle: seller.lifecycle,
       hasValidLocation: seller.hasValidLocation,
+      isPromoted,
+      promotedPlanName: activePromoPlanName,
       location: {
         lat: seller.lat,
         lng: seller.lng,
@@ -318,7 +333,7 @@ export async function getActiveSellersData({
   const sellerIds = sellers.map((seller) => seller._id);
   const allActiveSellerIds = allActiveSellers.map((seller) => seller._id);
 
-  const [ordersBySeller, productsBySeller, overallOrderStats] = await Promise.all([
+  const [ordersBySeller, productsBySeller, overallOrderStats, activePromotions] = await Promise.all([
     sellerIds.length
       ? Order.aggregate([
           { $match: { seller: { $in: sellerIds } } },
@@ -395,14 +410,24 @@ export async function getActiveSellersData({
           },
         ])
       : Promise.resolve([]),
+    sellerIds.length
+      ? SellerStorePromotion.find({
+          seller: { $in: sellerIds },
+          campaignStatus: "Active",
+          $or: [{ expiresAt: { $gt: new Date() } }, { expiresAt: null }],
+        }).select("seller planName").lean()
+      : Promise.resolve([]),
   ]);
 
   const orderMap = new Map(ordersBySeller.map((row) => [String(row._id), row]));
   const productMap = new Map(productsBySeller.map((row) => [String(row._id), row]));
+  const promoMap = new Map((activePromotions || []).map((row) => [String(row.seller), row.planName]));
 
   const enrichedSellers = sellers.map((seller) => {
     const orderStats = orderMap.get(String(seller._id)) || {};
     const productStats = productMap.get(String(seller._id)) || {};
+    const activePromoPlanName = promoMap.get(String(seller._id)) || null;
+    const isPromoted = Boolean(activePromoPlanName);
     const totalOrders = Number(orderStats.totalOrders || 0);
     const deliveredOrders = Number(orderStats.deliveredOrders || 0);
     const pendingOrders = Number(orderStats.pendingOrders || 0);
@@ -424,6 +449,8 @@ export async function getActiveSellersData({
       category: seller.category || "General",
       status: seller.isVerified && seller.isActive ? "active" : "inactive",
       verificationStatus: seller.isVerified ? "verified" : "unverified",
+      isPromoted,
+      promotedPlanName: activePromoPlanName,
       joinedAt,
       joinedDate: formatDate(joinedAt),
       lastOrderAt: orderStats.lastOrderAt || null,

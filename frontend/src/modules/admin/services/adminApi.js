@@ -196,4 +196,12 @@ export const adminApi = {
     updateSellerPlan: (id, data) => axiosInstance.put(`/admin/seller-plans/${id}`, data),
     deleteSellerPlan: (id) => axiosInstance.delete(`/admin/seller-plans/${id}`),
     assignSellerPlan: (sellerId, data) => axiosInstance.post(`/admin/sellers/${sellerId}/assign-plan`, data),
+
+    // Store Promotion / Ads Management
+    getAdminStorePromotionPlans: () => axiosInstance.get('/store-promotions/admin/plans'),
+    createStorePromotionPlan: (data) => axiosInstance.post('/store-promotions/admin/plans', data),
+    updateStorePromotionPlan: (id, data) => axiosInstance.put(`/store-promotions/admin/plans/${id}`, data),
+    deleteStorePromotionPlan: (id) => axiosInstance.delete(`/store-promotions/admin/plans/${id}`),
+    getAdminStorePromotionPurchases: () => axiosInstance.get('/store-promotions/admin/purchases'),
+    updateStorePromotionCampaignStatus: (id, data) => axiosInstance.patch(`/store-promotions/admin/purchases/${id}/status`, data),
 };

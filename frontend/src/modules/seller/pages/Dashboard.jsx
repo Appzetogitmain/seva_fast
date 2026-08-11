@@ -56,16 +56,23 @@ const Dashboard = () => {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [deliveryBoys, setDeliveryBoys] = useState([]);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const [promoStatus, setPromoStatus] = useState(null);
 
   useEffect(() => {
     const fetchSubStatus = async () => {
       try {
-        const res = await sellerApi.getSubscriptionStatus();
-        if (res.data?.success) {
-          setSubscriptionStatus(res.data.result);
+        const [subRes, promoRes] = await Promise.all([
+          sellerApi.getSubscriptionStatus(),
+          sellerApi.getStorePromotionStatus(),
+        ]);
+        if (subRes.data?.success) {
+          setSubscriptionStatus(subRes.data.result);
+        }
+        if (promoRes.data?.success) {
+          setPromoStatus(promoRes.data.result);
         }
       } catch (err) {
-        console.error("Failed to fetch sub status", err);
+        console.error("Failed to fetch sub/promo status", err);
       }
     };
     fetchSubStatus();
@@ -366,6 +373,44 @@ const Dashboard = () => {
             <Sparkles size={15} className="text-slate-950" />
             <span>Browse 0% Plans</span>
             <ArrowRight size={14} className="text-slate-950" />
+          </button>
+        </motion.div>
+      )}
+
+      {/* 🚀 Boost Your Store Banner (Only if seller has no active/pending promotion) */}
+      {!promoStatus?.hasActivePromotion && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 sm:p-5 bg-gradient-to-r from-indigo-900 via-purple-950 to-slate-900 text-white rounded-2xl shadow-xl border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative overflow-hidden my-4"
+        >
+          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="flex items-center gap-3.5 relative z-10">
+            <div className="h-11 w-11 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/30 shadow-inner">
+              <TrendingUp size={22} className="text-indigo-400 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[9px] font-black tracking-widest uppercase border border-indigo-500/30">
+                  PROMOTION &amp; ADS
+                </span>
+                <h4 className="text-xs sm:text-sm font-black text-white">
+                  🚀 Boost Your Store Visibility &amp; Sales!
+                </h4>
+              </div>
+              <p className="text-xs text-slate-300 font-medium mt-1">
+                Get featured placement, top search rankings, and multi-fold customer reach.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/seller/promotions')}
+            className="w-full sm:w-auto px-5 py-3 bg-indigo-500 hover:bg-indigo-400 active:scale-95 text-white font-black tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 transition-all shrink-0 cursor-pointer whitespace-nowrap z-10"
+          >
+            <span>🚀 Boost Your Store</span>
+            <ArrowRight size={14} className="text-white" />
           </button>
         </motion.div>
       )}

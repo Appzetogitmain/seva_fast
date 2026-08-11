@@ -1,5 +1,6 @@
 import Product from "../models/product.js";
 import Seller from "../models/seller.js";
+import SellerStorePromotion from "../models/sellerStorePromotion.js";
 import { handleResponse } from "../utils/helper.js";
 import { slugify } from "../utils/slugify.js";
 import getPagination from "../utils/pagination.js";
@@ -484,34 +485,54 @@ export const getProducts = async (req, res) => {
         if (p.sellerId) sellerIdSet.add(String(p.sellerId));
       }
 
-      // Resolve names in parallel via cache-backed service
-      const [categoryEntries, sellerEntries] = await Promise.all([
+      // Resolve names and active store promotion status in parallel via cache-backed service
+      const sellerIdArr = [...sellerIdSet];
+      const [categoryEntries, sellerEntries, activePromos] = await Promise.all([
         Promise.all(
           [...categoryIdSet].map(async (id) => [id, await resolveCategoryName(id)]),
         ),
         Promise.all(
-          [...sellerIdSet].map(async (id) => [id, await resolveSellerName(id)]),
+          sellerIdArr.map(async (id) => [id, await resolveSellerName(id)]),
         ),
+        sellerIdArr.length
+          ? SellerStorePromotion.find({
+              seller: { $in: sellerIdArr },
+              campaignStatus: "Active",
+              $or: [{ expiresAt: { $gt: new Date() } }, { expiresAt: null }],
+            }).select("seller planName").lean()
+          : Promise.resolve([]),
       ]);
 
       const nameMap = Object.fromEntries([...categoryEntries, ...sellerEntries]);
+      const promoMap = new Map((activePromos || []).map((p) => [String(p.seller), p.planName]));
 
       // Enrich products to match the shape previously returned by .populate()
-      const products = rawProducts.map((p) => ({
-        ...p,
-        headerId: p.headerId
-          ? { _id: p.headerId, name: nameMap[String(p.headerId)] ?? null }
-          : null,
-        categoryId: p.categoryId
-          ? { _id: p.categoryId, name: nameMap[String(p.categoryId)] ?? null }
-          : null,
-        subcategoryId: p.subcategoryId
-          ? { _id: p.subcategoryId, name: nameMap[String(p.subcategoryId)] ?? null }
-          : null,
-        sellerId: p.sellerId
-          ? { _id: p.sellerId, shopName: nameMap[String(p.sellerId)] ?? null }
-          : null,
-      }));
+      const products = rawProducts.map((p) => {
+        const sId = p.sellerId ? String(p.sellerId) : null;
+        const activePromoPlanName = sId ? promoMap.get(sId) || null : null;
+        const isPromoted = Boolean(activePromoPlanName);
+
+        return {
+          ...p,
+          headerId: p.headerId
+            ? { _id: p.headerId, name: nameMap[String(p.headerId)] ?? null }
+            : null,
+          categoryId: p.categoryId
+            ? { _id: p.categoryId, name: nameMap[String(p.categoryId)] ?? null }
+            : null,
+          subcategoryId: p.subcategoryId
+            ? { _id: p.subcategoryId, name: nameMap[String(p.subcategoryId)] ?? null }
+            : null,
+          sellerId: p.sellerId
+            ? {
+                _id: p.sellerId,
+                shopName: nameMap[sId] ?? null,
+                isPromoted,
+                promotedPlanName: activePromoPlanName,
+              }
+            : null,
+        };
+      });
 
       return {
         items: normalizeProductListModeration(products),

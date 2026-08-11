@@ -26,6 +26,7 @@ import Modal from '@shared/components/ui/Modal';
 import Pagination from '@shared/components/ui/Pagination';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Rocket } from 'lucide-react';
 
 const ProductManagement = () => {
     const [products, setProducts] = useState([]);
@@ -688,11 +689,17 @@ const ProductManagement = () => {
 
                                     {/* Seller Column */}
                                     <td className="px-6 py-5 align-middle">
-                                        <div className="flex items-center gap-2 min-w-0">
+                                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
                                             <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand-500 shadow-[0_0_0_4px_rgba(59,130,246,0.12)]" />
-                                            <span className="truncate text-[13px] font-medium text-slate-700" title={p.sellerId?.shopName || 'Admin'}>
+                                            <span className="truncate text-[13px] font-bold text-slate-700" title={p.sellerId?.shopName || 'Admin'}>
                                                 {p.sellerId?.shopName || 'Admin'}
                                             </span>
+                                            {p.sellerId?.isPromoted && (
+                                                <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-indigo-600 text-white text-[8px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0 shadow-xs">
+                                                    <Rocket className="h-2.5 w-2.5 animate-bounce" />
+                                                    PROMOTED
+                                                </span>
+                                            )}
                                         </div>
                                     </td>
 

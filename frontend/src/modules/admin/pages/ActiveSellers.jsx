@@ -18,7 +18,7 @@ import {
   HiOutlineCloudArrowUp,
   HiOutlineArrowTopRightOnSquare,
 } from "react-icons/hi2";
-import { Store, Sparkles } from "lucide-react";
+import { Store, Sparkles, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -477,9 +477,17 @@ const ActiveSellers = () => {
                           />
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-900">
-                            {seller.shopName}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-slate-900">
+                              {seller.shopName}
+                            </p>
+                            {seller.isPromoted && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-indigo-600 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md shadow-indigo-500/20 shrink-0">
+                                <Rocket className="h-3 w-3 animate-bounce" />
+                                PROMOTED
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             <span className="text-[10px] font-semibold text-slate-400">
                               {seller.ownerName}
@@ -489,7 +497,13 @@ const ActiveSellers = () => {
                               {seller.category || "General"}
                             </span>
                           </div>
-                          <div className="mt-1.5 flex items-center gap-1.5">
+                          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                            {seller.isPromoted && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                                <Rocket className="h-3 w-3 text-indigo-600 shrink-0" />
+                                Ads: {seller.promotedPlanName || 'Active Boost'}
+                              </span>
+                            )}
                             {seller.commissionModel === 'PLAN_BASED' && seller.subscription?.expiresAt && new Date(seller.subscription.expiresAt) > new Date() ? (
                               <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-xs">
                                 <Sparkles className="h-3 w-3 text-emerald-500 shrink-0" />
@@ -651,7 +665,7 @@ const ActiveSellers = () => {
                     <p className="text-sm font-semibold text-slate-500">
                       Owned by {selectedSeller.ownerName}
                     </p>
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <Badge
                         variant="success"
                         className="text-[8px] font-black uppercase tracking-widest"
@@ -664,6 +678,12 @@ const ActiveSellers = () => {
                       >
                         {selectedSeller.category || "General"}
                       </Badge>
+                      {selectedSeller.isPromoted && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-indigo-600 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md">
+                          <Rocket className="h-3 w-3 animate-bounce" />
+                          🚀 PROMOTED ({selectedSeller.promotedPlanName || 'Active Boost'})
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

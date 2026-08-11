@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Card from '@shared/components/ui/Card';
 import Badge from '@shared/components/ui/Badge';
@@ -26,7 +26,8 @@ import {
     Search,
     Download,
     UploadCloud,
-    FileText
+    FileText,
+    Rocket
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@shared/components/ui/Toast';
@@ -125,6 +126,29 @@ const SellerDetail = () => {
         }
     };
 
+    useEffect(() => {
+        const checkPromo = async () => {
+            if (!id) return;
+            try {
+                const res = await adminApi.getAdminStorePromotionPurchases({ sellerId: id });
+                if (res.data?.success) {
+                    const purchases = res.data.results || res.data.result || [];
+                    const active = purchases.find(p => p.campaignStatus === 'Active' && (!p.expiresAt || new Date(p.expiresAt) > new Date()));
+                    if (active) {
+                        setSeller(prev => ({
+                            ...prev,
+                            isPromoted: true,
+                            promotedPlanName: active.planName
+                        }));
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to check seller promotion', err);
+            }
+        };
+        checkPromo();
+    }, [id]);
+
     const handleRefresh = () => {
         setIsRefreshing(true);
         setTimeout(() => {
@@ -145,9 +169,15 @@ const SellerDetail = () => {
                         <ChevronLeft className="h-5 w-5 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
                     </button>
                     <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <h1 className="ds-h1">{seller.shopName}</h1>
                             <Badge variant="success" className="text-[10px] font-black uppercase tracking-widest">{seller.status}</Badge>
+                            {seller.isPromoted && (
+                                <span className="px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-indigo-600 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-indigo-500/20">
+                                    <Rocket className="h-3.5 w-3.5 animate-bounce" />
+                                    🚀 PROMOTED ({seller.promotedPlanName || 'Active Boost'})
+                                </span>
+                            )}
                         </div>
                         <p className="ds-description mt-1 text-slate-500 font-medium">Owned by {seller.ownerName} • {seller.category}</p>
                     </div>

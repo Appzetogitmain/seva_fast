@@ -60,4 +60,12 @@ export const sellerApi = {
     verifyPlanPurchase: (data) => axiosInstance.post('/seller/plans/subscribe/verify', data),
     getSubscriptionStatus: () => axiosInstance.get('/seller/subscription-status'),
     switchToCategoryCommission: () => axiosInstance.post('/seller/switch-to-commission'),
+
+    // Store Promotion / Ads
+    getStorePromotionPlans: () => axiosInstance.get('/store-promotions/public'),
+    initiateStorePromotionPurchase: (data) => axiosInstance.post('/store-promotions/subscribe/initiate', data),
+    verifyStorePromotionPurchase: (data) => axiosInstance.post('/store-promotions/subscribe/verify', data),
+    payStorePromotionWithWallet: (data) => axiosInstance.post('/store-promotions/subscribe/wallet', data),
+    getMyStorePromotions: () => axiosInstance.get('/store-promotions/seller/my-promotions'),
+    getStorePromotionStatus: () => axiosInstance.get('/store-promotions/seller/status'),
 };

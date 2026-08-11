@@ -21,7 +21,9 @@ import {
 } from "react-icons/hi2";
 
 const SellerPlans = React.lazy(() => import("../pages/Plans"));
+const StorePromotions = React.lazy(() => import("../pages/StorePromotions"));
 import SubscriptionExpiryModal from "../components/SubscriptionExpiryModal";
+import StorePromotionExpiryModal from "../components/StorePromotionExpiryModal";
 
 const Dashboard = React.lazy(() => import("../pages/Dashboard"));
 const ProductManagement = React.lazy(
@@ -52,6 +54,7 @@ const FleetTracking = React.lazy(() => import("../../admin/pages/FleetTracking")
 
 const navItems = [
   { label: "Dashboard", path: "/seller", icon: HiOutlineSquares2X2, end: true },
+  { label: "🚀 Boost Store", path: "/seller/promotions", icon: HiOutlineSparkles },
   { label: "Products", path: "/seller/products", icon: HiOutlineCube },
   { label: "Stock", path: "/seller/inventory", icon: HiOutlineArchiveBox },
   { label: "Orders", path: "/seller/orders", icon: HiOutlineTruck },
@@ -160,6 +163,7 @@ const SellerRoutes = () => {
   return (
     <DashboardLayout navItems={navItems} title="Seller Panel">
       <SubscriptionExpiryModal />
+      <StorePromotionExpiryModal />
       {user && user.certificate && !user.certificate.accepted && (
         <SellerCertificateModal seller={user} />
       )}
@@ -183,6 +187,7 @@ const SellerRoutes = () => {
         <Route path="/cod-cash" element={<CodCash />} />
         <Route path="/withdrawals" element={<Withdrawals />} />
         <Route path="/plans" element={<SellerPlans />} />
+        <Route path="/promotions" element={<StorePromotions />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
