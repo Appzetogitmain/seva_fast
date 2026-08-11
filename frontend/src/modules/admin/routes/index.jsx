@@ -150,6 +150,7 @@ const navItems = [
       { label: "Hero & categories per page", path: "/admin/hero-categories" },
       { label: "Send Notifications", path: "/admin/notifications" },
       { label: "WhatsApp Campaigns", path: "/admin/whatsapp-campaigns" },
+      { label: "WhatsApp Campaigns", path: "/admin/whatsapp-campaigns" },
       { label: "Coupons & Promos", path: "/admin/coupons" },
       { label: "Offer Sections", path: "/admin/offer-sections" },
       { label: "Shop by Store", path: "/admin/shop-by-store" },
