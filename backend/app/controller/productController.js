@@ -363,7 +363,8 @@ export const getProducts = async (req, res) => {
 
     if (search && String(search).trim()) {
       const cleanSearch = String(search).trim();
-      const searchRegex = new RegExp(cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const escapedSearch = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escapedSearch.split('').join('.*?'), "i");
 
       searchOrConditions = [
         { name: searchRegex },
@@ -1391,10 +1392,12 @@ export const getModerationProducts = async (req, res) => {
 
     if (search && String(search).trim()) {
       const term = String(search).trim();
+      const escapedSearch = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escapedSearch.split('').join('.*?'), "i");
       baseQuery.$or = [
-        { name: { $regex: term, $options: "i" } },
-        { slug: { $regex: term, $options: "i" } },
-        { sku: { $regex: term, $options: "i" } },
+        { name: searchRegex },
+        { slug: searchRegex },
+        { sku: searchRegex },
       ];
     }
 
