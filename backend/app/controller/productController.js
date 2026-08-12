@@ -1,5 +1,6 @@
 import Product from "../models/product.js";
 import Seller from "../models/seller.js";
+import Category from "../models/category.js";
 import SellerStorePromotion from "../models/sellerStorePromotion.js";
 import { handleResponse } from "../utils/helper.js";
 import { slugify } from "../utils/slugify.js";
@@ -358,8 +359,36 @@ export const getProducts = async (req, res) => {
     const enforceRadius = isCustomerVisibilityRequest(req);
 
     const query = {};
-    if (search) {
-      query.name = { $regex: search, $options: "i" };
+    let searchOrConditions = null;
+
+    if (search && String(search).trim()) {
+      const cleanSearch = String(search).trim();
+      const searchRegex = new RegExp(cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+
+      searchOrConditions = [
+        { name: searchRegex },
+        { brand: searchRegex },
+        { tags: searchRegex },
+        { description: searchRegex },
+        { "variants.name": searchRegex },
+      ];
+
+      try {
+        const matchingCategories = await Category.find(
+          { name: searchRegex },
+          { _id: 1 }
+        ).lean();
+        if (matchingCategories.length > 0) {
+          const matchedCatIds = matchingCategories.map((c) => c._id);
+          searchOrConditions.push(
+            { categoryId: { $in: matchedCatIds } },
+            { subcategoryId: { $in: matchedCatIds } },
+            { headerId: { $in: matchedCatIds } }
+          );
+        }
+      } catch (catSearchErr) {
+        console.warn("Error searching categories for product match:", catSearchErr?.message);
+      }
     }
 
     // Support both field names for flexibility (backward compatibility)
@@ -404,6 +433,16 @@ export const getProducts = async (req, res) => {
     } else {
       if (enforceRadius) {
         query.deliveryType = "scheduled";
+      }
+    }
+
+    if (searchOrConditions && searchOrConditions.length > 0) {
+      if (query.$or) {
+        const locationOr = query.$or;
+        delete query.$or;
+        query.$and = [{ $or: locationOr }, { $or: searchOrConditions }];
+      } else {
+        query.$or = searchOrConditions;
       }
     }
 

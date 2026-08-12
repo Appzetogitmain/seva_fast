@@ -475,86 +475,141 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
     }
   }
 
-  // 2. Sub-Admin Commission → Admin panel sub-admin wallet (by seller zone)
-  //    Field Worker → seller onboarder (customer referral chain)
-  const subAdminAmt = roundCurrency(commBreakdown.subAdminCommissionAmount || 0);
+  // 2. Sub-Admin Commission → Admin panel sub-admins (by seller zone + assigned categories)
+  //    Each sub-admin in the zone receives commission only for order items
+  //    matching their assigned header categories.
+  //    Sub-admins with no assignedCategories receive commission for all items (backward compat).
+  //    Each sub-admin's commission rate is their own categoryCommissionRate if set,
+  //    otherwise the global subAdminCommissionPercent from commBreakdown.
   const fieldWorkerAmt = roundCurrency(commBreakdown.fieldWorkerCommissionAmount || 0);
+  const globalSubAdminPercent = commBreakdown.subAdminCommissionPercent ?? 0;
 
-  if ((subAdminAmt > 0 || fieldWorkerAmt > 0) && order.seller) {
+  if (order.seller) {
     const SellerModel = (await import("../../models/seller.js")).default;
     const seller = await SellerModel.findById(order.seller).session(session);
 
     if (seller) {
-      // Sub-Admin: prefer zone-assigned Admin (created from admin panel)
-      if (subAdminAmt > 0) {
-        const zoneId = seller.zoneId || order.zoneId || null;
-        let creditedToPanelSubAdmin = false;
+      const zoneId = seller.zoneId || order.zoneId || null;
 
-        if (zoneId) {
-          const AdminModel = (await import("../../models/admin.js")).default;
-          const panelSubAdmin = await AdminModel.findOne({
-            role: "sub-admin",
-            assignedZones: zoneId,
-          }).session(session);
+      // ─── Panel Sub-Admin (zone + category-aware) ─────────────────────────
+      let anyPanelSubAdminCredited = false;
 
-          if (panelSubAdmin) {
-            await creditWallet({
-              ownerType: OWNER_TYPE.SUB_ADMIN,
-              ownerId: panelSubAdmin._id,
-              amount: subAdminAmt,
-              bucket: "available",
-              session,
-            });
+      if (zoneId) {
+        const AdminModel = (await import("../../models/admin.js")).default;
+        const panelSubAdmins = await AdminModel.find({
+          role: "sub-admin",
+          assignedZones: zoneId,
+        })
+          .select("_id assignedCategories categoryCommissionRate")
+          .lean()
+          .session(session);
 
-            const subAdminWallet = await getOrCreateWallet(
-              OWNER_TYPE.SUB_ADMIN,
-              panelSubAdmin._id,
-              { session },
+        // Order line items with their header category + subtotal
+        const lineItems = Array.isArray(order.paymentBreakdown?.lineItems)
+          ? order.paymentBreakdown.lineItems
+          : [];
+        const orderSubtotal = roundCurrency(
+          breakdown.productSubtotal || lineItems.reduce((s, li) => s + (li.itemSubtotal || 0), 0) || 0,
+        );
+
+        for (const panelSubAdmin of panelSubAdmins) {
+          const assignedCatIds = (panelSubAdmin.assignedCategories || []).map(String);
+          const hasFilter = assignedCatIds.length > 0;
+
+          // Determine the commission base for this sub-admin
+          let commissionBase = 0;
+          let coveredLineItems = [];
+
+          if (!hasFilter) {
+            // No category filter → gets commission on the entire order subtotal
+            commissionBase = orderSubtotal;
+            coveredLineItems = lineItems;
+          } else {
+            // Only items whose headerCategoryId is in this sub-admin's assigned categories
+            coveredLineItems = lineItems.filter((li) =>
+              assignedCatIds.includes(String(li.headerCategoryId)),
             );
-            await createLedgerEntry(
-              {
-                orderId: order._id,
-                walletId: subAdminWallet._id,
-                actorType: OWNER_TYPE.SUB_ADMIN,
-                actorId: panelSubAdmin._id,
-                type: LEDGER_TRANSACTION_TYPE.COMMISSION,
-                direction: LEDGER_DIRECTION.CREDIT,
-                amount: subAdminAmt,
-                paymentMode: order.paymentMode,
-                description: `Sub-admin commission for order ${order.orderId} (zone)`,
-                reference: `SA-COMM-${order.orderId}`,
-              },
-              { session },
+            commissionBase = roundCurrency(
+              coveredLineItems.reduce((s, li) => s + (li.itemSubtotal || 0), 0),
             );
-
-            const TransactionModel = (await import("../../models/transaction.js")).default;
-            await TransactionModel.create(
-              [
-                {
-                  user: panelSubAdmin._id,
-                  userModel: "Admin",
-                  type: "Commission",
-                  amount: subAdminAmt,
-                  status: "Settled",
-                  reference: `SA-COMM-${order.orderId}`,
-                  order: order._id,
-                  meta: {
-                    orderId: order._id,
-                    commissionPercent: commBreakdown.subAdminCommissionPercent,
-                    orderAmount: breakdown.productSubtotal,
-                    description: `Sub-Admin Commission from order ${order.orderId}`,
-                    zoneId: String(zoneId),
-                  },
-                },
-              ],
-              { session },
-            );
-            creditedToPanelSubAdmin = true;
           }
-        }
 
-        // Fallback: referral chain (legacy customer-based sub-admin)
-        if (!creditedToPanelSubAdmin && seller.onboardedBy) {
+          if (commissionBase <= 0) continue; // No matching items for this sub-admin
+
+          // Use per-sub-admin rate if set, otherwise fall back to global rate
+          const effectiveRate =
+            panelSubAdmin.categoryCommissionRate != null
+              ? Number(panelSubAdmin.categoryCommissionRate)
+              : globalSubAdminPercent;
+
+          const subAdminCommAmt = roundCurrency((commissionBase * effectiveRate) / 100);
+          if (subAdminCommAmt <= 0) continue;
+
+          // Credit sub-admin wallet
+          await creditWallet({
+            ownerType: OWNER_TYPE.SUB_ADMIN,
+            ownerId: panelSubAdmin._id,
+            amount: subAdminCommAmt,
+            bucket: "available",
+            session,
+          });
+
+          const subAdminWallet = await getOrCreateWallet(
+            OWNER_TYPE.SUB_ADMIN,
+            panelSubAdmin._id,
+            { session },
+          );
+          await createLedgerEntry(
+            {
+              orderId: order._id,
+              walletId: subAdminWallet._id,
+              actorType: OWNER_TYPE.SUB_ADMIN,
+              actorId: panelSubAdmin._id,
+              type: LEDGER_TRANSACTION_TYPE.COMMISSION,
+              direction: LEDGER_DIRECTION.CREDIT,
+              amount: subAdminCommAmt,
+              paymentMode: order.paymentMode,
+              description: `Sub-admin commission for order ${order.orderId} (zone${hasFilter ? ", category-filtered" : ""})`,
+              reference: `SA-COMM-${order.orderId}-${String(panelSubAdmin._id).slice(-6)}`,
+            },
+            { session },
+          );
+
+          const TransactionModel = (await import("../../models/transaction.js")).default;
+          await TransactionModel.create(
+            [
+              {
+                user: panelSubAdmin._id,
+                userModel: "Admin",
+                type: "Commission",
+                amount: subAdminCommAmt,
+                status: "Settled",
+                reference: `SA-COMM-${order.orderId}-${String(panelSubAdmin._id).slice(-6)}`,
+                order: order._id,
+                meta: {
+                  orderId: order._id,
+                  commissionRate: effectiveRate,
+                  commissionBase,
+                  orderAmount: orderSubtotal,
+                  categoryFiltered: hasFilter,
+                  assignedCategoryIds: assignedCatIds,
+                  description: `Sub-Admin Commission from order ${order.orderId}${hasFilter ? " (category-filtered)" : ""}`,
+                  zoneId: String(zoneId),
+                },
+              },
+            ],
+            { session },
+          );
+
+          anyPanelSubAdminCredited = true;
+        }
+      }
+
+      // ─── Fallback: legacy customer referral chain sub-admin ───────────────
+      // Only used when no panel sub-admin was matched to avoid double payment.
+      if (!anyPanelSubAdminCredited && seller.onboardedBy && globalSubAdminPercent > 0) {
+        const subAdminAmtLegacy = roundCurrency(commBreakdown.subAdminCommissionAmount || 0);
+        if (subAdminAmtLegacy > 0) {
           const CustomerModel = (await import("../../models/customer.js")).default;
           const onboarderUser = await CustomerModel.findById(seller.onboardedBy).session(session);
           if (onboarderUser) {
@@ -566,7 +621,7 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
             await creditWallet({
               ownerType: OWNER_TYPE.CUSTOMER,
               ownerId: targetSubAdminId,
-              amount: subAdminAmt,
+              amount: subAdminAmtLegacy,
               bucket: "available",
               session,
             });
@@ -584,7 +639,7 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
                 actorId: targetSubAdminId,
                 type: LEDGER_TRANSACTION_TYPE.COMMISSION,
                 direction: LEDGER_DIRECTION.CREDIT,
-                amount: subAdminAmt,
+                amount: subAdminAmtLegacy,
                 paymentMode: order.paymentMode,
                 description: `Sub-admin commission for order ${order.orderId}`,
                 reference: `SA-COMM-${order.orderId}`,
@@ -599,13 +654,13 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
                   user: targetSubAdminId,
                   userModel: "User",
                   type: "Commission",
-                  amount: subAdminAmt,
+                  amount: subAdminAmtLegacy,
                   status: "Settled",
                   reference: `SA-COMM-${order.orderId}`,
                   order: order._id,
                   meta: {
                     orderId: order._id,
-                    commissionPercent: commBreakdown.subAdminCommissionPercent,
+                    commissionPercent: globalSubAdminPercent,
                     orderAmount: breakdown.productSubtotal,
                     description: `Sub-Admin Commission from order ${order.orderId}`,
                   },
@@ -616,6 +671,7 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
           }
         }
       }
+
 
       // Field Worker: seller onboarder customer wallet
       if (fieldWorkerAmt > 0 && seller.onboardedBy) {

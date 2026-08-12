@@ -5,6 +5,7 @@ import { buildKey, getOrSet, getTTL, invalidate } from "../services/cacheService
 import { uploadToCloudinary } from "../services/mediaService.js";
 import mongoose from "mongoose";
 import { invalidateCategoryName } from "../services/entityNameCache.js";
+import { seedMasterCategories } from "../services/masterCategorySeedService.js";
 
 function normalizeUrl(value) {
   if (!value || typeof value !== "string") return "";
@@ -75,15 +76,10 @@ function validateHeaderHexColors(payload, { requireAll = false } = {}) {
   return null;
 }
 
-const CATEGORY_NAME_RE = /^[a-zA-Z0-9\s-]+$/;
-
 function validateCategoryName(payload) {
   if (!Object.prototype.hasOwnProperty.call(payload, "name")) return null;
   const name = String(payload.name ?? "").trim();
   if (!name) return "Category name is required";
-  if (!CATEGORY_NAME_RE.test(name)) {
-    return "Category name cannot contain special characters. Use letters, numbers, spaces, or hyphens only.";
-  }
   payload.name = name;
   return null;
 }
@@ -471,5 +467,23 @@ export const deleteCategory = async (req, res) => {
     return handleResponse(res, 200, "Category and all descendants deleted");
   } catch (error) {
     return handleResponse(res, 500, error.message);
+  }
+};
+
+/* ===============================
+   SEED MASTER CATEGORIES
+ ================================ */
+export const seedMasterCategoriesController = async (req, res) => {
+  try {
+    const result = await seedMasterCategories();
+    return handleResponse(
+      res,
+      200,
+      `Master categories populated successfully! Created/updated ${result.headers} headers, ${result.categories} categories, and ${result.subcategories} subcategories.`,
+      result
+    );
+  } catch (error) {
+    console.error("Seed master categories error:", error);
+    return handleResponse(res, 500, error.message || "Failed to seed master categories");
   }
 };

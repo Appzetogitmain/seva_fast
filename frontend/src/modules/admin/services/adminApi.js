@@ -47,6 +47,7 @@ export const adminApi = {
     createCategory: (formData) => axiosInstance.post('/admin/categories', formData),
     updateCategory: (id, formData) => axiosInstance.put(`/admin/categories/${id}`, formData),
     deleteCategory: (id) => axiosInstance.delete(`/admin/categories/${id}`),
+    seedMasterCategories: () => axiosInstance.post('/admin/categories/seed-master'),
     getParentUnits: () => axiosInstance.get('/admin/categories?flat=true'),
 
     // Product Management
@@ -170,6 +171,7 @@ export const adminApi = {
     rejectPlatformAd: (id, data) => axiosInstance.patch(`/admin/professionals/platform-ads/${id}/reject`, data),
 
     // Sub-Admin Management
+    // Payloads support: assignedZones, assignedCategories, categoryCommissionRate, allowedPermissions
     getSubadmins: () => axiosInstance.get('/admin/subadmins'),
     createSubadmin: (data) => axiosInstance.post('/admin/subadmins', data),
     updateSubadmin: (id, data) => axiosInstance.put(`/admin/subadmins/${id}`, data),
@@ -181,6 +183,9 @@ export const adminApi = {
     createZone: (data) => axiosInstance.post('/admin/zones', data),
     updateZone: (id, data) => axiosInstance.put(`/admin/zones/${id}`, data),
     deleteZone: (id) => axiosInstance.delete(`/admin/zones/${id}`),
+
+    // Header Categories (for sub-admin category picker)
+    getHeaderCategories: () => axiosInstance.get('/categories', { params: { type: 'header' } }),
 
     // Product Reviews
     getPendingReviews: (params) => axiosInstance.get('/reviews/admin/pending', { params }),

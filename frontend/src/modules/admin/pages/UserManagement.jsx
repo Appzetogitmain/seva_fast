@@ -12,7 +12,10 @@ import {
     HiOutlineMapPin,
     HiOutlineEnvelope,
     HiOutlinePhone,
-    HiOutlineKey
+    HiOutlineKey,
+    HiOutlineTag,
+    HiOutlineCurrencyRupee,
+    HiOutlineInformationCircle
 } from 'react-icons/hi2';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -51,6 +54,7 @@ const UserManagement = () => {
     const { showToast } = useToast();
     const [subadmins, setSubadmins] = useState([]);
     const [zones, setZones] = useState([]);
+    const [headerCategories, setHeaderCategories] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -63,6 +67,8 @@ const UserManagement = () => {
         phone: '',
         password: '',
         assignedZones: [],
+        assignedCategories: [],
+        categoryCommissionRate: '',
         allowedPermissions: []
     });
 
@@ -73,9 +79,10 @@ const UserManagement = () => {
     const fetchData = async () => {
         try {
             setIsLoading(true);
-            const [subRes, zonesRes] = await Promise.all([
+            const [subRes, zonesRes, catsRes] = await Promise.all([
                 adminApi.getSubadmins(),
-                adminApi.getZones()
+                adminApi.getZones(),
+                adminApi.getHeaderCategories()
             ]);
 
             if (subRes.data.success) {
@@ -83,6 +90,11 @@ const UserManagement = () => {
             }
             if (zonesRes.data.success) {
                 setZones(zonesRes.data.result?.zones || zonesRes.data.results || []);
+            }
+            if (catsRes.data.success) {
+                // Backend returns header categories (type: 'header')
+                const cats = catsRes.data.result || catsRes.data.results || catsRes.data || [];
+                setHeaderCategories(Array.isArray(cats) ? cats : []);
             }
         } catch (error) {
             showToast('Failed to load data', 'error');
@@ -102,6 +114,10 @@ const UserManagement = () => {
                 assignedZones: Array.isArray(user.assignedZones)
                     ? user.assignedZones.map(z => (z && typeof z === 'object' ? z._id : z))
                     : [],
+                assignedCategories: Array.isArray(user.assignedCategories)
+                    ? user.assignedCategories.map(c => (c && typeof c === 'object' ? c._id : c))
+                    : [],
+                categoryCommissionRate: user.categoryCommissionRate != null ? String(user.categoryCommissionRate) : '',
                 allowedPermissions: Array.isArray(user.allowedPermissions) ? user.allowedPermissions : []
             });
         } else {
@@ -112,6 +128,8 @@ const UserManagement = () => {
                 phone: '',
                 password: '',
                 assignedZones: [],
+                assignedCategories: [],
+                categoryCommissionRate: '',
                 allowedPermissions: []
             });
         }
@@ -144,6 +162,19 @@ const UserManagement = () => {
         });
     };
 
+    const handleToggleCategory = (catId) => {
+        setFormData(prev => {
+            const current = [...(prev.assignedCategories || [])];
+            const idx = current.indexOf(catId);
+            if (idx > -1) {
+                current.splice(idx, 1);
+            } else {
+                current.push(catId);
+            }
+            return { ...prev, assignedCategories: current };
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         // Bug 254: Validate name - only alphabets and spaces allowed
@@ -162,6 +193,10 @@ const UserManagement = () => {
                 email: formData.email,
                 phone: formData.phone,
                 assignedZones: formData.assignedZones,
+                assignedCategories: formData.assignedCategories || [],
+                categoryCommissionRate: formData.categoryCommissionRate !== '' && formData.categoryCommissionRate !== null
+                    ? Number(formData.categoryCommissionRate)
+                    : null,
                 allowedPermissions: formData.allowedPermissions
             };
 
@@ -235,6 +270,16 @@ const UserManagement = () => {
         });
     };
 
+    const getCategoryNames = (catRefs) => {
+        if (!Array.isArray(catRefs) || catRefs.length === 0) return [];
+        return catRefs.map(val => {
+            if (val && typeof val === 'object' && val.name) return val.name;
+            const id = val && typeof val === 'object' ? val._id : val;
+            const cat = headerCategories.find(c => c._id === id);
+            return cat ? cat.name : String(id);
+        });
+    };
+
     return (
         <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
             {/* Header Area */}
@@ -294,7 +339,8 @@ const UserManagement = () => {
                             <tr className="bg-slate-50/50 border-b border-slate-50">
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Sub-Admin Info</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact</th>
-                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Zones</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Zones</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Categories</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Wallet</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Permissions</th>
                                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
@@ -303,7 +349,7 @@ const UserManagement = () => {
                         <tbody className="divide-y divide-slate-50">
                             {isLoading && (
                                 <tr>
-                                    <td colSpan="6" className="text-center py-12 text-slate-400 text-sm">
+                                    <td colSpan="7" className="text-center py-12 text-slate-400 text-sm">
                                         Loading records...
                                     </td>
                                 </tr>
@@ -336,7 +382,7 @@ const UserManagement = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-6">
-                                        <div className="flex flex-wrap gap-1.5 max-w-xs">
+                                        <div className="flex flex-wrap gap-1.5 max-w-[140px]">
                                             {Array.isArray(user.assignedZones) && user.assignedZones.length > 0 ? (
                                                 getZoneNames(user.assignedZones).map((zname, idx) => (
                                                     <Badge key={idx} variant="primary" className="text-[9px] font-bold py-0.5 px-2 bg-slate-100 text-slate-700 border-none">
@@ -344,7 +390,29 @@ const UserManagement = () => {
                                                     </Badge>
                                                 ))
                                             ) : (
-                                                <span className="text-[10px] text-amber-600 font-bold italic">No zones — commissions won&apos;t credit</span>
+                                                <span className="text-[10px] text-amber-600 font-bold italic">No zones</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    {/* Categories column */}
+                                    <td className="px-6 py-6">
+                                        <div className="flex flex-wrap gap-1.5 max-w-[160px]">
+                                            {Array.isArray(user.assignedCategories) && user.assignedCategories.length > 0 ? (
+                                                <>
+                                                    {getCategoryNames(user.assignedCategories).map((cname, idx) => (
+                                                        <Badge key={idx} className="text-[9px] font-bold py-0.5 px-2 bg-violet-50 text-violet-700 border-none">
+                                                            {cname}
+                                                        </Badge>
+                                                    ))}
+                                                    {user.categoryCommissionRate != null && (
+                                                        <span className="text-[9px] font-black text-emerald-600 flex items-center gap-0.5 mt-0.5">
+                                                            <HiOutlineCurrencyRupee className="h-3 w-3" />
+                                                            {user.categoryCommissionRate}% own rate
+                                                        </span>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <span className="text-[10px] text-slate-400 font-bold italic">All categories</span>
                                             )}
                                         </div>
                                     </td>
@@ -389,7 +457,7 @@ const UserManagement = () => {
                             ))}
                             {!isLoading && filteredUsers.length === 0 && (
                                 <tr>
-                                    <td colSpan="6" className="text-center py-16">
+                                    <td colSpan="7" className="text-center py-16">
                                         <p className="text-slate-400 font-bold text-sm">No sub-admin users found.</p>
                                     </td>
                                 </tr>
@@ -539,6 +607,88 @@ const UserManagement = () => {
                                 </p>
                             )}
                         </div>
+                    </div>
+
+                    {/* Category Assignment Section */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                <HiOutlineTag className="h-4 w-4 text-slate-400" />
+                                Assigned Header Categories
+                            </label>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, assignedCategories: headerCategories.map(c => c._id) }))}
+                                    className="text-[9px] font-black text-violet-600 uppercase hover:underline"
+                                >
+                                    Select All
+                                </button>
+                                <span className="text-[9px] text-slate-300">|</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, assignedCategories: [] }))}
+                                    className="text-[9px] font-black text-rose-600 uppercase hover:underline"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                        <p className="text-[9px] text-slate-400 font-medium flex items-center gap-1">
+                            <HiOutlineInformationCircle className="h-3.5 w-3.5" />
+                            Leave empty to manage all categories. Commission is credited only for matched category items.
+                        </p>
+                        <div className="bg-slate-50 rounded-2xl p-4 max-h-36 overflow-y-auto grid grid-cols-2 gap-3 border border-slate-100">
+                            {headerCategories.map((cat) => {
+                                const isChecked = (formData.assignedCategories || []).includes(cat._id);
+                                return (
+                                    <label
+                                        key={cat._id}
+                                        className={cn(
+                                            'flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all',
+                                            isChecked
+                                                ? 'bg-violet-50 border-violet-400 text-violet-900'
+                                                : 'bg-white border-slate-100 text-slate-600 hover:bg-slate-100/50'
+                                        )}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => handleToggleCategory(cat._id)}
+                                            className="accent-violet-600 h-4 w-4 rounded cursor-pointer"
+                                        />
+                                        <span className="text-xs font-black select-none">{cat.name}</span>
+                                    </label>
+                                );
+                            })}
+                            {headerCategories.length === 0 && (
+                                <p className="col-span-2 text-center text-xs text-slate-400 py-4 italic font-bold">
+                                    No header categories found.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Per-Sub-Admin Commission Rate */}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            <HiOutlineCurrencyRupee className="h-4 w-4 text-slate-400" />
+                            Category Commission Rate (%)
+                        </label>
+                        <p className="text-[9px] text-slate-400 font-medium flex items-center gap-1">
+                            <HiOutlineInformationCircle className="h-3.5 w-3.5" />
+                            Leave blank to use the global sub-admin commission rate from Finance Settings.
+                        </p>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={formData.categoryCommissionRate}
+                            onChange={(e) => setFormData({ ...formData, categoryCommissionRate: e.target.value })}
+                            placeholder="e.g. 8.5 (leave blank = use global rate)"
+                            className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none ring-1 ring-transparent focus:ring-violet-200 transition-all"
+                        />
                     </div>
 
                     {/* Permissions selection checkboxes */}

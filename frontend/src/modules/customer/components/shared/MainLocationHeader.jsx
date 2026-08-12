@@ -418,7 +418,14 @@ const MainLocationHeader = ({
                   readOnly
                   className="flex-1 bg-transparent border-none outline-none pl-2 text-slate-800 font-semibold placeholder:text-black text-[15px] cursor-pointer"
                 />
-                <div className="flex items-center gap-2 border-l border-slate-100 pl-3">
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate("/search?voice=true");
+                  }}
+                  className="flex items-center gap-2 border-l border-slate-100 pl-3 cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+                  title="Voice Search"
+                >
                   <MicIcon sx={{ color: "#000000", fontSize: 20 }} />
                 </div>
               </motion.div>
@@ -531,7 +538,14 @@ const MainLocationHeader = ({
                 readOnly
                 className="flex-1 bg-transparent border-none outline-none pl-2 text-slate-800 font-semibold placeholder:text-black text-[14px] cursor-pointer"
               />
-              <div className="flex items-center gap-2 border-l border-slate-100 pl-2.5">
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate("/search?voice=true");
+                }}
+                className="flex items-center gap-2 border-l border-slate-100 pl-2.5 cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+                title="Voice Search"
+              >
                 <MicIcon sx={{ color: "#000000", fontSize: 18 }} />
               </div>
             </motion.div>

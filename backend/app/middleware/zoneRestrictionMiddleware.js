@@ -1,14 +1,20 @@
 import Admin from "../models/admin.js";
 import handleResponse from "../utils/helper.js";
 
-// Load assigned zones for a sub-admin
+// Load assigned zones and categories for a sub-admin
 export const loadSubadminZones = async (req, res, next) => {
   if (req.user?.role === "sub-admin") {
     try {
-      const admin = await Admin.findById(req.user.id).select("assignedZones").lean();
+      const admin = await Admin.findById(req.user.id)
+        .select("assignedZones assignedCategories categoryCommissionRate")
+        .lean();
       req.assignedZones = admin?.assignedZones || [];
+      req.assignedCategories = admin?.assignedCategories || [];
+      req.categoryCommissionRate = admin?.categoryCommissionRate ?? null;
     } catch (err) {
       req.assignedZones = [];
+      req.assignedCategories = [];
+      req.categoryCommissionRate = null;
     }
   }
   next();

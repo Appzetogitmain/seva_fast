@@ -3,7 +3,8 @@ import {
     getCategories,
     createCategory,
     updateCategory,
-    deleteCategory
+    deleteCategory,
+    seedMasterCategoriesController
 } from "../controller/categoryController.js";
 import { verifyToken, allowRoles } from "../middleware/authMiddleware.js";
 import multer from "multer";
@@ -17,6 +18,13 @@ const router = express.Router();
 router.get("/", getCategories);
 
 // Admin only routes
+router.post(
+    "/seed-master",
+    verifyToken,
+    allowRoles("admin"),
+    seedMasterCategoriesController
+);
+
 router.post(
     "/",
     verifyToken,

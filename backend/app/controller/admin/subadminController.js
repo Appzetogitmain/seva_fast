@@ -9,6 +9,7 @@ export const getSubadmins = async (req, res) => {
   try {
     const subadmins = await Admin.find({ role: "sub-admin" })
       .populate("assignedZones")
+      .populate("assignedCategories", "name type image iconId")
       .sort({ name: 1 })
       .lean();
 
@@ -43,13 +44,21 @@ export const getSubadmins = async (req, res) => {
 
 export const createSubadmin = async (req, res) => {
   try {
-    const { name, email, password, phone, assignedZones, allowedPermissions } = req.body;
+    const { name, email, password, phone, assignedZones, allowedPermissions, assignedCategories, categoryCommissionRate } = req.body;
     if (!name || !email || !password) {
       return handleResponse(res, 400, "Name, email and password are required");
     }
     // Bug 254: Name must contain only alphabets and spaces
     if (!/^[a-zA-Z\s]+$/.test(name.trim())) {
       return handleResponse(res, 400, "Full name must contain only alphabets and spaces");
+    }
+
+    // Validate categoryCommissionRate if provided
+    if (categoryCommissionRate !== undefined && categoryCommissionRate !== null) {
+      const rate = Number(categoryCommissionRate);
+      if (isNaN(rate) || rate < 0 || rate > 100) {
+        return handleResponse(res, 400, "categoryCommissionRate must be a number between 0 and 100");
+      }
     }
 
     const existing = await Admin.findOne({ email });
@@ -64,6 +73,8 @@ export const createSubadmin = async (req, res) => {
       phone,
       role: "sub-admin",
       assignedZones: assignedZones || [],
+      assignedCategories: assignedCategories || [],
+      categoryCommissionRate: categoryCommissionRate != null ? Number(categoryCommissionRate) : null,
       allowedPermissions: allowedPermissions || [],
       isVerified: true,
     });
@@ -88,7 +99,7 @@ export const createSubadmin = async (req, res) => {
 export const updateSubadmin = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, password, phone, assignedZones, allowedPermissions } = req.body;
+    const { name, email, password, phone, assignedZones, allowedPermissions, assignedCategories, categoryCommissionRate } = req.body;
 
     const subadmin = await Admin.findById(id);
     if (!subadmin || subadmin.role !== "sub-admin") {
@@ -114,6 +125,20 @@ export const updateSubadmin = async (req, res) => {
     if (assignedZones) subadmin.assignedZones = assignedZones;
     if (allowedPermissions) subadmin.allowedPermissions = allowedPermissions;
     if (password) subadmin.password = password;
+    // Update assignedCategories (allow setting to empty array to clear)
+    if (assignedCategories !== undefined) subadmin.assignedCategories = assignedCategories;
+    // Update per-sub-admin commission rate (null to revert to global rate)
+    if (categoryCommissionRate !== undefined) {
+      if (categoryCommissionRate === null || categoryCommissionRate === "") {
+        subadmin.categoryCommissionRate = null;
+      } else {
+        const rate = Number(categoryCommissionRate);
+        if (isNaN(rate) || rate < 0 || rate > 100) {
+          return handleResponse(res, 400, "categoryCommissionRate must be a number between 0 and 100");
+        }
+        subadmin.categoryCommissionRate = rate;
+      }
+    }
 
     await subadmin.save();
     await ensureSubAdminWallet(subadmin._id);
@@ -144,8 +169,9 @@ export const getSubadminWalletController = async (req, res) => {
   try {
     const { id } = req.params;
     const subadmin = await Admin.findOne({ _id: id, role: "sub-admin" })
-      .select("name email phone assignedZones")
+      .select("name email phone assignedZones assignedCategories categoryCommissionRate")
       .populate("assignedZones", "name")
+      .populate("assignedCategories", "name type image iconId")
       .lean();
     if (!subadmin) {
       return handleResponse(res, 404, "Sub-admin not found");

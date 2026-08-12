@@ -46,6 +46,23 @@ const adminSchema = new mongoose.Schema(
         ref: "Zone",
       },
     ],
+    // Header-level categories this sub-admin is responsible for.
+    // Empty array means "all categories" (backward-compatible default).
+    assignedCategories: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Category",
+      },
+    ],
+    // Per-sub-admin commission rate (%). When set, overrides the global
+    // subAdminCommissionPercent from finance settings for this sub-admin's
+    // assigned category items. null/undefined = use global rate.
+    categoryCommissionRate: {
+      type: Number,
+      default: null,
+      min: 0,
+      max: 100,
+    },
     allowedPermissions: [
       {
         type: String,

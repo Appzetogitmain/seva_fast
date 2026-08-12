@@ -23,8 +23,19 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { adminApi } from '../services/adminApi';
 import { toast } from 'sonner';
+import { useAuth } from '@core/context/AuthContext';
 
 const CategoryManagement = () => {
+    const { user } = useAuth();
+    // Sub-admin: restrict visible header categories to their assignedCategories.
+    // Super-admin (role === 'admin'): no restriction, sees everything.
+    const isSubAdmin = user?.role === 'sub-admin';
+    const subAdminAssignedCategoryIds = useMemo(() => {
+        if (!isSubAdmin) return null; // null = no filter
+        if (!Array.isArray(user?.assignedCategories) || user.assignedCategories.length === 0) return null;
+        return new Set(user.assignedCategories.map(c => (c && typeof c === 'object' ? c._id : c) + ''));
+    }, [isSubAdmin, user?.assignedCategories]);
+
     const [categories, setCategories] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [expanded, setExpanded] = useState([]);
@@ -70,10 +81,34 @@ const CategoryManagement = () => {
             ]);
 
             if (categoriesRes.data.success) {
-                setCategories(categoriesRes.data.results || categoriesRes.data.result || []);
+                let allCats = categoriesRes.data.results || categoriesRes.data.result || [];
+                // Sub-admin filter: keep only assigned header categories and their children
+                if (isSubAdmin && subAdminAssignedCategoryIds) {
+                    allCats = allCats.filter(cat => {
+                        if (cat.type === 'header') {
+                            return subAdminAssignedCategoryIds.has(String(cat._id));
+                        }
+                        // Keep child categories whose header parent is in assigned set
+                        if (cat.type === 'category' && cat.parentId) {
+                            return subAdminAssignedCategoryIds.has(String(cat.parentId));
+                        }
+                        // Keep subcategories whose grandparent header is assigned
+                        // (parentId of subcategory points to a category, not directly to header;
+                        //  we keep them unconditionally if the parent category is kept above)
+                        return true;
+                    });
+                }
+                setCategories(allCats);
             }
             if (parentsRes.data.success) {
-                setParentUnits(parentsRes.data.results || parentsRes.data.result || []);
+                let parents = parentsRes.data.results || parentsRes.data.result || [];
+                if (isSubAdmin && subAdminAssignedCategoryIds) {
+                    parents = parents.filter(p => !p.type || p.type === 'header'
+                        ? subAdminAssignedCategoryIds.has(String(p._id))
+                        : true
+                    );
+                }
+                setParentUnits(parents);
             }
         } catch (error) {
             toast.error('Failed to fetch data');
@@ -398,6 +433,24 @@ const CategoryManagement = () => {
                     </button>
                 </div>
             </div>
+
+            {/* Sub-admin category filter notice */}
+            {isSubAdmin && subAdminAssignedCategoryIds && (
+                <div className="flex items-start gap-3 px-5 py-4 rounded-2xl bg-violet-50 border border-violet-100 text-violet-800 text-xs font-semibold">
+                    <Tag className="h-4 w-4 mt-0.5 flex-shrink-0 text-violet-500" />
+                    <div>
+                        <span className="font-black text-violet-700">Filtered view — </span>
+                        You are managing categories assigned to your account only:{' '}
+                        <span className="font-black">
+                            {Array.from(subAdminAssignedCategoryIds).map((id, i) => {
+                                const cat = categories.find(c => String(c._id) === id);
+                                return cat ? (i > 0 ? ', ' : '') + cat.name : '';
+                            }).join('') || 'your assigned categories'}
+                        </span>
+                        . Commissions will be credited to your wallet for orders containing these items.
+                    </div>
+                </div>
+            )}
 
             {/* Toolbox & View Switcher */}
             <div className="space-y-4">

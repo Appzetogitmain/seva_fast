@@ -25,13 +25,9 @@ const HEX_COLOR_RE = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
 
 const isValidHexColor = (value) => HEX_COLOR_RE.test(String(value || "").trim());
 
-/** Letters, numbers, spaces, and hyphens only — no special characters. */
-const CATEGORY_NAME_RE = /^[a-zA-Z0-9\s-]+$/;
-
 const isValidCategoryName = (value) => {
   const name = String(value || "").trim();
-  if (!name) return false;
-  return CATEGORY_NAME_RE.test(name);
+  return name.length > 0;
 };
 
 /** Native <input type="color"> only accepts #rrggbb — expand #rgb when valid. */
@@ -217,8 +213,6 @@ const HeaderCategories = () => {
     const trimmed = String(value || "").trim();
     if (!trimmed) {
       setNameError("Name is required");
-    } else if (!isValidCategoryName(trimmed)) {
-      setNameError("Name cannot contain special characters. Use letters, numbers, spaces, or hyphens only.");
     } else {
       setNameError("");
     }
@@ -254,13 +248,6 @@ const HeaderCategories = () => {
     if (!trimmedName || !formData.slug) {
       if (!trimmedName) setNameError("Name is required");
       toast.error("Name and slug are required");
-      return;
-    }
-    if (!isValidCategoryName(trimmedName)) {
-      const msg =
-        "Name cannot contain special characters. Use letters, numbers, spaces, or hyphens only.";
-      setNameError(msg);
-      toast.error(msg);
       return;
     }
     setNameError("");
@@ -391,21 +378,52 @@ const HeaderCategories = () => {
     setIsAddModalOpen(true);
   };
 
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeedMasterCategories = async () => {
+    if (!window.confirm("Seed master categories? This will auto-populate and sync master categories (Grocery, Electronics, Beauty, Home, Baby Care, Pet Care, etc.). Existing custom categories will not be lost.")) {
+      return;
+    }
+    setIsSeeding(true);
+    const toastId = toast.loading("Seeding master categories & subcategories...");
+    try {
+      const res = await adminApi.seedMasterCategories();
+      toast.success(res.data?.message || "Master categories seeded successfully!", { id: toastId });
+      fetchCategories();
+    } catch (err) {
+      console.error("Master category seeding error:", err);
+      toast.error(err.response?.data?.message || "Failed to seed master categories", { id: toastId });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
             Header Categories
           </h1>
           <p className="text-gray-500 mt-1">Manage top-level categories</p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 bg-black text-primary-foreground px-4 py-2 rounded-lg hover:bg-brand-700 transition-colors">
-          <Plus className="w-5 h-5" />
-          Add New Header
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleSeedMasterCategories}
+            disabled={isSeeding}
+            className="flex items-center gap-2 bg-linear-to-r from-amber-500 to-orange-500 text-white px-4 py-2 rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all font-semibold shadow-sm active:scale-95 disabled:opacity-50 text-sm cursor-pointer"
+            title="Auto-populate Blinkit Master Categories & Subcategories"
+          >
+            <Sparkles className={cn("w-4 h-4", isSeeding && "animate-spin")} />
+            {isSeeding ? "Seeding..." : "Seed Master Categories"}
+          </button>
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-2 bg-black text-primary-foreground px-4 py-2 rounded-lg hover:bg-brand-700 transition-colors text-sm font-semibold cursor-pointer">
+            <Plus className="w-5 h-5" />
+            Add New Header
+          </button>
+        </div>
       </div>
 
       <Card className="border-none shadow-sm">
