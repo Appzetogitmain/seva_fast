@@ -303,6 +303,7 @@ export const updateCustomerProfile = async (req, res) => {
 
         if (payload.name) customer.name = payload.name;
         if (payload.email !== undefined) customer.email = payload.email || undefined;
+        if (payload.profileImage !== undefined) customer.profileImage = payload.profileImage || "";
         if (payload.addresses) customer.addresses = payload.addresses;
         if (payload.dateOfBirth !== undefined) {
             applyDateOfBirthToCustomer(customer, payload.dateOfBirth);

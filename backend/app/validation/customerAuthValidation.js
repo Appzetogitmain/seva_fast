@@ -20,6 +20,7 @@ export const updateCustomerProfileSchema = Joi.object({
   email: Joi.string().trim().email().optional().allow("", null),
   addresses: Joi.array().optional(),
   dateOfBirth: Joi.string().trim().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
+  profileImage: Joi.string().trim().max(500).optional().allow("", null),
 });
 
 export function validateSchema(schema, payload) {

@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Phone, Mail, Camera, Save, Cake } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Camera, Save, Cake, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@core/context/AuthContext';
 import { customerApi } from '../services/customerApi';
+import axiosInstance from '@core/api/axios';
+
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
 
 function formatDobForInput(dateOfBirth) {
     if (!dateOfBirth) return '';
@@ -19,17 +22,56 @@ function formatDobForInput(dateOfBirth) {
 const EditProfilePage = () => {
     const navigate = useNavigate();
     const { user, updateUser } = useAuth();
+    const fileInputRef = useRef(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
     const [formData, setFormData] = useState({
         name: user?.name || '',
         phone: user?.phone || '',
         email: user?.email || '',
         bio: user?.bio || '',
         dateOfBirth: formatDobForInput(user?.dateOfBirth),
+        profileImage: user?.profileImage || '',
     });
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handlePhotoButtonClick = () => {
+        if (isUploadingPhoto) return;
+        fileInputRef.current?.click();
+    };
+
+    const handlePhotoChange = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please choose an image file');
+            return;
+        }
+        if (file.size > MAX_PHOTO_SIZE_BYTES) {
+            toast.error('Image must be smaller than 5MB');
+            return;
+        }
+
+        setIsUploadingPhoto(true);
+        try {
+            const uploadForm = new FormData();
+            uploadForm.append('file', file);
+            const uploadRes = await axiosInstance.post('/media/upload', uploadForm, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            const photoUrl = uploadRes.data.result.url;
+            setFormData((prev) => ({ ...prev, profileImage: photoUrl }));
+            toast.success('Photo uploaded. Save changes to apply it.');
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to upload photo');
+        } finally {
+            setIsUploadingPhoto(false);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -40,6 +82,7 @@ const EditProfilePage = () => {
                 name: formData.name,
                 email: formData.email,
                 dateOfBirth: formData.dateOfBirth,
+                profileImage: formData.profileImage,
             });
             const updatedUser = response.data.result;
 
@@ -71,13 +114,40 @@ const EditProfilePage = () => {
                 <div className="flex flex-col items-center mb-8">
                     <div className="relative">
                         <div className="h-28 w-28 rounded-full bg-slate-200 border-4 border-white shadow-md flex items-center justify-center overflow-hidden">
-                            <User size={48} className="text-slate-400" />
+                            {formData.profileImage ? (
+                                <img
+                                    src={formData.profileImage}
+                                    alt={formData.name || 'Profile'}
+                                    className="h-full w-full object-cover"
+                                />
+                            ) : (
+                                <User size={48} className="text-slate-400" />
+                            )}
+                            {isUploadingPhoto && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                    <Loader2 size={24} className="text-white animate-spin" />
+                                </div>
+                            )}
                         </div>
-                        <button className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full border-2 border-white shadow-sm hover:bg-[#0a701a] transition-colors">
+                        <button
+                            type="button"
+                            onClick={handlePhotoButtonClick}
+                            disabled={isUploadingPhoto}
+                            className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full border-2 border-white shadow-sm hover:bg-[#0a701a] transition-colors disabled:opacity-50"
+                        >
                             <Camera size={18} />
                         </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handlePhotoChange}
+                        />
                     </div>
-                    <p className="mt-3 text-sm font-bold text-primary">Change Photo</p>
+                    <p className="mt-3 text-sm font-bold text-primary">
+                        {isUploadingPhoto ? 'Uploading...' : 'Change Photo'}
+                    </p>
                 </div>
 
                 {/* Edit Form */}

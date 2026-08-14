@@ -139,7 +139,7 @@ const ProfilePage = () => {
     const logoUrl = settings?.logoUrl || '/seva-fast-logo.png';
     const supportEmail = settings?.supportEmail || 'sevafast2@gmail.com';
     const siteHost = (typeof window !== 'undefined' ? window.location.host : 'www.sevafast.in') || 'www.sevafast.in';
-    const profilePhotoUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || user?.phone || 'customer')}`;
+    const profilePhotoUrl = user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || user?.phone || 'customer')}`;
     const qrSrc = (data, size = 120) =>
         `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
     const goldText =
