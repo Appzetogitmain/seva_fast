@@ -46,7 +46,6 @@ const emptyForm = {
     templateName: '',
     languageCode: '',
     bodyParams: [],
-    mediaUrl: '',
     audienceType: 'all',
     targetCustomerIds: [],
     scheduleType: 'immediate',
@@ -206,7 +205,6 @@ const WhatsAppCampaigns = () => {
                 templateName: form.templateName.trim(),
                 languageCode: form.languageCode.trim() || undefined,
                 bodyParams: form.bodyParams.filter((v) => v.trim() !== ''),
-                mediaUrl: form.mediaUrl.trim() || undefined,
                 audienceType: form.audienceType,
                 targetCustomerIds: form.audienceType === 'selected' ? selectedCustomers.map((c) => c.id) : undefined,
                 scheduleType: form.scheduleType,
@@ -535,16 +533,6 @@ const WhatsAppCampaigns = () => {
                                 </button>
                             </div>
                         ))}
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="ds-label">Header Image URL (optional)</label>
-                        <input
-                            value={form.mediaUrl}
-                            onChange={(e) => setForm((p) => ({ ...p, mediaUrl: e.target.value }))}
-                            className="ds-input w-full"
-                            placeholder="https://..."
-                        />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

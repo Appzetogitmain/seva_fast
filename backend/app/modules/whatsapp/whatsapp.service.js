@@ -3,13 +3,13 @@ import { getWhatsAppConfig } from "../../config/whatsapp.js";
 import { maskPhone } from "../../utils/phone.js";
 import logger from "../../services/logger.js";
 
-function buildMessagesUrl(config) {
-  return `${config.baseUrl}/${config.apiVersion}/${config.phoneNumberId}/messages`;
+function buildSendTemplateUrl(config) {
+  return `${config.baseUrl}/send-template`;
 }
 
-// Graph API expects the destination number in international format without
+// Tezsender expects the destination number in international format without
 // a leading '+' (our numbers are already normalized to E.164 upstream).
-function toGraphPhone(e164Phone) {
+function toTezsenderPhone(e164Phone) {
   return String(e164Phone || "").replace(/^\+/, "");
 }
 
@@ -24,18 +24,17 @@ function requireConfig() {
   return config;
 }
 
-function mapGraphError(error) {
-  const graphError = error.response?.data?.error;
-  const message = graphError?.message || error.message || "WhatsApp send failed";
+function mapTezsenderError(error) {
+  const responseData = error.response?.data;
+  const message = responseData?.message || error.message || "WhatsApp send failed";
   const mapped = new Error(message);
   mapped.statusCode = error.response ? 502 : 500;
-  mapped.providerCode = graphError?.code;
-  mapped.providerSubcode = graphError?.error_subcode;
   return mapped;
 }
 
 /**
- * Sends a Meta-approved template message. Business-initiated WhatsApp
+ * Sends an approved WhatsApp template message via Tezsender's Official
+ * (Meta Cloud device) send-template endpoint. Business-initiated WhatsApp
  * messages (order updates, birthday wishes, campaigns) must use an approved
  * template outside the 24h customer-service session window — this is the
  * only send path those flows should use.
@@ -45,7 +44,6 @@ export async function sendWhatsAppTemplateMessage({
   templateName,
   languageCode,
   bodyParams = [],
-  headerImageUrl,
 }) {
   const config = requireConfig();
 
@@ -55,52 +53,39 @@ export async function sendWhatsAppTemplateMessage({
     throw error;
   }
 
-  const components = [];
-  if (headerImageUrl) {
-    components.push({
-      type: "header",
-      parameters: [{ type: "image", image: { link: headerImageUrl } }],
-    });
-  }
-  if (bodyParams.length) {
-    components.push({
-      type: "body",
-      parameters: bodyParams.map((value) => ({ type: "text", text: String(value ?? "") })),
-    });
-  }
-
-  const payload = {
-    messaging_product: "whatsapp",
-    to: toGraphPhone(to),
-    type: "template",
-    template: {
-      name: templateName,
-      language: { code: languageCode || config.defaultLanguageCode },
-      ...(components.length ? { components } : {}),
-    },
+  const params = {
+    api_key: config.apiKey,
+    number: toTezsenderPhone(to),
+    template_name: templateName,
+    language: languageCode || config.defaultLanguageCode,
   };
+  if (bodyParams.length) {
+    params.params = bodyParams.map((value) => String(value ?? "")).join(",");
+  }
 
   try {
-    const response = await axios.post(buildMessagesUrl(config), payload, {
-      headers: {
-        Authorization: `Bearer ${config.accessToken}`,
-        "Content-Type": "application/json",
-      },
+    const response = await axios.get(buildSendTemplateUrl(config), {
+      params,
       timeout: config.timeoutMs,
     });
 
+    if (!response.data?.status) {
+      const error = new Error(response.data?.message || "WhatsApp send failed");
+      error.statusCode = 502;
+      throw error;
+    }
+
     return {
       success: true,
-      waMessageId: response.data?.messages?.[0]?.id || "",
+      waMessageId: response.data?.data?.id || response.data?.id || response.data?.msg_id || "",
       raw: response.data,
     };
   } catch (error) {
-    const mapped = mapGraphError(error);
-    logger.error("WhatsApp Graph API template send failed", {
+    const mapped = error.statusCode ? error : mapTezsenderError(error);
+    logger.error("Tezsender WhatsApp template send failed", {
       to: maskPhone(to),
       templateName,
       message: mapped.message,
-      providerCode: mapped.providerCode,
     });
     throw mapped;
   }

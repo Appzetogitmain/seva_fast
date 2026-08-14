@@ -141,7 +141,7 @@ async function validateDependencies() {
   // since order/birthday flows must keep working even if it's misconfigured.
   const whatsappEnabled = String(process.env.WHATSAPP_ENABLED || "false").toLowerCase() === "true";
   if (whatsappEnabled) {
-    const missingWhatsAppVars = ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"].filter(
+    const missingWhatsAppVars = ["TEZSENDER_API_KEY"].filter(
       (key) => !String(process.env[key] || "").trim(),
     );
     result.checks.whatsapp = missingWhatsAppVars.length

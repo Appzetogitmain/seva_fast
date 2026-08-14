@@ -4,7 +4,7 @@ import { WHATSAPP_MESSAGE_TYPES } from "./whatsapp.constants.js";
 /**
  * Template names/languages are intentionally kept here, separate from
  * dispatcher/business logic, so ops can repoint an event at a different
- * Meta-approved template (or change its language) via env vars only —
+ * Tezsender-approved template (or change its language) via env vars only —
  * no code change, no redeploy of order/campaign logic.
  */
 function envOrDefault(envKey, fallback) {
@@ -56,7 +56,7 @@ export function getTemplateForType(messageType) {
 
 /**
  * Ordered body-parameter builders — must match the {{1}}, {{2}}... variable
- * order in the corresponding Meta-approved template. Update here if an
+ * order in the corresponding approved template. Update here if an
  * approved template's variable order/count changes.
  */
 export function buildOrderEventBodyParams(messageType, vars = {}) {

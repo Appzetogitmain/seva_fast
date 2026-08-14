@@ -40,7 +40,7 @@ const whatsappCampaignSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
-    // Meta-approved template name/language — required for business-initiated sends.
+    // Approved WhatsApp template name/language — required for business-initiated sends.
     templateName: {
       type: String,
       required: true,
@@ -56,11 +56,6 @@ const whatsappCampaignSchema = new mongoose.Schema(
     bodyParams: {
       type: [String],
       default: [],
-    },
-    mediaUrl: {
-      type: String,
-      trim: true,
-      default: "",
     },
     audienceType: {
       type: String,

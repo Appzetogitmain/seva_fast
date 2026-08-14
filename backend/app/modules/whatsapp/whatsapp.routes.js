@@ -8,8 +8,6 @@ import {
   cancelCampaign,
   getCampaignMessages,
   listWhatsAppMessages,
-  verifyWhatsAppWebhook,
-  receiveWhatsAppWebhook,
 } from "./whatsapp.controller.js";
 
 // Admin-only campaign management + message tracking, mounted at /api/admin/whatsapp
@@ -25,11 +23,5 @@ whatsappAdminRouter.post("/campaigns/:id/cancel", cancelCampaign);
 whatsappAdminRouter.get("/campaigns/:id/messages", getCampaignMessages);
 whatsappAdminRouter.get("/messages", listWhatsAppMessages);
 
-// Public Meta webhook, mounted at /api/whatsapp/webhook — no auth middleware
-// (Meta verifies via hub.verify_token on GET and X-Hub-Signature-256 on POST).
-const whatsappWebhookRouter = express.Router();
-whatsappWebhookRouter.get("/webhook", verifyWhatsAppWebhook);
-whatsappWebhookRouter.post("/webhook", receiveWhatsAppWebhook);
-
-export { whatsappAdminRouter, whatsappWebhookRouter };
+export { whatsappAdminRouter };
 export default whatsappAdminRouter;

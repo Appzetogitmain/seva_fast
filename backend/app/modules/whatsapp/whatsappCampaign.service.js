@@ -74,7 +74,6 @@ async function sendToRecipient(campaign, recipient) {
       templateName: campaign.templateName,
       languageCode: campaign.languageCode,
       bodyParams,
-      headerImageUrl: campaign.mediaUrl || undefined,
     });
 
     await WhatsAppMessage.updateOne(

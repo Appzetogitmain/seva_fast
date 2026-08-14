@@ -28,7 +28,7 @@ import sellerPhotoOrderRoute from "./sellerPhotoOrderRoutes.js";
 import professionalRoute from "./professionalRoutes.js";
 import adminProfessionalRoute from "./adminProfessionalRoutes.js";
 import authActivityRoute from "./authActivityRoutes.js";
-import { whatsappAdminRouter, whatsappWebhookRouter } from "../modules/whatsapp/whatsapp.routes.js";
+import { whatsappAdminRouter } from "../modules/whatsapp/whatsapp.routes.js";
 import storePromotionRoute from "./storePromotionRoutes.js";
 import productDemandRoute from "./productDemandRoutes.js";
 
@@ -74,7 +74,6 @@ const setupRoutes = (app) => {
     router.use("/professionals", professionalRoute);
     router.use("/admin/professionals", adminProfessionalRoute);
     router.use("/admin/whatsapp", whatsappAdminRouter);
-    router.use("/whatsapp", whatsappWebhookRouter);
     router.use("/store-promotions", storePromotionRoute);
     router.use("/product-demands", productDemandRoute);
 
