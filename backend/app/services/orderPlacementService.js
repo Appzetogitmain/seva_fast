@@ -4,11 +4,11 @@ import CheckoutGroup from "../models/checkoutGroup.js";
 import Order from "../models/order.js";
 import User from "../models/customer.js";
 import Transaction from "../models/transaction.js";
-import { assertCouponUsable, syncCouponUsedCount } from "./couponUsageService.js";
+import { assertCouponUsable, computeCouponDiscount, syncCouponUsedCount } from "./couponUsageService.js";
 import { WORKFLOW_STATUS, DEFAULT_SELLER_TIMEOUT_MS } from "../constants/orderWorkflow.js";
 import { ORDER_PAYMENT_STATUS } from "../constants/finance.js";
 import { freezeFinancialSnapshot } from "./finance/orderFinanceService.js";
-import { resolveSellerOrderEarning } from "./finance/pricingService.js";
+import { hydrateOrderItems, resolveSellerOrderEarning } from "./finance/pricingService.js";
 import {
   generateUniqueCheckoutGroupId,
   generateUniquePublicOrderId,
@@ -137,6 +137,8 @@ function mapOrderItemsForPersistence(hydratedItems = []) {
     packageHeight: Number.isFinite(Number(item.packageHeight))
       ? Number(item.packageHeight)
       : undefined,
+    isReturnable: item.isReturnable ?? true,
+    returnWindowDays: item.returnWindowDays ?? 1,
   }));
 }
 
@@ -366,9 +368,10 @@ export async function placeOrderAtomic({
     const walletAmount = Math.max(0, Number(normalizedPayload.walletAmount || 0));
     const tipAmount = Math.max(0, Number(normalizedPayload.tipAmount || 0));
     const couponId = normalizedPayload.couponId || null;
+    let couponDoc = null;
     let couponCode = null;
     if (couponId) {
-      const couponDoc = await assertCouponUsable({
+      couponDoc = await assertCouponUsable({
         couponId,
         customerId,
         session,
@@ -394,6 +397,34 @@ export async function placeOrderAtomic({
       customerId,
       session,
     });
+
+    // The discount applied to the order is only ever what a valid coupon
+    // grants against the server-verified cart — a client-supplied
+    // discountTotal is never trusted, since seller payout is intentionally
+    // unaffected by it and admin alone absorbs the gap.
+    let discountTotal = 0;
+    let couponFreeDelivery = false;
+    if (couponDoc) {
+      const hydratedForDiscount = await hydrateOrderItems(orderItemsInput, {
+        session,
+        enforceServerPricing: true,
+      });
+      const cartTotal = hydratedForDiscount.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0,
+      );
+      const itemCount = hydratedForDiscount.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+      const { discountAmount, freeDelivery } = computeCouponDiscount(couponDoc, {
+        cartTotal,
+        itemCount,
+        items: hydratedForDiscount,
+      });
+      discountTotal = discountAmount;
+      couponFreeDelivery = freeDelivery;
+    }
 
     let hasFreeDelivery = false;
     let hasFreeHandling = false;
@@ -428,6 +459,9 @@ export async function placeOrderAtomic({
         cashbackPercentage = parseFloat(cashbackFeature.value) || 0;
       }
     }
+    if (couponFreeDelivery) {
+      hasFreeDelivery = true;
+    }
 
     let membershipTier = "none";
     if (user?.currentPlan && user.planExpiry && new Date(user.planExpiry) > new Date()) {
@@ -451,7 +485,7 @@ export async function placeOrderAtomic({
       orderItems: orderItemsInput,
       address: normalizedAddress,
       tipAmount,
-      discountTotal: Math.max(0, Number(normalizedPayload.discountTotal || 0)),
+      discountTotal,
       session,
       hasFreeDelivery,
       hasFreeHandling,

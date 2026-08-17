@@ -542,6 +542,34 @@ const ProductDetailPage = () => {
                                                 <Clock size={12} strokeWidth={2.5} className="text-primary" />
                                                 {selectedProduct.deliveryTime || '8-15 MINS'}
                                             </motion.div>
+                                            
+                                            {/* Returnability Badge */}
+                                            {(() => {
+                                                const isRet = selectedProduct.isReturnable ?? true;
+                                                const retDays = selectedProduct.returnWindowDays ?? 1;
+                                                if (!isRet) {
+                                                    return (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, x: -10 }}
+                                                            animate={{ opacity: 1, x: 0 }}
+                                                            transition={{ delay: 0.12 }}
+                                                            className="inline-flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-600 px-3 py-1.5 rounded-lg text-[10px] font-[700] uppercase tracking-wider"
+                                                        >
+                                                            Non-Returnable
+                                                        </motion.div>
+                                                    );
+                                                }
+                                                return (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, x: -10 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        transition={{ delay: 0.12 }}
+                                                        className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-600 px-3 py-1.5 rounded-lg text-[10px] font-[700] uppercase tracking-wider"
+                                                    >
+                                                        {retDays} Day{retDays !== 1 ? 's' : ''} Return
+                                                    </motion.div>
+                                                );
+                                            })()}
                                             {activePricing.hasDiscount && (
                                                 <motion.div
                                                     initial={{ opacity: 0, x: -10 }}

@@ -56,6 +56,14 @@ const orderSchema = new mongoose.Schema(
         packageLength: Number,
         packageBreadth: Number,
         packageHeight: Number,
+        isReturnable: {
+          type: Boolean,
+          default: true,
+        },
+        returnWindowDays: {
+          type: Number,
+          default: 1,
+        },
       },
     ],
     address: {
@@ -453,6 +461,14 @@ const orderSchema = new mongoose.Schema(
           type: String,
           enum: ["requested", "approved", "rejected", "returned"],
           default: "requested",
+        },
+        isReturnable: {
+          type: Boolean,
+          default: true,
+        },
+        returnWindowDays: {
+          type: Number,
+          default: 1,
         },
       },
     ],

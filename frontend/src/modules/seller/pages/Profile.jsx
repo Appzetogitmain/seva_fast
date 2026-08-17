@@ -239,8 +239,8 @@ const SellerProfile = () => {
             {!isEditing ? (
               <Button
                 onClick={() => setIsEditing(true)}
-                className="w-full md:w-auto bg-slate-900 text-white hover:bg-slate-800 transition-all rounded-xl px-6 lg:px-10 py-3.5 sm:py-4 flex items-center justify-center gap-3 font-black tracking-[2px] text-xs shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap">
-                <Edit2 size={16} /> EDIT PROFILE
+                className="w-full md:w-auto bg-slate-900 text-white hover:bg-slate-800 transition-all rounded-xl px-4 lg:px-10 py-3.5 sm:py-4 flex items-center justify-center gap-2 sm:gap-3 font-black tracking-[2px] text-xs shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] text-center flex-wrap">
+                <Edit2 size={16} className="shrink-0" /> <span>EDIT PROFILE</span>
               </Button>
             ) : (
               <div className="w-full md:w-auto flex gap-3 justify-center md:justify-end">
@@ -253,12 +253,12 @@ const SellerProfile = () => {
                 <Button
                   onClick={handleSubmit}
                   disabled={isSaving}
-                  className="flex-1 md:flex-none bg-slate-900 text-white hover:bg-slate-800 rounded-xl px-6 sm:px-8 py-3.5 sm:py-4 font-black tracking-[2px] text-xs flex items-center justify-center gap-3 shadow-lg h-12 sm:h-14 whitespace-nowrap">
+                  className="flex-1 md:flex-none bg-slate-900 text-white hover:bg-slate-800 rounded-xl px-4 sm:px-8 py-3.5 sm:py-4 font-black tracking-[2px] text-xs flex items-center justify-center gap-2 sm:gap-3 shadow-lg h-12 sm:h-14 text-center flex-wrap">
                   {isSaving ? (
                     "UPDATING..."
                   ) : (
                     <>
-                      <Save size={18} /> SAVE CHANGES
+                      <Save size={18} className="shrink-0" /> <span>SAVE CHANGES</span>
                     </>
                   )}
                 </Button>
@@ -341,7 +341,7 @@ const SellerProfile = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/seller/plans')}
-                  className="w-full lg:w-auto px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 active:scale-95 font-black tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 transition-all shrink-0 cursor-pointer whitespace-nowrap">
+                  className="w-full lg:w-auto px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 active:scale-95 font-black tracking-wider text-xs uppercase rounded-xl flex flex-wrap items-center justify-center gap-2 transition-all shrink-0 cursor-pointer text-center">
                   <ShieldCheck size={15} className="shrink-0 text-emerald-600" />
                   <span>View Active Pass</span>
                   <ArrowRight size={13} className="shrink-0 text-emerald-600" />
@@ -350,7 +350,7 @@ const SellerProfile = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/seller/plans')}
-                  className="w-full lg:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-black tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-md transition-all shrink-0 cursor-pointer whitespace-nowrap">
+                  className="w-full lg:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-black tracking-wider text-xs uppercase rounded-xl flex flex-wrap items-center justify-center gap-2 shadow-md transition-all shrink-0 cursor-pointer text-center">
                   <Sparkles size={15} className="shrink-0 text-amber-300" />
                   <span>Browse 0% Plans</span>
                   <ArrowRight size={13} className="shrink-0" />
@@ -482,7 +482,7 @@ const SellerProfile = () => {
                     <Button
                       type="button"
                       onClick={() => setIsMapOpen(true)}
-                      className="w-full sm:w-auto bg-white text-slate-900 border-2 border-slate-200 hover:border-slate-900 rounded-xl px-6 py-2.5 text-[10px] font-black tracking-[2px] shadow-sm hover:shadow-md transition-all whitespace-nowrap">
+                      className="w-full sm:w-auto bg-white text-slate-900 border-2 border-slate-200 hover:border-slate-900 rounded-xl px-4 py-2.5 text-[10px] font-black tracking-[2px] shadow-sm hover:shadow-md transition-all flex flex-wrap justify-center text-center">
                       CHANGE PIN
                     </Button>
                   )}
@@ -674,7 +674,7 @@ const SellerProfile = () => {
                   <button
                     type="button"
                     onClick={() => setIsCertModalOpen(true)}
-                    className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-[0.98] text-slate-950 font-black tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all cursor-pointer">
+                    className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-[0.98] text-slate-950 font-black tracking-wider text-xs uppercase rounded-xl flex flex-wrap items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all cursor-pointer text-center">
                     <ExternalLink size={16} className="shrink-0 text-slate-950" />
                     <span>View / Print Certificate</span>
                   </button>
@@ -729,7 +729,7 @@ const SellerProfile = () => {
                   <button
                     type="button"
                     onClick={() => window.open(profile.officialKycDocumentUrl, '_blank', 'noopener,noreferrer')}
-                    className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-slate-950 font-black tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer">
+                    className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] text-slate-950 font-black tracking-wider text-xs uppercase rounded-xl flex flex-wrap items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer text-center">
                     <ExternalLink size={16} className="shrink-0 text-slate-950" />
                     <span>View / Download KYC PDF</span>
                   </button>

@@ -570,7 +570,7 @@ export async function hydrateOrderItems(
     .filter(Boolean);
 
   const productQuery = Product.find({ _id: { $in: productIds } })
-    .select("_id name salePrice price costPrice mainImage headerId sellerId status approvalStatus variants deliveryType weight packageLength packageBreadth packageHeight")
+    .select("_id name salePrice price costPrice mainImage headerId sellerId status approvalStatus variants deliveryType weight packageLength packageBreadth packageHeight isReturnable returnWindowDays")
     .lean();
   if (session) productQuery.session(session);
   const products = await productQuery;
@@ -637,6 +637,8 @@ export async function hydrateOrderItems(
       packageLength: product.packageLength ?? null,
       packageBreadth: product.packageBreadth ?? null,
       packageHeight: product.packageHeight ?? null,
+      isReturnable: product.isReturnable ?? true,
+      returnWindowDays: product.returnWindowDays ?? 1,
     };
   });
 }

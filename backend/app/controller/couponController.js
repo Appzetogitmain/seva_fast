@@ -2,6 +2,7 @@ import Coupon from "../models/coupon.js";
 import handleResponse from "../utils/helper.js";
 import Order from "../models/order.js";
 import {
+    computeCouponDiscount,
     countCouponRedemptions,
     getCouponRedemptionCounts,
     resolveUsedCount,
@@ -304,21 +305,13 @@ export const validateCoupon = async (req, res) => {
             }
         }
 
-        // Calculate discount
-        let discountAmount = 0;
-        let freeDelivery = false;
-
-        if (coupon.discountType === "free_delivery") {
-            freeDelivery = true;
-        } else if (coupon.discountType === "percentage") {
-            discountAmount = Math.round((cartTotal * coupon.discountValue) / 100);
-        } else if (coupon.discountType === "fixed") {
-            discountAmount = coupon.discountValue;
-        }
-
-        if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
-            discountAmount = coupon.maxDiscount;
-        }
+        // Calculate discount (same formula order placement re-verifies against
+        // the server-priced cart before it's ever allowed to reduce the total)
+        const { discountAmount, freeDelivery } = computeCouponDiscount(coupon, {
+            cartTotal,
+            itemCount: Array.isArray(items) ? items.length : 0,
+            items: Array.isArray(items) ? items : [],
+        });
 
         if (discountAmount <= 0 && !freeDelivery) {
             return handleResponse(

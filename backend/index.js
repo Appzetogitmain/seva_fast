@@ -262,6 +262,18 @@ async function startScheduler() {
     getReturnWindowReleaseJobHandler()
   );
 
+  // Register seller plan expiry housekeeping job (auto-reverts an expired
+  // PLAN_BASED seller back to CATEGORY_WISE commission)
+  const {
+    getSellerPlanExpiryJobInterval,
+    getSellerPlanExpiryJobHandler,
+  } = await import("./app/jobs/sellerPlanExpiryJob.js");
+  registerScheduledJob(
+    'sellerPlanExpiryJob',
+    getSellerPlanExpiryJobInterval(),
+    getSellerPlanExpiryJobHandler()
+  );
+
   // Register monthly turnover commission job
   const {
     getMonthlyTurnoverCommissionJobInterval,

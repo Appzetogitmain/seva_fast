@@ -696,13 +696,7 @@ export const requestReturn = async (req, res) => {
       );
     }
 
-    if (windowExpiresAt && now > windowExpiresAt) {
-      return handleResponse(
-        res,
-        400,
-        `Return window has expired. You can only request a return within ${formatDurationMinutes(windowMinutes)} of delivery.`,
-      );
-    }
+    // Overarching window expiration check removed. We now validate each selected item individually.
 
     const selectedItems = [];
     for (const entry of items) {
@@ -722,6 +716,16 @@ export const requestReturn = async (req, res) => {
           400,
           "Invalid quantity for one of the return items.",
         );
+      }
+      
+      if (original.isReturnable === false) {
+        return handleResponse(res, 400, `Item ${original.name} is non-returnable.`);
+      }
+
+      const itemWindowMinutes = original.returnWindowDays != null ? original.returnWindowDays * 24 * 60 : windowMinutes;
+      const itemWindowExpiresAt = new Date(eligibleAt.getTime() + itemWindowMinutes * 60 * 1000);
+      if (now > itemWindowExpiresAt) {
+        return handleResponse(res, 400, `Return window for ${original.name} has expired.`);
       }
 
       selectedItems.push({

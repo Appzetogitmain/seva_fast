@@ -388,6 +388,10 @@ const ProductManagement = () => {
         data.append("packageBreadth", formData.packageBreadth);
         data.append("packageHeight", formData.packageHeight);
       }
+      data.append("isReturnable", formData.isReturnable);
+      if (formData.isReturnable) {
+        data.append("returnWindowDays", formData.returnWindowDays);
+      }
       data.append("tags", formData.tags);
       data.append("variants", JSON.stringify(formData.variants));
 
@@ -494,6 +498,8 @@ const ProductManagement = () => {
         packageHeight: item.packageHeight != null && item.packageHeight !== "" ? String(item.packageHeight) : "",
         deliveryType: item.deliveryType || "instant",
         brand: item.brand || "",
+        isReturnable: item.isReturnable ?? true,
+        returnWindowDays: item.returnWindowDays ?? 1,
         mainImage: item.mainImage || null,
         galleryImages: item.galleryImages || [],
         variants: (item.variants && item.variants.length > 0) ? item.variants.map(v => ({ ...v, id: v._id || Date.now(), costPrice: v.costPrice || "" })) : [
@@ -532,6 +538,8 @@ const ProductManagement = () => {
         packageHeight: "",
         deliveryType: "instant",
         brand: "",
+        isReturnable: true,
+        returnWindowDays: 1,
         mainImage: null,
         galleryImages: [],
         variants: [
@@ -1266,6 +1274,41 @@ const ProductManagement = () => {
                           </div>
                         </div>
                       )}
+
+                      {/* Returns & Warranties */}
+                      <div className="pt-6 mt-6 border-t border-slate-100 space-y-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-900">Returnable Product</h3>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Allow customers to return this product</p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              checked={formData.isReturnable}
+                              onChange={(e) => setFormData({ ...formData, isReturnable: e.target.checked })}
+                            />
+                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                          </label>
+                        </div>
+                        {formData.isReturnable && (
+                          <div className="space-y-1.5 flex flex-col pt-2">
+                            <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                              Return Window (Days) <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={formData.returnWindowDays}
+                              onChange={(e) => setFormData({ ...formData, returnWindowDays: parseInt(e.target.value) || 0 })}
+                              className="w-full md:w-1/2 px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
+                              placeholder="e.g. 7"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                   {/* Additional tabs populated as needed */}

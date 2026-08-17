@@ -142,12 +142,29 @@ function getReturnWindowMinutes() {
   return parsePositiveInt(process.env.RETURN_WINDOW_MINUTES, 24 * 60);
 }
 
-function computeReturnWindowDates(deliveredAt) {
+function computeReturnWindowDates(deliveredAt, items = []) {
   const eligibleDelay = getReturnEligibilityDelayMinutes();
-  const windowMinutes = getReturnWindowMinutes();
+  const globalWindowMinutes = getReturnWindowMinutes();
+  
+  let maxWindowMinutes = 0;
+  let hasReturnable = false;
+
+  for (const item of items) {
+    if (item.isReturnable) {
+      hasReturnable = true;
+      const itemWindowMinutes = item.returnWindowDays != null ? item.returnWindowDays * 24 * 60 : globalWindowMinutes;
+      if (itemWindowMinutes > maxWindowMinutes) {
+        maxWindowMinutes = itemWindowMinutes;
+      }
+    }
+  }
+
+  // If no items are returnable, window is 0. Otherwise use max found (or global default if no items passed).
+  const finalWindowMinutes = items.length > 0 && !hasReturnable ? 0 : (hasReturnable ? maxWindowMinutes : globalWindowMinutes);
+
   const start = deliveredAt instanceof Date ? deliveredAt : new Date();
   const eligibleAt = new Date(start.getTime() + eligibleDelay * 60 * 1000);
-  const windowExpiresAt = new Date(start.getTime() + windowMinutes * 60 * 1000);
+  const windowExpiresAt = new Date(start.getTime() + finalWindowMinutes * 60 * 1000);
 
   return {
     eligibleAt,
@@ -977,12 +994,12 @@ export async function settleDeliveredOrder(orderOrId, { actorId = null } = {}) {
     assertCodWalletEligible(order, "settlement");
 
     if (!order.returnEligibleAt || !order.returnWindowExpiresAt) {
-      const { eligibleAt, windowExpiresAt } = computeReturnWindowDates(order.deliveredAt);
+      const { eligibleAt, windowExpiresAt } = computeReturnWindowDates(order.deliveredAt, order.items);
       order.returnEligibleAt = order.returnEligibleAt || eligibleAt;
       order.returnWindowExpiresAt = order.returnWindowExpiresAt || windowExpiresAt;
       order.returnDeadline = order.returnDeadline || windowExpiresAt;
     } else if (!order.returnStatus || order.returnStatus === "none") {
-      const { eligibleAt, windowExpiresAt } = computeReturnWindowDates(order.deliveredAt);
+      const { eligibleAt, windowExpiresAt } = computeReturnWindowDates(order.deliveredAt, order.items);
       order.returnEligibleAt = eligibleAt;
       order.returnWindowExpiresAt = windowExpiresAt;
       order.returnDeadline = windowExpiresAt;

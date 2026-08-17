@@ -158,6 +158,15 @@ const productSchema = new mongoose.Schema(
         isFeatured: {
             type: Boolean,
             default: false,
+        },
+        isReturnable: {
+            type: Boolean,
+            default: true,
+        },
+        returnWindowDays: {
+            type: Number,
+            default: 1, // Defaulting to 1 day per the plan
+            min: 0,
         }
     },
     { timestamps: true }

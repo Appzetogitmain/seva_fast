@@ -1192,9 +1192,19 @@ const OrderDetailPage = () => {
                   <h4 className="font-semibold text-slate-800 text-sm mb-0.5 truncate">
                     {item.name}
                   </h4>
-                  <p className="text-slate-500 text-xs font-medium">
-                    Qty: {item.quantity}
-                  </p>
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-slate-500 text-xs font-medium">
+                      Qty: {item.quantity}
+                    </p>
+                    {(() => {
+                      const isRet = item.isReturnable ?? true;
+                      const retDays = item.returnWindowDays ?? 1;
+                      if (!isRet) {
+                        return <p className="text-[10px] font-bold text-rose-500 bg-rose-50 self-start px-1.5 py-0.5 rounded">Non-returnable</p>;
+                      }
+                      return <p className="text-[10px] font-bold text-emerald-600 bg-emerald-50 self-start px-1.5 py-0.5 rounded">{retDays} day return</p>;
+                    })()}
+                  </div>
                 </div>
                 <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                   <p className="font-bold text-slate-900">
@@ -1504,15 +1514,23 @@ const OrderDetailPage = () => {
             <div className="max-h-48 overflow-y-auto space-y-3">
               {order.items.map((item, idx) => {
                 const checked = !!selectedReturnItems[idx];
+                const isItemReturnable = item.isReturnable ?? true;
+                const itemWindowDays = item.returnWindowDays ?? 1;
+                const { eligibleAtMs } = getReturnWindowBounds();
+                const itemExpiresAtMs = eligibleAtMs + (itemWindowDays * 24 * 60 * 60 * 1000);
+                const isItemWindowExpired = Date.now() > itemExpiresAtMs;
+                const disableCheckbox = !isItemReturnable || isItemWindowExpired;
+
                 return (
                   <label
                     key={idx}
-                    className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                    className={`flex items-center gap-3 p-3 rounded-2xl border ${disableCheckbox ? "border-slate-100 bg-slate-50 opacity-60" : "border-slate-100 hover:bg-slate-50 cursor-pointer"} transition-colors`}>
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={disableCheckbox}
                       onChange={() => toggleItemSelection(idx)}
-                      className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                      className="h-4 w-4 rounded border-slate-300 text-slate-900 disabled:opacity-50"
                     />
                     <div className="flex-1">
                       <p className="text-sm font-bold text-slate-800">
@@ -1521,6 +1539,13 @@ const OrderDetailPage = () => {
                       <p className="text-xs text-slate-500">
                         Qty: {item.quantity} • ₹{item.price * item.quantity}
                       </p>
+                      {!isItemReturnable ? (
+                        <p className="text-[10px] font-bold text-rose-500 mt-0.5">Non-returnable</p>
+                      ) : isItemWindowExpired ? (
+                        <p className="text-[10px] font-bold text-amber-500 mt-0.5">Return window expired</p>
+                      ) : (
+                        <p className="text-[10px] font-bold text-emerald-500 mt-0.5">Returnable for {itemWindowDays} day{itemWindowDays !== 1 ? 's' : ''}</p>
+                      )}
                     </div>
                   </label>
                 );
