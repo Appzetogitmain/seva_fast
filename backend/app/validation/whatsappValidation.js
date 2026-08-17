@@ -1,6 +1,7 @@
 import Joi from "joi";
 import {
   WHATSAPP_CAMPAIGN_TYPES,
+  WHATSAPP_CAMPAIGN_CONTENT_TYPES,
   WHATSAPP_AUDIENCE_TYPES,
   WHATSAPP_SCHEDULE_TYPES,
 } from "../models/whatsappCampaign.js";
@@ -21,7 +22,18 @@ export const createCampaignSchema = Joi.object({
   campaignType: Joi.string()
     .valid(...WHATSAPP_CAMPAIGN_TYPES)
     .default("announcement"),
+  contentType: Joi.string()
+    .valid(...WHATSAPP_CAMPAIGN_CONTENT_TYPES)
+    .default("text"),
   message: Joi.string().trim().min(1).max(1024).required(),
+  imageUrl: Joi.string()
+    .trim()
+    .uri({ scheme: ["http", "https"] })
+    .when("contentType", {
+      is: "image",
+      then: Joi.string().uri({ scheme: ["http", "https"] }).required(),
+      otherwise: Joi.string().uri({ scheme: ["http", "https"] }).optional().allow(""),
+    }),
   audienceType: Joi.string()
     .valid(...WHATSAPP_AUDIENCE_TYPES)
     .required(),

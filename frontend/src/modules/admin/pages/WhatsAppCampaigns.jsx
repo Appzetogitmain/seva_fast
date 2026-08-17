@@ -15,7 +15,10 @@ import {
     HiOutlineCheckCircle,
     HiOutlineEye,
     HiOutlineMagnifyingGlass,
+    HiOutlinePhoto,
+    HiOutlineDocumentText,
 } from 'react-icons/hi2';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { adminApi } from '../services/adminApi';
 import { formatDate } from '@shared/utils/formatDate';
@@ -42,7 +45,9 @@ const MESSAGE_STATUS_VARIANT = {
 const emptyForm = {
     title: '',
     campaignType: 'announcement',
+    contentType: 'text',
     message: '',
+    imageUrl: '',
     audienceType: 'all',
     targetCustomerIds: [],
     scheduleType: 'immediate',
@@ -63,6 +68,7 @@ const WhatsAppCampaigns = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [form, setForm] = useState(emptyForm);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
 
     const [customerSearch, setCustomerSearch] = useState('');
     const [customerResults, setCustomerResults] = useState([]);
@@ -151,6 +157,33 @@ const WhatsAppCampaigns = () => {
         resetForm();
     };
 
+    const handleImageSelect = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select an image file', 'warning');
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            showToast('Image must be under 10MB', 'warning');
+            return;
+        }
+
+        try {
+            setIsUploadingImage(true);
+            const { data } = await adminApi.uploadWhatsAppCampaignImage(file);
+            const url = data?.result?.url;
+            if (!url) throw new Error('Upload did not return an image URL');
+            setForm((p) => ({ ...p, imageUrl: url }));
+        } catch (error) {
+            showToast(error?.response?.data?.message || 'Failed to upload image', 'error');
+        } finally {
+            setIsUploadingImage(false);
+        }
+    };
+
     const toggleCustomer = (customer) => {
         setSelectedCustomers((prev) => {
             const exists = prev.some((c) => c.id === customer.id);
@@ -163,6 +196,10 @@ const WhatsAppCampaigns = () => {
         if (isSubmitting) return;
         if (!form.title.trim() || !form.message.trim()) {
             showToast('Title and message are required', 'warning');
+            return;
+        }
+        if (form.contentType === 'image' && !form.imageUrl) {
+            showToast('Upload an offer image before sending', 'warning');
             return;
         }
         if (form.audienceType === 'selected' && selectedCustomers.length === 0) {
@@ -179,7 +216,9 @@ const WhatsAppCampaigns = () => {
             const payload = {
                 title: form.title.trim(),
                 campaignType: form.campaignType,
+                contentType: form.contentType,
                 message: form.message.trim(),
+                imageUrl: form.contentType === 'image' ? form.imageUrl : undefined,
                 audienceType: form.audienceType,
                 targetCustomerIds: form.audienceType === 'selected' ? selectedCustomers.map((c) => c.id) : undefined,
                 scheduleType: form.scheduleType,
@@ -242,7 +281,7 @@ const WhatsAppCampaigns = () => {
         <div className="ds-section-spacing">
             <PageHeader
                 title="WhatsApp Campaigns"
-                description="Send plain-text WhatsApp broadcasts to your customers via Tezsender."
+                description="Send text or image WhatsApp broadcasts to your customers via Tezsender."
                 badge={
                     <Badge variant="success" className="ds-badge ds-badge-success">
                         Tezsender
@@ -326,7 +365,12 @@ const WhatsAppCampaigns = () => {
                             {!isLoading && campaigns.map((c) => (
                                 <tr key={c._id} className="group hover:bg-slate-50/30 transition-colors">
                                     <td className="px-4 py-6">
-                                        <p className="text-sm font-black text-slate-900">{c.title}</p>
+                                        <div className="flex items-center gap-1.5">
+                                            <p className="text-sm font-black text-slate-900">{c.title}</p>
+                                            {c.contentType === 'image' && (
+                                                <HiOutlinePhoto className="h-3.5 w-3.5 text-slate-400 shrink-0" title="Image campaign" />
+                                            )}
+                                        </div>
                                         <p className="text-[10px] font-bold text-slate-400 mt-1 capitalize">{c.campaignType?.replace(/_/g, ' ')}</p>
                                     </td>
                                     <td className="px-4 py-6">
@@ -444,7 +488,75 @@ const WhatsAppCampaigns = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="ds-label">Message</label>
+                        <label className="ds-label">Message Type</label>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setForm((p) => ({ ...p, contentType: 'text' }))}
+                                className={cn(
+                                    'flex-1 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ring-1 transition-all flex items-center justify-center gap-2',
+                                    form.contentType === 'text'
+                                        ? 'bg-slate-900 text-white ring-slate-900'
+                                        : 'bg-white text-slate-600 ring-slate-200 hover:ring-slate-300',
+                                )}
+                            >
+                                <HiOutlineDocumentText className="h-3.5 w-3.5" />
+                                Text Only
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setForm((p) => ({ ...p, contentType: 'image' }))}
+                                className={cn(
+                                    'flex-1 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest ring-1 transition-all flex items-center justify-center gap-2',
+                                    form.contentType === 'image'
+                                        ? 'bg-slate-900 text-white ring-slate-900'
+                                        : 'bg-white text-slate-600 ring-slate-200 hover:ring-slate-300',
+                                )}
+                            >
+                                <HiOutlinePhoto className="h-3.5 w-3.5" />
+                                Image + Caption
+                            </button>
+                        </div>
+                    </div>
+
+                    {form.contentType === 'image' && (
+                        <div className="space-y-2">
+                            <label className="ds-label">Offer Image</label>
+                            {form.imageUrl ? (
+                                <div className="relative w-full max-w-xs rounded-2xl overflow-hidden ring-1 ring-slate-200">
+                                    <img src={form.imageUrl} alt="Offer" className="w-full h-40 object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm((p) => ({ ...p, imageUrl: '' }))}
+                                        className="absolute top-2 right-2 h-7 w-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center"
+                                    >
+                                        <HiOutlineXMark className="h-4 w-4 text-white" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <label
+                                    className={cn(
+                                        'flex flex-col items-center justify-center gap-2 w-full max-w-xs h-32 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer',
+                                        isUploadingImage && 'pointer-events-none opacity-70',
+                                    )}
+                                >
+                                    {isUploadingImage ? (
+                                        <Loader2 className="h-5 w-5 text-slate-400 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <HiOutlinePhoto className="h-6 w-6 text-slate-400" />
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Click to upload image</span>
+                                        </>
+                                    )}
+                                    <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" disabled={isUploadingImage} />
+                                </label>
+                            )}
+                            <p className="ds-caption text-slate-400">Sent via Tezsender's image API. Max 10MB.</p>
+                        </div>
+                    )}
+
+                    <div className="space-y-2">
+                        <label className="ds-label">{form.contentType === 'image' ? 'Caption' : 'Message'}</label>
                         <textarea
                             rows={4}
                             value={form.message}
@@ -453,7 +565,12 @@ const WhatsAppCampaigns = () => {
                             placeholder="Hi {name}, enjoy 20% off this festive season!"
                             maxLength={1024}
                         />
-                        <p className="ds-caption text-slate-400">This exact text is sent to each recipient. Use {'{name}'} to insert the customer's name.</p>
+                        <p className="ds-caption text-slate-400">
+                            {form.contentType === 'image'
+                                ? "This text is sent as the image caption."
+                                : 'This exact text is sent to each recipient.'}{' '}
+                            Use {'{name}'} to insert the customer's name.
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

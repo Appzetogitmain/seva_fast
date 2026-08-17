@@ -10,6 +10,8 @@ import {
 import { autoProcessSellerPayoutForOrder } from "./finance/payoutService.js";
 import { processOrderLevelCommissions } from "./finance/commissionService.js";
 import { resolveSellerOrderEarning } from "./finance/pricingService.js";
+import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
+import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 
 function isCodOrder(order) {
   const mode = String(order?.paymentMode || "").toUpperCase();
@@ -171,6 +173,19 @@ export async function applyDeliveredSettlement(order, orderIdString) {
         cashbackCredited: true,
       };
       await settled.save();
+
+      emitNotificationEvent(NOTIFICATION_EVENTS.WALLET_UPDATED, {
+        customerId: settled.customer,
+        userId: settled.customer,
+        orderObjectId: settled._id,
+        data: {
+          amount: estimatedCashback,
+          direction: "credited",
+          reason: `Cashback for order #${orderIdString}`,
+          balance: user.walletBalance,
+          dedupeKey: `wallet:${orderIdString}:cashback`,
+        },
+      });
     }
   }
 

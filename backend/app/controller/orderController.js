@@ -1797,6 +1797,19 @@ export const completeReturnAndRefund = async (order) => {
         reference: `REF-WALLET-${order.orderId}`,
         meta: { orderId: order._id, type: "return_wallet" }
       });
+
+      emitNotificationEvent(NOTIFICATION_EVENTS.WALLET_UPDATED, {
+        customerId: customer._id,
+        userId: customer._id,
+        orderObjectId: order._id,
+        data: {
+          amount: walletRefundTotal,
+          direction: "credited",
+          reason: `Return refund for order #${order.orderId}`,
+          balance: customer.walletBalance,
+          dedupeKey: `wallet:${order.orderId}:return_refund`,
+        },
+      });
     }
   }
 

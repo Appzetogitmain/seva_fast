@@ -7,6 +7,8 @@ export const WHATSAPP_TEMPLATE_TYPES = [
   "out_for_delivery",
   "order_delivered",
   "order_cancelled",
+  "wallet_update",
+  "plan_purchased",
   "birthday_wish",
 ];
 

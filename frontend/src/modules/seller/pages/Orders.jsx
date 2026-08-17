@@ -70,6 +70,7 @@ const Orders = () => {
     const [pageSize, setPageSize] = useState(20);
     const [total, setTotal] = useState(0);
     const [deliveryBoys, setDeliveryBoys] = useState([]);
+    const [sellerProfile, setSellerProfile] = useState(null);
     const hasMountedRef = useRef(false);
 
     const fetchDeliveryBoys = async () => {
@@ -83,8 +84,21 @@ const Orders = () => {
         }
     };
 
+    // Printed receipts double as packing slips that travel with the order
+    // past the seller (admin/subadmin/rider handling) — they need to show
+    // which seller the order belongs to, so fetch shop identity once.
+    const fetchSellerProfile = async () => {
+        try {
+            const response = await sellerApi.getProfile();
+            setSellerProfile(response.data.result || null);
+        } catch (error) {
+            console.error("Failed to fetch seller profile:", error);
+        }
+    };
+
     useEffect(() => {
         fetchDeliveryBoys();
+        fetchSellerProfile();
     }, []);
 
     const isAnyModalOpen = isDetailsModalOpen || isQuickViewModalOpen;
@@ -444,6 +458,9 @@ const Orders = () => {
                     <div style="text-align: center;" class="title">SEVA FAST</div>
                     <div style="text-align: center;" class="subtitle">CUSTOMER INVOICE</div>
                     <div class="divider"></div>
+                    <div class="info-row"><strong>Seller:</strong> ${sellerProfile?.shopName || 'N/A'}</div>
+                    ${sellerProfile?.phone ? `<div class="info-row"><strong>Seller Phone:</strong> ${sellerProfile.phone}</div>` : ''}
+                    <div class="divider"></div>
                     <div class="info-row"><strong>Order:</strong> #${order.id}</div>
                     <div class="info-row"><strong>Status:</strong> ${order.status.toUpperCase()}</div>
                     <div class="info-row"><strong>Date:</strong> ${order.date} ${order.time}</div>
@@ -617,14 +634,19 @@ const Orders = () => {
                             <p style="margin: 5px 0 0 0;">Status: <span style="text-transform: uppercase;">${order.status}</span></p>
                         </div>
                     </div>
-                    
+
                     <div class="details">
+                        <div>
+                            <h3>Sold By (Seller)</h3>
+                            <div style="font-weight: bold; color: #0f172a; margin-bottom: 4px;">${sellerProfile?.shopName || 'N/A'}</div>
+                            ${sellerProfile?.phone ? `<div>Phone: ${sellerProfile.phone}</div>` : ''}
+                        </div>
                         <div>
                             <h3>Billed To</h3>
                             <div style="font-weight: bold; color: #0f172a; margin-bottom: 4px;">${order.customer.name}</div>
                             <div>Phone: ${order.customer.phone}</div>
                         </div>
-                        <div style="text-align: right; max-width: 300px;">
+                        <div style="text-align: right; max-width: 260px;">
                             <h3>Delivery Address</h3>
                             <div>${order.address}</div>
                         </div>

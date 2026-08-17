@@ -40,6 +40,16 @@ const TEMPLATE_MAP = {
     default: "Hi {name}, your order #{orderNumber} has been cancelled. Status: {status}.",
     label: "Order Cancelled",
   },
+  [WHATSAPP_MESSAGE_TYPES.WALLET_UPDATE]: {
+    envKey: "WHATSAPP_TEMPLATE_WALLET_UPDATE",
+    default: "Hi {name}, {amount} has been {direction} your SevaFast wallet. Reason: {reason}. New balance: {balance}.",
+    label: "Wallet Update",
+  },
+  [WHATSAPP_MESSAGE_TYPES.PLAN_PURCHASED]: {
+    envKey: "WHATSAPP_TEMPLATE_PLAN_PURCHASED",
+    default: "Hi {name}, you've successfully subscribed to the {planName} plan for {amount}! Valid for {validityDays} days (till {expiryDate}). Benefits: {features}. Thank you for choosing SevaFast!",
+    label: "Plan Purchased",
+  },
   [WHATSAPP_MESSAGE_TYPES.BIRTHDAY_WISH]: {
     envKey: "WHATSAPP_TEMPLATE_BIRTHDAY_WISH",
     default: "Happy Birthday {name}! Wishing you a wonderful day from all of us.",
@@ -54,6 +64,8 @@ const TEMPLATE_VARS = {
   [WHATSAPP_MESSAGE_TYPES.OUT_FOR_DELIVERY]: ["name", "orderNumber"],
   [WHATSAPP_MESSAGE_TYPES.ORDER_DELIVERED]: ["name", "orderNumber", "amount"],
   [WHATSAPP_MESSAGE_TYPES.ORDER_CANCELLED]: ["name", "orderNumber", "status"],
+  [WHATSAPP_MESSAGE_TYPES.WALLET_UPDATE]: ["name", "amount", "direction", "reason", "balance"],
+  [WHATSAPP_MESSAGE_TYPES.PLAN_PURCHASED]: ["name", "planName", "amount", "validityDays", "expiryDate", "features"],
   [WHATSAPP_MESSAGE_TYPES.BIRTHDAY_WISH]: ["name"],
 };
 

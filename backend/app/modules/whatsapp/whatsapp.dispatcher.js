@@ -128,6 +128,86 @@ async function handleOrderEvent(eventType, payload) {
   });
 }
 
+/**
+ * Fires for every customer wallet credit/debit that settles something owed
+ * to them — return refunds, cancellation refunds, cashback, admin manual
+ * adjustments, etc. Callers pass the resulting balance and a human reason
+ * directly in payload.data since a wallet event isn't always tied to a
+ * single order's pricing snapshot the way handleOrderEvent's lookups assume.
+ */
+async function handleWalletEvent(payload) {
+  const customerId = payload.customerId || payload.userId;
+  if (!customerId) return;
+
+  const template = await getTemplateForType(WHATSAPP_MESSAGE_TYPES.WALLET_UPDATE);
+  if (!template) return;
+
+  const customer = await Customer.findById(customerId).select("name phone").lean();
+  if (!customer) return;
+
+  const data = payload.data || {};
+  const amount = formatAmount(data.amount);
+  const direction = data.direction === "debited" ? "debited from" : "credited to";
+  const balance = formatAmount(data.balance);
+  const reason = data.reason || "Wallet update";
+
+  const message = renderTemplate(template, {
+    name: customer.name || "Customer",
+    amount,
+    direction,
+    reason,
+    balance,
+  });
+
+  await recordAndSend({
+    customerId: customer._id,
+    phone: customer.phone,
+    messageType: WHATSAPP_MESSAGE_TYPES.WALLET_UPDATE,
+    dedupeKey: data.dedupeKey || `wallet:${customerId}:${Date.now()}`,
+    relatedOrder: payload.orderObjectId || null,
+    message,
+  });
+}
+
+/**
+ * Fires the instant a customer's membership plan purchase actually takes
+ * effect (free-plan activation or paid-plan payment verification) — never
+ * at "order initiated," only once the plan is actually granted.
+ */
+async function handlePlanPurchaseEvent(payload) {
+  const customerId = payload.customerId || payload.userId;
+  if (!customerId) return;
+
+  const template = await getTemplateForType(WHATSAPP_MESSAGE_TYPES.PLAN_PURCHASED);
+  if (!template) return;
+
+  const customer = await Customer.findById(customerId).select("name phone").lean();
+  if (!customer) return;
+
+  const data = payload.data || {};
+  const features = Array.isArray(data.features) && data.features.length > 0
+    ? data.features.join(", ")
+    : "see app for details";
+
+  const message = renderTemplate(template, {
+    name: customer.name || "Customer",
+    planName: data.planName || "your",
+    amount: formatAmount(data.amount),
+    validityDays: data.validityDays || "",
+    expiryDate: data.expiryDate ? formatShortDate(data.expiryDate) : "",
+    features,
+  });
+
+  await recordAndSend({
+    customerId: customer._id,
+    phone: customer.phone,
+    messageType: WHATSAPP_MESSAGE_TYPES.PLAN_PURCHASED,
+    dedupeKey: data.dedupeKey || `plan:${customerId}:${Date.now()}`,
+    relatedOrder: null,
+    message,
+  });
+}
+
 async function handleBirthdayEvent(payload) {
   const customerId = payload.userId || payload.customerId;
   if (!customerId) return;
@@ -170,6 +250,14 @@ async function handleBirthdayEvent(payload) {
 export async function dispatchWhatsAppForEvent(eventType, payload = {}) {
   if (eventType === NOTIFICATION_EVENTS.BIRTHDAY_WISH) {
     await handleBirthdayEvent(payload);
+    return;
+  }
+  if (eventType === NOTIFICATION_EVENTS.WALLET_UPDATED) {
+    await handleWalletEvent(payload);
+    return;
+  }
+  if (eventType === NOTIFICATION_EVENTS.PLAN_PURCHASED) {
+    await handlePlanPurchaseEvent(payload);
     return;
   }
   if (ORDER_EVENT_TO_WHATSAPP_MESSAGE_TYPE[eventType]) {

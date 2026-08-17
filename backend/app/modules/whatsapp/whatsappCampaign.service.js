@@ -2,7 +2,7 @@ import Customer from "../../models/customer.js";
 import WhatsAppCampaign from "../../models/whatsappCampaign.js";
 import WhatsAppMessage from "../../models/whatsappMessage.js";
 import { isValidE164Phone, normalizePhoneNumber, maskPhone } from "../../utils/phone.js";
-import { sendWhatsAppTextMessage } from "./whatsapp.service.js";
+import { sendWhatsAppTextMessage, sendWhatsAppImageMessage } from "./whatsapp.service.js";
 import { getWhatsAppConfig } from "../../config/whatsapp.js";
 import { WHATSAPP_MESSAGE_TYPES } from "./whatsapp.constants.js";
 import { renderTemplate } from "./whatsapp.templates.js";
@@ -65,7 +65,10 @@ async function sendToRecipient(campaign, recipient) {
   try {
     const message = renderTemplate(campaign.message, { name: recipient.name || "there" });
 
-    const result = await sendWhatsAppTextMessage({ to: phone, message });
+    const result =
+      campaign.contentType === "image" && campaign.imageUrl
+        ? await sendWhatsAppImageMessage({ to: phone, imageUrl: campaign.imageUrl, caption: message })
+        : await sendWhatsAppTextMessage({ to: phone, message });
 
     await WhatsAppMessage.updateOne(
       { _id: record._id },

@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import User from "../../models/customer.js";
 import Order from "../../models/order.js";
+import { emitNotificationEvent } from "../../modules/notifications/notification.emitter.js";
+import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
 
 export async function getUsersData({ page, limit, skip }) {
   const pipeline = [
@@ -207,6 +209,18 @@ export async function updateUserWalletData(id, amount, action, reason) {
     status: "Settled",
     reference: `ADMIN-${Date.now()}`,
     meta: { reason: reason || "Admin adjustment" },
+  });
+
+  emitNotificationEvent(NOTIFICATION_EVENTS.WALLET_UPDATED, {
+    customerId: user._id,
+    userId: user._id,
+    data: {
+      amount: amountNum,
+      direction: action === "add" ? "credited" : "debited",
+      reason: reason || "Admin wallet adjustment",
+      balance: user.walletBalance,
+      dedupeKey: `wallet:admin:${user._id}:${Date.now()}`,
+    },
   });
 
   return {

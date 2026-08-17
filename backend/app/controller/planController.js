@@ -7,6 +7,23 @@ import Razorpay from "razorpay";
 import { processPlanPurchaseLevelCommissions } from "../services/finance/commissionService.js";
 import { resolvePlanPurchaseReferrer } from "../services/referralService.js";
 import { upsertPlanSubscription } from "../services/planSubscriptionService.js";
+import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
+import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
+
+function emitPlanPurchasedWhatsApp({ userId, plan, expiryDate, dedupeKey }) {
+  emitNotificationEvent(NOTIFICATION_EVENTS.PLAN_PURCHASED, {
+    customerId: userId,
+    userId,
+    data: {
+      planName: plan.name,
+      amount: plan.price,
+      validityDays: plan.validityDays || 365,
+      expiryDate,
+      features: (plan.features || []).map((f) => f.label).filter(Boolean),
+      dedupeKey,
+    },
+  });
+}
 
 function resolvePlanId(rawPlanId) {
     const planId = String(rawPlanId || "").trim();
@@ -100,11 +117,34 @@ export const createPlanOrder = async (req, res) => {
             const expiryDate = new Date();
             expiryDate.setDate(expiryDate.getDate() + (plan.validityDays || 365));
 
-            await User.findByIdAndUpdate(userId, {
-                $set: {
-                    activePlan: plan._id,
-                    planExpiry: expiryDate
-                }
+            const existingUser = await User.findById(userId).select("referredBy planSubscriptions");
+            if (!existingUser) return handleResponse(res, 404, "User not found");
+
+            const permissions = plan.features
+                .filter((f) => f.unit === "Boolean" && f.value === true)
+                .map((f) => f.key);
+
+            const updateData = {
+                currentPlan: plan._id,
+                planExpiry: expiryDate,
+                permissions,
+                planSubscriptions: upsertPlanSubscription(existingUser.planSubscriptions, {
+                    planId: plan._id,
+                    validityDays: plan.validityDays || 365,
+                    paymentReference: `FREE_${Date.now()}`,
+                }),
+            };
+            if (referredBy && !existingUser.referredBy) {
+                updateData.referredBy = referredBy;
+            }
+
+            await User.findByIdAndUpdate(userId, { $set: updateData });
+
+            emitPlanPurchasedWhatsApp({
+                userId,
+                plan,
+                expiryDate,
+                dedupeKey: `plan:${userId}:${plan._id}:${expiryDate.getTime()}`,
             });
 
             return handleResponse(res, 200, "Free plan activated successfully", {
@@ -217,6 +257,13 @@ export const verifyPlanPayment = async (req, res) => {
                 commissionError?.message || commissionError,
             );
         }
+
+        emitPlanPurchasedWhatsApp({
+            userId,
+            plan,
+            expiryDate,
+            dedupeKey: `plan:${userId}:${razorpay_payment_id}`,
+        });
 
         return handleResponse(res, 200, "Subscribed to plan successfully", updatedUser);
     } catch (error) {

@@ -19,6 +19,8 @@ import {
 } from "./walletService.js";
 import { createPendingPayoutForOrder } from "./payoutService.js";
 import { resolveSellerOrderEarning } from "./pricingService.js";
+import { emitNotificationEvent } from "../../modules/notifications/notification.emitter.js";
+import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
 
 function toOrderIdQuery(orderOrId) {
   if (!orderOrId) return null;
@@ -1260,8 +1262,10 @@ export async function reverseOrderFinanceOnCancellation(
 
     // NEW: Refund Wallet Amount Used
     const walletUsed = roundCurrency(order.pricing?.walletAmount || order.paymentBreakdown?.walletAmount || 0);
+    let walletCredit = null;
+    let customerSpendableBalance = null;
     if (walletUsed > 0) {
-      await creditWallet({
+      walletCredit = await creditWallet({
         ownerType: OWNER_TYPE.CUSTOMER,
         ownerId: order.customer,
         amount: walletUsed,
@@ -1285,6 +1289,19 @@ export async function reverseOrderFinanceOnCancellation(
         },
         { session },
       );
+
+      // The ledger entries above are bookkeeping only — the customer's
+      // actual spendable balance (what checkout deducts from and the wallet
+      // page displays) lives on Customer.walletBalance, not this Wallet
+      // ledger. Without this, a cancelled order's wallet-used amount would
+      // never actually come back to money the customer can spend.
+      const CustomerModel = (await import("../../models/customer.js")).default;
+      const customer = await CustomerModel.findById(order.customer).session(session);
+      if (customer) {
+        customer.walletBalance = roundCurrency((customer.walletBalance || 0) + walletUsed);
+        await customer.save({ session });
+        customerSpendableBalance = customer.walletBalance;
+      }
     }
 
     order.settlementStatus = {
@@ -1307,6 +1324,22 @@ export async function reverseOrderFinanceOnCancellation(
 
     await order.save({ session });
     await session.commitTransaction();
+
+    if (walletCredit && order.customer) {
+      emitNotificationEvent(NOTIFICATION_EVENTS.WALLET_UPDATED, {
+        customerId: order.customer,
+        userId: order.customer,
+        orderObjectId: order._id,
+        data: {
+          amount: walletCredit.amount,
+          direction: "credited",
+          reason: `Wallet refund for cancelled order #${order.orderId}`,
+          balance: customerSpendableBalance ?? walletCredit.after,
+          dedupeKey: `wallet:${order.orderId}:cancel_refund`,
+        },
+      });
+    }
+
     return order;
   } catch (error) {
     await session.abortTransaction();

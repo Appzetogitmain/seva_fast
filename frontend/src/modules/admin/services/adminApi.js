@@ -85,6 +85,13 @@ export const adminApi = {
 
     // WhatsApp campaigns
     getWhatsAppConfigStatus: () => axiosInstance.get('/admin/whatsapp/config-status'),
+    uploadWhatsAppCampaignImage: (file) => {
+        const formData = new FormData();
+        formData.append('image', file);
+        return axiosInstance.post('/admin/whatsapp/campaigns/upload-image', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
     createWhatsAppCampaign: (data) => axiosInstance.post('/admin/whatsapp/campaigns', data),
     getWhatsAppCampaigns: (params) => axiosInstance.get('/admin/whatsapp/campaigns', { params }),
     getWhatsAppCampaign: (id) => axiosInstance.get(`/admin/whatsapp/campaigns/${id}`),

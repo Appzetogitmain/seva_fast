@@ -10,6 +10,7 @@ export const WHATSAPP_CAMPAIGN_TYPES = [
   "custom",
 ];
 
+export const WHATSAPP_CAMPAIGN_CONTENT_TYPES = ["text", "image"];
 export const WHATSAPP_AUDIENCE_TYPES = ["all", "selected"];
 export const WHATSAPP_SCHEDULE_TYPES = ["immediate", "scheduled"];
 export const WHATSAPP_CAMPAIGN_STATUSES = [
@@ -33,12 +34,26 @@ const whatsappCampaignSchema = new mongoose.Schema(
       enum: WHATSAPP_CAMPAIGN_TYPES,
       default: "announcement",
     },
-    // The actual plain-text message sent via Tezsender's send-text API.
-    // Supports a {name} placeholder, filled in per-recipient at send time.
+    // "text" -> sent via Tezsender's send-text API, message is the body.
+    // "image" -> sent via send-image, message is the caption, imageUrl required.
+    contentType: {
+      type: String,
+      enum: WHATSAPP_CAMPAIGN_CONTENT_TYPES,
+      default: "text",
+    },
+    // Plain text body (contentType: "text") or image caption (contentType:
+    // "image"). Supports a {name} placeholder, filled in per-recipient at send time.
     message: {
       type: String,
       required: true,
       trim: true,
+    },
+    // Required when contentType is "image" — a Cloudinary-hosted image URL
+    // uploaded via POST /admin/whatsapp/campaigns/upload-image.
+    imageUrl: {
+      type: String,
+      trim: true,
+      default: "",
     },
     audienceType: {
       type: String,

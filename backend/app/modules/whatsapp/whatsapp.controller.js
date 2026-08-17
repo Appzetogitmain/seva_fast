@@ -7,6 +7,7 @@ import { createCampaignSchema, updateTemplateSchema, validateSchema } from "../.
 import { dispatchCampaign } from "./whatsappCampaign.service.js";
 import { listEffectiveTemplates } from "./whatsapp.templates.js";
 import { getWhatsAppConfig, isWhatsAppEnabled } from "../../config/whatsapp.js";
+import { uploadToCloudinary } from "../../services/mediaService.js";
 import logger from "../../services/logger.js";
 
 // ── Config status (admin) — never returns the API key ──────────────────────
@@ -56,6 +57,29 @@ export const createCampaign = async (req, res) => {
     }
 
     return handleResponse(res, 201, "Campaign created", campaign);
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
+  }
+};
+
+/**
+ * POST /api/admin/whatsapp/campaigns/upload-image (admin only)
+ * Uploads a campaign offer image to Cloudinary. Returns the public URL to be
+ * passed as `imageUrl` when creating a campaign with contentType "image".
+ * Request: multipart/form-data with field "image".
+ */
+export const uploadCampaignImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return handleResponse(res, 400, "An image file is required");
+    }
+
+    const url = await uploadToCloudinary(req.file.buffer, "whatsapp-campaigns", {
+      mimeType: req.file.mimetype,
+      resourceType: "image",
+    });
+
+    return handleResponse(res, 200, "Image uploaded", { url });
   } catch (error) {
     return handleResponse(res, error.statusCode || 500, error.message);
   }
@@ -209,6 +233,7 @@ export const listWhatsAppMessages = async (req, res) => {
 
 export default {
   getWhatsAppConfigStatus,
+  uploadCampaignImage,
   createCampaign,
   listCampaigns,
   getCampaign,

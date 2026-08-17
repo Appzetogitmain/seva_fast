@@ -23,6 +23,13 @@ const SAMPLE_VARS = {
     orderNumber: 'ORD10234',
     amount: 'Rs. 1,249',
     status: 'cancelled',
+    direction: 'credited to',
+    reason: 'Return refund for order #ORD10234',
+    balance: 'Rs. 2,499',
+    planName: 'Gold',
+    validityDays: '365',
+    expiryDate: '17 Aug 2027',
+    features: 'Free Delivery, 5% Cashback',
 };
 
 function renderPreview(text) {
@@ -99,22 +106,38 @@ const WhatsAppTemplates = () => {
     const [configStatus, setConfigStatus] = useState(null);
     const [templates, setTemplates] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [loadError, setLoadError] = useState('');
     const [savingType, setSavingType] = useState(null);
 
     const fetchAll = async () => {
-        try {
-            setIsLoading(true);
-            const [templatesRes, statusRes] = await Promise.all([
-                adminApi.getWhatsAppTemplates(),
-                adminApi.getWhatsAppConfigStatus(),
-            ]);
-            if (templatesRes.data.success) setTemplates(templatesRes.data.result || []);
-            if (statusRes.data.success) setConfigStatus(statusRes.data.result);
-        } catch (error) {
-            showToast(error?.response?.data?.message || 'Failed to load WhatsApp templates', 'error');
-        } finally {
-            setIsLoading(false);
+        setIsLoading(true);
+        setLoadError('');
+
+        // Independent settles — templates and config-status are unrelated;
+        // one failing must never blank out data the other already fetched.
+        const [templatesResult, statusResult] = await Promise.allSettled([
+            adminApi.getWhatsAppTemplates(),
+            adminApi.getWhatsAppConfigStatus(),
+        ]);
+
+        if (templatesResult.status === 'fulfilled' && templatesResult.value.data.success) {
+            // handleResponse (backend/app/utils/helper.js) puts array payloads under
+            // `results` (plural) and object payloads under `result` (singular) —
+            // listEffectiveTemplates() returns an array, so it's `results` here.
+            setTemplates(templatesResult.value.data.results || []);
+        } else if (templatesResult.status === 'rejected') {
+            const message = templatesResult.reason?.response?.data?.message || 'Failed to load WhatsApp templates';
+            setLoadError(message);
+            showToast(message, 'error');
         }
+
+        if (statusResult.status === 'fulfilled' && statusResult.value.data.success) {
+            setConfigStatus(statusResult.value.data.result);
+        } else if (statusResult.status === 'rejected') {
+            showToast(statusResult.reason?.response?.data?.message || 'Failed to load WhatsApp config status', 'error');
+        }
+
+        setIsLoading(false);
     };
 
     useEffect(() => {
@@ -180,6 +203,25 @@ const WhatsAppTemplates = () => {
                 </Card>
             )}
 
+            {loadError && (
+                <Card className="ds-card-compact bg-rose-50 border-rose-100">
+                    <div className="flex gap-3 items-start justify-between">
+                        <div className="flex gap-3 items-start">
+                            <HiOutlineExclamationTriangle className="ds-icon-lg text-rose-600 flex-shrink-0" />
+                            <p className="ds-body text-rose-800">{loadError}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={fetchAll}
+                            className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-rose-700 hover:text-rose-900 shrink-0"
+                        >
+                            <HiOutlineArrowPath className="h-3.5 w-3.5" />
+                            Retry
+                        </button>
+                    </div>
+                </Card>
+            )}
+
             {isLoading && templates.length === 0 && (
                 <Card className="ds-card-standard">
                     <div className="text-center py-12">
@@ -187,6 +229,14 @@ const WhatsAppTemplates = () => {
                             <HiOutlineChatBubbleLeftRight className="h-8 w-8 text-slate-200" />
                         </div>
                         <p className="ds-caption text-slate-400">Loading templates...</p>
+                    </div>
+                </Card>
+            )}
+
+            {!isLoading && !loadError && templates.length === 0 && (
+                <Card className="ds-card-standard">
+                    <div className="text-center py-12">
+                        <p className="ds-caption text-slate-400">No templates found.</p>
                     </div>
                 </Card>
             )}

@@ -86,6 +86,17 @@ const OrderDetail = () => {
         }
     };
 
+    // Order items only carry a product ref — the category snapshot lives on
+    // paymentBreakdown.lineItems (frozen at order time), matched here by productId.
+    const getItemCategoryName = (item) => {
+        const lineItems = order?.paymentBreakdown?.lineItems;
+        if (!Array.isArray(lineItems) || lineItems.length === 0) return null;
+        const productId = String(item.product?._id || item.product || '');
+        if (!productId) return null;
+        const match = lineItems.find((li) => String(li.productId) === productId);
+        return match?.headerCategoryName || null;
+    };
+
     const copyToClipboard = (text, label) => {
         if (!text) return;
         navigator.clipboard.writeText(text);
@@ -267,6 +278,7 @@ const OrderDetail = () => {
                                 <thead>
                                     <tr className="bg-slate-50/50">
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Node</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Unit Price</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Qty</th>
                                         <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Aggregate</th>
@@ -289,6 +301,15 @@ const OrderDetail = () => {
                                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">ID: {item.product?._id || item.product}</p>
                                                     </div>
                                                 </div>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                {getItemCategoryName(item) ? (
+                                                    <Badge className="bg-brand-50 text-brand-700 border-none text-[9px] font-black">
+                                                        {getItemCategoryName(item)}
+                                                    </Badge>
+                                                ) : (
+                                                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">—</span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-5 text-center text-sm font-bold text-slate-600">₹{item.price}</td>
                                             <td className="px-6 py-5 text-center">
@@ -333,6 +354,41 @@ const OrderDetail = () => {
                                 <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">OWNER: {order.seller?.name}</p>
                             </div>
                         </div>
+                        {order.seller?.phone && (
+                            <p className="text-[10px] font-bold text-slate-400 flex items-center gap-3 mt-4">
+                                <Phone className="h-3.5 w-3.5" /> {order.seller.phone}
+                            </p>
+                        )}
+                        {order.seller?.address && (
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 mt-4">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        Shop Location
+                                    </span>
+                                    {order.seller?.location?.coordinates?.length === 2 &&
+                                        (order.seller.location.coordinates[0] !== 0 ||
+                                            order.seller.location.coordinates[1] !== 0) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const [lng, lat] = order.seller.location.coordinates;
+                                                    window.open(
+                                                        `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+                                                        "_blank",
+                                                    );
+                                                }}
+                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-primary hover:bg-primary/5 transition-colors"
+                                            >
+                                                <MapPin className="h-3 w-3" />
+                                                Open in Maps
+                                            </button>
+                                        )}
+                                </div>
+                                <p className="text-xs font-bold text-slate-600 leading-relaxed italic">
+                                    "{order.seller.address}"
+                                </p>
+                            </div>
+                        )}
                     </Card>
 
                     {/* Logistical Nodes */}

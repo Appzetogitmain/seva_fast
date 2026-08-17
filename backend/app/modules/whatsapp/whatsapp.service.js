@@ -7,6 +7,10 @@ function buildSendTextUrl(config) {
   return `${config.baseUrl}/send-text`;
 }
 
+function buildSendImageUrl(config) {
+  return `${config.baseUrl}/send-image`;
+}
+
 // Tezsender expects the destination number in international format without
 // a leading '+' (our numbers are already normalized to E.164 upstream).
 function toTezsenderPhone(e164Phone) {
@@ -82,6 +86,60 @@ export async function sendWhatsAppTextMessage({ to, message }) {
   }
 }
 
+/**
+ * Sends an image WhatsApp message (with an optional caption) via Tezsender's
+ * send-image endpoint. Same GET/query-string shape as send-text, plus an
+ * image URL. Confirmed against a live "api_key, number, msg, and image_url
+ * are required" validation error from Tezsender: the caption field is named
+ * `msg` (same as send-text), not `caption`.
+ */
+export async function sendWhatsAppImageMessage({ to, imageUrl, caption = "" }) {
+  const config = requireConfig();
+
+  const url = String(imageUrl || "").trim();
+  if (!url) {
+    const error = new Error("WhatsApp image URL is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const params = {
+    api_key: config.apiKey,
+    number: toTezsenderPhone(to),
+    msg: caption || "",
+    image_url: url,
+  };
+
+  try {
+    const response = await axios.get(buildSendImageUrl(config), {
+      params,
+      timeout: config.timeoutMs,
+    });
+
+    // Tezsender always replies HTTP 200 and signals failure via body.status.
+    if (!response.data?.status) {
+      const error = new Error(response.data?.message || "WhatsApp image send failed");
+      error.statusCode = 502;
+      throw error;
+    }
+
+    return {
+      success: true,
+      waMessageId: response.data?.msgId || response.data?.data?.id || response.data?.id || "",
+      ackStatus: response.data?.ackStatus || "",
+      raw: response.data,
+    };
+  } catch (error) {
+    const mapped = error.statusCode ? error : mapTezsenderError(error);
+    logger.error("Tezsender WhatsApp image send failed", {
+      to: maskPhone(to),
+      message: mapped.message,
+    });
+    throw mapped;
+  }
+}
+
 export default {
   sendWhatsAppTextMessage,
+  sendWhatsAppImageMessage,
 };
