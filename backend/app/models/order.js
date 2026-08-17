@@ -357,6 +357,18 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Delivery",
     },
+    deliveryMode: {
+      type: String,
+      enum: ["platform", "self"],
+      default: "platform",
+    },
+    selfDeliveryPerson: {
+      name: { type: String, trim: true },
+      phone: { type: String, trim: true },
+    },
+    selfDeliveryMarkedAt: {
+      type: Date,
+    },
     deliveryType: {
       type: String,
       enum: ["instant", "scheduled"],

@@ -464,7 +464,13 @@ const Returns = () => {
                 </button>
               </div>
 
-              <div className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-4 custom-scrollbar">
+              <div
+                className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto overscroll-contain touch-pan-y flex-1 min-h-0 space-y-4 custom-scrollbar"
+                data-lenis-prevent
+                data-lenis-prevent-wheel
+                onWheel={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+              >
                 <div className="space-y-2">
                   <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                     Customer
@@ -775,8 +781,12 @@ const Returns = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="pointer-events-auto w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain relative bg-white rounded-3xl shadow-2xl p-6 space-y-4"
+              className="pointer-events-auto w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain touch-pan-y relative bg-white rounded-3xl shadow-2xl p-6 space-y-4"
+              data-lenis-prevent
+              data-lenis-prevent-wheel
               onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
             >
               <h3 className="text-xl font-black text-slate-900">
                 {actionModal.mode === "qc_fail" ? "QC Failed" : "Action"}

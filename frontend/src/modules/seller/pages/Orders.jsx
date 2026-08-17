@@ -71,13 +71,15 @@ const Orders = () => {
     const [total, setTotal] = useState(0);
     const [deliveryBoys, setDeliveryBoys] = useState([]);
     const [sellerProfile, setSellerProfile] = useState(null);
+    const [ownDeliveryFormOrderId, setOwnDeliveryFormOrderId] = useState(null);
+    const [ownDeliveryName, setOwnDeliveryName] = useState('');
+    const [ownDeliveryPhone, setOwnDeliveryPhone] = useState('');
     const hasMountedRef = useRef(false);
 
     const fetchDeliveryBoys = async () => {
         try {
-            const response = await sellerApi.getDeliveryPartners({ verified: 'true', status: 'online' });
-            const payload = response.data.result || {};
-            const list = Array.isArray(payload.items) ? payload.items : (response.data.results || []);
+            const response = await sellerApi.getAvailableRiders();
+            const list = Array.isArray(response.data.result) ? response.data.result : [];
             setDeliveryBoys(list);
         } catch (error) {
             console.error("Failed to fetch delivery partners:", error);
@@ -158,6 +160,8 @@ const Orders = () => {
                         phone: order.deliveryBoy.phone,
                     }
                     : null,
+                deliveryMode: order.deliveryMode || 'platform',
+                selfDeliveryPerson: order.selfDeliveryPerson || null,
             }));
 
             setOrders(formattedOrders);
@@ -767,14 +771,43 @@ const Orders = () => {
             const deliveryBoy = assignedBoy
                 ? { _id: assignedBoy._id, name: assignedBoy.name, phone: assignedBoy.phone }
                 : null;
-            setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, deliveryBoy } : o)));
+            setOrders(prev => prev.map(o => (
+                o.id === orderId ? { ...o, deliveryBoy, deliveryMode: 'platform', selfDeliveryPerson: null } : o
+            )));
             if (selectedOrder && selectedOrder.id === orderId) {
-                setSelectedOrder({ ...selectedOrder, deliveryBoy });
+                setSelectedOrder({ ...selectedOrder, deliveryBoy, deliveryMode: 'platform', selfDeliveryPerson: null });
             }
             fetchOrders(page, false);
         } catch (error) {
             console.error("Failed to assign delivery partner:", error);
             showToast(error?.response?.data?.message || "Failed to assign delivery partner", "error");
+        }
+    };
+
+    const handleSetOwnDelivery = async (orderId, { name, phone } = {}) => {
+        const current = orders.find((o) => o.id === orderId) || selectedOrder;
+        const status = String(current?.status || "").toLowerCase();
+        if (status !== "packed" && status !== "out_for_delivery") {
+            showToast("Mark order as Packed before setting your own delivery person", "error");
+            return;
+        }
+        try {
+            await sellerApi.updateOrderStatus(orderId, { selfDelivery: { name, phone } });
+            showToast("Order marked for your own delivery person", "success");
+            const selfDeliveryPerson = { name: name || "", phone: phone || "" };
+            setOrders(prev => prev.map(o => (
+                o.id === orderId ? { ...o, deliveryMode: 'self', selfDeliveryPerson, deliveryBoy: null } : o
+            )));
+            if (selectedOrder && selectedOrder.id === orderId) {
+                setSelectedOrder({ ...selectedOrder, deliveryMode: 'self', selfDeliveryPerson, deliveryBoy: null });
+            }
+            setOwnDeliveryFormOrderId(null);
+            setOwnDeliveryName('');
+            setOwnDeliveryPhone('');
+            fetchOrders(page, false);
+        } catch (error) {
+            console.error("Failed to set own delivery:", error);
+            showToast(error?.response?.data?.message || "Failed to set own delivery person", "error");
         }
     };
 
@@ -1433,59 +1466,95 @@ const Orders = () => {
                                                             <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
                                                         </h4>
                                                         <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm space-y-2">
-                                                            {selectedOrder.deliveryBoy ? (
-                                                                <div className="flex flex-col gap-1.5">
-                                                                    <div className="flex justify-between items-center">
-                                                                        <div>
-                                                                            <p className="text-xs font-bold text-slate-800">{selectedOrder.deliveryBoy.name}</p>
-                                                                            <p className="text-[11px] font-semibold text-slate-600">{selectedOrder.deliveryBoy.phone}</p>
-                                                                        </div>
-                                                                        <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Assigned</span>
-                                                                    </div>
-                                                                    {String(selectedOrder.status || "").toLowerCase() === "packed" && (
-                                                                        <>
-                                                                            <div className="h-px bg-slate-200 my-1" />
-                                                                            <div className="relative">
-                                                                                <select
-                                                                                    value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}
-                                                                                    onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
-                                                                                    className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
-                                                                                >
-                                                                                    <option value={selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id || ''}>
-                                                                                        {selectedOrder.deliveryBoy.name} ({selectedOrder.deliveryBoy.phone})
-                                                                                    </option>
-                                                                                    <option value="" disabled>Change Rider...</option>
-                                                                                    {deliveryBoys
-                                                                                        .filter(boy => (boy._id || boy.id) !== (selectedOrder.deliveryBoy._id || selectedOrder.deliveryBoy.id))
-                                                                                        .map(boy => (
-                                                                                            <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
-                                                                                        ))}
-                                                                                </select>
-                                                                                <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
-                                                                            </div>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            ) : String(selectedOrder.status || "").toLowerCase() === "packed" ? (
-                                                                <div className="relative">
-                                                                    <select
-                                                                        value=""
-                                                                        onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
-                                                                        className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
-                                                                    >
-                                                                        <option value="">Assign Rider...</option>
-                                                                        {deliveryBoys.length === 0 ? (
-                                                                            <option value="" disabled>No online riders available</option>
-                                                                        ) : (
-                                                                            deliveryBoys.map(boy => (
-                                                                                <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
-                                                                            ))
+                                                            {selectedOrder.deliveryMode === 'self' ? (
+                                                                <div className="flex justify-between items-center">
+                                                                    <div>
+                                                                        <p className="text-xs font-bold text-slate-800">
+                                                                            {selectedOrder.selfDeliveryPerson?.name || 'Own delivery person'}
+                                                                        </p>
+                                                                        {selectedOrder.selfDeliveryPerson?.phone && (
+                                                                            <p className="text-[11px] font-semibold text-slate-600">{selectedOrder.selfDeliveryPerson.phone}</p>
                                                                         )}
-                                                                    </select>
-                                                                    <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                                                    </div>
+                                                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Own Delivery</span>
+                                                                </div>
+                                                            ) : selectedOrder.deliveryBoy ? (
+                                                                <div className="flex justify-between items-center">
+                                                                    <div>
+                                                                        <p className="text-xs font-bold text-slate-800">{selectedOrder.deliveryBoy.name}</p>
+                                                                        <p className="text-[11px] font-semibold text-slate-600">{selectedOrder.deliveryBoy.phone}</p>
+                                                                    </div>
+                                                                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Assigned</span>
                                                                 </div>
                                                             ) : (
                                                                 <p className="text-[11px] text-slate-500 font-medium">No delivery partner assigned.</p>
+                                                            )}
+
+                                                            {String(selectedOrder.status || "").toLowerCase() === "packed" && (
+                                                                ownDeliveryFormOrderId === selectedOrder.id ? (
+                                                                    <div className="space-y-2">
+                                                                        <div className="h-px bg-slate-200 my-1" />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={ownDeliveryName}
+                                                                            onChange={(e) => setOwnDeliveryName(e.target.value)}
+                                                                            placeholder="Delivery person name (optional)"
+                                                                            className="w-full text-xs px-3 py-2 bg-white rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={ownDeliveryPhone}
+                                                                            onChange={(e) => setOwnDeliveryPhone(e.target.value)}
+                                                                            placeholder="Phone number (optional)"
+                                                                            className="w-full text-xs px-3 py-2 bg-white rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
+                                                                        />
+                                                                        <div className="flex gap-2">
+                                                                            <button
+                                                                                onClick={() => handleSetOwnDelivery(selectedOrder.id, { name: ownDeliveryName, phone: ownDeliveryPhone })}
+                                                                                className="flex-1 text-[11px] font-bold text-white bg-primary rounded-xl py-2 hover:opacity-90 transition-all"
+                                                                            >
+                                                                                Confirm Own Delivery
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => { setOwnDeliveryFormOrderId(null); setOwnDeliveryName(''); setOwnDeliveryPhone(''); }}
+                                                                                className="px-3 text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                                                                            >
+                                                                                Cancel
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        <div className="h-px bg-slate-200 my-1" />
+                                                                        <div className="relative">
+                                                                            <select
+                                                                                value={selectedOrder.deliveryBoy?._id || selectedOrder.deliveryBoy?.id || ''}
+                                                                                onChange={(e) => handleAssignDeliveryBoy(selectedOrder.id, e.target.value)}
+                                                                                className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800"
+                                                                            >
+                                                                                <option value="">
+                                                                                    {selectedOrder.deliveryBoy ? 'Change Rider...' : 'Assign Rider...'}
+                                                                                </option>
+                                                                                {deliveryBoys.length === 0 ? (
+                                                                                    <option value="" disabled>No online riders available</option>
+                                                                                ) : (
+                                                                                    deliveryBoys
+                                                                                        .filter(boy => (boy._id || boy.id) !== (selectedOrder.deliveryBoy?._id || selectedOrder.deliveryBoy?.id))
+                                                                                        .map(boy => (
+                                                                                            <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
+                                                                                        ))
+                                                                                )}
+                                                                            </select>
+                                                                            <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => setOwnDeliveryFormOrderId(selectedOrder.id)}
+                                                                            className="text-[11px] font-bold text-primary hover:underline"
+                                                                        >
+                                                                            {selectedOrder.deliveryMode === 'self' ? 'Edit own delivery details' : 'Use my own delivery person instead'}
+                                                                        </button>
+                                                                    </>
+                                                                )
                                                             )}
                                                         </div>
                                                     </div>

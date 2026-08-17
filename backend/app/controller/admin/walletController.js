@@ -35,8 +35,7 @@ export const getDeliveryTransactions = async (req, res) => {
       maxLimit: 200,
     });
 
-    const sellerId = req.user.role === "seller" ? req.user.id : null;
-    const data = await getDeliveryTransactionsData({ page, limit, skip, sellerId });
+    const data = await getDeliveryTransactionsData({ page, limit, skip });
     return handleResponse(res, 200, "Delivery transactions fetched", data);
   } catch (error) {
     return handleResponse(res, 500, error.message);

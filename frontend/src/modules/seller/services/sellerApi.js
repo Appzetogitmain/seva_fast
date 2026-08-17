@@ -51,8 +51,8 @@ export const sellerApi = {
     rejectReturn: (orderId, data) => axiosInstance.put(`/orders/returns/${orderId}/reject`, data),
     assignReturnDelivery: (orderId, data) => axiosInstance.put(`/orders/returns/${orderId}/assign-delivery`, data),
 
-    // Delivery Boys
-    getDeliveryPartners: (params) => axiosInstance.get('/admin/delivery-partners', { params }),
+    // Delivery Boys — platform-wide pool, GPS/availability filtered near this seller
+    getAvailableRiders: () => axiosInstance.get('/orders/available-riders'),
 
     // Subscription Plans
     getPlans: () => axiosInstance.get('/seller/plans'),

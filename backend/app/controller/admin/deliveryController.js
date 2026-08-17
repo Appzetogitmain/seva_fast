@@ -22,10 +22,6 @@ export const getDeliveryPartners = async (req, res) => {
       query.isVerified = false;
     }
 
-    if (req.user.role === "seller") {
-      query.sellerId = req.user.id;
-    }
-
     const { page, limit, skip } = getPagination(req, {
       defaultLimit: 25,
       maxLimit: 200,
@@ -55,12 +51,8 @@ export const getDeliveryPartners = async (req, res) => {
 export const approveDeliveryPartner = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateQuery = { _id: id };
-    if (req.user.role === "seller") {
-      updateQuery.sellerId = req.user.id;
-    }
     const rider = await Delivery.findOneAndUpdate(
-      updateQuery,
+      { _id: id },
       { isVerified: true, isOnline: true },
       { new: true },
     );
@@ -86,11 +78,7 @@ export const approveDeliveryPartner = async (req, res) => {
 export const rejectDeliveryPartner = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleteQuery = { _id: id };
-    if (req.user.role === "seller") {
-      deleteQuery.sellerId = req.user.id;
-    }
-    const rider = await Delivery.findOneAndDelete(deleteQuery);
+    const rider = await Delivery.findOneAndDelete({ _id: id });
 
     if (!rider) {
       return handleResponse(res, 404, "Rider not found");
@@ -127,12 +115,7 @@ export const updateDeliveryPartner = async (req, res) => {
       isOnline,
     } = req.body || {};
 
-    const query = { _id: id };
-    if (req.user.role === "seller") {
-      query.sellerId = req.user.id;
-    }
-
-    const rider = await Delivery.findOne(query);
+    const rider = await Delivery.findOne({ _id: id });
     if (!rider) {
       return handleResponse(res, 404, "Rider not found");
     }

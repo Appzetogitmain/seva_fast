@@ -1594,6 +1594,80 @@ export async function handoffCodCashToSeller(orderOrId, { actorId = null } = {})
   }
 }
 
+/**
+ * Self-delivered COD orders never go through a rider, so the cash the seller's
+ * own person collects starts (and stays) with the seller — no rider cash-in-hand
+ * debit needed, and no rider commission to net out (unlike handoffCodCashToSeller,
+ * which nets out the rider's cut). This feeds the seller's existing COD-cash
+ * remit flow (getSellerCodCashSummary / submitSellerCodCashToAdmin) the same way
+ * a rider handoff would.
+ */
+export async function markSelfDeliveryCodCashWithSeller(orderOrId) {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const order = await findOrderForUpdate(orderOrId, session);
+
+    if (
+      order.deliveryMode !== "self" ||
+      !isCodOrder(order) ||
+      order.financeFlags?.codCashWithSeller ||
+      !order.seller
+    ) {
+      await session.commitTransaction();
+      return order;
+    }
+
+    const amount = roundCurrency(
+      order.paymentBreakdown?.grandTotal || order.pricing?.total || 0,
+    );
+    if (amount <= 0) {
+      await session.commitTransaction();
+      return order;
+    }
+
+    await updateCashInHand({
+      ownerType: OWNER_TYPE.SELLER,
+      ownerId: order.seller,
+      deltaAmount: amount,
+      session,
+    });
+
+    order.paymentBreakdown = {
+      ...(order.paymentBreakdown || {}),
+      codCollectedAmount: amount,
+      codPendingAmount: amount,
+    };
+    order.financeFlags = {
+      ...(order.financeFlags || {}),
+      codCollectMethod: "cash",
+      codMarkedCollected: true,
+      codCashWithRider: false,
+      codCashWithSeller: true,
+    };
+
+    await createFinanceAuditLog(
+      {
+        action: "COD_CASH_SELF_DELIVERY_WITH_SELLER",
+        actorType: OWNER_TYPE.SELLER,
+        actorId: order.seller,
+        orderId: order._id,
+        metadata: { amount: amount },
+      },
+      { session },
+    );
+
+    await order.save({ session });
+    await session.commitTransaction();
+    return order;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
 export async function sellerRemitCodCash(
   orderOrId,
   amount,

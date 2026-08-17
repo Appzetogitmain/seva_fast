@@ -26,7 +26,9 @@ import { applyDeliveredSettlement } from "../services/orderSettlement.js";
 import {
   freezeFinancialSnapshot,
   reverseOrderFinanceOnCancellation,
+  markSelfDeliveryCodCashWithSeller,
 } from "../services/finance/orderFinanceService.js";
+import { getDeliveryPartnerIdsWithinSellerRadius } from "../services/deliveryNearbyService.js";
 import {
   generateOrderPaymentBreakdown,
   hydrateOrderItems,
@@ -892,7 +894,7 @@ export const getReturnDetails = async (req, res) => {
 export const updateOrderStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { status, deliveryBoyId } = req.body;
+    const { status, deliveryBoyId, selfDelivery } = req.body;
     const { id: userId, role } = req.user;
 
     const orderKey = orderMatchQueryFromRouteParam(orderId);
@@ -1037,6 +1039,8 @@ export const updateOrderStatus = async (req, res) => {
 
     if (deliveryBoyId) {
       order.deliveryBoy = deliveryBoyId;
+      order.deliveryMode = "platform";
+      order.selfDeliveryPerson = undefined;
       order.deliverySearchExpiresAt = new Date(Date.now() + 60000);
       order.assignedAt = order.assignedAt || new Date();
       order.deliveryRiderStep = order.deliveryRiderStep || 1;
@@ -1115,6 +1119,38 @@ export const updateOrderStatus = async (req, res) => {
       }
     }
 
+    if (selfDelivery && typeof selfDelivery === "object") {
+      const effectiveStatus = String(nextStatus || order.status || "").toLowerCase();
+      const canSetAtStatus = ["packed", "out_for_delivery"].includes(effectiveStatus);
+      if (!canSetAtStatus) {
+        return handleResponse(
+          res,
+          400,
+          "Own delivery person can only be set after the order is packed.",
+        );
+      }
+
+      if (order.deliveryBoy) {
+        const previousDeliveryBoyId = order.deliveryBoy;
+        order.deliveryBoy = undefined;
+        order.deliveryPartner = undefined;
+        try {
+          await retractDeliveryBroadcastForOrder(canonicalOrderId, previousDeliveryBoyId);
+        } catch (retractErr) {
+          console.warn("[updateOrderStatus] retract broadcast failed:", retractErr.message);
+        }
+      }
+
+      order.deliveryMode = "self";
+      order.selfDeliveryPerson = {
+        name: selfDelivery.name ? String(selfDelivery.name).trim() : "",
+        phone: selfDelivery.phone ? String(selfDelivery.phone).trim() : "",
+      };
+      order.selfDeliveryMarkedAt = new Date();
+
+      await order.save();
+    }
+
     // Legacy orders: keep rider UI step in sync with status (delivery app refresh-safe)
     if (
       isAssignedDeliveryBoy &&
@@ -1179,6 +1215,9 @@ export const updateOrderStatus = async (req, res) => {
       // - queue rider payout
       // - mark COD cash collected (system float)
       await order.save();
+      if (order.deliveryMode === "self") {
+        await markSelfDeliveryCodCashWithSeller(order._id);
+      }
       await applyDeliveredSettlement(order, canonicalOrderId);
 
       emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_DELIVERED, {
@@ -1263,6 +1302,33 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     return handleResponse(res, 200, "Order status updated", order);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+/* ===============================
+   AVAILABLE RIDERS (Seller/Admin) — platform pool near a seller, by availability/GPS
+================================ */
+export const getAvailableRiders = async (req, res) => {
+  try {
+    const { role, id: userId } = req.user;
+    const sellerId = role === "seller" ? userId : req.query.sellerId;
+
+    if (!sellerId) {
+      return handleResponse(res, 400, "sellerId is required");
+    }
+
+    const ids = await getDeliveryPartnerIdsWithinSellerRadius(sellerId);
+    const riders = await Delivery.find({
+      _id: { $in: ids },
+      isVerified: true,
+      isOnline: true,
+    })
+      .select("name phone vehicleType vehicleNumber currentArea profileImage")
+      .lean();
+
+    return handleResponse(res, 200, "Available riders fetched successfully", riders);
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }

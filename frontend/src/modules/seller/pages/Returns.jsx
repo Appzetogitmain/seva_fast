@@ -104,9 +104,8 @@ const Returns = () => {
 
     const fetchDeliveryBoys = async () => {
         try {
-            const response = await sellerApi.getDeliveryPartners({ verified: 'true', status: 'online' });
-            const payload = response.data.result || {};
-            const list = Array.isArray(payload.items) ? payload.items : (response.data.results || []);
+            const response = await sellerApi.getAvailableRiders();
+            const list = Array.isArray(response.data.result) ? response.data.result : [];
             setDeliveryBoys(list);
         } catch (error) {
             console.error("Failed to fetch delivery partners:", error);

@@ -217,38 +217,40 @@ router.post("/sellers/:id/assign-plan", verifyToken, allowRoles("admin"), assign
 router.get(
     "/delivery-partners",
     verifyToken,
-    allowRoles("admin", "seller"),
+    allowRoles("admin"),
     getDeliveryPartners
 );
 
 router.put(
     "/delivery-partners/:id",
     verifyToken,
-    allowRoles("admin", "seller"),
+    allowRoles("admin"),
     updateDeliveryPartner
 );
 
 router.patch(
     "/delivery-partners/approve/:id",
     verifyToken,
-    allowRoles("admin", "seller"),
+    allowRoles("admin"),
     approveDeliveryPartner
 );
 
 router.delete(
     "/delivery-partners/reject/:id",
     verifyToken,
-    allowRoles("admin", "seller"),
+    allowRoles("admin"),
     rejectDeliveryPartner
 );
 
+// Active fleet stays seller-accessible: it's order tracking scoped by order.seller,
+// not rider roster management (riders are platform-owned, managed by admin only).
 router.get("/active-fleet", verifyToken, allowRoles("admin", "seller"), getActiveFleet);
 router.get("/wallet-data", verifyToken, allowRoles("admin"), getAdminWalletData);
 
 // Delivery Payouts / Funds
-router.get("/delivery-transactions", verifyToken, allowRoles('admin', 'seller'), getDeliveryTransactions);
-router.put("/transactions/:id/settle", verifyToken, allowRoles("admin", "seller"), settleTransaction);
-router.put("/transactions/bulk-settle-delivery", verifyToken, allowRoles("admin", "seller"), bulkSettleDelivery);
+router.get("/delivery-transactions", verifyToken, allowRoles("admin"), getDeliveryTransactions);
+router.put("/transactions/:id/settle", verifyToken, allowRoles("admin"), settleTransaction);
+router.put("/transactions/bulk-settle-delivery", verifyToken, allowRoles("admin"), bulkSettleDelivery);
 
 // Cash Collection Hub
 router.get("/delivery-cash", verifyToken, allowRoles("admin"), getDeliveryCashBalances);

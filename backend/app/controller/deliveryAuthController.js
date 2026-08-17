@@ -65,26 +65,12 @@ export const signupDelivery = async (req, res) => {
             email, address, vehicleNumber,
             drivingLicenseNumber,
             accountHolder, accountNumber, ifsc,
-            sellerCode, dob, bloodGroup, aadharNumber, panNumber
+            dob, bloodGroup, aadharNumber, panNumber
         } = req.body;
 
         if (!name || !phone) {
             return handleResponse(res, 400, "Name and phone are required");
         }
-
-        const normalizedSellerCode = String(sellerCode || "").trim().toUpperCase();
-        if (!normalizedSellerCode) {
-            return handleResponse(res, 400, "Seller invite code is required");
-        }
-
-        let sellerId = null;
-        const seller = await mongoose.model("Seller").findOne({
-            sellerCode: normalizedSellerCode,
-        });
-        if (!seller) {
-            return handleResponse(res, 400, "Invalid seller invite code");
-        }
-        sellerId = seller._id;
 
         let delivery = await findDeliveryByPhone(phone);
 
@@ -140,7 +126,6 @@ export const signupDelivery = async (req, res) => {
             accountHolder,
             accountNumber,
             ifsc,
-            sellerId,
             dob,
             bloodGroup,
             aadharNumber,

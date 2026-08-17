@@ -5,6 +5,7 @@ import {
   getOrderDetails,
   cancelOrder,
   updateOrderStatus,
+  getAvailableRiders,
   getSellerOrders,
   getAvailableOrders,
   acceptOrder,
@@ -158,6 +159,13 @@ router.put(
   allowRoles("admin", "seller"),
   requireApprovedSeller,
   updateOrderStatus,
+);
+router.get(
+  "/available-riders",
+  verifyToken,
+  allowRoles("admin", "seller"),
+  requireApprovedSeller,
+  getAvailableRiders,
 );
 router.get(
   "/seller-returns",

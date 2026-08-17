@@ -16,6 +16,7 @@ import {
   handoffCodCashToSeller,
   markCodCashCollectedByRider,
   markCodOnlinePaid,
+  markSelfDeliveryCodCashWithSeller,
   reconcileCodCash,
 } from "../services/finance/orderFinanceService.js";
 import {
@@ -453,6 +454,10 @@ export const markOrderDeliveredAndSettle = async (req, res) => {
         order.deliveredAt = new Date();
       }
       await order.save();
+    }
+
+    if (order.deliveryMode === "self") {
+      await markSelfDeliveryCodCashWithSeller(order._id);
     }
 
     const updated = await applyDeliveredSettlement(order, order.orderId);
