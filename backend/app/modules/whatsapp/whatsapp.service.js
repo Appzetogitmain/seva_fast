@@ -3,8 +3,8 @@ import { getWhatsAppConfig } from "../../config/whatsapp.js";
 import { maskPhone } from "../../utils/phone.js";
 import logger from "../../services/logger.js";
 
-function buildSendTemplateUrl(config) {
-  return `${config.baseUrl}/send-template`;
+function buildSendTextUrl(config) {
+  return `${config.baseUrl}/send-text`;
 }
 
 // Tezsender expects the destination number in international format without
@@ -33,22 +33,16 @@ function mapTezsenderError(error) {
 }
 
 /**
- * Sends an approved WhatsApp template message via Tezsender's Official
- * (Meta Cloud device) send-template endpoint. Business-initiated WhatsApp
- * messages (order updates, birthday wishes, campaigns) must use an approved
- * template outside the 24h customer-service session window — this is the
- * only send path those flows should use.
+ * Sends a plain-text WhatsApp message via Tezsender's QR/device-based
+ * send-text endpoint (GET https://tezsender.in/api/send-text). This device
+ * mode has no Meta template approval — the message body is whatever our own
+ * internal templates (whatsapp.templates.js) render, sent as-is as `msg`.
  */
-export async function sendWhatsAppTemplateMessage({
-  to,
-  templateName,
-  languageCode,
-  bodyParams = [],
-}) {
+export async function sendWhatsAppTextMessage({ to, message }) {
   const config = requireConfig();
 
-  if (!templateName) {
-    const error = new Error("WhatsApp template name is required");
+  if (!message || !String(message).trim()) {
+    const error = new Error("WhatsApp message text is required");
     error.statusCode = 400;
     throw error;
   }
@@ -56,19 +50,16 @@ export async function sendWhatsAppTemplateMessage({
   const params = {
     api_key: config.apiKey,
     number: toTezsenderPhone(to),
-    template_name: templateName,
-    language: languageCode || config.defaultLanguageCode,
+    msg: message,
   };
-  if (bodyParams.length) {
-    params.params = bodyParams.map((value) => String(value ?? "")).join(",");
-  }
 
   try {
-    const response = await axios.get(buildSendTemplateUrl(config), {
+    const response = await axios.get(buildSendTextUrl(config), {
       params,
       timeout: config.timeoutMs,
     });
 
+    // Tezsender always replies HTTP 200 and signals failure via body.status.
     if (!response.data?.status) {
       const error = new Error(response.data?.message || "WhatsApp send failed");
       error.statusCode = 502;
@@ -77,14 +68,14 @@ export async function sendWhatsAppTemplateMessage({
 
     return {
       success: true,
-      waMessageId: response.data?.data?.id || response.data?.id || response.data?.msg_id || "",
+      waMessageId: response.data?.msgId || response.data?.data?.id || response.data?.id || "",
+      ackStatus: response.data?.ackStatus || "",
       raw: response.data,
     };
   } catch (error) {
     const mapped = error.statusCode ? error : mapTezsenderError(error);
-    logger.error("Tezsender WhatsApp template send failed", {
+    logger.error("Tezsender WhatsApp text send failed", {
       to: maskPhone(to),
-      templateName,
       message: mapped.message,
     });
     throw mapped;
@@ -92,5 +83,5 @@ export async function sendWhatsAppTemplateMessage({
 }
 
 export default {
-  sendWhatsAppTemplateMessage,
+  sendWhatsAppTextMessage,
 };

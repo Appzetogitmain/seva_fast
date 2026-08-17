@@ -95,11 +95,50 @@ const couponSchema = new mongoose.Schema(
         metadata: {
             type: Object,
         },
+        // When set, only this customer may redeem the coupon (checked in
+        // couponUsageService.assertCouponUsable + couponController.validateCoupon).
+        // System-managed — never accepted from the admin coupon form.
+        assignedCustomer: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
+            index: true,
+        },
+        // Marks the ONE coupon admins use as the source rules (discount type/value,
+        // min order, etc.) that get cloned into a fresh per-customer coupon when a
+        // customer's birthday arrives. Not directly redeemable itself.
+        isBirthdayTemplate: {
+            type: Boolean,
+            default: false,
+        },
+        // Only meaningful when isBirthdayTemplate is true — how many days the
+        // cloned per-customer coupon stays valid for, counted from issuance.
+        birthdayValidityDays: {
+            type: Number,
+            default: 7,
+            min: 1,
+        },
+        // Deterministic idempotency key for system-issued coupons, e.g.
+        // "birthday:<customerId>:2026". A unique partial index on this field
+        // is what stops a scheduler re-run from ever issuing two coupons for
+        // the same customer/year — mirrors whatsappMessage.dedupeKey.
+        dedupeKey: {
+            type: String,
+            default: "",
+            trim: true,
+        },
     },
     { timestamps: true }
 );
 
 couponSchema.index({ isActive: 1, validFrom: 1, validTill: 1 });
+// MongoDB partial indexes only support $eq/$exists/$gt/$gte/$lt/$lte/$type/$and —
+// $ne is NOT supported, so this must use $gt: "" (see whatsappMessage.js for the
+// bug this exact mistake caused there).
+couponSchema.index(
+    { dedupeKey: 1 },
+    { unique: true, partialFilterExpression: { dedupeKey: { $type: "string", $gt: "" } } }
+);
 
 export default mongoose.model("Coupon", couponSchema);
 

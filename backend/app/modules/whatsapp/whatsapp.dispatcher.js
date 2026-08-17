@@ -1,17 +1,22 @@
 import Order from "../../models/order.js";
 import Customer from "../../models/customer.js";
 import WhatsAppMessage from "../../models/whatsappMessage.js";
-import { isValidE164Phone, maskPhone } from "../../utils/phone.js";
-import { sendWhatsAppTemplateMessage } from "./whatsapp.service.js";
-import { getTemplateForType, buildOrderEventBodyParams, buildBirthdayBodyParams } from "./whatsapp.templates.js";
+import { isValidE164Phone, normalizePhoneNumber, maskPhone } from "../../utils/phone.js";
+import { sendWhatsAppTextMessage } from "./whatsapp.service.js";
+import { getTemplateForType, renderTemplate } from "./whatsapp.templates.js";
 import { WHATSAPP_MESSAGE_TYPES, ORDER_EVENT_TO_WHATSAPP_MESSAGE_TYPE } from "./whatsapp.constants.js";
 import { NOTIFICATION_EVENTS } from "../notifications/notification.constants.js";
 import { getWhatsAppConfig } from "../../config/whatsapp.js";
+import { issueBirthdayCoupon, formatCouponDiscountLabel } from "../../services/birthdayCouponService.js";
 import logger from "../../services/logger.js";
 
 function formatAmount(value) {
   const num = Number(value || 0);
   return `Rs. ${num.toLocaleString("en-IN")}`;
+}
+
+function formatShortDate(date) {
+  return new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 /**
@@ -20,15 +25,18 @@ function formatAmount(value) {
  * only ever updates the WhatsAppMessage row and logs — it never throws back
  * to the caller, so a WhatsApp outage can't affect order/birthday flows.
  */
-async function recordAndSend({ customerId, phone, messageType, dedupeKey, relatedOrder, templateName, languageCode, bodyParams }) {
+async function recordAndSend({ customerId, phone: rawPhone, messageType, dedupeKey, relatedOrder, message }) {
+  // Some existing customer records predate phone normalization and are
+  // still stored as bare 10-digit numbers — normalize here so those
+  // customers aren't silently skipped for every WhatsApp notification.
+  const phone = normalizePhoneNumber(rawPhone);
+
   let record;
   try {
     record = await WhatsAppMessage.create({
       customer: customerId || null,
       phone,
       messageType,
-      templateName,
-      languageCode,
       relatedOrder: relatedOrder || null,
       dedupeKey,
       status: "queued",
@@ -63,7 +71,7 @@ async function recordAndSend({ customerId, phone, messageType, dedupeKey, relate
   }
 
   try {
-    const result = await sendWhatsAppTemplateMessage({ to: phone, templateName, languageCode, bodyParams });
+    const result = await sendWhatsAppTextMessage({ to: phone, message });
     await WhatsAppMessage.updateOne(
       { _id: record._id },
       { $set: { status: "sent", waMessageId: result.waMessageId, sentAt: new Date() } },
@@ -88,7 +96,7 @@ async function handleOrderEvent(eventType, payload) {
   const orderId = String(payload.orderId || "").trim();
   if (!orderId) return;
 
-  const template = getTemplateForType(messageType);
+  const template = await getTemplateForType(messageType);
   if (!template) return;
 
   const order = await Order.findOne({ orderId })
@@ -103,8 +111,8 @@ async function handleOrderEvent(eventType, payload) {
   const amount = formatAmount(order.paymentBreakdown?.grandTotal || order.pricing?.total || 0);
   const status = order.orderStatus || order.status || "";
 
-  const bodyParams = buildOrderEventBodyParams(messageType, {
-    customerName,
+  const message = renderTemplate(template, {
+    name: customerName,
     orderNumber: order.orderId,
     amount,
     status,
@@ -116,9 +124,7 @@ async function handleOrderEvent(eventType, payload) {
     messageType,
     dedupeKey: `order:${order.orderId}:${messageType}`,
     relatedOrder: order._id,
-    templateName: template.name,
-    languageCode: template.languageCode,
-    bodyParams,
+    message,
   });
 }
 
@@ -126,14 +132,30 @@ async function handleBirthdayEvent(payload) {
   const customerId = payload.userId || payload.customerId;
   if (!customerId) return;
 
-  const template = getTemplateForType(WHATSAPP_MESSAGE_TYPES.BIRTHDAY_WISH);
+  const template = await getTemplateForType(WHATSAPP_MESSAGE_TYPES.BIRTHDAY_WISH);
   if (!template) return;
 
   const customer = await Customer.findById(customerId).select("name phone").lean();
   if (!customer) return;
 
   const year = payload.birthdayYear || new Date().getFullYear();
-  const bodyParams = buildBirthdayBodyParams({ customerName: customer.name || "there" });
+  let message = renderTemplate(template, { name: customer.name || "there" });
+
+  // Coupon issuance is a best-effort add-on — never let it block the wish
+  // itself (no birthday template configured, a transient DB error, etc.
+  // should all still result in a plain "Happy Birthday" message going out).
+  try {
+    const coupon = await issueBirthdayCoupon(customer, year);
+    if (coupon) {
+      message += ` \u{1F381} Here's a birthday gift: use code ${coupon.code} for ${formatCouponDiscountLabel(coupon)} on your next order, valid till ${formatShortDate(coupon.validTill)}.`;
+    }
+  } catch (error) {
+    logger.error("Failed to issue birthday coupon", {
+      customerId: String(customer._id),
+      year,
+      message: error.message,
+    });
+  }
 
   await recordAndSend({
     customerId: customer._id,
@@ -141,9 +163,7 @@ async function handleBirthdayEvent(payload) {
     messageType: WHATSAPP_MESSAGE_TYPES.BIRTHDAY_WISH,
     dedupeKey: `birthday:${customer._id}:${year}`,
     relatedOrder: null,
-    templateName: template.name,
-    languageCode: template.languageCode,
-    bodyParams,
+    message,
   });
 }
 

@@ -91,6 +91,9 @@ export const adminApi = {
     cancelWhatsAppCampaign: (id) => axiosInstance.post(`/admin/whatsapp/campaigns/${id}/cancel`),
     getWhatsAppCampaignMessages: (id, params) => axiosInstance.get(`/admin/whatsapp/campaigns/${id}/messages`, { params }),
     getWhatsAppMessages: (params) => axiosInstance.get('/admin/whatsapp/messages', { params }),
+    getWhatsAppTemplates: () => axiosInstance.get('/admin/whatsapp/templates'),
+    updateWhatsAppTemplate: (messageType, data) => axiosInstance.put(`/admin/whatsapp/templates/${messageType}`, data),
+    resetWhatsAppTemplate: (messageType) => axiosInstance.delete(`/admin/whatsapp/templates/${messageType}`),
 
     // Reviews
     // Delivery Partners

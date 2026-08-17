@@ -89,9 +89,13 @@ const whatsappMessageSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// MongoDB partial indexes only support a limited operator set ($eq, $exists,
+// $gt/$gte/$lt/$lte, $type, $and) — $ne is NOT allowed and silently fails
+// index creation (autoIndex logs the error but doesn't crash the app), so
+// this must use $gt: "" instead of $ne: "" to exclude the empty-string default.
 whatsappMessageSchema.index(
   { dedupeKey: 1 },
-  { unique: true, partialFilterExpression: { dedupeKey: { $type: "string", $ne: "" } } },
+  { unique: true, partialFilterExpression: { dedupeKey: { $type: "string", $gt: "" } } },
 );
 whatsappMessageSchema.index({ customer: 1, messageType: 1, createdAt: -1 });
 whatsappMessageSchema.index({ relatedCampaign: 1, status: 1 });

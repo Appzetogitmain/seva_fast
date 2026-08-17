@@ -1,9 +1,11 @@
 import handleResponse from "../../utils/helper.js";
 import WhatsAppCampaign from "../../models/whatsappCampaign.js";
 import WhatsAppMessage from "../../models/whatsappMessage.js";
+import WhatsAppTemplate, { WHATSAPP_TEMPLATE_TYPES } from "../../models/whatsappTemplate.js";
 import Customer from "../../models/customer.js";
-import { createCampaignSchema, validateSchema } from "../../validation/whatsappValidation.js";
+import { createCampaignSchema, updateTemplateSchema, validateSchema } from "../../validation/whatsappValidation.js";
 import { dispatchCampaign } from "./whatsappCampaign.service.js";
+import { listEffectiveTemplates } from "./whatsapp.templates.js";
 import { getWhatsAppConfig, isWhatsAppEnabled } from "../../config/whatsapp.js";
 import logger from "../../services/logger.js";
 
@@ -129,6 +131,54 @@ export const getCampaignMessages = async (req, res) => {
   }
 };
 
+// ── Message templates (admin) ───────────────────────────────────────────────
+// Source of truth for the 5 automated event templates (order lifecycle +
+// birthday). The dispatcher (whatsapp.templates.js) reads this same
+// collection first, falling back to env vars / hardcoded defaults if a row
+// doesn't exist yet — so editing here takes effect immediately, no redeploy.
+
+export const listWhatsAppTemplates = async (req, res) => {
+  try {
+    const templates = await listEffectiveTemplates();
+    return handleResponse(res, 200, "WhatsApp templates fetched", templates);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+export const updateWhatsAppTemplate = async (req, res) => {
+  try {
+    const { messageType } = req.params;
+    if (!WHATSAPP_TEMPLATE_TYPES.includes(messageType)) {
+      return handleResponse(res, 400, "Unknown template type");
+    }
+    const payload = validateSchema(updateTemplateSchema, req.body);
+
+    const template = await WhatsAppTemplate.findOneAndUpdate(
+      { messageType },
+      { $set: { text: payload.text, updatedBy: req.user?.id || null } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+
+    return handleResponse(res, 200, "Template updated", template);
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
+  }
+};
+
+export const resetWhatsAppTemplate = async (req, res) => {
+  try {
+    const { messageType } = req.params;
+    if (!WHATSAPP_TEMPLATE_TYPES.includes(messageType)) {
+      return handleResponse(res, 400, "Unknown template type");
+    }
+    await WhatsAppTemplate.deleteOne({ messageType });
+    return handleResponse(res, 200, "Template reset to default");
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
 // ── Message tracking (admin) ───────────────────────────────────────────────
 
 export const listWhatsAppMessages = async (req, res) => {
@@ -164,5 +214,8 @@ export default {
   getCampaign,
   cancelCampaign,
   getCampaignMessages,
+  listWhatsAppTemplates,
+  updateWhatsAppTemplate,
+  resetWhatsAppTemplate,
   listWhatsAppMessages,
 };

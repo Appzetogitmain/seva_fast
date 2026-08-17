@@ -43,9 +43,6 @@ const emptyForm = {
     title: '',
     campaignType: 'announcement',
     message: '',
-    templateName: '',
-    languageCode: '',
-    bodyParams: [],
     audienceType: 'all',
     targetCustomerIds: [],
     scheduleType: 'immediate',
@@ -162,29 +159,10 @@ const WhatsAppCampaigns = () => {
         });
     };
 
-    const updateBodyParam = (index, value) => {
-        setForm((prev) => {
-            const next = [...prev.bodyParams];
-            next[index] = value;
-            return { ...prev, bodyParams: next };
-        });
-    };
-
-    const addBodyParam = () => {
-        setForm((prev) => {
-            if (prev.bodyParams.length >= 10) return prev;
-            return { ...prev, bodyParams: [...prev.bodyParams, ''] };
-        });
-    };
-
-    const removeBodyParam = (index) => {
-        setForm((prev) => ({ ...prev, bodyParams: prev.bodyParams.filter((_, i) => i !== index) }));
-    };
-
     const handleSubmit = async () => {
         if (isSubmitting) return;
-        if (!form.title.trim() || !form.message.trim() || !form.templateName.trim()) {
-            showToast('Title, message and template name are required', 'warning');
+        if (!form.title.trim() || !form.message.trim()) {
+            showToast('Title and message are required', 'warning');
             return;
         }
         if (form.audienceType === 'selected' && selectedCustomers.length === 0) {
@@ -202,9 +180,6 @@ const WhatsAppCampaigns = () => {
                 title: form.title.trim(),
                 campaignType: form.campaignType,
                 message: form.message.trim(),
-                templateName: form.templateName.trim(),
-                languageCode: form.languageCode.trim() || undefined,
-                bodyParams: form.bodyParams.filter((v) => v.trim() !== ''),
                 audienceType: form.audienceType,
                 targetCustomerIds: form.audienceType === 'selected' ? selectedCustomers.map((c) => c.id) : undefined,
                 scheduleType: form.scheduleType,
@@ -258,7 +233,7 @@ const WhatsAppCampaigns = () => {
             return 'WhatsApp is disabled (WHATSAPP_ENABLED=false). Campaigns will be created but sends will fail until it is enabled.';
         }
         if (!configStatus.configured) {
-            return 'WhatsApp is enabled but not fully configured (missing access token / phone number id). Sends will fail until credentials are set.';
+            return 'WhatsApp is enabled but not fully configured (missing Tezsender API key). Sends will fail until it is set.';
         }
         return null;
     }, [configStatus]);
@@ -267,10 +242,10 @@ const WhatsAppCampaigns = () => {
         <div className="ds-section-spacing">
             <PageHeader
                 title="WhatsApp Campaigns"
-                description="Send Meta-approved WhatsApp template broadcasts to your customers."
+                description="Send plain-text WhatsApp broadcasts to your customers via Tezsender."
                 badge={
                     <Badge variant="success" className="ds-badge ds-badge-success">
-                        WhatsApp Cloud API
+                        Tezsender
                     </Badge>
                 }
                 actions={
@@ -352,7 +327,7 @@ const WhatsAppCampaigns = () => {
                                 <tr key={c._id} className="group hover:bg-slate-50/30 transition-colors">
                                     <td className="px-4 py-6">
                                         <p className="text-sm font-black text-slate-900">{c.title}</p>
-                                        <p className="text-[10px] font-bold text-slate-400 mt-1 capitalize">{c.campaignType?.replace(/_/g, ' ')} · {c.templateName}</p>
+                                        <p className="text-[10px] font-bold text-slate-400 mt-1 capitalize">{c.campaignType?.replace(/_/g, ' ')}</p>
                                     </td>
                                     <td className="px-4 py-6">
                                         <div className="flex items-center gap-2 text-slate-500">
@@ -469,70 +444,16 @@ const WhatsAppCampaigns = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="ds-label">Message (internal record)</label>
+                        <label className="ds-label">Message</label>
                         <textarea
-                            rows={3}
+                            rows={4}
                             value={form.message}
                             onChange={(e) => setForm((p) => ({ ...p, message: e.target.value }))}
                             className="ds-textarea w-full resize-none"
-                            placeholder="What this campaign is about (for your records — the actual send uses the approved template below)"
+                            placeholder="Hi {name}, enjoy 20% off this festive season!"
                             maxLength={1024}
                         />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="ds-label">Meta-Approved Template Name</label>
-                            <input
-                                value={form.templateName}
-                                onChange={(e) => setForm((p) => ({ ...p, templateName: e.target.value }))}
-                                className="ds-input w-full"
-                                placeholder="e.g. diwali_sale_2026"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="ds-label">Language Code (optional)</label>
-                            <input
-                                value={form.languageCode}
-                                onChange={(e) => setForm((p) => ({ ...p, languageCode: e.target.value }))}
-                                className="ds-input w-full"
-                                placeholder="en_US"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <label className="ds-label">Template Body Variables (in order, after recipient name)</label>
-                            <button
-                                type="button"
-                                onClick={addBodyParam}
-                                disabled={form.bodyParams.length >= 10}
-                                className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline disabled:opacity-40"
-                            >
-                                + Add Variable
-                            </button>
-                        </div>
-                        {form.bodyParams.length === 0 && (
-                            <p className="ds-caption text-slate-400">No extra variables — only the recipient's name is sent.</p>
-                        )}
-                        {form.bodyParams.map((value, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                                <input
-                                    value={value}
-                                    onChange={(e) => updateBodyParam(index, e.target.value)}
-                                    className="ds-input w-full"
-                                    placeholder={`{{${index + 2}}} value`}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => removeBodyParam(index)}
-                                    className="p-2 text-slate-400 hover:text-rose-500"
-                                >
-                                    <HiOutlineXMark className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ))}
+                        <p className="ds-caption text-slate-400">This exact text is sent to each recipient. Use {'{name}'} to insert the customer's name.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

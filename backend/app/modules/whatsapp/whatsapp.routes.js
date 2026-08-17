@@ -7,6 +7,9 @@ import {
   getCampaign,
   cancelCampaign,
   getCampaignMessages,
+  listWhatsAppTemplates,
+  updateWhatsAppTemplate,
+  resetWhatsAppTemplate,
   listWhatsAppMessages,
 } from "./whatsapp.controller.js";
 
@@ -22,6 +25,9 @@ whatsappAdminRouter.get("/campaigns/:id", getCampaign);
 whatsappAdminRouter.post("/campaigns/:id/cancel", cancelCampaign);
 whatsappAdminRouter.get("/campaigns/:id/messages", getCampaignMessages);
 whatsappAdminRouter.get("/messages", listWhatsAppMessages);
+whatsappAdminRouter.get("/templates", listWhatsAppTemplates);
+whatsappAdminRouter.put("/templates/:messageType", updateWhatsAppTemplate);
+whatsappAdminRouter.delete("/templates/:messageType", resetWhatsAppTemplate);
 
 export { whatsappAdminRouter };
 export default whatsappAdminRouter;

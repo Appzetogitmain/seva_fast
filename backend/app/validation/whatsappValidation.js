@@ -4,8 +4,17 @@ import {
   WHATSAPP_AUDIENCE_TYPES,
   WHATSAPP_SCHEDULE_TYPES,
 } from "../models/whatsappCampaign.js";
+import { WHATSAPP_TEMPLATE_TYPES } from "../models/whatsappTemplate.js";
 
 const objectId = Joi.string().trim().length(24).hex();
+
+export const updateTemplateSchema = Joi.object({
+  text: Joi.string().trim().min(1).max(1024).required(),
+}).options({ abortEarly: false });
+
+export const templateMessageTypeSchema = Joi.string()
+  .valid(...WHATSAPP_TEMPLATE_TYPES)
+  .required();
 
 export const createCampaignSchema = Joi.object({
   title: Joi.string().trim().min(3).max(120).required(),
@@ -13,9 +22,6 @@ export const createCampaignSchema = Joi.object({
     .valid(...WHATSAPP_CAMPAIGN_TYPES)
     .default("announcement"),
   message: Joi.string().trim().min(1).max(1024).required(),
-  templateName: Joi.string().trim().min(1).max(150).required(),
-  languageCode: Joi.string().trim().max(20).optional().allow(""),
-  bodyParams: Joi.array().items(Joi.string().trim().allow("")).max(10).default([]),
   audienceType: Joi.string()
     .valid(...WHATSAPP_AUDIENCE_TYPES)
     .required(),

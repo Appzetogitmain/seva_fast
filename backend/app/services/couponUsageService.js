@@ -179,6 +179,14 @@ export async function assertCouponUsable({
     throw new Error("This coupon is not active");
   }
 
+  if (coupon.isBirthdayTemplate) {
+    throw new Error("This coupon cannot be applied directly");
+  }
+
+  if (coupon.assignedCustomer && String(coupon.assignedCustomer) !== String(customerId)) {
+    throw new Error("This coupon is not valid for your account");
+  }
+
   const totalUsed = await countCouponRedemptions({ coupon, session });
   if (coupon.usageLimit && totalUsed >= coupon.usageLimit) {
     throw new Error("This coupon has reached its usage limit");

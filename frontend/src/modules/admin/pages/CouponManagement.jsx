@@ -52,7 +52,7 @@ const CouponManagement = () => {
 
     const [coupons, setCoupons] = useState([]);
 
-    const [formData, setFormData] = useState({
+    const emptyFormData = {
         code: '',
         title: '',
         couponType: 'generic',
@@ -65,7 +65,11 @@ const CouponManagement = () => {
         validFrom: '',
         validTill: '',
         description: '',
-    });
+        isBirthdayTemplate: false,
+        birthdayValidityDays: '7',
+    };
+
+    const [formData, setFormData] = useState(emptyFormData);
 
     /** Keep numeric promo fields within [min, max] — never negative. */
     const handleNonNegativeChange = (field, raw, min = 0, max = Infinity) => {
@@ -169,23 +173,12 @@ const CouponManagement = () => {
                 validFrom: coupon.validFrom ? coupon.validFrom.substring(0, 10) : '',
                 validTill: coupon.validTill ? coupon.validTill.substring(0, 10) : '',
                 description: coupon.description || '',
+                isBirthdayTemplate: Boolean(coupon.isBirthdayTemplate),
+                birthdayValidityDays: String(coupon.birthdayValidityDays || 7),
             });
         } else {
             setEditingCoupon(null);
-            setFormData({
-                code: '',
-                title: '',
-                couponType: 'generic',
-                discountType: 'percentage',
-                discountValue: '',
-                minOrderValue: '',
-                maxDiscount: '',
-                usageLimit: '',
-                perUserLimit: '1',
-                validFrom: '',
-                validTill: '',
-                description: '',
-            });
+            setFormData(emptyFormData);
         }
         setIsModalOpen(true);
     };
@@ -217,6 +210,10 @@ const CouponManagement = () => {
             if (formData.discountType === 'percentage' && discountValue > 100) {
                 return showToast('Percentage discount cannot exceed 100', 'error');
             }
+            const birthdayValidityDays = formData.birthdayValidityDays ? Number(formData.birthdayValidityDays) : 7;
+            if (formData.isBirthdayTemplate && (!Number.isFinite(birthdayValidityDays) || birthdayValidityDays < 1)) {
+                return showToast('Birthday coupon validity must be at least 1 day', 'error');
+            }
 
             const payload = {
                 ...formData,
@@ -227,6 +224,7 @@ const CouponManagement = () => {
                 perUserLimit,
                 validFrom: formData.validFrom,
                 validTill: formData.validTill,
+                birthdayValidityDays,
             };
 
             if (editingCoupon?._id) {
@@ -369,7 +367,17 @@ const CouponManagement = () => {
                                                 <HiOutlineTicket className="h-6 w-6" />
                                             </div>
                                             <div>
-                                                <span className="text-sm font-black text-slate-900 tracking-wider bg-slate-100 px-2 py-1 rounded-lg border-2 border-dashed border-slate-300">{c.code}</span>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm font-black text-slate-900 tracking-wider bg-slate-100 px-2 py-1 rounded-lg border-2 border-dashed border-slate-300">{c.code}</span>
+                                                    {c.isBirthdayTemplate && (
+                                                        <Badge variant="warning" className="text-[9px] font-black uppercase">🎂 Template</Badge>
+                                                    )}
+                                                    {c.assignedCustomer && (
+                                                        <Badge variant="primary" className="text-[9px] font-black uppercase">
+                                                            🎁 {c.assignedCustomer.name || 'Customer'}-only
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                                 <p className="text-[10px] font-bold text-slate-400 mt-1">{c.title}</p>
                                                 <p className="text-[10px] font-medium text-slate-400 mt-0.5 line-clamp-2">{c.description}</p>
                                             </div>
@@ -611,33 +619,81 @@ const CouponManagement = () => {
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Uses (optional)</label>
-                            <input
-                                type="number"
-                                min={0}
-                                step="1"
-                                onKeyDown={blockNegativeKeys}
-                                onWheel={(e) => e.target.blur()}
-                                value={formData.usageLimit}
-                                onChange={(e) => handleNonNegativeChange('usageLimit', e.target.value, 0)}
-                                className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
-                            />
+                            {formData.isBirthdayTemplate ? (
+                                <div className="w-full px-4 py-3 bg-slate-100 rounded-2xl text-[10px] font-bold text-slate-400">
+                                    Fixed to 1 per customer — not editable for birthday coupons
+                                </div>
+                            ) : (
+                                <input
+                                    type="number"
+                                    min={0}
+                                    step="1"
+                                    onKeyDown={blockNegativeKeys}
+                                    onWheel={(e) => e.target.blur()}
+                                    value={formData.usageLimit}
+                                    onChange={(e) => handleNonNegativeChange('usageLimit', e.target.value, 0)}
+                                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
+                                />
+                            )}
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Per User Limit</label>
-                            <input
-                                type="number"
-                                min={1}
-                                step="1"
-                                onKeyDown={blockNegativeKeys}
-                                onWheel={(e) => e.target.blur()}
-                                value={formData.perUserLimit}
-                                onChange={(e) => handleNonNegativeChange('perUserLimit', e.target.value, 1)}
-                                className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
-                            />
+                            {formData.isBirthdayTemplate ? (
+                                <div className="w-full px-4 py-3 bg-slate-100 rounded-2xl text-[10px] font-bold text-slate-400">
+                                    Fixed to 1 per customer — not editable for birthday coupons
+                                </div>
+                            ) : (
+                                <input
+                                    type="number"
+                                    min={1}
+                                    step="1"
+                                    onKeyDown={blockNegativeKeys}
+                                    onWheel={(e) => e.target.blur()}
+                                    value={formData.perUserLimit}
+                                    onChange={(e) => handleNonNegativeChange('perUserLimit', e.target.value, 1)}
+                                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-black outline-none"
+                                />
+                            )}
                         </div>
+                    </div>
+
+                    <div className="space-y-3 p-4 bg-amber-50 rounded-2xl ring-1 ring-amber-100">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={formData.isBirthdayTemplate}
+                                onChange={(e) => setFormData({ ...formData, isBirthdayTemplate: e.target.checked })}
+                                className="h-4 w-4 rounded accent-primary"
+                            />
+                            <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+                                Use as Birthday Coupon Template
+                            </span>
+                        </label>
+                        <p className="text-[10px] text-slate-500">
+                            When enabled, this coupon's discount rules are cloned into a fresh, one-time code for each
+                            customer on their birthday and sent automatically via WhatsApp. Only one coupon can be the
+                            active template — enabling this here disables it on any other coupon.
+                        </p>
+                        {formData.isBirthdayTemplate && (
+                            <div className="space-y-2 pt-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    Valid For (days after birthday)
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    step="1"
+                                    onKeyDown={blockNegativeKeys}
+                                    onWheel={(e) => e.target.blur()}
+                                    value={formData.birthdayValidityDays}
+                                    onChange={(e) => handleNonNegativeChange('birthdayValidityDays', e.target.value, 1)}
+                                    className="w-full px-4 py-3 bg-white border-none rounded-2xl text-xs font-black outline-none ring-1 ring-amber-100"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-6">

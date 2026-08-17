@@ -33,29 +33,12 @@ const whatsappCampaignSchema = new mongoose.Schema(
       enum: WHATSAPP_CAMPAIGN_TYPES,
       default: "announcement",
     },
-    // Admin-entered description of the campaign content (kept as a readable
-    // record even though the actual outbound message is the approved template).
+    // The actual plain-text message sent via Tezsender's send-text API.
+    // Supports a {name} placeholder, filled in per-recipient at send time.
     message: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-    // Approved WhatsApp template name/language — required for business-initiated sends.
-    templateName: {
       type: String,
       required: true,
       trim: true,
-    },
-    languageCode: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-    // Ordered values for the template body's {{1}}, {{2}}... placeholders,
-    // appended after the auto-injected recipient name.
-    bodyParams: {
-      type: [String],
-      default: [],
     },
     audienceType: {
       type: String,

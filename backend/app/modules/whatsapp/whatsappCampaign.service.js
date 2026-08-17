@@ -1,10 +1,11 @@
 import Customer from "../../models/customer.js";
 import WhatsAppCampaign from "../../models/whatsappCampaign.js";
 import WhatsAppMessage from "../../models/whatsappMessage.js";
-import { isValidE164Phone, maskPhone } from "../../utils/phone.js";
-import { sendWhatsAppTemplateMessage } from "./whatsapp.service.js";
+import { isValidE164Phone, normalizePhoneNumber, maskPhone } from "../../utils/phone.js";
+import { sendWhatsAppTextMessage } from "./whatsapp.service.js";
 import { getWhatsAppConfig } from "../../config/whatsapp.js";
 import { WHATSAPP_MESSAGE_TYPES } from "./whatsapp.constants.js";
+import { renderTemplate } from "./whatsapp.templates.js";
 import logger from "../../services/logger.js";
 
 async function resolveRecipients(campaign) {
@@ -24,7 +25,7 @@ async function resolveRecipients(campaign) {
 }
 
 async function sendToRecipient(campaign, recipient) {
-  const phone = recipient.phone;
+  const phone = normalizePhoneNumber(recipient.phone);
 
   if (!isValidE164Phone(phone)) {
     return "skipped";
@@ -37,8 +38,6 @@ async function sendToRecipient(campaign, recipient) {
       customer: recipient._id,
       phone,
       messageType: WHATSAPP_MESSAGE_TYPES.CAMPAIGN,
-      templateName: campaign.templateName,
-      languageCode: campaign.languageCode,
       relatedCampaign: campaign._id,
       dedupeKey,
       status: "queued",
@@ -64,17 +63,9 @@ async function sendToRecipient(campaign, recipient) {
   }
 
   try {
-    const bodyParams = [
-      recipient.name || "there",
-      ...(campaign.bodyParams?.length ? campaign.bodyParams : [campaign.message]),
-    ];
+    const message = renderTemplate(campaign.message, { name: recipient.name || "there" });
 
-    const result = await sendWhatsAppTemplateMessage({
-      to: phone,
-      templateName: campaign.templateName,
-      languageCode: campaign.languageCode,
-      bodyParams,
-    });
+    const result = await sendWhatsAppTextMessage({ to: phone, message });
 
     await WhatsAppMessage.updateOne(
       { _id: record._id },

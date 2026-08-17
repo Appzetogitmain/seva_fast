@@ -691,6 +691,7 @@ const CheckoutPage = () => {
           description: "Applied manually",
           ...data,
         });
+        setIsCouponModalOpen(false);
         showToast(`Coupon ${manualCode.trim()} applied!`, "success");
       } else {
         showToast(res.data.message || "Invalid coupon", "error");

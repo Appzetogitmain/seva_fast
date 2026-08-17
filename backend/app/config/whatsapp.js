@@ -29,7 +29,6 @@ export function getWhatsAppConfig() {
       .trim()
       .replace(/\/+$/, ""),
     timeoutMs: parseInt(process.env.TEZSENDER_SEND_TIMEOUT_MS || "15000", 10),
-    defaultLanguageCode: String(process.env.WHATSAPP_DEFAULT_LANGUAGE_CODE || "en_US").trim(),
   };
 }
 

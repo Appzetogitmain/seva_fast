@@ -1,6 +1,7 @@
 import express from "express";
 import {
     listCoupons,
+    listPublicCoupons,
     createCoupon,
     updateCoupon,
     deleteCoupon,
@@ -17,7 +18,7 @@ router.delete("/admin/coupons/:id", deleteCoupon);
 
 // Customer‑facing
 router.post("/coupons/validate", validateCoupon);
-router.get("/coupons", listCoupons);
+router.get("/coupons", listPublicCoupons);
 
 export default router;
 
