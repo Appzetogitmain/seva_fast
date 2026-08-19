@@ -193,7 +193,9 @@ const DeliveryLayout = () => {
     shownOrderIdsRef.current = new Set(shownOrderIdsRef.current).add(newOrder.orderId);
     const total = newOrder.pricing?.total || 0;
     const isReturnPickup = newOrder.isReturnPickup || false;
-    const earnings = newOrder.riderEarnings || 0;
+    const earnings = isReturnPickup
+      ? (newOrder.returnDeliveryCommission || 0)
+      : (newOrder.riderEarnings || 0);
     const sellerAddress = [newOrder.seller?.address, newOrder.seller?.locality, newOrder.seller?.city]
       .filter((part) => typeof part === "string" && part.trim())
       .join(", ");

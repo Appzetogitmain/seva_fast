@@ -502,6 +502,10 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Delivery",
     },
+    returnFulfillmentMode: {
+      type: String,
+      enum: ["admin_rider", "own"],
+    },
     returnDeliveryCommission: {
       type: Number,
       default: 0,

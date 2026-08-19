@@ -17,6 +17,7 @@ import {
   rejectReturnRequest,
   updateReturnQcStatus,
   assignReturnDelivery,
+  submitReturnSelfCollection,
   acceptReturnPickup,
   rejectReturnPickup,
   updateReturnStatus,
@@ -200,6 +201,13 @@ router.put(
   allowRoles("admin", "seller"),
   requireApprovedSeller,
   assignReturnDelivery,
+);
+router.put(
+  "/returns/:orderId/self-collect",
+  verifyToken,
+  allowRoles("seller"),
+  requireApprovedSeller,
+  submitReturnSelfCollection,
 );
 
 // Delivery routes
