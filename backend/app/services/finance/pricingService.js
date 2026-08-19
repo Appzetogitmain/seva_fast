@@ -488,23 +488,23 @@ export function calculateCustomerDeliveryFee(
 
 export function calculateRiderPayout(
   distanceKm,
-  deliverySettings,
+  deliverySettings = {},
   { weightKg = 0, isExpressDelivery = false } = {},
 ) {
   const mode =
-    deliverySettings.deliveryPricingMode || DELIVERY_PRICING_MODE.DISTANCE_BASED;
+    deliverySettings?.deliveryPricingMode || DELIVERY_PRICING_MODE.DISTANCE_BASED;
   const actualDistance = Number(distanceKm || 0);
   const normalizedDistance = Number.isFinite(actualDistance)
     ? Math.max(actualDistance, 0)
     : 0;
 
-  const expressMaxWeight = Number(deliverySettings.expressDeliveryMaxWeightKg ?? 5);
+  const expressMaxWeight = Number(deliverySettings?.expressDeliveryMaxWeightKg ?? 5);
   if (
     isExpressDelivery &&
-    deliverySettings.expressDeliveryEnabled !== false &&
+    deliverySettings?.expressDeliveryEnabled !== false &&
     Number(weightKg || 0) <= expressMaxWeight
   ) {
-    const expressEarning = roundCurrency(deliverySettings.riderExpressEarning ?? 100);
+    const expressEarning = roundCurrency(deliverySettings?.riderExpressEarning ?? 100);
     return {
       riderPayoutBase: expressEarning,
       riderPayoutDistance: 0,
@@ -515,36 +515,55 @@ export function calculateRiderPayout(
     };
   }
 
-  const slabs = Array.isArray(deliverySettings.riderEarningSlabs)
+  const slabs = Array.isArray(deliverySettings?.riderEarningSlabs)
     ? deliverySettings.riderEarningSlabs
     : [];
   const slab = resolveDistanceSlab(slabs, normalizedDistance);
-  const riderBase = roundCurrency(slab?.earning ?? 0);
+  let riderBase = roundCurrency(slab?.earning ?? 0);
 
-  const weightSurcharge = computeWeightSurcharge(
-    weightKg,
-    deliverySettings.riderEarningBaseWeightKg ?? 2,
-    deliverySettings.riderEarningExtraFeePerKg ?? 10,
-  );
-
-  // Extra per-km earning for distance beyond the start of the open-ended
-  // final slab (e.g. beyond 15km, on top of its flat base earning) —
-  // separate admin-configured rate, defaults to 0. The matched slab IS the
-  // open-ended one whenever distance falls past every finite band.
-  let extraDistanceEarning = 0;
+  let riderDistance = 0;
   let roundedExtraKm = 0;
-  if (slab && slab.maxKm == null) {
-    const extraKm = normalizedDistance - Number(slab.minKm || 0);
+
+  // IF riderEarningSlabs is empty or slab earning is not configured, compute using Admin settings:
+  // - riderBasePayout (default 30 ₹)
+  // - baseDistanceCapacityKm (default 0.5 km)
+  // - deliveryPartnerRatePerKm (default 5 ₹ / km)
+  if (!slab || (!riderBase && slabs.length === 0)) {
+    const basePayout = roundCurrency(
+      deliverySettings?.riderBasePayout ?? deliverySettings?.customerBaseDeliveryFee ?? 30
+    );
+    const baseCapacityKm = Number(deliverySettings?.baseDistanceCapacityKm ?? 0.5);
+    const ratePerKm = Number(
+      deliverySettings?.deliveryPartnerRatePerKm ?? deliverySettings?.incrementalKmSurcharge ?? 5
+    );
+
+    riderBase = basePayout;
+    const extraKm = Math.max(0, normalizedDistance - baseCapacityKm);
     if (extraKm > 0) {
       roundedExtraKm = ceilKm(extraKm);
-      const perKmRate = Number(deliverySettings.riderExtraEarningPerKmBeyondSlabs ?? 0);
-      extraDistanceEarning = roundCurrency(roundedExtraKm * perKmRate);
+      riderDistance = roundCurrency(roundedExtraKm * ratePerKm);
     }
+  } else {
+    // Slabs configured
+    const weightSurcharge = computeWeightSurcharge(
+      weightKg,
+      deliverySettings?.riderEarningBaseWeightKg ?? 2,
+      deliverySettings?.riderEarningExtraFeePerKg ?? 10,
+    );
+
+    let extraDistanceEarning = 0;
+    if (slab && slab.maxKm == null) {
+      const extraKm = normalizedDistance - Number(slab.minKm || 0);
+      if (extraKm > 0) {
+        roundedExtraKm = ceilKm(extraKm);
+        const perKmRate = Number(deliverySettings?.riderExtraEarningPerKmBeyondSlabs ?? 0);
+        extraDistanceEarning = roundCurrency(roundedExtraKm * perKmRate);
+      }
+    }
+
+    riderDistance = roundCurrency(weightSurcharge + extraDistanceEarning);
   }
 
-  // riderPayoutDistance carries "everything beyond the flat base slab" —
-  // weight surcharge plus any open-ended extra-distance earning.
-  const riderDistance = roundCurrency(weightSurcharge + extraDistanceEarning);
   const riderTotal = roundCurrency(riderBase + riderDistance);
 
   return {
@@ -781,27 +800,50 @@ export async function generateOrderPaymentBreakdown({
   const lineItems = normalizedItems.map((item) => {
     const category = categoryById.get(String(item.headerCategoryId));
     const itemSubtotal = roundCurrency(item.price * item.quantity);
-    
+
     const itemShippingProportion = productSubtotal > 0 ? (itemSubtotal / productSubtotal) * shippingChargeToDeduct : 0;
     const itemCommissionBase = Math.max(itemSubtotal - itemShippingProportion, 0);
 
-    const categoryCommissionVal = category
-      ? Number(category.adminCommissionValue ?? category.adminCommission ?? 0)
-      : 0;
+    // Category commission can be configured as a percentage OR a fixed amount
+    // (per item / per qty) — resolveCommissionConfig() is the single source
+    // of truth for interpreting that config, shared with calculateCategoryCommission().
+    const categoryCommission = resolveCommissionConfig(category);
     const overridePercent = getSellerCategoryOverridePercent(
       sellerConfig,
       item.headerCategoryId,
     );
-    const appliedPercent =
-      overridePercent !== null
-        ? overridePercent
-        : categoryCommissionVal > 0
-          ? categoryCommissionVal
-          : Number(effectiveSettings.adminCommissionPercent ?? 0);
 
-    const itemCommission = isExempt
-      ? 0
-      : roundCurrency((itemCommissionBase * appliedPercent) / 100);
+    let appliedType = categoryCommission.type;
+    let appliedValue = categoryCommission.value;
+    let appliedFixedRule = categoryCommission.fixedRule;
+    let commissionSource = "global_slab";
+
+    if (overridePercent !== null) {
+      appliedType = COMMISSION_TYPE.PERCENTAGE;
+      appliedValue = overridePercent;
+      appliedFixedRule = COMMISSION_FIXED_RULE.PER_QTY;
+      commissionSource = "seller_category_override";
+    } else if (categoryCommission.value > 0) {
+      commissionSource = "category_config";
+    } else {
+      appliedType = COMMISSION_TYPE.PERCENTAGE;
+      appliedValue = Number(effectiveSettings.adminCommissionPercent ?? 0);
+    }
+
+    let itemCommission = 0;
+    if (!isExempt) {
+      if (appliedType === COMMISSION_TYPE.FIXED) {
+        const fixedBase =
+          appliedFixedRule === COMMISSION_FIXED_RULE.PER_ITEM
+            ? appliedValue
+            : appliedValue * item.quantity;
+        itemCommission = roundCurrency(fixedBase);
+      } else {
+        itemCommission = percentOf(itemCommissionBase, appliedValue);
+      }
+      itemCommission = clampMoney(itemCommission, 0, itemSubtotal);
+    }
+
     const itemSellerPayout = Math.max(itemSubtotal - itemCommission, 0);
     const itemCostPrice = Number(item.costPrice || 0);
     const itemCostTotal = roundCurrency(itemCostPrice * item.quantity);
@@ -820,13 +862,9 @@ export async function generateOrderPaymentBreakdown({
       adminProductCommission: itemCommission,
       headerCategoryId: item.headerCategoryId,
       headerCategoryName: category?.name || "Unknown",
-      appliedCommissionType: isExempt
-        ? "one_time_exempt"
-        : overridePercent !== null
-          ? "seller_category_override"
-          : "global_slab",
-      appliedCommissionValue: isExempt ? 0 : appliedPercent,
-      appliedCommissionFixedRule: "percentage",
+      appliedCommissionType: isExempt ? "one_time_exempt" : commissionSource,
+      appliedCommissionValue: isExempt ? 0 : appliedValue,
+      appliedCommissionFixedRule: isExempt ? "none" : appliedType,
     };
   });
 

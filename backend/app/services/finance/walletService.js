@@ -2,6 +2,8 @@ import Wallet from "../../models/wallet.js";
 import Payout from "../../models/payout.js";
 import Order from "../../models/order.js";
 import Customer from "../../models/customer.js";
+import Seller from "../../models/seller.js";
+import Delivery from "../../models/delivery.js";
 import {
   ORDER_PAYMENT_STATUS,
   OWNER_TYPE,
@@ -315,4 +317,188 @@ export async function getAdminFinanceSummary() {
     reconciledCODInflows: roundCurrency(codReconciled[0]?.amount || 0),
     adminReferralEarnings,
   };
+}
+
+function aggregateToAmountMap(rows) {
+  const map = new Map();
+  for (const row of rows) {
+    if (row._id == null) continue;
+    map.set(String(row._id), roundCurrency(row.amount || 0));
+  }
+  return map;
+}
+
+/**
+ * Per-rider and per-seller COD cash tracking for the admin dashboard:
+ * cash currently held, cash already handed over/remitted onward, cash still
+ * pending, and (for sellers) the product payout admin still owes them.
+ */
+export async function getCodPartnerBreakdown() {
+  const [
+    riderWallets,
+    sellerWallets,
+    riderPendingOrders,
+    sellerPendingOrders,
+    riderSettledRows,
+    sellerSettledRows,
+    sellerPayoutRows,
+  ] = await Promise.all([
+    Wallet.find({ ownerType: OWNER_TYPE.DELIVERY_PARTNER, ownerId: { $ne: null } })
+      .select("ownerId cashInHand")
+      .lean(),
+    Wallet.find({ ownerType: OWNER_TYPE.SELLER, ownerId: { $ne: null } })
+      .select("ownerId cashInHand")
+      .lean(),
+    // Raw orders (not just grouped sums) so we can show, per rider, exactly
+    // which seller and which order each pending amount belongs to.
+    Order.find({
+      paymentMode: "COD",
+      "financeFlags.codCashWithRider": true,
+      "paymentBreakdown.codPendingAmount": { $gt: 0 },
+    })
+      .select("orderId deliveryBoy seller deliveredAt createdAt paymentBreakdown.codPendingAmount")
+      .populate("seller", "shopName name")
+      .sort({ createdAt: -1 })
+      .lean(),
+    // Same idea for sellers: which rider handed them how much, per order.
+    Order.find({
+      paymentMode: "COD",
+      "financeFlags.codCashWithSeller": true,
+      "paymentBreakdown.codPendingAmount": { $gt: 0 },
+    })
+      .select("orderId deliveryBoy seller deliveredAt createdAt paymentBreakdown.codPendingAmount")
+      .populate("deliveryBoy", "name phone")
+      .sort({ createdAt: -1 })
+      .lean(),
+    Order.aggregate([
+      { $match: { paymentMode: "COD", deliveryBoy: { $ne: null }, "paymentBreakdown.codRemittedAmount": { $gt: 0 } } },
+      { $group: { _id: "$deliveryBoy", amount: { $sum: "$paymentBreakdown.codRemittedAmount" } } },
+    ]),
+    Order.aggregate([
+      { $match: { paymentMode: "COD", seller: { $ne: null }, "paymentBreakdown.codRemittedAmount": { $gt: 0 } } },
+      { $group: { _id: "$seller", amount: { $sum: "$paymentBreakdown.codRemittedAmount" } } },
+    ]),
+    Payout.aggregate([
+      {
+        $match: {
+          payoutType: PAYOUT_TYPE.SELLER,
+          status: { $in: [PAYOUT_STATUS.PENDING, PAYOUT_STATUS.PROCESSING] },
+        },
+      },
+      { $group: { _id: "$beneficiaryId", amount: { $sum: "$amount" } } },
+    ]),
+  ]);
+
+  const riderCashMap = new Map(riderWallets.map((w) => [String(w.ownerId), roundCurrency(w.cashInHand || 0)]));
+  const sellerCashMap = new Map(sellerWallets.map((w) => [String(w.ownerId), roundCurrency(w.cashInHand || 0)]));
+  const riderSettledMap = aggregateToAmountMap(riderSettledRows);
+  const sellerSettledMap = aggregateToAmountMap(sellerSettledRows);
+  const sellerPayoutMap = aggregateToAmountMap(sellerPayoutRows);
+
+  // Group each rider's pending orders, tagging which seller each one is owed to.
+  const riderPendingByRider = new Map();
+  for (const order of riderPendingOrders) {
+    if (!order.deliveryBoy) continue;
+    const riderId = String(order.deliveryBoy);
+    const amount = roundCurrency(order.paymentBreakdown?.codPendingAmount || 0);
+    if (amount <= 0) continue;
+    if (!riderPendingByRider.has(riderId)) {
+      riderPendingByRider.set(riderId, { amount: 0, orders: [] });
+    }
+    const bucket = riderPendingByRider.get(riderId);
+    bucket.amount = roundCurrency(bucket.amount + amount);
+    bucket.orders.push({
+      orderId: order.orderId,
+      sellerId: order.seller?._id ? String(order.seller._id) : null,
+      sellerName: order.seller?.shopName || order.seller?.name || "Unknown Seller",
+      amount,
+      deliveredAt: order.deliveredAt || order.createdAt || null,
+    });
+  }
+
+  // Group each seller's pending orders, tagging which rider is holding each one.
+  const sellerPendingBySeller = new Map();
+  for (const order of sellerPendingOrders) {
+    if (!order.seller) continue;
+    const sellerId = String(order.seller);
+    const amount = roundCurrency(order.paymentBreakdown?.codPendingAmount || 0);
+    if (amount <= 0) continue;
+    if (!sellerPendingBySeller.has(sellerId)) {
+      sellerPendingBySeller.set(sellerId, { amount: 0, orders: [] });
+    }
+    const bucket = sellerPendingBySeller.get(sellerId);
+    bucket.amount = roundCurrency(bucket.amount + amount);
+    bucket.orders.push({
+      orderId: order.orderId,
+      riderId: order.deliveryBoy?._id ? String(order.deliveryBoy._id) : null,
+      riderName: order.deliveryBoy?.name || "Unknown Rider",
+      amount,
+      deliveredAt: order.deliveredAt || order.createdAt || null,
+    });
+  }
+
+  const riderIds = new Set([
+    ...riderCashMap.keys(),
+    ...riderPendingByRider.keys(),
+    ...riderSettledMap.keys(),
+  ]);
+  const sellerIds = new Set([
+    ...sellerCashMap.keys(),
+    ...sellerPendingBySeller.keys(),
+    ...sellerSettledMap.keys(),
+    ...sellerPayoutMap.keys(),
+  ]);
+
+  const [riderDocs, sellerDocs] = await Promise.all([
+    Delivery.find({ _id: { $in: [...riderIds] } }).select("name phone").lean(),
+    Seller.find({ _id: { $in: [...sellerIds] } }).select("shopName name phone").lean(),
+  ]);
+  const riderNameMap = new Map(riderDocs.map((d) => [String(d._id), d]));
+  const sellerNameMap = new Map(sellerDocs.map((d) => [String(d._id), d]));
+
+  const riders = [...riderIds]
+    .map((id) => {
+      const cashInHand = riderCashMap.get(id) || 0;
+      const pending = riderPendingByRider.get(id) || { amount: 0, orders: [] };
+      const totalSettled = riderSettledMap.get(id) || 0;
+      if (cashInHand <= 0 && pending.amount <= 0 && totalSettled <= 0) return null;
+      const doc = riderNameMap.get(id);
+      return {
+        riderId: id,
+        name: doc?.name || "Unknown Rider",
+        phone: doc?.phone || "",
+        cashInHand,
+        pendingHandoff: pending.amount,
+        totalSettled,
+        // Which seller(s) and order(s) make up pendingHandoff.
+        pendingOrders: pending.orders,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.cashInHand - a.cashInHand);
+
+  const sellers = [...sellerIds]
+    .map((id) => {
+      const cashInHand = sellerCashMap.get(id) || 0;
+      const pending = sellerPendingBySeller.get(id) || { amount: 0, orders: [] };
+      const totalSettled = sellerSettledMap.get(id) || 0;
+      const payoutOwedByAdmin = sellerPayoutMap.get(id) || 0;
+      if (cashInHand <= 0 && pending.amount <= 0 && totalSettled <= 0 && payoutOwedByAdmin <= 0) return null;
+      const doc = sellerNameMap.get(id);
+      return {
+        sellerId: id,
+        name: doc?.shopName || doc?.name || "Unknown Seller",
+        phone: doc?.phone || "",
+        cashInHand,
+        pendingRemit: pending.amount,
+        totalSettled,
+        payoutOwedByAdmin,
+        // Which rider(s) and order(s) make up pendingRemit.
+        pendingOrders: pending.orders,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.cashInHand - a.cashInHand);
+
+  return { riders, sellers };
 }

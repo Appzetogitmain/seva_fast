@@ -16,7 +16,7 @@ const deliverySchema = new mongoose.Schema(
 
         vehicleType: {
             type: String,
-            enum: ["bike", "cycle", "scooter"],
+            enum: ["bike", "cycle", "scooter", "other"],
             default: "bike",
         },
 

@@ -6,9 +6,7 @@ import {
   Navigation,
   Phone,
   MessageSquare,
-  Shield,
   Clock,
-  Star,
   Search,
   Loader2,
 } from "lucide-react";
@@ -51,7 +49,8 @@ function hasValidLatLng(location) {
 const LiveTrackingMap = memo(({
   status = "out for delivery",
   eta = "8 mins",
-  riderName = "Ramesh Kumar",
+  riderName,
+  hasAssignedRider = false,
   riderLocation,
   sellerLocation,
   destinationLocation,
@@ -61,7 +60,11 @@ const LiveTrackingMap = memo(({
 }) => {
   const mapRef = useRef(null);
   const [mapInstance, setMapInstance] = useState(null);
-  const isSearching = SEARCHING_STATUSES.includes(status?.toLowerCase());
+  // No real rider assigned yet ⇒ still "searching", regardless of order status
+  // (e.g. packed but nobody has accepted the delivery yet) — never show live
+  // tracking / a rider card until there's an actual assigned partner.
+  const isSearching =
+    !hasAssignedRider || SEARCHING_STATUSES.includes(status?.toLowerCase());
   const [progress, setProgress] = useState(0);
   const [dots, setDots] = useState("");
 
@@ -305,9 +308,11 @@ const LiveTrackingMap = memo(({
           className="relative z-10 bg-white px-4 py-2 rounded-full shadow-md border border-brand-100 flex items-center gap-2">
           <div className="h-2 w-2 bg-brand-500 rounded-full animate-pulse" />
           <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-            {status === "confirmed"
-              ? "Order Confirmed · Assigning Rider"
-              : "Order Placed · Finding Rider"}
+            {["packed", "PICKUP_READY", "pickup_ready"].includes(status)
+              ? "Order Packed · Assigning Rider"
+              : status === "confirmed"
+                ? "Order Confirmed · Assigning Rider"
+                : "Order Placed · Finding Rider"}
           </span>
         </motion.div>
       </div>
@@ -442,32 +447,20 @@ const LiveTrackingMap = memo(({
         </button>
       </div>
 
-      {/* 4. Rider Info Card (Compact Bottom) */}
-      {riderName && (
+      {/* 4. Rider Info Card (Compact Bottom) — only once a real partner is assigned */}
+      {hasAssignedRider && (
         <div className="absolute bottom-2 left-2 right-2 z-40">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className="bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/50">
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="h-10 w-10 rounded-full bg-gray-100 overflow-hidden border-2 border-white shadow-sm">
-                  <img
-                    src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&auto=format&fit=crop&q=60"
-                    alt="Rider"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 bg-primary text-primary-foreground text-[7px] font-bold px-1 py-0.5 rounded-full flex items-center gap-0.5">
-                  4.8 <Star size={5} fill="white" />
-                </div>
+              <div className="h-10 w-10 rounded-full bg-brand-50 border-2 border-white shadow-sm flex items-center justify-center text-primary font-black text-sm">
+                {String(riderName || "D").trim().charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-gray-900 text-xs truncate">{riderName}</h3>
-                <p className="text-[10px] text-gray-500 flex items-center gap-1">
-                  <Shield size={8} />
-                  Vaccinated
-                </p>
+                <h3 className="font-bold text-gray-900 text-xs truncate">{riderName || "Delivery Partner"}</h3>
+                <p className="text-[10px] text-gray-500">On the way</p>
               </div>
               <div className="flex items-center gap-1.5">
                 <button className="h-8 w-8 rounded-full bg-brand-50 flex items-center justify-center text-primary hover:bg-brand-100 transition-colors">
@@ -504,6 +497,7 @@ const LiveTrackingMap = memo(({
     prevProps.status === nextProps.status &&
     prevProps.eta === nextProps.eta &&
     prevProps.riderName === nextProps.riderName &&
+    prevProps.hasAssignedRider === nextProps.hasAssignedRider &&
     prevProps.riderLocation?.lat === nextProps.riderLocation?.lat &&
     prevProps.riderLocation?.lng === nextProps.riderLocation?.lng &&
     prevProps.sellerLocation?.lat === nextProps.sellerLocation?.lat &&

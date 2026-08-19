@@ -79,6 +79,7 @@ export function emitOrderStatusUpdate(orderId, payload, customerId, sellerId, or
   if (sid) {
     s.to(`seller:${sid}`).emit("order:status:update", body);
   }
+  s.to("admin").emit("order:status:update", body);
 }
 
 export function emitToSeller(sellerId, { event, payload }) {

@@ -132,9 +132,10 @@ const autoCancelExpiredOrders = async () => {
         { _id: order._id, status: "pending" },
         {
           $set: {
-            status: "cancelled",
-            cancelledBy: "system",
-            cancelReason: "Seller timeout (60s)",
+            sellerTimeoutAlert: true,
+            sellerTimeoutAlertAt: now,
+            attentionRequired: true,
+            attentionReason: "Seller acceptance timeout (> 1 min)",
           },
           $unset: { expiresAt: 1 },
         },
@@ -142,25 +143,16 @@ const autoCancelExpiredOrders = async () => {
       );
       if (!updated) continue;
 
-      try {
-        await compensateOrderCancellation(updated, updated.orderId);
-      } catch (e) {
-        logger.error('legacy compensation failed', {
-          jobName: 'orderAutoCancelJob',
-          orderId: updated.orderId,
-          error: e.message
-        });
-      }
-
-      emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
+      emitNotificationEvent(NOTIFICATION_EVENTS.SELLER_TIMEOUT_ALERT, {
         orderId: updated.orderId,
         customerId: updated.customer,
         userId: updated.customer,
         sellerId: updated.seller,
-        customerMessage:
-          "Your order was cancelled because it was not accepted in time.",
+        customerMessage: "Your order is being processed by the seller.",
         sellerMessage:
-          `Order #${updated.orderId} was cancelled because it was not accepted in time.`,
+          `ACTION REQUIRED: Order #${updated.orderId} is pending acceptance over 1 min. Please Accept or Cancel.`,
+        adminMessage:
+          `ACTION REQUIRED: Order #${updated.orderId} pending seller acceptance over 1 min.`,
       });
     }
 

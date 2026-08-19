@@ -572,10 +572,11 @@ return (
                                             className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/10 transition-all appearance-none"
                                         >
                                             <option value="">Select Vehicle</option>
-                                            <option>Two Wheeler</option>
-                                            <option>Electric Scooter</option>
-                                            <option>Cycle</option>
-                                            <option>Three Wheeler</option>
+                                            <option value="Bike">Bike</option>
+                                            <option value="Scooter">Scooter</option>
+                                            <option value="Cycle">Cycle</option>
+                                            <option value="Three Wheeler">Three Wheeler</option>
+                                            <option value="Other">Other</option>
                                         </select>
                                     </div>
                                 </div>

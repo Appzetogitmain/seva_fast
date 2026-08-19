@@ -55,7 +55,8 @@ const CategoryManagement = () => {
         type: 'header',
         parentId: '',
         hsnCode: '',
-        gstRate: 0
+        gstRate: 0,
+        sortOrder: 0
     });
 
     // Standard Indian GST slabs — offered as quick picks, but the field stays
@@ -274,7 +275,8 @@ const CategoryManagement = () => {
                 type: item.type,
                 parentId: item.parentId || '',
                 hsnCode: item.hsnCode || '',
-                gstRate: item.gstRate ?? 0
+                gstRate: item.gstRate ?? 0,
+                sortOrder: item.sortOrder ?? 0
             });
             setEditingItem(item);
             setPreviewUrl(item.image || null);
@@ -288,7 +290,8 @@ const CategoryManagement = () => {
                 type: type,
                 parentId: parentId || '',
                 hsnCode: '',
-                gstRate: 0
+                gstRate: 0,
+                sortOrder: 0
             });
             setEditingItem(null);
             setPreviewUrl(null);
@@ -357,6 +360,11 @@ const CategoryManagement = () => {
                                         )}>
                                             {item.name}
                                         </span>
+                                        {typeof item.sortOrder === 'number' && (
+                                            <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200" title="Display Order Number">
+                                                #{item.sortOrder}
+                                            </span>
+                                        )}
                                         {item.status === 'inactive' && (
                                             <Badge variant="gray" className="text-[7px] h-3 px-1 font-bold uppercase tracking-tighter">Draft</Badge>
                                         )}
@@ -751,7 +759,7 @@ const CategoryManagement = () => {
                                         <h3 className="text-xl font-bold text-slate-900">{editingItem ? 'Edit Organization Unit' : 'Create New Unit'}</h3>
                                     </header>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Display Name</label>
                                             <input
@@ -771,6 +779,17 @@ const CategoryManagement = () => {
                                         <div className="space-y-1">
                                             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">URL Identifier (Slug)</label>
                                             <input value={formData.slug} readOnly className="w-full px-4 py-2.5 bg-slate-50 border-none rounded-xl text-xs text-slate-400 font-bold outline-none" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Display Order #</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={formData.sortOrder}
+                                                onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) || 0 })}
+                                                className="w-full px-4 py-2.5 bg-slate-100/50 border-none rounded-xl text-xs font-bold outline-none ring-primary/5 focus:ring-2 placeholder:text-slate-300"
+                                                placeholder="e.g. 1, 2, 3"
+                                            />
                                         </div>
                                     </div>
 

@@ -235,18 +235,19 @@ const DeliveryOtpDisplay = ({ orderId, checkoutGroupId = null, initialOtp = null
 
         {/* OTP Display */}
         {/* Requirement 4.2: Display OTP in prominent, easily readable format */}
-        {/* Requirement 4.3: Display with font size at least 24 points */}
-        <div
-          className={`border rounded-2xl p-6 text-center transition-colors duration-300 ${
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className={`border rounded-xl p-4 text-center transition-colors duration-300 ${
             isExpiringSoon
               ? "bg-amber-50 border-amber-300"
               : "bg-gradient-to-br from-purple-50 to-brand-50 border-purple-200"
           }`}
         >
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Shield className={`w-5 h-5 ${isExpiringSoon ? "text-amber-600" : "text-purple-600"}`} />
+          <div className="flex items-center justify-center gap-1.5 mb-1.5">
+            <Shield className={`w-4 h-4 ${isExpiringSoon ? "text-amber-600" : "text-purple-600"}`} />
             <p
-              className={`text-xs font-bold uppercase tracking-wider ${
+              className={`text-[10px] font-bold uppercase tracking-wider ${
                 isExpiringSoon ? "text-amber-800" : "text-purple-800"
               }`}
             >
@@ -254,21 +255,18 @@ const DeliveryOtpDisplay = ({ orderId, checkoutGroupId = null, initialOtp = null
             </p>
           </div>
 
-          {/* OTP Value - Minimum 24pt font (32px = 24pt) */}
-          {/* Requirement 4.3: Font size at least 24 points */}
           <div
-            className={`text-5xl font-black font-mono tracking-[0.3em] mb-3 ${
+            className={`text-3xl font-black font-mono tracking-[0.3em] mb-1.5 ${
               isExpiringSoon ? "text-amber-950" : "text-purple-950"
             }`}
-            style={{ fontSize: "48px" }} // 36pt = 48px (exceeds 24pt requirement)
           >
             {otpData.otp}
           </div>
 
-          <p className={`text-xs ${isExpiringSoon ? "text-amber-700" : "text-purple-700"}`}>
+          <p className={`text-[10px] ${isExpiringSoon ? "text-amber-700" : "text-purple-700"}`}>
             Share this code with your delivery partner
           </p>
-        </div>
+        </motion.div>
 
         {/* Countdown Timer */}
         {/* Requirement 7.5: Display countdown timer showing remaining validity */}

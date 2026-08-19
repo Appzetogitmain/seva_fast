@@ -57,6 +57,33 @@ const AdminWallet = () => {
     const [orderEarningsSearch, setOrderEarningsSearch] = useState('');
     const [orderPaymentFilter, setOrderPaymentFilter] = useState('all');
     const [selectedOrderEarning, setSelectedOrderEarning] = useState(null);
+    const [codPartners, setCodPartners] = useState({ riders: [], sellers: [] });
+    const [codPartnersLoading, setCodPartnersLoading] = useState(true);
+    const [expandedRiderId, setExpandedRiderId] = useState(null);
+    const [expandedSellerId, setExpandedSellerId] = useState(null);
+
+    const fetchCodPartners = async () => {
+        try {
+            setCodPartnersLoading(true);
+            const res = await adminApi.getCodPartnerBreakdown();
+            if (res.data.success) {
+                const result = res.data.result || {};
+                setCodPartners({
+                    riders: Array.isArray(result.riders) ? result.riders : [],
+                    sellers: Array.isArray(result.sellers) ? result.sellers : [],
+                });
+            }
+        } catch (error) {
+            console.error('COD partner breakdown fetch error:', error);
+            toast.error('Failed to load COD cash tracking');
+        } finally {
+            setCodPartnersLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchCodPartners();
+    }, []);
 
     const fetchOrderEarnings = async (page = 1) => {
         try {
@@ -430,6 +457,201 @@ const AdminWallet = () => {
                     </motion.div>
                 ))}
             </div>
+
+            {/* COD Cash Tracking — who's holding what, what's settled, what's still owed */}
+            <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-[28px] overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-orange-50 text-orange-600 rounded-xl">
+                            <Clock className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 className="ds-h2">COD Cash Tracking</h2>
+                            <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                                Cash currently held by riders/sellers, what's been settled, and what's still pending
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={fetchCodPartners}
+                        disabled={codPartnersLoading}
+                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-all disabled:opacity-50"
+                        aria-label="Refresh"
+                    >
+                        <RotateCw className={cn("h-4 w-4 text-slate-600", codPartnersLoading && "animate-spin")} />
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+                    {/* Riders */}
+                    <div className="p-6">
+                        <h3 className="text-sm font-black text-slate-900 mb-3">Delivery Partners</h3>
+                        <div className="overflow-x-auto -mx-2">
+                            <table className="w-full text-xs min-w-[420px]">
+                                <thead>
+                                    <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-wide">
+                                        <th className="px-2 pb-2"></th>
+                                        <th className="px-2 pb-2">Rider</th>
+                                        <th className="px-2 pb-2 text-right">Cash In Hand</th>
+                                        <th className="px-2 pb-2 text-right">Pending</th>
+                                        <th className="px-2 pb-2 text-right">Settled</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {codPartners.riders.map((row) => {
+                                        const isExpanded = expandedRiderId === row.riderId;
+                                        const hasDetail = Array.isArray(row.pendingOrders) && row.pendingOrders.length > 0;
+                                        return (
+                                            <React.Fragment key={row.riderId}>
+                                                <tr
+                                                    className={cn(
+                                                        "border-t border-slate-50",
+                                                        hasDetail && "cursor-pointer hover:bg-slate-50/60",
+                                                    )}
+                                                    onClick={() => hasDetail && setExpandedRiderId(isExpanded ? null : row.riderId)}
+                                                >
+                                                    <td className="px-2 py-2 text-slate-400">
+                                                        {hasDetail && (
+                                                            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-90")} />
+                                                        )}
+                                                    </td>
+                                                    <td className="px-2 py-2 font-bold text-slate-800">{row.name}</td>
+                                                    <td className="px-2 py-2 text-right font-black text-orange-600">
+                                                        ₹{row.cashInHand.toLocaleString()}
+                                                    </td>
+                                                    <td className="px-2 py-2 text-right text-slate-500">
+                                                        ₹{row.pendingHandoff.toLocaleString()}
+                                                    </td>
+                                                    <td className="px-2 py-2 text-right text-emerald-600 font-semibold">
+                                                        ₹{row.totalSettled.toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                                {isExpanded && hasDetail && (
+                                                    <tr className="bg-slate-50/60">
+                                                        <td colSpan={5} className="px-2 py-3">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wide mb-2 pl-2">
+                                                                Owed to — per order
+                                                            </p>
+                                                            <div className="space-y-1.5 pl-2">
+                                                                {row.pendingOrders.map((o) => (
+                                                                    <div
+                                                                        key={o.orderId}
+                                                                        className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-slate-100"
+                                                                    >
+                                                                        <div>
+                                                                            <span className="font-bold text-slate-800">#{o.orderId}</span>
+                                                                            <span className="text-slate-400 mx-1.5">→</span>
+                                                                            <span className="text-slate-600 font-semibold">{o.sellerName}</span>
+                                                                        </div>
+                                                                        <span className="font-black text-orange-600">₹{o.amount.toLocaleString()}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                    {!codPartnersLoading && codPartners.riders.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="px-2 py-6 text-center text-slate-400">
+                                                No COD cash activity with any rider right now.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Sellers */}
+                    <div className="p-6">
+                        <h3 className="text-sm font-black text-slate-900 mb-3">Sellers</h3>
+                        <div className="overflow-x-auto -mx-2">
+                            <table className="w-full text-xs min-w-[480px]">
+                                <thead>
+                                    <tr className="text-left text-[10px] font-black text-slate-400 uppercase tracking-wide">
+                                        <th className="px-2 pb-2"></th>
+                                        <th className="px-2 pb-2">Seller</th>
+                                        <th className="px-2 pb-2 text-right">Cash In Hand</th>
+                                        <th className="px-2 pb-2 text-right">Pending Remit</th>
+                                        <th className="px-2 pb-2 text-right">Settled</th>
+                                        <th className="px-2 pb-2 text-right">Admin Owes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {codPartners.sellers.map((row) => {
+                                        const isExpanded = expandedSellerId === row.sellerId;
+                                        const hasDetail = Array.isArray(row.pendingOrders) && row.pendingOrders.length > 0;
+                                        return (
+                                            <React.Fragment key={row.sellerId}>
+                                                <tr
+                                                    className={cn(
+                                                        "border-t border-slate-50",
+                                                        hasDetail && "cursor-pointer hover:bg-slate-50/60",
+                                                    )}
+                                                    onClick={() => hasDetail && setExpandedSellerId(isExpanded ? null : row.sellerId)}
+                                                >
+                                                    <td className="px-2 py-2 text-slate-400">
+                                                        {hasDetail && (
+                                                            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-90")} />
+                                                        )}
+                                                    </td>
+                                                    <td className="px-2 py-2 font-bold text-slate-800">{row.name}</td>
+                                                    <td className="px-2 py-2 text-right font-black text-orange-600">
+                                                        ₹{row.cashInHand.toLocaleString()}
+                                                    </td>
+                                                    <td className="px-2 py-2 text-right text-slate-500">
+                                                        ₹{row.pendingRemit.toLocaleString()}
+                                                    </td>
+                                                    <td className="px-2 py-2 text-right text-emerald-600 font-semibold">
+                                                        ₹{row.totalSettled.toLocaleString()}
+                                                    </td>
+                                                    <td className="px-2 py-2 text-right font-black text-blue-600">
+                                                        ₹{row.payoutOwedByAdmin.toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                                {isExpanded && hasDetail && (
+                                                    <tr className="bg-slate-50/60">
+                                                        <td colSpan={6} className="px-2 py-3">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-wide mb-2 pl-2">
+                                                                Owed by — per order
+                                                            </p>
+                                                            <div className="space-y-1.5 pl-2">
+                                                                {row.pendingOrders.map((o) => (
+                                                                    <div
+                                                                        key={o.orderId}
+                                                                        className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-slate-100"
+                                                                    >
+                                                                        <div>
+                                                                            <span className="font-bold text-slate-800">#{o.orderId}</span>
+                                                                            <span className="text-slate-400 mx-1.5">←</span>
+                                                                            <span className="text-slate-600 font-semibold">{o.riderName}</span>
+                                                                        </div>
+                                                                        <span className="font-black text-orange-600">₹{o.amount.toLocaleString()}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                    {!codPartnersLoading && codPartners.sellers.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="px-2 py-6 text-center text-slate-400">
+                                                No COD cash activity with any seller right now.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </Card>
 
             {/* Order-wise Platform Earnings */}
             <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-[28px] overflow-hidden">

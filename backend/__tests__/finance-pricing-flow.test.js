@@ -302,6 +302,7 @@ describe("finance pricing flow", () => {
 
     mockGetOrCreateFinanceSettings.mockResolvedValue({
       deliveryPricingMode: "distance_based",
+      deliveryFeeSlabs: [{ minKm: 0, maxKm: 5, fee: 50, freeAboveOrderValue: null }],
       customerBaseDeliveryFee: 30,
       riderBasePayout: 30,
       baseDistanceCapacityKm: 0.5,
@@ -367,6 +368,7 @@ describe("finance pricing flow", () => {
 
     mockGetOrCreateFinanceSettings.mockResolvedValue({
       deliveryPricingMode: "distance_based",
+      deliveryFeeSlabs: [{ minKm: 0, maxKm: 5, fee: 30, freeAboveOrderValue: null }],
       customerBaseDeliveryFee: 30,
       riderBasePayout: 30,
       baseDistanceCapacityKm: 0.5,

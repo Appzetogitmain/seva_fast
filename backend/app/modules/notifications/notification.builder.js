@@ -205,6 +205,20 @@ function eventDefinition(eventType) {
             : `You have received a new order.${amountSuffix}`;
         },
       };
+    case NOTIFICATION_EVENTS.SELLER_TIMEOUT_ALERT:
+      return {
+        role: NOTIFICATION_ROLES.SELLER,
+        recipientIds: (payload) => normalizeIdList(payload.sellerId || payload.sellerIds),
+        title: () => "Action Required: Order Pending",
+        body: (payload) => payload.sellerMessage || `Order #${payload.orderId} is pending acceptance over 1 min.`,
+      };
+    case NOTIFICATION_EVENTS.NO_RIDER_ALERT:
+      return {
+        role: NOTIFICATION_ROLES.SELLER,
+        recipientIds: (payload) => normalizeIdList(payload.sellerId || payload.sellerIds),
+        title: () => "Action Required: No Rider Available",
+        body: (payload) => payload.sellerMessage || `No rider accepted Order #${payload.orderId}. Please assign own delivery boy or cancel.`,
+      };
     case NOTIFICATION_EVENTS.DELIVERY_ASSIGNED:
       return {
         role: NOTIFICATION_ROLES.DELIVERY,

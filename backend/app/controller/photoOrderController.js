@@ -37,8 +37,12 @@ export const createPhotoOrder = async (req, res) => {
         const { sellerId, photoUrl, notes, city } = req.body;
         const customerId = req.user.id;
 
-        if (!sellerId || !photoUrl) {
-            return handleResponse(res, 400, "Seller ID and Photo URL are required");
+        if (!sellerId) {
+            return handleResponse(res, 400, "Seller ID is required");
+        }
+
+        if (!photoUrl && !notes) {
+            return handleResponse(res, 400, "Either a Photo or Notes/Enquiry must be provided");
         }
 
         const photoOrder = await PhotoOrder.create({

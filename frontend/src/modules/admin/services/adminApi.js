@@ -27,6 +27,7 @@ export const adminApi = {
     getDeliveryFinanceSettings: () => axiosInstance.get('/admin/settings/delivery'),
     updateDeliveryFinanceSettings: (data) => axiosInstance.put('/admin/settings/delivery', data),
     getFinanceSummary: () => axiosInstance.get('/admin/finance/summary'),
+    getCodPartnerBreakdown: () => axiosInstance.get('/admin/finance/cod-partners'),
     getFinanceLedger: (params) => axiosInstance.get('/admin/finance/ledger', { params }),
     getFinanceOrderEarnings: (params) => axiosInstance.get('/admin/finance/order-earnings', { params }),
     getCommissionSplitsReport: (params) => axiosInstance.get('/admin/finance/commission-splits', { params }),

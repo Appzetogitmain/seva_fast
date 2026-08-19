@@ -4,7 +4,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
 import { Toaster, toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { BellRing, MapPin } from "lucide-react";
+import { BellRing, MapPin, Navigation } from "lucide-react";
 import { deliveryApi } from "../services/deliveryApi";
 import { useAuth } from "@core/context/AuthContext";
 import {
@@ -159,12 +159,13 @@ const DeliveryLayout = () => {
     const total = typeof p.total === "number" ? p.total : Number(p.total) || 0;
     const dropLabel = typeof p.drop === "string" ? p.drop : String(p.drop);
     const earnings = typeof p.earnings === "number" ? p.earnings : 0;
+    const distanceKmVal = Number(p.distanceKm);
     setActiveOrder({
       id: payload.orderId,
       mongoId: undefined,
       pickup: p.pickup,
       drop: dropLabel,
-      distance: "Nearby",
+      distance: Number.isFinite(distanceKmVal) && distanceKmVal > 0 ? `${distanceKmVal.toFixed(1)} km` : "Nearby",
       estTime: "10-15 min",
       value: total,
       earnings: earnings,
@@ -193,16 +194,23 @@ const DeliveryLayout = () => {
     const total = newOrder.pricing?.total || 0;
     const isReturnPickup = newOrder.isReturnPickup || false;
     const earnings = newOrder.riderEarnings || 0;
+    const sellerAddress = [newOrder.seller?.address, newOrder.seller?.locality, newOrder.seller?.city]
+      .filter((part) => typeof part === "string" && part.trim())
+      .join(", ");
+    const sellerLabel = sellerAddress
+      ? `${newOrder.seller?.shopName || "Seller"} — ${sellerAddress}`
+      : newOrder.seller?.shopName || "Seller";
+    const distanceKmVal = Number(newOrder.distanceKm);
     setActiveOrder({
       id: newOrder.orderId,
       mongoId: newOrder._id,
       pickup: isReturnPickup
         ? newOrder.address?.address || "Customer Address"
-        : newOrder.seller?.shopName || "Seller",
+        : sellerLabel,
       drop: isReturnPickup
-        ? newOrder.seller?.shopName || "Seller Store"
+        ? sellerLabel
         : newOrder.address?.address || "Customer Address",
-      distance: "Nearby",
+      distance: Number.isFinite(distanceKmVal) && distanceKmVal > 0 ? `${distanceKmVal.toFixed(1)} km` : "Nearby",
       estTime: "10-15 min",
       value: total,
       earnings: earnings,
@@ -574,7 +582,11 @@ const DeliveryLayout = () => {
       setActiveOrder(null);
       acceptInFlightRef.current = false;
       setIsAcceptingOrder(false);
-      navigate(buildDeliveryOrderDetailsPath(id), { replace: true });
+      // Push (not replace) so the back button returns to wherever the rider
+      // was — the order itself stays assigned to them either way (that's
+      // already confirmed server-side by the time we navigate here); this
+      // only affects where "back" lands, not the assignment.
+      navigate(buildDeliveryOrderDetailsPath(id));
     },
     [navigate],
   );
@@ -724,6 +736,14 @@ const DeliveryLayout = () => {
                           <p className="text-sm font-bold text-slate-900 line-clamp-2">{activeOrder.drop}</p>
                         </div>
                       </div>
+                      {activeOrder.distance && activeOrder.distance !== "Nearby" && (
+                        <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+                          <Navigation className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <p className="text-xs font-bold text-slate-700">
+                            {activeOrder.distance} trip distance
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="w-full h-1.5 bg-slate-100 rounded-full mb-2 overflow-hidden">

@@ -16,13 +16,34 @@ import {
     IdCard,
     RotateCw,
     Check,
-    X
+    X,
+    CreditCard,
+    Building,
+    Hash,
+    ShieldCheck,
+    FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { adminApi } from '../services/adminApi';
 import { formatDate } from '@shared/utils/formatDate';
+
+const renderVal = (val, { isMono = false, isUppercase = false } = {}) => {
+    const text = String(val || '').trim();
+    if (!text || text === 'N/A' || text === 'Not Specified') {
+        return <span className="text-[11px] font-semibold text-rose-500 italic">Not Provided</span>;
+    }
+    return (
+        <span className={cn(
+            "text-xs font-bold text-slate-900 leading-relaxed block",
+            isMono && "font-mono tracking-wider",
+            isUppercase && "uppercase"
+        )}>
+            {text}
+        </span>
+    );
+};
 
 const PendingDeliveryBoys = () => {
     const [pendingRiders, setPendingRiders] = useState([]);
@@ -49,14 +70,23 @@ const PendingDeliveryBoys = () => {
                 name: r.name,
                 phone: r.phone,
                 email: r.email,
+                address: r.address,
+                dob: r.dob,
+                bloodGroup: r.bloodGroup,
                 avatar: r.profileImage,
                 appliedDate: formatDate(r.createdAt),
-                location: r.currentArea || 'Unknown',
+                location: r.currentArea || 'Not Specified',
                 vehicle: r.vehicleType ? r.vehicleType.charAt(0).toUpperCase() + r.vehicleType.slice(1) : 'Bike',
+                vehicleNumber: r.vehicleNumber,
+                drivingLicenseNumber: r.drivingLicenseNumber,
+                aadharNumber: r.aadharNumber,
+                panNumber: r.panNumber,
+                accountHolder: r.accountHolder,
+                accountNumber: r.accountNumber,
+                ifsc: r.ifsc,
                 documents: Object.keys(r.documents || {}).filter(key => r.documents[key]),
                 documentUrls: r.documents || {},
                 status: r.isVerified ? 'approved' : 'pending_review',
-                experience: 'Not Specified', // Mock for now
                 preferredArea: r.currentArea || 'Not Specified'
             }));
 
@@ -303,45 +333,29 @@ const PendingDeliveryBoys = () => {
                                         <img
                                             src={rider.avatar && !rider.avatar.includes('emoji') && !rider.avatar.includes('avatar') ? rider.avatar : "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
                                             alt=""
-                                            className="h-12 w-12 rounded-lg bg-gray-100 ring-2 ring-white shadow-sm object-cover flex-shrink-0 group-hover:scale-110 transition-all"
+                                            className="h-11 w-11 rounded-xl bg-white shadow-xs object-cover flex-shrink-0"
                                         />
                                         <div className="min-w-0">
-                                            <p className="text-sm font-black text-slate-900 truncate">{rider.name}</p>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <Phone className="h-3 w-3 text-slate-400 flex-shrink-0" />
-                                                <span className="text-[10px] font-bold text-slate-500">{rider.phone}</span>
-                                            </div>
+                                            <h4 className="text-xs font-bold text-slate-900 truncate">{rider.name}</h4>
+                                            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Applied: {rider.appliedDate}</p>
                                         </div>
                                     </div>
 
-                                    {/* Col 2: Operational Intel */}
-                                    <div className="space-y-1.5">
+                                    {/* Col 2: Contact */}
+                                    <div className="flex items-center gap-2 text-slate-600">
+                                        <Phone className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                                        <span className="text-xs font-bold text-slate-900">{rider.phone}</span>
+                                    </div>
+
+                                    {/* Col 3: Vehicle & Location */}
+                                    <div className="flex flex-col gap-1">
                                         <div className="flex items-center gap-2 text-slate-600">
-                                            <Truck className="h-3.5 w-3.5 flex-shrink-0" />
-                                            <span className="text-[10px] font-bold">{rider.vehicle}</span>
+                                            <Truck className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                                            <span className="text-xs font-bold text-slate-900">{rider.vehicle}</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-slate-400">
                                             <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                                            <span className="text-[10px] font-bold">{rider.location}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Col 3: Submission Status */}
-                                    <div className="flex flex-col gap-2">
-                                        <Badge variant={rider.status === 'pending_review' ? 'primary' : 'warning'} className="w-fit text-[8px] font-black uppercase">
-                                            {rider.status.replace('_', ' ')}
-                                        </Badge>
-                                        <div className="flex flex-wrap gap-1">
-                                            {rider.documents.slice(0, 2).map((doc, i) => (
-                                                <div key={i} className="h-5 px-2 bg-slate-100 rounded-md text-[8px] font-bold text-slate-500 flex items-center">
-                                                    {doc}
-                                                </div>
-                                            ))}
-                                            {rider.documents.length > 2 && (
-                                                <div className="h-5 px-2 bg-slate-100 rounded-md text-[8px] font-bold text-slate-400 flex items-center">
-                                                    +{rider.documents.length - 2} More
-                                                </div>
-                                            )}
+                                            <span className="text-[10px] font-semibold text-slate-500">{rider.location}</span>
                                         </div>
                                     </div>
 
@@ -349,7 +363,7 @@ const PendingDeliveryBoys = () => {
                                     <div className="flex items-center justify-end">
                                         <button
                                             onClick={() => setViewingRider(rider)}
-                                            className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-bold shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95 whitespace-nowrap"
+                                            className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all active:scale-[0.98]"
                                         >
                                             VIEW APPLICATION
                                         </button>
@@ -402,37 +416,36 @@ const PendingDeliveryBoys = () => {
                                 >
                                     {/* Left: Applicant Profile Info */}
                                     <div className="lg:w-80 lg:min-h-0 bg-slate-50 p-5 border-b lg:border-b-0 lg:border-r border-slate-100 lg:overflow-y-auto lg:shrink-0">
-                                        <div className="text-center mb-10">
+                                        <div className="text-center mb-8">
                                             <img
                                                 src={viewingRider.avatar && !viewingRider.avatar.includes('emoji') && !viewingRider.avatar.includes('avatar') ? viewingRider.avatar : "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
                                                 alt=""
-                                                className="h-24 w-24 rounded-2xl bg-white shadow-xl object-cover ring-4 ring-white"
+                                                className="h-24 w-24 rounded-2xl bg-white shadow-xl object-cover ring-4 ring-white mx-auto"
                                             />
-                                            <h3 className="ds-h2">{viewingRider.name}</h3>
-                                            <p className="ds-label text-primary mt-1">Applicant Node</p>
+                                            <h3 className="ds-h2 mt-3">{viewingRider.name}</h3>
+                                            <p className="text-[11px] font-bold text-slate-500 mt-0.5">Applied: {viewingRider.appliedDate}</p>
                                         </div>
 
-                                        <div className="space-y-6">
+                                        <div className="space-y-4">
                                             <div className="space-y-1">
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Preferred Area</p>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Preferred Area / City</p>
                                                 <div className="flex items-center gap-2 text-slate-700">
-                                                    <MapPin className="h-4 w-4 text-slate-400" />
-                                                    <span className="text-xs font-bold">{viewingRider.preferredArea}</span>
+                                                    <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                                                    {renderVal(viewingRider.preferredArea)}
                                                 </div>
                                             </div>
                                             <div className="space-y-1">
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Experience</p>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Work Vehicle</p>
                                                 <div className="flex items-center gap-2 text-slate-700">
-                                                    <Calendar className="h-4 w-4 text-slate-400" />
-                                                    <span className="text-xs font-bold">{viewingRider.experience}</span>
+                                                    <Truck className="h-4 w-4 text-slate-400 shrink-0" />
+                                                    {renderVal(viewingRider.vehicle)}
                                                 </div>
                                             </div>
-                                            <div className="pt-6 border-t border-slate-200">
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">System Confidence</p>
-                                                <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-brand-500 w-[85%]" />
-                                                </div>
-                                                <p className="text-[9px] font-bold text-brand-600 mt-2">85% Verification Score</p>
+                                            <div className="pt-4 border-t border-slate-200">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Application Status</p>
+                                                <Badge variant={viewingRider.status === 'pending_review' ? 'primary' : 'warning'} className="text-[9px] font-black uppercase">
+                                                    {viewingRider.status.replace('_', ' ')}
+                                                </Badge>
                                             </div>
                                         </div>
                                     </div>
@@ -442,7 +455,7 @@ const PendingDeliveryBoys = () => {
                                         <div className="flex justify-between items-start gap-3 mb-8 lg:mb-10">
                                             <div className="min-w-0">
                                                 <h2 className="ds-h1 text-xl sm:text-2xl">Verification Protocol</h2>
-                                                <p className="ds-description mt-1 text-sm">Check submitted legal documents for platform entry.</p>
+                                                <p className="ds-description mt-1 text-sm">Review all registration details & submitted documents.</p>
                                             </div>
                                             <button
                                                 type="button"
@@ -454,35 +467,139 @@ const PendingDeliveryBoys = () => {
                                             </button>
                                         </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 lg:mb-12">
-                                            <div className="space-y-4">
-                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Contact Records</h4>
-                                                <div className="p-6 bg-slate-50 rounded-xl space-y-4">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary">
-                                                            <Phone className="h-5 w-5" />
+                                        {/* Contact & Personal Info Grid */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                            <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Contact & Personal Info</h4>
+                                                <div className="p-5 bg-slate-50 rounded-2xl space-y-3 border border-slate-100">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-primary shrink-0">
+                                                            <Phone className="h-4 w-4" />
                                                         </div>
-                                                        <span className="text-sm font-bold text-slate-900">{viewingRider.phone}</span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Phone Number</p>
+                                                            {renderVal(viewingRider.phone)}
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary">
-                                                            <Mail className="h-5 w-5" />
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-primary shrink-0">
+                                                            <Mail className="h-4 w-4" />
                                                         </div>
-                                                        <span className="text-sm font-bold text-slate-900">{viewingRider.email}</span>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Email Address</p>
+                                                            {renderVal(viewingRider.email)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-primary shrink-0">
+                                                            <MapPin className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Full Address</p>
+                                                            {renderVal(viewingRider.address)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Date of Birth</p>
+                                                            {renderVal(viewingRider.dob)}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Blood Group</p>
+                                                            {renderVal(viewingRider.bloodGroup)}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div className="space-y-4">
-                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Vehicle Identification</h4>
-                                                <div className="p-6 bg-slate-50 rounded-xl border-2 border-brand-500/10">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="h-12 w-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-brand-600">
-                                                            <Truck className="h-6 w-6" />
+                                            <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Vehicle & License Details</h4>
+                                                <div className="p-5 bg-slate-50 rounded-2xl space-y-3 border border-slate-100">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-brand-600 shrink-0">
+                                                            <Truck className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Vehicle Type</p>
+                                                            {renderVal(viewingRider.vehicle)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-brand-600 shrink-0">
+                                                            <ShieldCheck className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Vehicle Registration No.</p>
+                                                            {renderVal(viewingRider.vehicleNumber, { isMono: true, isUppercase: true })}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-brand-600 shrink-0">
+                                                            <FileText className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Driving License No.</p>
+                                                            {renderVal(viewingRider.drivingLicenseNumber, { isMono: true, isUppercase: true })}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Identification & Bank Details Grid */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                                            <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Government Identification</h4>
+                                                <div className="p-5 bg-slate-50 rounded-2xl space-y-3 border border-slate-100">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-indigo-600 shrink-0">
+                                                            <IdCard className="h-4 w-4" />
                                                         </div>
                                                         <div>
-                                                            <p className="text-sm font-black text-slate-900">{viewingRider.vehicle}</p>
-                                                            <p className="text-[9px] font-bold text-brand-600 uppercase tracking-widest mt-0.5">Eco-Friendly Ready</p>
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Aadhaar Card Number</p>
+                                                            {renderVal(viewingRider.aadharNumber, { isMono: true })}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-indigo-600 shrink-0">
+                                                            <FileSearch className="h-4 w-4" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">PAN Card Number</p>
+                                                            {renderVal(viewingRider.panNumber, { isMono: true, isUppercase: true })}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Bank Account Details</h4>
+                                                <div className="p-5 bg-amber-50/50 rounded-2xl space-y-3 border border-amber-100/80">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-amber-600 shrink-0">
+                                                            <Building className="h-4 w-4" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-amber-700/80 uppercase">Account Holder Name</p>
+                                                            {renderVal(viewingRider.accountHolder)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-amber-600 shrink-0">
+                                                            <CreditCard className="h-4 w-4" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-amber-700/80 uppercase">Account Number</p>
+                                                            {renderVal(viewingRider.accountNumber, { isMono: true })}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="h-9 w-9 rounded-xl bg-white shadow-xs flex items-center justify-center text-amber-600 shrink-0">
+                                                            <Hash className="h-4 w-4" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[9px] font-black text-amber-700/80 uppercase">IFSC Code</p>
+                                                            {renderVal(viewingRider.ifsc, { isMono: true, isUppercase: true })}
                                                         </div>
                                                     </div>
                                                 </div>

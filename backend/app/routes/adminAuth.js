@@ -71,6 +71,7 @@ import {
     getAdminFinancePayoutsController,
     getAdminFinanceSummaryController,
     getAdminOrderEarningsController,
+    getCodPartnerBreakdownController,
     getCommissionSplitsReportController,
     getDeliverySettingsController,
     processAdminFinancePayoutsController,
@@ -131,6 +132,12 @@ router.get(
     verifyToken,
     allowRoles("admin"),
     getAdminFinanceSummaryController,
+);
+router.get(
+    "/finance/cod-partners",
+    verifyToken,
+    allowRoles("admin"),
+    getCodPartnerBreakdownController,
 );
 router.get(
     "/finance/ledger",

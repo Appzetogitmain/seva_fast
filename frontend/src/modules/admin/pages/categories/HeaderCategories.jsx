@@ -107,6 +107,7 @@ const HeaderCategories = () => {
     headerColor: "#FF1E1E",
     headerFontColor: "#111111",
     headerIconColor: "#111111",
+    sortOrder: 0,
   });
 
   const [imageFile, setImageFile] = useState(null);
@@ -350,6 +351,7 @@ const HeaderCategories = () => {
       headerColor: "#FF1E1E",
       headerFontColor: "#111111",
       headerIconColor: "#111111",
+      sortOrder: 0,
     });
     setImageFile(null);
     setPreviewUrl(null);
@@ -373,6 +375,7 @@ const HeaderCategories = () => {
       headerColor: item.headerColor || "#FF1E1E",
       headerFontColor: item.headerFontColor || "#FFFFFF",
       headerIconColor: item.headerIconColor || "#111111",
+      sortOrder: item.sortOrder ?? 0,
     });
     setPreviewUrl(item.image || null);
     setIsAddModalOpen(true);
@@ -848,6 +851,23 @@ const HeaderCategories = () => {
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Display Order # (Position)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.sortOrder ?? 0}
+                    onChange={(e) =>
+                      setFormData({ ...formData, sortOrder: Number(e.target.value) || 0 })
+                    }
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    placeholder="e.g. 1, 2, 3"
+                  />
+                  <p className="text-[11px] text-gray-500">Lower numbers appear first on customer header (e.g. 1 for Grocery, 2 for Baby Care).</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

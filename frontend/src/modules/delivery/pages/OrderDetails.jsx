@@ -583,6 +583,17 @@ const OrderDetails = () => {
     return mode === "COD" || method === "cod" || method === "cash";
   }, [order]);
 
+  // COD breakdown: total cash to collect, the rider's own earning kept out
+  // of it, and what's left to hand over/settle with seller or admin.
+  const codBreakdown = useMemo(() => {
+    if (!order) return { gross: 0, earning: 0, toSettle: 0 };
+    const gross = Number(order.paymentBreakdown?.grandTotal ?? order.pricing?.total ?? 0);
+    const earning = Number(order.riderEarnings || 0);
+    const pendingActual = Number(order.codPendingAmount || 0);
+    const toSettle = pendingActual > 0 ? pendingActual : Math.max(gross - earning, 0);
+    return { gross, earning, toSettle };
+  }, [order]);
+
   const [codBusy, setCodBusy] = useState(false);
   const [codQr, setCodQr] = useState(null);
 
@@ -1269,6 +1280,30 @@ const OrderDetails = () => {
               <h3 className="font-bold text-lg text-gray-900 mb-1">Collect COD Payment</h3>
               <p className="text-sm text-gray-500 mb-4">
                 Choose how the customer will pay. Wallets settle only after admin receives money.
+              </p>
+
+              <div className="grid grid-cols-3 gap-2 mb-4 bg-white rounded-2xl border border-orange-100 p-3">
+                <div className="text-center">
+                  <p className="text-[9px] font-bold text-gray-500 uppercase">Total COD</p>
+                  <p className="text-base font-extrabold text-gray-900">
+                    ₹{codBreakdown.gross.toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-center border-x border-orange-100">
+                  <p className="text-[9px] font-bold text-emerald-600 uppercase">Your Earning</p>
+                  <p className="text-base font-extrabold text-emerald-600">
+                    ₹{codBreakdown.earning.toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[9px] font-bold text-orange-600 uppercase">To Settle</p>
+                  <p className="text-base font-extrabold text-orange-700">
+                    ₹{codBreakdown.toSettle.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-500 mb-4 -mt-2">
+                Keep your ₹{codBreakdown.earning.toLocaleString()} earning — hand over only the remaining ₹{codBreakdown.toSettle.toLocaleString()}.
               </p>
 
               {(!codFlags.codCollectMethod || codFlags.codCollectMethod === "none") && (

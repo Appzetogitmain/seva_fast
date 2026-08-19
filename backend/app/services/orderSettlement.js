@@ -259,6 +259,15 @@ export async function finalizeCodAfterAdminCredit(orderOrId, orderIdString) {
         $set: {
           amount: deliveryEarning,
           status: "Settled",
+          // COD: this earning was already kept in hand from the cash the
+          // rider collected (see createPendingRiderPayout) — it counts
+          // toward lifetime earnings history but must NOT also be treated
+          // as withdrawable balance, or it'd pay the same commission twice.
+          meta: {
+            settledViaCash: true,
+            codCollectedAmount: Math.round(refreshed.paymentBreakdown?.codCollectedAmount || 0),
+            codRemittedAmount: Math.round(refreshed.paymentBreakdown?.codRemittedAmount || 0),
+          },
         },
         $setOnInsert: {
           user: refreshed.deliveryBoy,

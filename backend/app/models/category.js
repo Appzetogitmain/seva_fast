@@ -35,6 +35,10 @@ const categorySchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    sortOrder: {
+      type: Number,
+      default: 0,
+    },
     type: {
       type: String,
       enum: ["header", "category", "subcategory"],

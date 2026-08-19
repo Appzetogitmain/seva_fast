@@ -20,6 +20,9 @@ const CodCash = () => {
   const [data, setData] = React.useState({
     systemFloatCOD: 0,
     cashInHand: 0,
+    totalCodEarnings: 0,
+    totalCollected: 0,
+    totalSettled: 0,
     toCollect: [],
     toHandoff: [],
   });
@@ -42,6 +45,9 @@ const CodCash = () => {
         setData({
           systemFloatCOD: safeMoney(result.systemFloatCOD),
           cashInHand: safeMoney(result.cashInHand),
+          totalCodEarnings: safeMoney(result.totalCodEarnings),
+          totalCollected: safeMoney(result.totalCollected),
+          totalSettled: safeMoney(result.totalSettled),
           toCollect: Array.isArray(result.toCollect) ? result.toCollect : [],
           toHandoff: nextToHandoff,
         });
@@ -168,6 +174,21 @@ const CodCash = () => {
                 <p className="text-[11px] font-bold text-gray-500 uppercase">Pending Orders</p>
                 <p className="text-lg font-bold text-gray-900">{pendingOrdersCount}</p>
               </div>
+              <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
+                <p className="text-[11px] font-bold text-emerald-700 uppercase">Your Earning (COD)</p>
+                <p className="text-lg font-bold text-emerald-700">
+                  {RUPEE}
+                  {safeMoney(data.totalCodEarnings).toLocaleString()}
+                </p>
+                <p className="text-[10px] text-emerald-600 mt-0.5">Already kept from cash collected</p>
+              </div>
+              <div className="rounded-xl bg-gray-50 border border-gray-100 p-3">
+                <p className="text-[11px] font-bold text-gray-500 uppercase">Handed Over So Far</p>
+                <p className="text-lg font-bold text-gray-900">
+                  {RUPEE}
+                  {safeMoney(data.totalSettled).toLocaleString()}
+                </p>
+              </div>
             </div>
 
             <div className="mt-4 rounded-xl bg-orange-50 border border-orange-100 p-4">
@@ -232,19 +253,29 @@ const CodCash = () => {
               {(Array.isArray(data.toCollect) ? data.toCollect : []).slice(0, 20).map((row) => (
                 <div
                   key={`collect-${row.orderId}`}
-                  className="flex items-center justify-between rounded-xl border border-orange-100 bg-orange-50/40 p-3"
+                  className="rounded-xl border border-orange-100 bg-orange-50/40 p-3"
                 >
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">Order #{row.orderId}</p>
-                    <p className="text-xs text-gray-600">
-                      Collect {RUPEE}
-                      {safeMoney(row.amountGross).toLocaleString()} (gross)
-                    </p>
+                  <p className="text-sm font-bold text-gray-900 mb-2">Order #{row.orderId}</p>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-500 uppercase">Total COD</p>
+                      <p className="text-sm font-extrabold text-gray-900">
+                        {RUPEE}{safeMoney(row.amountGross).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-emerald-600 uppercase">Your Earning</p>
+                      <p className="text-sm font-extrabold text-emerald-600">
+                        {RUPEE}{safeMoney(row.riderCommission).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-orange-600 uppercase">To Settle</p>
+                      <p className="text-sm font-extrabold text-orange-700">
+                        {RUPEE}{safeMoney(row.amountNetExpected).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm font-extrabold text-orange-700">
-                    {RUPEE}
-                    {safeMoney(row.amountNetExpected).toLocaleString()}
-                  </p>
                 </div>
               ))}
 
@@ -268,16 +299,29 @@ const CodCash = () => {
               {(Array.isArray(data.toHandoff) ? data.toHandoff : []).slice(0, 20).map((row) => (
                 <div
                   key={`handoff-${row.orderId}`}
-                  className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-3"
+                  className="rounded-xl border border-gray-100 bg-white p-3"
                 >
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">Order #{row.orderId}</p>
-                    <p className="text-xs text-gray-500">Hand to seller (net)</p>
+                  <p className="text-sm font-bold text-gray-900 mb-2">Order #{row.orderId}</p>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-500 uppercase">Collected</p>
+                      <p className="text-sm font-extrabold text-gray-900">
+                        {RUPEE}{safeMoney(row.amountGross).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-emerald-600 uppercase">Your Earning</p>
+                      <p className="text-sm font-extrabold text-emerald-600">
+                        {RUPEE}{safeMoney(row.riderCommission).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-500 uppercase">To Hand Over</p>
+                      <p className="text-sm font-extrabold text-gray-900">
+                        {RUPEE}{safeMoney(row.amountNetPending).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm font-extrabold text-gray-900">
-                    {RUPEE}
-                    {safeMoney(row.amountNetPending).toLocaleString()}
-                  </p>
                 </div>
               ))}
 

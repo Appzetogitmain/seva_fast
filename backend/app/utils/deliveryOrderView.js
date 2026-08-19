@@ -27,6 +27,16 @@ function stripItemPrices(item) {
 export function sanitizeOrderForDeliveryView(order) {
   if (!order || typeof order !== "object") return order;
 
+  // Actual pickup->drop distance, computed once at checkout and frozen here —
+  // distanceKm/routeDistanceKm were never real fields on the Order schema, so
+  // this always resolved to null before.
+  const resolvedDistanceKm =
+    order.distanceSnapshot?.distanceKmRounded ??
+    order.distanceSnapshot?.distanceKmActual ??
+    order.paymentBreakdown?.distanceKmRounded ??
+    order.paymentBreakdown?.distanceKmActual ??
+    null;
+
   const total =
     Number(order.pricing?.total) ||
     Number(order.paymentBreakdown?.grandTotal) ||
@@ -66,9 +76,19 @@ export function sanitizeOrderForDeliveryView(order) {
     // delivery, per the admin-configured slab structure. Exposed as its own
     // flat field since paymentBreakdown above is deliberately stripped down
     // to customer-facing totals only.
-    riderEarnings: Number(order.paymentBreakdown?.riderPayoutTotal) || 0,
+    riderEarnings: (Number.isFinite(Number(order.paymentBreakdown?.riderPayoutTotal)) && Number(order.paymentBreakdown?.riderPayoutTotal) > 0)
+      ? Number(order.paymentBreakdown.riderPayoutTotal)
+      : Math.round(30 + Math.max(0, Number(resolvedDistanceKm ?? 0) - 0.5) * 5),
+    // COD cash breakdown, exposed as flat fields for the same reason as
+    // riderEarnings (paymentBreakdown above is stripped down). Note
+    // codCollectedAmount is net of the rider's own commission (what actually
+    // enters the system float) — use paymentBreakdown.grandTotal for the
+    // full gross amount the customer paid.
+    codCollectedAmount: Number(order.paymentBreakdown?.codCollectedAmount) || 0,
+    codRemittedAmount: Number(order.paymentBreakdown?.codRemittedAmount) || 0,
+    codPendingAmount: Number(order.paymentBreakdown?.codPendingAmount) || 0,
     // Bug 222: Include distance/time for history cards
-    distanceKm: order.distanceKm ?? order.routeDistanceKm ?? null,
+    distanceKm: resolvedDistanceKm,
     estimatedMinutes: order.estimatedMinutes ?? order.routeEstimatedMinutes ?? null,
     // Bug 231/230: Include return fields
     returnStatus: order.returnStatus,

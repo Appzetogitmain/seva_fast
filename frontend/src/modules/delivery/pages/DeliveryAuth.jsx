@@ -32,6 +32,7 @@ const VEHICLE_TYPES = [
   { value: "bike", label: "Bike" },
   { value: "scooter", label: "Scooter" },
   { value: "cycle", label: "Cycle" },
+  { value: "other", label: "Other" },
 ];
 
 const DELIVERY_TEST_PHONES = new Set(["6268423925", "9111966732", "8888888888"]);
@@ -86,7 +87,7 @@ const DeliveryAuth = () => {
   const [timer, setTimer] = useState(30);
   const [validationErrors, setValidationErrors] = useState({});
 
-  const isCycleVehicle = signupVehicle === "cycle";
+  const isCycleVehicle = signupVehicle === "cycle" || signupVehicle === "other";
 
 
 

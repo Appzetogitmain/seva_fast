@@ -343,6 +343,25 @@ export async function createPendingRiderPayout(order, { session, actorId } = {})
     return null;
   }
 
+  // COD: the rider already netted their own commission out of the cash they
+  // collected (getCodNetAmount = gross - riderPayoutTotal is all they owe
+  // onward) — they're physically holding this amount already. Queuing a
+  // Payout here too would let it also be paid out electronically later,
+  // doubling this same commission. Mark it settled by cash retention instead
+  // of creating a payout/wallet credit for it.
+  if (isCodOrder(order)) {
+    order.financeFlags = {
+      ...(order.financeFlags || {}),
+      riderPayoutQueued: true,
+      riderPayoutSettledViaCash: true,
+    };
+    order.settlementStatus = {
+      ...(order.settlementStatus || {}),
+      riderPayout: "COMPLETED",
+    };
+    return null;
+  }
+
   const payout = await createPendingPayoutForOrder(
     {
       order,

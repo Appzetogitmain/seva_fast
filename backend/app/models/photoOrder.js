@@ -16,7 +16,7 @@ const photoOrderSchema = new mongoose.Schema({
     },
     photoUrl: { 
         type: String, 
-        required: true 
+        required: false 
     },
     notes: { 
         type: String 

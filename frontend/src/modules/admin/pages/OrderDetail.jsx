@@ -64,7 +64,7 @@ const OrderDetail = () => {
             fetchDetail(); // Refresh data
         } catch (error) {
             console.error("Failed to update status:", error);
-            showToast("Failed to update status", "error");
+            showToast(error?.response?.data?.message || "Failed to update status", "error");
         }
     };
 

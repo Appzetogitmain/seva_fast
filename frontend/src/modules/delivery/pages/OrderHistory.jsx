@@ -20,6 +20,7 @@ const displayOrderStatus = (order) => {
     return "delivered";
   if (order?.workflowStatus === "CANCELLED" || order?.status === "cancelled")
     return "cancelled";
+  if (order?.deliveryBoy) return "ongoing";
   return order?.status || "active";
 };
 
@@ -178,7 +179,7 @@ const OrderHistory = () => {
 
         {/* Status Filters */}
         <div className="-mx-4 px-4 flex gap-2 overflow-x-auto pb-2 no-scrollbar snap-x snap-mandatory">
-          {["All", "Delivered", "Cancelled", "Returns"].map((status) => (
+          {["All", "Ongoing", "Delivered", "Cancelled", "Returns"].map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status.toLowerCase())}
@@ -207,7 +208,10 @@ const OrderHistory = () => {
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
-            {filteredOrders.length > 0 ? filteredOrders.map((order) => (
+            {filteredOrders.length > 0 ? filteredOrders.map((order) => {
+              const cardStatus = displayOrderStatus(order);
+              const isOngoing = cardStatus === "ongoing";
+              return (
               <motion.div
                 key={order._id}
                 layout
@@ -225,7 +229,7 @@ const OrderHistory = () => {
                       openOrderDetail(order);
                     }
                   }}
-                  className="hover:shadow-md transition-shadow cursor-pointer group">
+                  className={`hover:shadow-md transition-shadow cursor-pointer group ${isOngoing ? "ring-2 ring-amber-300 shadow-md" : ""}`}>
                   <div className="p-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-start mb-3">
                       <div className="min-w-0">
@@ -234,13 +238,18 @@ const OrderHistory = () => {
                             #{order.orderId}
                           </span>
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${displayOrderStatus(order) === "delivered"
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1 ${cardStatus === "delivered"
                               ? "bg-brand-100 text-brand-700"
-                              : displayOrderStatus(order) === "cancelled"
+                              : cardStatus === "cancelled"
                                 ? "bg-red-100 text-red-700"
-                                : "bg-brand-100 text-brand-700"
+                                : cardStatus === "ongoing"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-brand-100 text-brand-700"
                               }`}>
-                            {displayOrderStatus(order)}
+                            {isOngoing && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            )}
+                            {cardStatus}
                           </span>
                         </div>
                         <div className="flex items-center text-gray-400 text-xs">
@@ -303,26 +312,27 @@ const OrderHistory = () => {
                           </span>
                         ) : null}
                         {/* Bug 231: Return commission badge */}
-                        {displayOrderStatus(order) === "return" && (
+                        {cardStatus === "return" && (
                           <span className="flex items-center bg-purple-50 px-2 py-1 rounded border border-purple-100 text-purple-700 font-bold">
                             Commission: ₹{order.returnDeliveryCommission ?? 0}
                           </span>
                         )}
                         {/* Bug 231: Hide cash for return, show it only for normal orders */}
-                        {displayOrderStatus(order) !== "return" && (
+                        {cardStatus !== "return" && (
                           <span className="block font-bold text-sm text-brand-600 whitespace-nowrap">
                             ₹{order.riderEarnings ?? 0} earned
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center text-primary font-bold group-hover:underline self-end sm:self-auto">
-                        View Details <ChevronRight size={14} className="ml-0.5" />
+                      <div className={`flex items-center font-bold group-hover:underline self-end sm:self-auto ${isOngoing ? "text-amber-600" : "text-primary"}`}>
+                        {isOngoing ? "Track Live Delivery" : "View Details"} <ChevronRight size={14} className="ml-0.5" />
                       </div>
                     </div>
                   </div>
                 </Card>
               </motion.div>
-            )) : (
+              );
+            }) : (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

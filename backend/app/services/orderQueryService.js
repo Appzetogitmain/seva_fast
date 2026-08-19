@@ -309,7 +309,7 @@ export async function fetchAvailableOrdersForDelivery({
       .sort({ createdAt: -1, _id: -1 })
       .limit(limit)
       .populate("customer", "name phone")
-      .populate("seller", "shopName address name location")
+      .populate("seller", "shopName address locality city name location")
       .lean();
 
     assignedReturnPickups = assignedReturnPickupsRaw.map((rp) => ({
@@ -331,7 +331,7 @@ export async function fetchAvailableOrdersForDelivery({
       .sort({ createdAt: -1, _id: -1 })
       .limit(limit)
       .populate("customer", "name phone")
-      .populate("seller", "shopName address name location serviceRadius")
+      .populate("seller", "shopName address locality city name location serviceRadius")
       .lean();
 
     v2Orders = v2OrdersRaw;

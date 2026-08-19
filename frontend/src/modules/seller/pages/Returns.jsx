@@ -475,7 +475,7 @@ const Returns = () => {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 10 }}
                             className="w-full max-w-2xl relative z-10 bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col"
-                            style={{ maxHeight: 'calc(100vh - 2rem)' }}
+                            style={{ maxHeight: 'calc(100vh - 8rem)' }}
                         >
                             <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 shrink-0">
                                 <div>
@@ -503,7 +503,12 @@ const Returns = () => {
                                 </button>
                             </div>
 
-                            <div className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto overscroll-contain flex-1 space-y-4">
+                            <div
+                                className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto overscroll-contain flex-1 space-y-4"
+                                data-lenis-prevent
+                                data-lenis-prevent-wheel
+                                data-lenis-prevent-touch
+                            >
                                 <div className="space-y-2">
                                     <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                                         Customer

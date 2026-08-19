@@ -48,11 +48,22 @@ function deliveryBroadcastPayloadFromOrder(order, extra = {}) {
     order.seller && typeof order.seller === "object" && order.seller !== null
       ? order.seller
       : null;
-  const pickup = seller?.shopName || "Seller";
+  const sellerAddress = [seller?.address, seller?.locality, seller?.city]
+    .filter((part) => typeof part === "string" && part.trim())
+    .join(", ");
+  const pickup = sellerAddress
+    ? `${seller?.shopName || "Seller"} — ${sellerAddress}`
+    : seller?.shopName || "Seller";
   const drop =
     typeof order.address?.address === "string" && order.address.address.trim()
       ? order.address.address.trim()
       : "Customer address";
+  const distanceKm =
+    order.distanceSnapshot?.distanceKmRounded ??
+    order.distanceSnapshot?.distanceKmActual ??
+    order.paymentBreakdown?.distanceKmRounded ??
+    order.paymentBreakdown?.distanceKmActual ??
+    null;
   const meta = order.deliverySearchMeta || {};
   const sid = seller?._id ?? order.seller;
   return {
@@ -63,7 +74,9 @@ function deliveryBroadcastPayloadFromOrder(order, extra = {}) {
     preview: {
       pickup,
       drop,
+      distanceKm,
       total: order.pricing?.total ?? 0,
+      earnings: Number(order.paymentBreakdown?.riderPayoutTotal) || 0,
     },
     deliverySearchExpiresAt: order.deliverySearchExpiresAt,
     ...extra,
@@ -89,14 +102,50 @@ export function resolveWorkflowStatus(order) {
 export async function afterPlaceOrderV2(orderDoc) {
   const orderId = orderDoc.orderId;
   await scheduleSellerTimeoutJob(orderId);
+
+  const payload = {
+    orderId,
+    workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
+    sellerPendingExpiresAt: orderDoc.sellerPendingExpiresAt,
+    order: {
+      orderId: orderDoc.orderId,
+      _id: orderDoc._id,
+      grandTotal: orderDoc.grandTotal,
+      pricing: orderDoc.pricing,
+      items: orderDoc.items,
+      shippingAddress: orderDoc.shippingAddress,
+      paymentMode: orderDoc.paymentMode,
+      paymentStatus: orderDoc.paymentStatus,
+      createdAt: orderDoc.createdAt,
+    },
+  };
+
+  // 1. Emit to specific Seller room
   emitToSeller(orderDoc.seller?.toString(), {
     event: "order:new",
-    payload: {
-      orderId,
-      workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
-      sellerPendingExpiresAt: orderDoc.sellerPendingExpiresAt,
-    },
+    payload,
   });
+
+  // 2. Broadcast to Delivery Partners
+  try {
+    const previewData = {
+      orderId: orderDoc.orderId,
+      sellerName: orderDoc.sellerName || "Store",
+      pickupAddress: orderDoc.pickupAddress || "",
+      deliveryAddress: orderDoc.shippingAddress?.address || "",
+      grandTotal: orderDoc.grandTotal,
+      itemsCount: orderDoc.items?.length || 0,
+      paymentMode: orderDoc.paymentMode || "COD",
+    };
+
+    void emitDeliveryBroadcastForSeller(orderDoc.seller?.toString(), {
+      orderId: orderDoc.orderId,
+      preview: previewData,
+      deliverySearchExpiresAt: new Date(Date.now() + 60000).toISOString(),
+    });
+  } catch (e) {
+    console.warn("[afterPlaceOrderV2] delivery broadcast failed:", e.message);
+  }
 }
 
 const BULL_ADD_TIMEOUT_MS = () =>
@@ -276,7 +325,7 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
     { new: true },
   )
     .populate("customer", "name phone")
-    .populate("seller", "shopName address name location serviceRadius");
+    .populate("seller", "shopName address locality city name location serviceRadius");
 
   if (!updated) {
     const err = new Error("Order not available for acceptance or expired");
@@ -310,8 +359,18 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
     updated.seller,
     updated._id,
   );
-  // Do not automatically broadcast to nearby riders upon seller acceptance.
-  // Delivery boy will only be notified when manually assigned by the seller.
+
+  // Broadcast to nearby online delivery partners as soon as the customer
+  // starts seeing "searching for delivery" — first to accept wins
+  // (deliveryAcceptAtomic). The seller can still manually assign a specific
+  // rider later from the dashboard; that path overrides whoever, if anyone,
+  // has accepted so far.
+  if (!isScheduled) {
+    void emitDeliveryBroadcastForSeller(
+      updated.seller,
+      deliveryBroadcastPayloadFromOrder(updated),
+    );
+  }
 
   emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CONFIRMED, {
     orderId: updated.orderId,
@@ -479,7 +538,10 @@ export async function deliveryAcceptAtomic(deliveryId, orderId, idempotencyKey) 
       orderId,
       workflowVersion: { $gte: 2 },
       workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH,
-      deliveryBoy: deliveryOid,
+      // Broadcast orders have no deliveryBoy set until someone claims them —
+      // this is the actual "first to accept wins" race. $in also covers the
+      // (harmless, idempotent) case of a rider double-tapping accept.
+      deliveryBoy: { $in: [null, deliveryOid] },
       deliverySearchExpiresAt: { $gt: now },
       skippedBy: { $nin: [deliveryOid] },
     },
@@ -591,34 +653,39 @@ export async function processSellerTimeoutJob({ orderId }) {
     },
     {
       $set: {
-        workflowStatus: WORKFLOW_STATUS.CANCELLED,
-        status: "cancelled",
-        cancelledBy: "system",
-        cancelReason: "Seller timeout (60s)",
+        sellerTimeoutAlert: true,
+        sellerTimeoutAlertAt: now,
+        attentionRequired: true,
+        attentionReason: "Seller acceptance timeout (> 1 min)",
       },
-      $unset: { expiresAt: 1 },
     },
     { new: true },
   );
 
   if (!updated) return;
 
-  await compensateOrderCancellation(updated, orderId);
-
   emitOrderStatusUpdate(
     orderId,
-    { workflowStatus: WORKFLOW_STATUS.CANCELLED, status: "cancelled" },
+    { 
+      workflowStatus: WORKFLOW_STATUS.SELLER_PENDING, 
+      status: "pending",
+      sellerTimeoutAlert: true,
+      attentionRequired: true,
+      attentionReason: "Seller acceptance timeout (> 1 min)",
+    },
     updated.customer,
     updated.seller,
     updated._id,
   );
-  emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
+
+  emitNotificationEvent(NOTIFICATION_EVENTS.SELLER_TIMEOUT_ALERT, {
     orderId: updated.orderId,
     customerId: updated.customer,
     userId: updated.customer,
     sellerId: updated.seller,
-    customerMessage: "Your order was cancelled because seller did not accept in time.",
-    sellerMessage: `Order #${updated.orderId} was cancelled due to timeout.`,
+    customerMessage: "Your order is being processed by the seller.",
+    sellerMessage: `ACTION REQUIRED: Order #${updated.orderId} is pending acceptance for over 1 min. Please Accept or Cancel.`,
+    adminMessage: `ACTION REQUIRED: Order #${updated.orderId} pending seller acceptance over 1 min.`,
   });
 }
 
@@ -664,10 +731,15 @@ export async function processDeliveryTimeoutJob({ orderId, attempt }) {
     await scheduleDeliveryTimeoutJob(orderId, currentAttempt + 1);
 
     const orderRich = await Order.findOne({ orderId })
-      .populate("seller", "shopName address name location serviceRadius")
+      .populate("seller", "shopName address locality city name location serviceRadius")
       .lean();
     if (orderRich) {
-      // Automatic retry broadcast disabled. Only assigned rider gets notified.
+      // Nobody accepted within the previous window — re-broadcast so riders
+      // who came online (or missed the first alert) get another chance.
+      void emitDeliveryBroadcastForSeller(
+        orderRich.seller,
+        deliveryBroadcastPayloadFromOrder(orderRich, { retryAttempt: currentAttempt + 1 }),
+      );
     }
     return;
   }
@@ -680,40 +752,48 @@ export async function processDeliveryTimeoutJob({ orderId, attempt }) {
     },
     {
       $set: {
-        workflowStatus: WORKFLOW_STATUS.CANCELLED,
-        status: "cancelled",
-        cancelledBy: "system",
-        cancelReason: "No delivery partner (timeout)",
+        noRiderAvailable: true,
+        noRiderAlertAt: now,
+        attentionRequired: true,
+        attentionReason: "No delivery partner available after search attempts",
       },
-      $unset: { expiresAt: 1 },
     },
     { new: true },
   );
 
   if (!updated) return;
 
-  await compensateOrderCancellation(updated, orderId);
   try {
     await retractDeliveryBroadcastForOrder(orderId);
   } catch (retractErr) {
     console.warn("[deliveryTimeoutJob] retract broadcast failed:", retractErr.message);
   }
+
   emitOrderStatusUpdate(
     orderId,
-    { workflowStatus: WORKFLOW_STATUS.CANCELLED, status: "cancelled" },
+    { 
+      workflowStatus: WORKFLOW_STATUS.DELIVERY_SEARCH, 
+      status: "confirmed",
+      noRiderAvailable: true,
+      attentionRequired: true,
+      attentionReason: "No delivery partner available",
+    },
     updated.customer,
     updated.seller,
     updated._id,
   );
-  emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
+
+  emitNotificationEvent(NOTIFICATION_EVENTS.NO_RIDER_ALERT, {
     orderId: updated.orderId,
     customerId: updated.customer,
     userId: updated.customer,
     sellerId: updated.seller,
     customerMessage:
-      "Order was cancelled because no delivery partner was available.",
+      "We are searching for a delivery partner for your order.",
     sellerMessage:
-      `Order #${updated.orderId} was cancelled because no delivery partner was available.`,
+      `ACTION REQUIRED: No rider accepted Order #${updated.orderId}. Please assign your own delivery boy or cancel the order.`,
+    adminMessage:
+      `ACTION REQUIRED: Order #${updated.orderId} has no rider available. Assign delivery boy or cancel.`,
   });
 }
 

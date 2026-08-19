@@ -508,7 +508,7 @@ const CheckoutPage = () => {
             latitude: resolvedLoc.lat,
             longitude: resolvedLoc.lng,
           },
-          { persist: true, updateSavedHome: false },
+          { persist: true, updateSavedHome: true },
         );
       }
 
@@ -531,6 +531,8 @@ const CheckoutPage = () => {
     let location = null;
     let placeId = null;
     let formattedAddress = null;
+    const fullAddressString = `${editAddressForm.address}${editAddressForm.landmark ? `, ${editAddressForm.landmark}` : ""}, ${editAddressForm.city}`;
+
     try {
       const query = [
         editAddressForm.address,
@@ -551,18 +553,6 @@ const CheckoutPage = () => {
         location = { lat: loc.lat, lng: loc.lng };
         placeId = resp.data?.result?.placeId || null;
         formattedAddress = resp.data?.result?.formattedAddress || null;
-        updateLocation(
-          {
-            name: resp.data?.result?.formattedAddress || query,
-            time: currentLocation?.time || "12-15 mins",
-            city: currentLocation?.city,
-            state: currentLocation?.state,
-            pincode: currentLocation?.pincode,
-            latitude: loc.lat,
-            longitude: loc.lng,
-          },
-          { persist: true, updateSavedHome: false },
-        );
       }
     } catch (e) {
       showToast(
@@ -572,12 +562,29 @@ const CheckoutPage = () => {
       );
     }
 
-    setCurrentAddress({
+    const updatedAddrObj = {
       ...editAddressForm,
       ...(location ? { location } : {}),
       ...(placeId ? { placeId } : {}),
       ...(formattedAddress ? { formattedAddress } : {}),
-    });
+    };
+
+    setCurrentAddress(updatedAddrObj);
+
+    // Persist to LocationContext and localStorage so future checkouts & home screen use the edited address
+    updateLocation(
+      {
+        name: formattedAddress || fullAddressString,
+        time: currentLocation?.time || "12-15 mins",
+        city: editAddressForm.city || currentLocation?.city,
+        state: currentLocation?.state,
+        pincode: currentLocation?.pincode,
+        latitude: location?.lat ?? currentLocation?.latitude,
+        longitude: location?.lng ?? currentLocation?.longitude,
+      },
+      { persist: true, updateSavedHome: true },
+    );
+
     setIsEditAddressOpen(false);
     showToast("Delivery address updated", "success");
   };
@@ -885,6 +892,32 @@ const CheckoutPage = () => {
         const paymentRef =
           result.paymentRef || result.checkoutGroupId || mainOrderId;
 
+        // Persist order address to LocationContext so next order default uses new address
+        const usedAddress = orderData.address;
+        if (usedAddress && usedAddress.address) {
+          const addressStr = `${usedAddress.address}${usedAddress.landmark ? `, ${usedAddress.landmark}` : ""}${usedAddress.city ? `, ${usedAddress.city}` : ""}`;
+          updateLocation(
+            {
+              name: addressStr,
+              time: currentLocation?.time || "12-15 mins",
+              city: usedAddress.city || currentLocation?.city,
+              state: currentLocation?.state,
+              pincode: currentLocation?.pincode,
+              latitude: usedAddress.location?.lat ?? currentLocation?.latitude,
+              longitude: usedAddress.location?.lng ?? currentLocation?.longitude,
+            },
+            { persist: true, updateSavedHome: true }
+          );
+        }
+
+        // Clear temporary recipient override after placing order
+        setSavedRecipient(null);
+        try {
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem(RECIPIENT_STORAGE_KEY);
+          }
+        } catch {}
+
         if (!mainOrderId) {
           setIsPlacingOrder(false);
           showToast(
@@ -1073,6 +1106,20 @@ const CheckoutPage = () => {
   if (cart.length === 0 && !showSuccess) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+        {/* Top Back Navigation for Empty Cart */}
+        <div className="absolute top-6 left-6 z-30">
+          <button
+            onClick={() => {
+              if (window.history.length > 1) navigate(-1);
+              else navigate("/");
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-xs transition-all active:scale-95 shadow-sm border border-slate-200"
+          >
+            <ChevronLeft size={20} />
+            <span>Back</span>
+          </button>
+        </div>
+
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-brand-50/50 via-transparent to-transparent pointer-events-none" />
         <div className="absolute -top-20 -right-20 w-80 h-80 bg-brand-100/30 rounded-full blur-3xl pointer-events-none animate-pulse" />
         <div className="absolute top-40 -left-20 w-60 h-60 bg-yellow-100/40 rounded-full blur-3xl pointer-events-none animate-pulse" />
@@ -1127,8 +1174,17 @@ const CheckoutPage = () => {
   }
 
   // ─── Main checkout return ────────────────────────────────────────────────────
+  const handleRemoveRecipient = () => {
+    setSavedRecipient(null);
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(RECIPIENT_STORAGE_KEY);
+      }
+    } catch {}
+  };
+
   return (
-    <div className="min-h-screen bg-[#f5f1e8] pb-32 font-sans">
+    <div className="min-h-screen bg-[#f8f9fb] pb-32 pt-4 font-sans antialiased">
       {/* Order Success Overlay */}
       <CheckoutOrderSuccess orderId={orderId} show={showSuccess} />
 
@@ -1139,22 +1195,31 @@ const CheckoutPage = () => {
         <div className="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
           <div className="flex items-center justify-between">
             <button
-              onClick={() => navigate(-1)}
-              className="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl transition-all active:scale-95">
-              <ChevronLeft size={28} className="text-white" />
+              onClick={() => {
+                if (window.history.length > 1) navigate(-1);
+                else navigate("/");
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 md:px-4 md:py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl transition-all active:scale-95 text-white font-bold text-sm shadow-sm"
+              title="Go Back"
+            >
+              <ChevronLeft size={24} className="text-white" />
+              <span className="hidden sm:inline font-semibold text-xs tracking-wider uppercase">Back</span>
             </button>
+
             <div className="flex flex-col items-center">
               <h1 className="text-xl md:text-3xl font-[1000] text-white tracking-tight uppercase">Checkout</h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className="h-1.5 w-1.5 bg-brand-400 rounded-full animate-pulse" />
                 <p className="text-brand-100/90 text-[10px] md:text-xs font-black tracking-[0.2em] uppercase">
-                  {cartCount} {cartCount === 1 ? "Item" : "Items"} in cart
+                  {cartCount} {cartCount === 1 ? "Item" : "Items"} in Cart
                 </p>
               </div>
             </div>
+
             <button
               onClick={handleShare}
-              className="h-12 px-4 flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl transition-all active:scale-95">
+              className="h-10 md:h-12 px-3 md:px-4 flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-2xl transition-all active:scale-95"
+            >
               <Share2 size={20} className="text-white" />
               <span className="text-xs font-black text-white uppercase tracking-widest hidden sm:block">Share</span>
             </button>
@@ -1218,7 +1283,7 @@ const CheckoutPage = () => {
               recipientData={recipientData}
               onRecipientDataChange={setRecipientData}
               onSaveRecipient={handleSaveRecipient}
-              onRemoveRecipient={() => setSavedRecipient(null)}
+              onRemoveRecipient={handleRemoveRecipient}
               displayName={displayName}
               displayPhone={displayPhone}
               displayAddress={displayAddress}

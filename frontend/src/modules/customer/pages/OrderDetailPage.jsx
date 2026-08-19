@@ -956,7 +956,8 @@ const OrderDetailPage = () => {
             <LiveTrackingMap
               status={order.workflowStatus || order.status}
               eta={estimatedArrival.arrivingInText}
-              riderName={order.deliveryBoy?.name || "Delivery Partner"}
+              riderName={order.deliveryBoy?.name}
+              hasAssignedRider={Boolean(order.deliveryBoy)}
               riderLocation={liveLocation}
               sellerLocation={sellerLocation}
               destinationLocation={
@@ -1065,32 +1066,23 @@ const OrderDetailPage = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100"
+            className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100"
           >
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="h-14 w-14 rounded-full bg-slate-100 overflow-hidden border border-slate-200 shadow-sm">
-                  <img
-                    src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100&auto=format&fit=crop&q=60"
-                    alt="Rider"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="absolute -bottom-1 -right-1 bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-md">
-                  4.8 ★
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-brand-50 border border-slate-200 shadow-sm flex items-center justify-center text-primary font-black text-base">
+                {String(order.deliveryBoy?.name || "D").trim().charAt(0).toUpperCase()}
               </div>
               <div className="flex-1">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Your Courier</p>
-                <h3 className="font-bold text-slate-800 text-lg">{order.deliveryBoy?.name || "Delivery Partner"}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">On the way to you</p>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Your Courier</p>
+                <h3 className="font-bold text-slate-800 text-sm leading-none">{order.deliveryBoy?.name || "Delivery Partner"}</h3>
+                <p className="text-[11px] text-slate-500 mt-1 leading-none">On the way to you</p>
               </div>
               <div className="flex items-center gap-2">
-                <button className="h-11 w-11 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200">
-                  <MessageSquare size={20} className="text-slate-600" />
+                <button className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200">
+                  <MessageSquare size={16} className="text-slate-600" />
                 </button>
-                <button className="h-11 w-11 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200">
-                  <Phone size={20} className="text-slate-600" />
+                <button className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200">
+                  <Phone size={16} className="text-slate-600" />
                 </button>
               </div>
             </div>
@@ -1102,26 +1094,26 @@ const OrderDetailPage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100"
+          className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100"
         >
-          <div className="flex items-start gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-orange-50 flex items-center justify-center flex-shrink-0">
-              <Store size={24} className="text-orange-600" />
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+              <Store size={20} className="text-orange-600" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <p className="text-xs font-bold text-orange-600 uppercase tracking-wider">Pickup Location</p>
+                <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider leading-none">Pickup Location</p>
               </div>
-              <h4 className="font-bold text-slate-900 text-base mb-1">Store Location</h4>
-              <p className="text-sm text-slate-500 leading-relaxed">
+              <h4 className="font-bold text-slate-900 text-sm mb-1 leading-none">Store Location</h4>
+              <p className="text-xs text-slate-500 leading-snug line-clamp-1">
                 {order.address?.address || "Address not available"}
               </p>
             </div>
             <button
               onClick={handleOpenInMaps}
-              className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors flex-shrink-0"
+              className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors flex-shrink-0"
             >
-              <Navigation2 size={18} className="text-slate-700" />
+              <Navigation2 size={16} className="text-slate-700" />
             </button>
           </div>
         </motion.div>
@@ -1131,21 +1123,21 @@ const OrderDetailPage = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100"
+          className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100"
         >
-          <div className="flex items-start gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-brand-50 flex items-center justify-center flex-shrink-0">
-              <MapPin size={24} className="text-brand-600" />
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+              <MapPin size={20} className="text-brand-600" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <p className="text-xs font-bold text-brand-600 uppercase tracking-wider">Delivery Address</p>
-                <span className="bg-brand-50 text-brand-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                <p className="text-[10px] font-bold text-brand-600 uppercase tracking-wider leading-none">Delivery Address</p>
+                <span className="bg-brand-50 text-brand-700 text-[9px] px-2 py-0.5 rounded-full font-bold">
                   {order.address.type}
                 </span>
               </div>
-              <h4 className="font-bold text-slate-900 text-base mb-1">{order.address.name}</h4>
-              <p className="text-sm text-slate-500 leading-relaxed">
+              <h4 className="font-bold text-slate-900 text-sm mb-1 leading-none">{order.address.name}</h4>
+              <p className="text-xs text-slate-500 leading-snug line-clamp-2">
                 {order.address.address}, {order.address.city}
               </p>
               {order.address?.location &&
@@ -1503,56 +1495,58 @@ const OrderDetailPage = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative z-10 w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 space-y-4"
+            className="relative z-10 w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 flex flex-col max-h-[85vh]"
           >
-            <h3 className="text-lg font-black text-slate-900">
+            <h3 className="text-lg font-black text-slate-900 shrink-0">
               Request Return
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 mb-4 shrink-0">
               Select the items you want to return and tell us why.
             </p>
-            <div className="max-h-48 overflow-y-auto space-y-3">
-              {order.items.map((item, idx) => {
-                const checked = !!selectedReturnItems[idx];
-                const isItemReturnable = item.isReturnable ?? true;
-                const itemWindowDays = item.returnWindowDays ?? 1;
-                const { eligibleAtMs } = getReturnWindowBounds();
-                const itemExpiresAtMs = eligibleAtMs + (itemWindowDays * 24 * 60 * 60 * 1000);
-                const isItemWindowExpired = Date.now() > itemExpiresAtMs;
-                const disableCheckbox = !isItemReturnable || isItemWindowExpired;
 
-                return (
-                  <label
-                    key={idx}
-                    className={`flex items-center gap-3 p-3 rounded-2xl border ${disableCheckbox ? "border-slate-100 bg-slate-50 opacity-60" : "border-slate-100 hover:bg-slate-50 cursor-pointer"} transition-colors`}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={disableCheckbox}
-                      onChange={() => toggleItemSelection(idx)}
-                      className="h-4 w-4 rounded border-slate-300 text-slate-900 disabled:opacity-50"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-slate-800">
-                        {item.name}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        Qty: {item.quantity} • ₹{item.price * item.quantity}
-                      </p>
-                      {!isItemReturnable ? (
-                        <p className="text-[10px] font-bold text-rose-500 mt-0.5">Non-returnable</p>
-                      ) : isItemWindowExpired ? (
-                        <p className="text-[10px] font-bold text-amber-500 mt-0.5">Return window expired</p>
-                      ) : (
-                        <p className="text-[10px] font-bold text-emerald-500 mt-0.5">Returnable for {itemWindowDays} day{itemWindowDays !== 1 ? 's' : ''}</p>
-                      )}
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
+            {/* Scrollable content area */}
+            <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pr-1">
+              <div className="space-y-3">
+                {order.items.map((item, idx) => {
+                  const checked = !!selectedReturnItems[idx];
+                  const isItemReturnable = item.isReturnable ?? true;
+                  const itemWindowDays = item.returnWindowDays ?? 1;
+                  const { eligibleAtMs } = getReturnWindowBounds();
+                  const itemExpiresAtMs = eligibleAtMs + (itemWindowDays * 24 * 60 * 60 * 1000);
+                  const isItemWindowExpired = Date.now() > itemExpiresAtMs;
+                  const disableCheckbox = !isItemReturnable || isItemWindowExpired;
 
-            <div className="space-y-4">
+                  return (
+                    <label
+                      key={idx}
+                      className={`flex items-center gap-3 p-3 rounded-2xl border ${disableCheckbox ? "border-slate-100 bg-slate-50 opacity-60" : "border-slate-100 hover:bg-slate-50 cursor-pointer"} transition-colors`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={disableCheckbox}
+                        onChange={() => toggleItemSelection(idx)}
+                        className="h-4 w-4 rounded border-slate-300 text-slate-900 disabled:opacity-50"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-slate-800">
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Qty: {item.quantity} • ₹{item.price * item.quantity}
+                        </p>
+                        {!isItemReturnable ? (
+                          <p className="text-[10px] font-bold text-rose-500 mt-0.5">Non-returnable</p>
+                        ) : isItemWindowExpired ? (
+                          <p className="text-[10px] font-bold text-amber-500 mt-0.5">Return window expired</p>
+                        ) : (
+                          <p className="text-[10px] font-bold text-emerald-500 mt-0.5">Returnable for {itemWindowDays} day{itemWindowDays !== 1 ? 's' : ''}</p>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-600">
                   Reason for return
@@ -1639,7 +1633,8 @@ const OrderDetailPage = () => {
               </label>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            {/* Fixed footer buttons */}
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 mt-4 shrink-0">
               <button
                 onClick={() => !requestingReturn && setShowReturnModal(false)}
                 className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"

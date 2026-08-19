@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInViewAnimation } from "@/core/hooks/useInViewAnimation";
-import { Sparkles, Heart, Snowflake, ChevronLeft, ChevronRight } from "lucide-react";
+import { Sparkles, Heart, Snowflake, ChevronLeft, ChevronRight, Camera } from "lucide-react";
 
 // MUI Icons (shared with admin & icon selector)
 import HomeIcon from "@mui/icons-material/Home";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import ProductCard from "../components/shared/ProductCard";
 import MainLocationHeader from "../components/shared/MainLocationHeader";
 import { useProductDetail } from "../context/ProductDetailContext";
+import { useCart } from "../context/CartContext";
 import { cn } from "@/lib/utils";
 import CardBanner from "@/assets/CardBanner.jpg";
 import SectionRenderer from "../components/experience/SectionRenderer";
@@ -37,6 +38,7 @@ import LowestPriceSection from "../components/home/LowestPriceSection";
 import OfferSections from "../components/home/OfferSections";
 import PlatformBannerSlider from "../components/home/PlatformBannerSlider";
 import ServiceUnavailableSection from "@shared/components/ServiceUnavailableSection";
+import { CustomPhotoOrderModal } from "../components/shared/CustomPhotoOrderModal";
 
 const DEFAULT_CATEGORY_THEME = {
   gradient: "linear-gradient(to bottom, var(--primary), var(--brand-400))",
@@ -172,6 +174,7 @@ const Home = () => {
   const { isOpen: isProductDetailOpen } = useProductDetail();
   const { currentLocation } = useLocation();
   const navigate = useNavigate();
+  const { cartCount } = useCart();
   const quickCatsRef = useRef(null);
   const cachedHomePageData = getCachedHomePageData(currentLocation);
 
@@ -207,6 +210,7 @@ const Home = () => {
   const [headerCategoryMap, setHeaderCategoryMap] = useState(() => cachedHomePageData?.headerCategoryMap || {});
   const [pendingReturn, setPendingReturn] = useState(null);
   const [offerSections, setOfferSections] = useState(() => cachedHomePageData?.offerSections || []);
+  const [isCustomOrderModalOpen, setIsCustomOrderModalOpen] = useState(false);
   const activeCategoryFetchRef = useRef(0);
 
   useEffect(() => {
@@ -437,6 +441,21 @@ const Home = () => {
   useEffect(() => { if (!isInstantBannerJump) return; const id = requestAnimationFrame(() => setIsInstantBannerJump(false)); return () => cancelAnimationFrame(id); }, [isInstantBannerJump]);
 
   const productsById = useMemo(() => { const map = {}; products.forEach((p) => { map[p._id || p.id] = p; }); return map; }, [products]);
+
+  // Lowest Price section: only products that have a discount, sorted by highest discount % first
+  const lowestPriceProducts = useMemo(() => {
+    return products
+      .filter((p) => {
+        const mrp = Number(p.originalPrice || p.price || 0);
+        const sale = Number(p.price || 0); // after mapping, p.price = effective/sale price
+        return mrp > 0 && sale > 0 && sale < mrp;
+      })
+      .sort((a, b) => {
+        const discA = (Number(a.originalPrice || 0) - Number(a.price || 0)) / Number(a.originalPrice || 1);
+        const discB = (Number(b.originalPrice || 0) - Number(b.price || 0)) / Number(b.originalPrice || 1);
+        return discB - discA;
+      });
+  }, [products]);
   const effectiveQuickCategories = useMemo(() => {
     if (activeCategory?._id && activeCategory._id !== "all") {
       const byHeader = headerCategoryMap[String(activeCategory._id)] || [];
@@ -495,7 +514,7 @@ const Home = () => {
           <PromoMarquee />
           <div className="px-4 lg:px-8 max-w-7xl mx-auto">
             <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => navigate(`/category/${id}`)} />
-            <LowestPriceSection products={products} onSeeAll={() => navigate("/category/all")} />
+            <LowestPriceSection products={lowestPriceProducts} onSeeAll={() => navigate("/category/all")} />
             {activePlatformAds && activePlatformAds.length > 0 && (
               <div className="pt-4 pb-4">
                 <PlatformBannerSlider ads={activePlatformAds} />
@@ -509,8 +528,23 @@ const Home = () => {
               </div>
             )}
           </div>
+          
+          {/* Floating Action Button for Custom Photo Order */}
+          <button
+            onClick={() => setIsCustomOrderModalOpen(true)}
+            className={`fixed ${cartCount > 0 ? 'bottom-[140px]' : 'bottom-20'} right-4 md:bottom-8 md:right-8 z-[100] bg-indigo-600 border-2 border-white text-white px-4 py-3 md:px-5 md:py-3.5 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.3)] hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 group`}
+            title="Send Custom Photo Order"
+          >
+            <Camera size={22} className="group-hover:animate-pulse" />
+            <span className="text-xs md:text-sm font-bold tracking-wide">Photo Order</span>
+          </button>
         </>
       )}
+
+      <CustomPhotoOrderModal 
+          isOpen={isCustomOrderModalOpen} 
+          onClose={() => setIsCustomOrderModalOpen(false)} 
+      />
     </div>
   );
 };

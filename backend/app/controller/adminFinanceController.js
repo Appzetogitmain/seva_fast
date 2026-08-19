@@ -3,7 +3,7 @@ import Wallet from "../models/wallet.js";
 import Seller from "../models/seller.js";
 import Delivery from "../models/delivery.js";
 import handleResponse from "../utils/helper.js";
-import { getAdminFinanceSummary } from "../services/finance/walletService.js";
+import { getAdminFinanceSummary, getCodPartnerBreakdown } from "../services/finance/walletService.js";
 import User from "../models/customer.js";
 import Transaction from "../models/transaction.js";
 import { getLedgerEntries } from "../services/finance/ledgerService.js";
@@ -48,6 +48,15 @@ export const getAdminFinanceSummaryController = async (req, res) => {
   try {
     const summary = await getAdminFinanceSummary();
     return handleResponse(res, 200, "Admin finance summary fetched", summary);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+export const getCodPartnerBreakdownController = async (req, res) => {
+  try {
+    const breakdown = await getCodPartnerBreakdown();
+    return handleResponse(res, 200, "COD partner breakdown fetched", breakdown);
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }

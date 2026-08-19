@@ -268,12 +268,14 @@ export const getDeliveryCodCashSummary = async (req, res) => {
 
             const estimatedNet = roundCurrency(Math.max(gross - riderCommission, 0));
             const pendingNet = roundCurrency(order.paymentBreakdown?.codPendingAmount ?? 0);
+            const remittedNet = roundCurrency(order.paymentBreakdown?.codRemittedAmount ?? 0);
             const contribution =
                 codCashWithRider && pendingNet > 0
                     ? pendingNet
                     : !codMarkedCollected && !codOnlinePaid && collectMethod !== "online_qr"
                       ? estimatedNet
                       : 0;
+            const isCollected = codMarkedCollected || codOnlinePaid;
 
             return {
                 orderId: order.orderId,
@@ -290,12 +292,29 @@ export const getDeliveryCodCashSummary = async (req, res) => {
                 riderCommission,
                 amountNetExpected: estimatedNet,
                 amountNetPending: pendingNet,
+                amountNetRemitted: remittedNet,
                 systemFloatContribution: contribution,
+                isCollected,
             };
         });
 
         const systemFloatCOD = roundCurrency(
             normalized.reduce((sum, row) => sum + Number(row.systemFloatContribution || 0), 0),
+        );
+        // Rider's own commission across every COD order they've delivered —
+        // this is money they kept in hand, not a wallet/bank payout.
+        const totalCodEarnings = roundCurrency(
+            normalized.reduce((sum, row) => sum + Number(row.riderCommission || 0), 0),
+        );
+        // Total COD cash actually collected from customers so far (gross).
+        const totalCollected = roundCurrency(
+            normalized
+                .filter((row) => row.isCollected)
+                .reduce((sum, row) => sum + Number(row.amountGross || 0), 0),
+        );
+        // Net amount already handed over/remitted onward (to seller or admin).
+        const totalSettled = roundCurrency(
+            normalized.reduce((sum, row) => sum + Number(row.amountNetRemitted || 0), 0),
         );
 
         const toHandoff = normalized
@@ -314,6 +333,9 @@ export const getDeliveryCodCashSummary = async (req, res) => {
         return handleResponse(res, 200, "COD cash summary fetched", {
             systemFloatCOD,
             cashInHand: roundCurrency(wallet?.cashInHand || 0),
+            totalCodEarnings,
+            totalCollected,
+            totalSettled,
             toHandoff,
             toRemit: toHandoff,
             toCollect,
@@ -527,6 +549,14 @@ export const getMyDeliveryOrders = async (req, res) => {
                     { returnDeliveryBoy: deliveryBoyId },
                 ],
             };
+        } else if (normalized === "ongoing") {
+            // Assigned to this rider and not yet in a terminal state — the job
+            // they're actively working (or should resume tracking) right now.
+            query = {
+                deliveryBoy: deliveryBoyId,
+                status: { $nin: ["delivered", "cancelled"] },
+                workflowStatus: { $nin: [WORKFLOW_STATUS.DELIVERED, WORKFLOW_STATUS.CANCELLED] },
+            };
         } else {
             query = assignedToPartner;
         }
@@ -559,8 +589,11 @@ export const requestWithdrawal = async (req, res) => {
         // 1. Calculate current available balance
         const transactions = await Transaction.find({ user: deliveryBoyId, userModel: 'Delivery' });
 
+        // COD earnings marked settledViaCash were already kept in hand by the
+        // rider (netted out of the cash they collected) — excluding them here
+        // stops the same commission being withdrawn a second time.
         const settledBalance = transactions
-            .filter(t => t.status === 'Settled')
+            .filter(t => t.status === 'Settled' && !t.meta?.settledViaCash)
             .reduce((acc, t) => acc + t.amount, 0);
 
         const pendingPayouts = transactions

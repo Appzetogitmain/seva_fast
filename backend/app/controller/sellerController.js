@@ -311,6 +311,7 @@ export const getSellerCodCashSummary = async (req, res) => {
 
     const Order = (await import("../models/order.js")).default;
     const Wallet = (await import("../models/wallet.js")).default;
+    const Delivery = (await import("../models/delivery.js")).default;
 
     const wallet = await Wallet.findOne({
       ownerType: "SELLER",
@@ -325,16 +326,70 @@ export const getSellerCodCashSummary = async (req, res) => {
       status: { $ne: "cancelled" },
       orderStatus: { $ne: "cancelled" },
       "financeFlags.codCashWithSeller": true,
-      "paymentBreakdown.codPendingAmount": { $gt: 0 },
     })
       .select(
         "orderId status orderStatus deliveredAt createdAt financeFlags paymentBreakdown pricing deliveryBoy",
       )
       .sort({ createdAt: -1 })
-      .limit(100)
+      .limit(200)
       .lean();
 
-    const pendingOrders = orders.map((order) => {
+    // Cash the rider collected but hasn't handed to the seller yet — this is
+    // what the rider still owes the seller, per order.
+    const heldByRiderOrders = await Order.find({
+      seller: sellerId,
+      paymentMode: "COD",
+      status: { $ne: "cancelled" },
+      orderStatus: { $ne: "cancelled" },
+      "financeFlags.codCashWithRider": true,
+      "financeFlags.codCashWithSeller": { $ne: true },
+      "paymentBreakdown.codPendingAmount": { $gt: 0 },
+    })
+      .select("orderId deliveredAt createdAt paymentBreakdown pricing deliveryBoy")
+      .populate("deliveryBoy", "name phone")
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    const heldByRider = heldByRiderOrders.map((order) => ({
+      orderId: order.orderId,
+      deliveredAt: order.deliveredAt || null,
+      createdAt: order.createdAt || null,
+      riderId: order.deliveryBoy?._id || null,
+      riderName: order.deliveryBoy?.name || "Unassigned",
+      riderPhone: order.deliveryBoy?.phone || "",
+      amountGross: roundCurrency(order.paymentBreakdown?.grandTotal ?? order.pricing?.total ?? 0),
+      riderCommission: roundCurrency(order.paymentBreakdown?.riderPayoutTotal ?? 0),
+      amountOwedBySeller: roundCurrency(order.paymentBreakdown?.codPendingAmount ?? 0),
+    }));
+    const totalHeldByRiders = roundCurrency(
+      heldByRider.reduce((sum, row) => sum + Number(row.amountOwedBySeller || 0), 0),
+    );
+
+    // Seller's own product-margin payout, per order — separate from COD cash
+    // flow entirely. "Order Payment" transactions still Pending are what
+    // admin has not yet released to the seller.
+    const pendingAdminTxns = await Transaction.find({
+      user: sellerId,
+      userModel: "Seller",
+      type: "Order Payment",
+      status: "Pending",
+    })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .populate("order", "orderId")
+      .lean();
+
+    const owedByAdmin = pendingAdminTxns.map((txn) => ({
+      orderId: txn.order?.orderId || txn.reference,
+      amount: roundCurrency(txn.amount || 0),
+      createdAt: txn.createdAt || null,
+    }));
+    const totalOwedByAdmin = roundCurrency(
+      owedByAdmin.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    );
+
+    const normalized = orders.map((order) => {
       const gross = roundCurrency(
         order.paymentBreakdown?.grandTotal ?? order.pricing?.total ?? 0,
       );
@@ -344,6 +399,9 @@ export const getSellerCodCashSummary = async (req, res) => {
       const pendingNet = roundCurrency(
         order.paymentBreakdown?.codPendingAmount ?? 0,
       );
+      const remittedNet = roundCurrency(
+        order.paymentBreakdown?.codRemittedAmount ?? 0,
+      );
       return {
         orderId: order.orderId,
         status: order.status,
@@ -352,17 +410,29 @@ export const getSellerCodCashSummary = async (req, res) => {
         amountGross: gross,
         riderCommission,
         amountNetPending: pendingNet,
+        amountNetRemitted: remittedNet,
       };
     });
 
+    const pendingOrders = normalized.filter((row) => row.amountNetPending > 0);
+
     const totalPending = roundCurrency(
       pendingOrders.reduce((sum, row) => sum + Number(row.amountNetPending || 0), 0),
+    );
+    // Amount already remitted onward to admin — what's been settled so far.
+    const totalSettled = roundCurrency(
+      normalized.reduce((sum, row) => sum + Number(row.amountNetRemitted || 0), 0),
     );
 
     return handleResponse(res, 200, "Seller COD cash summary fetched", {
       cashInHand: roundCurrency(wallet?.cashInHand || 0),
       totalPending,
+      totalSettled,
       pendingOrders,
+      heldByRider,
+      totalHeldByRiders,
+      owedByAdmin,
+      totalOwedByAdmin,
     });
   } catch (error) {
     return handleResponse(res, 500, error.message);

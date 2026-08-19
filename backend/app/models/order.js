@@ -280,6 +280,12 @@ const orderSchema = new mongoose.Schema(
         default: [],
       },
     },
+    sellerTimeoutAlert: { type: Boolean, default: false },
+    sellerTimeoutAlertAt: { type: Date },
+    noRiderAvailable: { type: Boolean, default: false },
+    noRiderAlertAt: { type: Date },
+    attentionRequired: { type: Boolean, default: false },
+    attentionReason: { type: String, default: "" },
     financeFlags: {
       onlinePaymentCaptured: { type: Boolean, default: false },
       codMarkedCollected: { type: Boolean, default: false },
@@ -287,6 +293,11 @@ const orderSchema = new mongoose.Schema(
       sellerPayoutQueued: { type: Boolean, default: false },
       sellerPayoutHeld: { type: Boolean, default: false },
       riderPayoutQueued: { type: Boolean, default: false },
+      // Rider already nets their own commission out of COD cash before
+      // remitting the rest (see getCodNetAmount) — this marks that their
+      // payout was settled that way, so it's never also queued as a
+      // separate wallet/bank payout for the same amount.
+      riderPayoutSettledViaCash: { type: Boolean, default: false },
       adminEarningCredited: { type: Boolean, default: false },
       cashbackCredited: { type: Boolean, default: false },
       levelCommissionCredited: { type: Boolean, default: false },

@@ -924,6 +924,24 @@ export const updateOrderStatus = async (req, res) => {
       currentWorkflow === WORKFLOW_STATUS.CANCELLED ||
       currentWorkflow === WORKFLOW_STATUS.DELIVERED;
 
+    const STATUS_RANK_MAP = {
+      pending: 1,
+      created: 1,
+      seller_pending: 1,
+      confirmed: 2,
+      seller_accepted: 2,
+      delivery_search: 2,
+      packed: 3,
+      pickup_ready: 3,
+      delivery_assigned: 3,
+      out_for_delivery: 4,
+      delivered: 5,
+      cancelled: 6,
+    };
+
+    const currentRank = STATUS_RANK_MAP[currentLegacyStatus] || STATUS_RANK_MAP[currentWorkflow.toLowerCase()] || 0;
+    const nextRank = nextStatus ? (STATUS_RANK_MAP[nextStatus] || 0) : 0;
+
     // Never revive timed-out / cancelled / delivered orders via a late status update.
     if (
       nextStatus &&
@@ -936,11 +954,20 @@ export const updateOrderStatus = async (req, res) => {
     ) {
       return handleResponse(
         res,
-        409,
+        400,
         currentLegacyStatus === "cancelled" ||
           currentWorkflow === WORKFLOW_STATUS.CANCELLED
-          ? "Order was cancelled (timeout or rejection) and cannot be confirmed"
-          : "Order is already finalized and cannot be updated",
+          ? "Order was cancelled and status cannot be changed."
+          : "Order has already been delivered and status cannot be reversed or changed.",
+      );
+    }
+
+    // Prevent backward status transitions
+    if (nextStatus && currentRank > 0 && nextRank > 0 && nextRank < currentRank) {
+      return handleResponse(
+        res,
+        400,
+        "Order status cannot be moved backwards to a previous stage.",
       );
     }
 
@@ -1079,14 +1106,26 @@ export const updateOrderStatus = async (req, res) => {
 
       try {
         const orderRich = await Order.findById(order._id)
-          .populate("seller", "shopName address name location serviceRadius")
+          .populate("seller", "shopName address locality city name location serviceRadius")
           .lean();
         const seller = orderRich?.seller || {};
-        const pickup = seller.shopName || "Seller";
+        const sellerAddress = [seller.address, seller.locality, seller.city]
+          .filter((part) => typeof part === "string" && part.trim())
+          .join(", ");
+        const pickup = sellerAddress
+          ? `${seller.shopName || "Seller"} — ${sellerAddress}`
+          : seller.shopName || "Seller";
         const drop = orderRich?.address?.address || "Customer address";
+        const distanceKm =
+          orderRich?.distanceSnapshot?.distanceKmRounded ??
+          orderRich?.distanceSnapshot?.distanceKmActual ??
+          orderRich?.paymentBreakdown?.distanceKmRounded ??
+          orderRich?.paymentBreakdown?.distanceKmActual ??
+          null;
         const assignPreview = {
           pickup,
           drop,
+          distanceKm,
           total: orderRich?.pricing?.total ?? 0,
           earnings: Number(orderRich?.paymentBreakdown?.riderPayoutTotal) || 0,
         };

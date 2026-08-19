@@ -116,6 +116,55 @@ async function assertUniqueCategoryName({ name, type, excludeId = null }) {
   return "This subcategory already exists";
 }
 
+/**
+ * Ensures sortOrder > 0 is unique within the same category type.
+ * Returns error string with existing category name + suggested number if duplicate.
+ */
+async function assertUniqueSortOrder({ sortOrder, type, excludeId = null }) {
+  const num = Number(sortOrder) || 0;
+  if (num <= 0 || !type) return null; // 0 or unassigned allows duplicate
+
+  const query = {
+    type,
+    sortOrder: num,
+  };
+  if (excludeId && mongoose.Types.ObjectId.isValid(String(excludeId))) {
+    query._id = { $ne: excludeId };
+  }
+
+  const existing = await Category.findOne(query).select("name sortOrder").lean();
+  if (existing) {
+    const highest = await Category.findOne({ type })
+      .sort({ sortOrder: -1 })
+      .select("sortOrder")
+      .lean();
+    const suggested = (highest?.sortOrder || 0) + 1;
+    return `Display Order #${num} is already set for category '${existing.name}'. Next available suggested order number: ${suggested}.`;
+  }
+  return null;
+}
+
+/**
+ * Sort categories: explicit positive numbers (1, 2, 3...) come first in order,
+ * unnumbered/0 categories come after, sorted alphabetically by name.
+ */
+function sortCategoriesEffective(list) {
+  if (!Array.isArray(list)) return [];
+  return [...list].sort((a, b) => {
+    const orderA = Number(a.sortOrder) || 0;
+    const orderB = Number(b.sortOrder) || 0;
+
+    if (orderA > 0 && orderB > 0) {
+      if (orderA !== orderB) return orderA - orderB;
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    }
+    if (orderA > 0 && orderB === 0) return -1;
+    if (orderA === 0 && orderB > 0) return 1;
+
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  });
+}
+
 /* ===============================
    GET ALL CATEGORIES (Hierarchy)
  ================================ */
@@ -128,8 +177,8 @@ export const getCategories = async (req, res) => {
       const categories = await getOrSet(
         cacheKey,
         async () => {
-          const selectFields = "name slug image iconId type parentId headerColor headerFontColor headerIconColor hsnCode gstRate";
-          return Category.find({ type: "header" })
+          const selectFields = "name slug image iconId type parentId sortOrder headerColor headerFontColor headerIconColor hsnCode gstRate";
+          const raw = await Category.find({ type: "header" })
             .select(selectFields)
             .populate({
               path: "children",
@@ -139,8 +188,17 @@ export const getCategories = async (req, res) => {
                 select: selectFields,
               },
             })
-            .sort({ name: 1, _id: 1 })
             .lean();
+
+          const sortTree = (items) => {
+            if (!Array.isArray(items)) return [];
+            const sorted = sortCategoriesEffective(items);
+            return sorted.map((node) => ({
+              ...node,
+              children: sortTree(node.children || []),
+            }));
+          };
+          return sortTree(raw);
         },
         getTTL("categories"),
       );
@@ -172,10 +230,12 @@ export const getCategories = async (req, res) => {
         query.parentId = parentId;
       }
 
-      const [items, total] = await Promise.all([
-        Category.find(query).sort({ name: 1 }).skip(skip).limit(limit).lean(),
+      const [rawItems, total] = await Promise.all([
+        Category.find(query).lean(),
         Category.countDocuments(query),
       ]);
+      const items = sortCategoriesEffective(rawItems).slice(skip, skip + limit);
+      
       return handleResponse(res, 200, "Categories fetched successfully", {
         items,
         page,
@@ -192,7 +252,10 @@ export const getCategories = async (req, res) => {
     const cacheKey = categoryCacheKey({ tree: false, type: query.type || "all" });
     const categories = await getOrSet(
       cacheKey,
-      async () => Category.find(query).sort({ name: 1, _id: 1 }).lean(),
+      async () => {
+        const raw = await Category.find(query).lean();
+        return sortCategoriesEffective(raw);
+      },
       getTTL("categories"),
     );
     return handleResponse(
@@ -212,7 +275,7 @@ export const getCategories = async (req, res) => {
 export const createCategory = async (req, res) => {
   try {
     const categoryData = {};
-    const allowedKeys = ["name", "slug", "description", "type", "parentId", "status", "iconId", "headerColor", "headerFontColor", "headerIconColor", "adminCommission", "adminCommissionType", "adminCommissionValue", "handlingFees", "handlingFeeType", "handlingFeeValue", "hsnCode", "gstRate"];
+    const allowedKeys = ["name", "slug", "description", "type", "parentId", "status", "iconId", "headerColor", "headerFontColor", "headerIconColor", "sortOrder", "adminCommission", "adminCommissionType", "adminCommissionValue", "handlingFees", "handlingFeeType", "handlingFeeValue", "hsnCode", "gstRate"];
     
     // Strict Whitelisting and Sanitization
     for (const key of allowedKeys) {
@@ -279,6 +342,12 @@ export const createCategory = async (req, res) => {
     });
     if (duplicateNameError) return handleResponse(res, 400, duplicateNameError);
 
+    const duplicateOrderError = await assertUniqueSortOrder({
+      sortOrder: categoryData.sortOrder,
+      type,
+    });
+    if (duplicateOrderError) return handleResponse(res, 400, duplicateOrderError);
+
     // Final sanity check for unique slug to prevent catch block late failure
     const existing = await Category.findOne({ slug: categoryData.slug }).lean();
     if (existing) {
@@ -325,7 +394,7 @@ export const updateCategory = async (req, res) => {
     }
 
     const categoryData = {};
-    const allowedKeys = ["name", "slug", "description", "type", "parentId", "status", "iconId", "headerColor", "headerFontColor", "headerIconColor", "adminCommission", "adminCommissionType", "adminCommissionValue", "handlingFees", "handlingFeeType", "handlingFeeValue", "hsnCode", "gstRate"];
+    const allowedKeys = ["name", "slug", "description", "type", "parentId", "status", "iconId", "headerColor", "headerFontColor", "headerIconColor", "sortOrder", "adminCommission", "adminCommissionType", "adminCommissionValue", "handlingFees", "handlingFeeType", "handlingFeeValue", "hsnCode", "gstRate"];
     
     for (const key of allowedKeys) {
       if (Object.prototype.hasOwnProperty.call(req.body, key)) {
@@ -388,6 +457,15 @@ export const updateCategory = async (req, res) => {
         excludeId: id,
       });
       if (duplicateNameError) return handleResponse(res, 400, duplicateNameError);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(categoryData, "sortOrder")) {
+      const duplicateOrderError = await assertUniqueSortOrder({
+        sortOrder: categoryData.sortOrder,
+        type,
+        excludeId: id,
+      });
+      if (duplicateOrderError) return handleResponse(res, 400, duplicateOrderError);
     }
 
     if (Object.prototype.hasOwnProperty.call(categoryData, "slug")) {

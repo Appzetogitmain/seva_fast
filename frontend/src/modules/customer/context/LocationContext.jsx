@@ -289,8 +289,13 @@ export const LocationProvider = ({ children }) => {
     refreshAddresses();
   }, [refreshAddresses]);
 
-  // On mount: only restore from cache. Do NOT auto-fetch – browsers block the
-  // location prompt unless it's triggered by a user gesture (e.g. tap).
+  // On mount: restore a previously resolved location from cache. If there is
+  // none (first visit on this device), actively ask the browser for
+  // permission and use the real location — geolocation does not require a
+  // user gesture to show the permission prompt, so this is safe to call
+  // straight from an effect. Only fall back to the hardcoded default if the
+  // user denies permission, the request fails, or geolocation isn't
+  // supported at all.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -312,18 +317,23 @@ export const LocationProvider = ({ children }) => {
             },
             { persist: false, updateSavedHome: false },
           );
+          return;
         }
-      } else {
-        // If no location is stored, persist the default one immediately
+      }
+    } catch {
+      // ignore parse errors, fall through to a fresh location request
+    }
+
+    // No usable cached location — prompt for permission and use the real
+    // location. If denied/unsupported/failed, fall back to the default.
+    fetchAndCacheLocation().then((result) => {
+      if (!result.ok) {
         updateLocation(currentLocation, {
           persist: true,
           updateSavedHome: false,
         });
       }
-    } catch {
-      // ignore parse errors
-    }
-    // Live fetch happens only when user taps location pill or "Use current location"
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
