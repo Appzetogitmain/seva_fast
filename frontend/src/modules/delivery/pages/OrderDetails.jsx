@@ -64,6 +64,12 @@ const PUBLIC_STATUS_STEPS = [
   { id: 3, label: "Delivered" },
 ];
 
+const RETURN_STATUS_STEPS = [
+  { id: 1, label: "Collecting" },
+  { id: 2, label: "Returning to Seller" },
+  { id: 3, label: "Returned" },
+];
+
 const getPersistedRiderStep = (order) => {
   if (!order) return 1;
 
@@ -73,7 +79,13 @@ const getPersistedRiderStep = (order) => {
     if (["returned", "qc_passed", "qc_failed", "refund_completed"].includes(rs)) return 5;
     if (rs === "return_drop_pending") return 4;
     if (rs === "return_in_transit") return 3;
-    if (rs === "return_pickup_assigned" || rs === "return_approved") return 1;
+    if (rs === "return_pickup_assigned") {
+      // Pickup proof is saved server-side as soon as it's uploaded, well before
+      // the OTP flow flips returnStatus — use it to restore "arrived, proof
+      // done" across a refresh/navigation instead of resetting to step 1.
+      return Array.isArray(order.returnPickupImages) && order.returnPickupImages.length > 0 ? 2 : 1;
+    }
+    if (rs === "return_approved") return 1;
   }
 
   const workflowStatus = String(order.workflowStatus || "").toUpperCase();
@@ -180,6 +192,7 @@ const OrderDetails = () => {
       if (ord) {
         setOrder(ord);
         setStep(getPersistedRiderStep(ord));
+        setPickupProofSubmitted(Boolean(ord.returnPickupImages?.length));
       }
       return ord;
     } catch (error) {
@@ -322,6 +335,7 @@ const OrderDetails = () => {
   const publicStatusStage = isReturn
     ? step >= 5 ? 3 : step >= 3 ? 2 : 1
     : getPublicStatusStage(step);
+  const statusSteps = isReturn ? RETURN_STATUS_STEPS : PUBLIC_STATUS_STEPS;
   const cachedRiderLocation = getCachedDeliveryPartnerLocation(30 * 60 * 1000);
   const destinationLocation = order?.address?.location;
 
@@ -816,6 +830,9 @@ const OrderDetails = () => {
                   <p className="text-[10px] uppercase font-bold text-brand-200 text-left px-1">
                     Items to pick up
                   </p>
+                  <p className="text-[9px] uppercase font-bold text-brand-300/80 text-left px-1 -mt-1">
+                    Real listing photo — match it to the customer's photo below
+                  </p>
                   <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar-dark text-left">
                     {(order.returnItems || order.items)?.map((item, i) => (
                       <div key={i} className="flex items-center gap-3 bg-white/10 p-2 rounded-xl border border-white/5">
@@ -842,10 +859,15 @@ const OrderDetails = () => {
                       )}
 
                       {order.returnImages?.length > 0 && (
-                        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                          {order.returnImages.map((img, idx) => (
-                            <img key={idx} src={img} alt={`Return Proof ${idx}`} className="w-10 h-10 rounded-lg object-cover border border-white/20 shrink-0" />
-                          ))}
+                        <div className="mt-3">
+                          <p className="text-[9px] uppercase font-bold text-brand-200 mb-1">
+                            Customer's photo — confirm it's the same item before pickup
+                          </p>
+                          <div className="flex gap-2 overflow-x-auto pb-1">
+                            {order.returnImages.map((img, idx) => (
+                              <img key={idx} src={img} alt={`Return Proof ${idx}`} className="w-14 h-14 rounded-lg object-cover border border-white/20 shrink-0" />
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -938,11 +960,11 @@ const OrderDetails = () => {
               className="absolute top-1/2 left-0 h-1 bg-brand-500 -z-10 rounded-full"
               initial={{ width: "0%" }}
               animate={{
-                width: `${((publicStatusStage - 1) / (PUBLIC_STATUS_STEPS.length - 1)) * 100}%`,
+                width: `${((publicStatusStage - 1) / (statusSteps.length - 1)) * 100}%`,
               }}
               transition={{ duration: 0.5, ease: "easeInOut" }}
             />
-            {PUBLIC_STATUS_STEPS.map(({ id, label }) => (
+            {statusSteps.map(({ id, label }) => (
               <motion.div
                 key={id}
                 initial={false}
@@ -960,7 +982,7 @@ const OrderDetails = () => {
             ))}
           </div>
           <div className="flex justify-between mt-2 text-xs text-slate-500 font-medium px-1">
-            {PUBLIC_STATUS_STEPS.map(({ id, label }) => (
+            {statusSteps.map(({ id, label }) => (
               <span key={id} className="text-center">
                 {label}
               </span>
@@ -1054,26 +1076,28 @@ const OrderDetails = () => {
                       <h2 className="font-bold text-gray-800">
                         {isReturn ? "Return Drop" : "Customer Details"}
                       </h2>
-                      <div className="flex items-center space-x-2 mt-0.5">
-                        <p
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                            order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay === 0
-                              ? "bg-purple-50 text-purple-700 border-purple-200"
+                      {!isReturn && (
+                        <div className="flex items-center space-x-2 mt-0.5">
+                          <p
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                              order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay === 0
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay > 0
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                : order.payment?.method?.toLowerCase() === "cash" || order.payment?.method?.toLowerCase() === "cod"
+                                ? "bg-orange-50 text-orange-700 border-orange-200"
+                                : "bg-brand-50 text-brand-700 border-brand-200"
+                            }`}
+                          >
+                            {order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay === 0
+                              ? "WALLET"
                               : order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay > 0
-                              ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                              : order.payment?.method?.toLowerCase() === "cash" || order.payment?.method?.toLowerCase() === "cod"
-                              ? "bg-orange-50 text-orange-700 border-orange-200"
-                              : "bg-brand-50 text-brand-700 border-brand-200"
-                          }`}
-                        >
-                          {order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay === 0
-                            ? "WALLET"
-                            : order.pricing?.walletAmount > 0 && order.pricing?.finalAmountToPay > 0
-                            ? "WALLET + " + (order.payment?.method?.toUpperCase() || "ONLINE")
-                            : order.payment?.method?.toUpperCase() || "CASH"}
-                        </p>
-                        <p className="text-[10px] text-gray-400 font-medium">Bill: Rs.{order.pricing?.total}</p>
-                      </div>
+                              ? "WALLET + " + (order.payment?.method?.toUpperCase() || "ONLINE")
+                              : order.payment?.method?.toUpperCase() || "CASH"}
+                          </p>
+                          <p className="text-[10px] text-gray-400 font-medium">Bill: Rs.{order.pricing?.total}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex space-x-2">
@@ -1122,10 +1146,10 @@ const OrderDetails = () => {
               <div className="p-2 bg-purple-100 text-purple-600 rounded-lg mr-3">
                 <Package size={20} />
               </div>
-              <span>Order Amount</span>
+              <span>{isReturn ? "Return Earnings" : "Order Amount"}</span>
             </div>
             <span className="text-lg font-bold text-gray-900">
-              Rs.{order.pricing?.total ?? 0}
+              Rs.{isReturn ? (order.returnDeliveryCommission ?? 0) : (order.pricing?.total ?? 0)}
             </span>
           </div>
         </Card>
@@ -1148,6 +1172,7 @@ const OrderDetails = () => {
             {!pickupProofSubmitted ? (
               <ReturnPickupProofUpload
                 orderId={orderId}
+                order={order}
                 onSubmitted={() => setPickupProofSubmitted(true)}
               />
             ) : (

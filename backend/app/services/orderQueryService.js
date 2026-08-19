@@ -316,6 +316,43 @@ export async function fetchAvailableOrdersForDelivery({
       ...rp,
       isReturnPickup: true,
     }));
+
+    // Unassigned broadcasts (returnDeliveryBoy still null) — covers riders who
+    // missed the live `delivery:broadcast` socket push (offline momentarily,
+    // came online after the 60s window, etc). Distance-filtered in JS since
+    // order.address.location is a plain {lat,lng}, not a 2dsphere point.
+    const broadcastCandidates = await Order.find({
+      returnStatus: "return_pickup_assigned",
+      returnFulfillmentMode: "admin_rider",
+      returnDeliveryBoy: null,
+      skippedBy: { $nin: [userId] },
+    })
+      .sort({ returnRequestedAt: -1, createdAt: -1, _id: -1 })
+      .limit(Math.max(limit * 3, 30))
+      .populate("customer", "name phone")
+      .populate("seller", "shopName address locality city name location")
+      .lean();
+
+    if (broadcastCandidates.length > 0) {
+      const rider = await Delivery.findById(userId).select("location").lean();
+      const riderCoords = rider?.location?.coordinates;
+      if (Array.isArray(riderCoords) && riderCoords.length === 2 && (riderCoords[0] !== 0 || riderCoords[1] !== 0)) {
+        const [rlng, rlat] = riderCoords;
+        const nearbyBroadcasts = broadcastCandidates
+          .filter((order) => {
+            const loc = order.address?.location;
+            if (!loc || typeof loc.lat !== "number" || typeof loc.lng !== "number") return false;
+            return distanceMeters(rlat, rlng, loc.lat, loc.lng) <= 5000;
+          })
+          .map((order) => ({ ...order, isReturnPickup: true }));
+
+        for (const order of nearbyBroadcasts) {
+          if (!assignedReturnPickups.some((rp) => rp.orderId === order.orderId)) {
+            assignedReturnPickups.push(order);
+          }
+        }
+      }
+    }
   }
 
   let v2Orders = [];

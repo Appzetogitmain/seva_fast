@@ -13,7 +13,7 @@ const CONDITIONS = [
  * ReturnPickupProofUpload — Upload product images and condition at customer pickup.
  * Rider must upload at least 1 image and select condition before requesting OTP.
  */
-const ReturnPickupProofUpload = ({ orderId, onSubmitted }) => {
+const ReturnPickupProofUpload = ({ orderId, order, onSubmitted }) => {
   const [images, setImages] = useState([]); // array of { url, preview }
   const [condition, setCondition] = useState("");
   const [conditionNote, setConditionNote] = useState("");
@@ -130,6 +130,58 @@ const ReturnPickupProofUpload = ({ orderId, onSubmitted }) => {
           <p className="text-xs text-gray-500">Take photos of product & packaging before pickup</p>
         </div>
       </div>
+
+      {/* Verify Item Match: real listing photo vs what the customer uploaded */}
+      {(order?.returnItems?.length > 0 || order?.returnImages?.length > 0) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+          <p className="text-xs font-bold text-amber-800">
+            ⚠️ Verify this is the same item before you accept it from the customer
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Real Product</p>
+              <div className="flex gap-1.5 overflow-x-auto">
+                {(order?.returnItems || []).map((item, idx) => (
+                  <img
+                    key={idx}
+                    src={item.image || item.product?.mainImage || "/placeholder.png"}
+                    alt={item.name}
+                    className="w-16 h-16 rounded-lg object-cover border border-gray-200 shrink-0"
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Customer's Photo</p>
+              <div className="flex gap-1.5 overflow-x-auto">
+                {(order?.returnImages || []).length > 0 ? (
+                  order.returnImages.map((img, idx) => (
+                    <img
+                      key={idx}
+                      src={img}
+                      alt={`Customer upload ${idx + 1}`}
+                      className="w-16 h-16 rounded-lg object-cover border border-gray-200 shrink-0"
+                    />
+                  ))
+                ) : (
+                  <div className="w-16 h-16 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-[9px] text-gray-400 text-center px-1">
+                    No photo
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          {order?.returnReason && (
+            <div className="bg-white/60 rounded-xl p-2.5 border border-amber-100">
+              <p className="text-[10px] font-bold text-amber-700 uppercase mb-0.5">Reason for return</p>
+              <p className="text-xs text-gray-800">{order.returnReason}</p>
+              {order?.returnReasonDetail && (
+                <p className="text-[11px] text-gray-600 italic mt-0.5">"{order.returnReasonDetail}"</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Image Upload Grid */}
       <div>

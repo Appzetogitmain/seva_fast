@@ -113,7 +113,7 @@ export function getOrderStatusLabel(order) {
       case "return_approved": return "Return Approved";
       case "return_pickup_assigned": return "Pickup Assigned";
       case "return_pickup_verified": return "Pickup Verified";
-      case "returned": return "Return Delivered to Seller";
+      case "returned": return "Returned";
       case "qc_passed": return "Return QC Passed";
       case "qc_failed": return "Return QC Failed";
       case "refund_completed": return "Returned & Refunded";

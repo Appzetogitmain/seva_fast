@@ -33,7 +33,10 @@ const Returns = () => {
     const [rejectReason, setRejectReason] = useState("");
     const [submittingReject, setSubmittingReject] = useState(false);
     const [assigningPickup, setAssigningPickup] = useState(false);
-    const [deliveryBoys, setDeliveryBoys] = useState([]);
+    const [selfCollectOpen, setSelfCollectOpen] = useState(false);
+    const [selfCollectImages, setSelfCollectImages] = useState([]);
+    const [selfCollectNote, setSelfCollectNote] = useState("");
+    const [submittingSelfCollect, setSubmittingSelfCollect] = useState(false);
     const [activeOtps, setActiveOtps] = useState({}); // { orderId: { otp, expiresAt } }
     const canManageReturns = true;
 
@@ -102,16 +105,6 @@ const Returns = () => {
         }
     };
 
-    const fetchDeliveryBoys = async () => {
-        try {
-            const response = await sellerApi.getAvailableRiders();
-            const list = Array.isArray(response.data.result) ? response.data.result : [];
-            setDeliveryBoys(list);
-        } catch (error) {
-            console.error("Failed to fetch delivery partners:", error);
-        }
-    };
-
     const fetchReturns = async () => {
         try {
             setLoading(true);
@@ -131,7 +124,6 @@ const Returns = () => {
 
     useEffect(() => {
         fetchReturns();
-        fetchDeliveryBoys();
 
         const getToken = () => localStorage.getItem("auth_seller");
 
@@ -170,8 +162,7 @@ const Returns = () => {
         );
         if (!match) return;
 
-        setSelectedReturn(match);
-        setIsDetailsOpen(true);
+        openDetails(match);
         setActiveTab("All");
 
         const next = new URLSearchParams(searchParams);
@@ -198,9 +189,24 @@ const Returns = () => {
         });
     }, [returns, activeTab]);
 
-    const openDetails = (ret) => {
+    const openDetails = async (ret) => {
         setSelectedReturn(ret);
         setIsDetailsOpen(true);
+
+        // If the rider already requested the seller drop OTP before this seller
+        // opened the app (or it was missed live), fetch it so it's still shown
+        // instead of only relying on the one-time "return:drop:otp" socket push.
+        if (ret.returnStatus === "return_drop_pending" && !activeOtps[ret.orderId]) {
+            try {
+                const res = await sellerApi.getReturnDetails(ret.orderId);
+                const dropOtp = res.data?.result?.returnDropOtp;
+                if (dropOtp?.otp) {
+                    setActiveOtps((prev) => ({ ...prev, [ret.orderId]: dropOtp }));
+                }
+            } catch (error) {
+                console.error("Failed to fetch active return drop OTP:", error);
+            }
+        }
     };
 
     const handleApprove = async (orderId) => {
@@ -238,41 +244,72 @@ const Returns = () => {
         }
     };
 
-    const handleAssignReturnRider = async (orderId, deliveryBoyId) => {
-        if (!deliveryBoyId) return;
+    const handleBroadcastReturn = async (orderId) => {
         try {
             setAssigningPickup(true);
-            await sellerApi.assignReturnDelivery(orderId, { deliveryBoyId });
-            showToast("Delivery partner assigned for return pickup", "success");
-            const assignedBoy = deliveryBoys.find(
-                (b) => b._id === deliveryBoyId || b.id === deliveryBoyId,
-            );
-            const returnDeliveryBoy = assignedBoy
-                ? { _id: assignedBoy._id, name: assignedBoy.name, phone: assignedBoy.phone }
-                : null;
+            await sellerApi.assignReturnDelivery(orderId, { mode: "admin_rider" });
+            showToast("Broadcasted to nearby riders", "success");
             setReturns((prev) =>
                 prev.map((r) =>
                     r.orderId === orderId
-                        ? { ...r, returnDeliveryBoy, returnStatus: "return_pickup_assigned" }
+                        ? { ...r, returnDeliveryBoy: null, returnFulfillmentMode: "admin_rider", returnStatus: "return_pickup_assigned" }
                         : r,
                 ),
             );
             if (selectedReturn?.orderId === orderId) {
                 setSelectedReturn({
                     ...selectedReturn,
-                    returnDeliveryBoy,
+                    returnDeliveryBoy: null,
+                    returnFulfillmentMode: "admin_rider",
                     returnStatus: "return_pickup_assigned",
                 });
             }
             await fetchReturns();
         } catch (error) {
-            console.error("Failed to assign return rider:", error);
+            console.error("Failed to broadcast return pickup:", error);
             showToast(
-                error.response?.data?.message || "Failed to assign delivery partner",
+                error.response?.data?.message || "Failed to broadcast return pickup",
                 "error",
             );
         } finally {
             setAssigningPickup(false);
+        }
+    };
+
+    const handleSelfCollectFileChange = (e) => {
+        const files = Array.from(e.target.files || []);
+        files.forEach((file) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setSelfCollectImages((prev) => [...prev, reader.result]);
+            };
+            reader.readAsDataURL(file);
+        });
+        e.target.value = "";
+    };
+
+    const handleSubmitSelfCollect = async (orderId) => {
+        if (selfCollectImages.length === 0) return;
+        try {
+            setSubmittingSelfCollect(true);
+            await sellerApi.submitReturnSelfCollection(orderId, {
+                images: selfCollectImages,
+                note: selfCollectNote,
+            });
+            showToast("Return marked as self-collected", "success");
+            setSelfCollectOpen(false);
+            setSelfCollectImages([]);
+            setSelfCollectNote("");
+            await fetchReturns();
+            setIsDetailsOpen(false);
+        } catch (error) {
+            console.error("Failed to submit self-collection:", error);
+            showToast(
+                error.response?.data?.message || "Failed to record self-collection",
+                "error",
+            );
+        } finally {
+            setSubmittingSelfCollect(false);
         }
     };
 
@@ -740,14 +777,95 @@ const Returns = () => {
                                 </div>
 
                                 {(selectedReturn.returnStatus === "return_approved" ||
-                                    selectedReturn.returnStatus === "return_pickup_assigned") && (
+                                    selectedReturn.returnStatus === "return_pickup_assigned" ||
+                                    (selectedReturn.returnStatus === "returned" &&
+                                        selectedReturn.returnFulfillmentMode === "own")) && (
                                     <div>
                                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                            <HiOutlineTruck className="h-3 w-3 text-primary" /> Return Pickup Rider
+                                            <HiOutlineTruck className="h-3 w-3 text-primary" /> Return Pickup
                                         </h4>
                                         <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm space-y-2">
-                                            {selectedReturn.returnDeliveryBoy ? (
-                                                <div className="flex flex-col gap-1.5">
+                                            {selectedReturn.returnStatus === "return_approved" ? (
+                                                selfCollectOpen ? (
+                                                    <div className="space-y-2">
+                                                        <p className="text-[11px] font-bold text-slate-600">
+                                                            Upload proof of pickup
+                                                        </p>
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            multiple
+                                                            onChange={handleSelfCollectFileChange}
+                                                            className="text-[11px] w-full"
+                                                        />
+                                                        {selfCollectImages.length > 0 && (
+                                                            <div className="flex gap-2 flex-wrap">
+                                                                {selfCollectImages.map((img, idx) => (
+                                                                    <img
+                                                                        key={idx}
+                                                                        src={img}
+                                                                        alt={`Proof ${idx + 1}`}
+                                                                        className="h-12 w-12 rounded-lg object-cover border border-slate-200"
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        <textarea
+                                                            value={selfCollectNote}
+                                                            onChange={(e) => setSelfCollectNote(e.target.value)}
+                                                            placeholder="Note (optional)"
+                                                            rows={2}
+                                                            className="w-full text-xs p-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-200 outline-none"
+                                                        />
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                className="flex-1"
+                                                                disabled={submittingSelfCollect || selfCollectImages.length === 0}
+                                                                onClick={() => handleSubmitSelfCollect(selectedReturn.orderId)}
+                                                            >
+                                                                {submittingSelfCollect ? "Submitting..." : "Confirm Self-Collected"}
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() => {
+                                                                    setSelfCollectOpen(false);
+                                                                    setSelfCollectImages([]);
+                                                                    setSelfCollectNote("");
+                                                                }}
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col gap-2">
+                                                        <p className="text-[11px] text-slate-500 font-medium">
+                                                            Choose how this return pickup should be handled.
+                                                        </p>
+                                                        <div className="flex gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                className="flex-1"
+                                                                disabled={assigningPickup}
+                                                                onClick={() => handleBroadcastReturn(selectedReturn.orderId)}
+                                                            >
+                                                                Broadcast to Nearby Riders
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="flex-1"
+                                                                onClick={() => setSelfCollectOpen(true)}
+                                                            >
+                                                                Mark as Self-Collected
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            ) : selectedReturn.returnStatus === "return_pickup_assigned" ? (
+                                                selectedReturn.returnDeliveryBoy ? (
                                                     <div className="flex justify-between items-center">
                                                         <div>
                                                             <p className="text-xs font-bold text-slate-800">
@@ -758,84 +876,21 @@ const Returns = () => {
                                                             </p>
                                                         </div>
                                                         <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                                            Assigned
+                                                            Accepted
                                                         </span>
                                                     </div>
-                                                    {selectedReturn.returnStatus === "return_approved" ||
-                                                    selectedReturn.returnStatus === "return_pickup_assigned" ? (
-                                                        <>
-                                                            <div className="h-px bg-slate-200 my-1" />
-                                                            <div className="relative">
-                                                                <select
-                                                                    value={selectedReturn.returnDeliveryBoy._id || selectedReturn.returnDeliveryBoy.id || ""}
-                                                                    onChange={(e) =>
-                                                                        handleAssignReturnRider(
-                                                                            selectedReturn.orderId,
-                                                                            e.target.value,
-                                                                        )
-                                                                    }
-                                                                    disabled={assigningPickup}
-                                                                    className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800 disabled:opacity-60"
-                                                                >
-                                                                    <option
-                                                                        value={
-                                                                            selectedReturn.returnDeliveryBoy._id ||
-                                                                            selectedReturn.returnDeliveryBoy.id ||
-                                                                            ""
-                                                                        }
-                                                                    >
-                                                                        {selectedReturn.returnDeliveryBoy.name} (
-                                                                        {selectedReturn.returnDeliveryBoy.phone})
-                                                                    </option>
-                                                                    <option value="" disabled>
-                                                                        Change Rider...
-                                                                    </option>
-                                                                    {deliveryBoys
-                                                                        .filter(
-                                                                            (boy) =>
-                                                                                (boy._id || boy.id) !==
-                                                                                (selectedReturn.returnDeliveryBoy._id ||
-                                                                                    selectedReturn.returnDeliveryBoy.id),
-                                                                        )
-                                                                        .map((boy) => (
-                                                                            <option key={boy._id} value={boy._id}>
-                                                                                {boy.name} ({boy.phone})
-                                                                            </option>
-                                                                        ))}
-                                                                </select>
-                                                                <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
-                                                            </div>
-                                                        </>
-                                                    ) : null}
-                                                </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                                        <p className="text-[11px] font-bold text-slate-600">
+                                                            Broadcasted to nearby riders — waiting for someone to accept...
+                                                        </p>
+                                                    </div>
+                                                )
                                             ) : (
-                                                <div className="relative">
-                                                    <select
-                                                        value=""
-                                                        onChange={(e) =>
-                                                            handleAssignReturnRider(
-                                                                selectedReturn.orderId,
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        disabled={assigningPickup}
-                                                        className="w-full text-xs pl-3 pr-8 py-2 bg-white rounded-xl border border-slate-200 appearance-none cursor-pointer focus:ring-2 focus:ring-brand-200 outline-none shadow-sm font-semibold text-slate-800 disabled:opacity-60"
-                                                    >
-                                                        <option value="">Assign Rider...</option>
-                                                        {deliveryBoys.length === 0 ? (
-                                                            <option value="" disabled>
-                                                                No online riders available
-                                                            </option>
-                                                        ) : (
-                                                            deliveryBoys.map((boy) => (
-                                                                <option key={boy._id} value={boy._id}>
-                                                                    {boy.name} ({boy.phone})
-                                                                </option>
-                                                            ))
-                                                        )}
-                                                    </select>
-                                                    <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
-                                                </div>
+                                                <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                                    Self-Collected by Seller
+                                                </span>
                                             )}
                                         </div>
                                     </div>

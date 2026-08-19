@@ -398,6 +398,7 @@ export const getOrderDetails = async (req, res) => {
     let order = await Order.findOne(orderKey)
       .populate("customer", "name email phone")
       .populate("items.product", "name mainImage price salePrice")
+      .populate("returnItems.product", "name mainImage")
       .populate("deliveryBoy", "name phone")
       .populate("returnDeliveryBoy", "name phone")
       .populate("seller", "shopName name address phone location")
@@ -845,7 +846,7 @@ export const getReturnDetails = async (req, res) => {
       }
     }
 
-    // Fetch active OTP if in pickup assigned status
+    // Fetch active OTP if in pickup assigned status (customer-facing pickup OTP)
     let activeOtp = null;
     if (order.returnStatus === "return_pickup_assigned") {
       const otpDoc = await OrderOtp.findOne({
@@ -855,6 +856,21 @@ export const getReturnDetails = async (req, res) => {
         expiresAt: { $gt: new Date() },
       }).sort({ createdAt: -1 });
       activeOtp = otpDoc?.code || null;
+    }
+
+    // Fetch active seller drop OTP so it's visible on reload/reconnect, not
+    // just via the live "return:drop:otp" socket push when it was generated.
+    let activeDropOtp = null;
+    if (order.returnStatus === "return_drop_pending") {
+      const dropOtpDoc = await OrderOtp.findOne({
+        orderId: order.orderId,
+        type: "return_drop",
+        consumedAt: null,
+        expiresAt: { $gt: new Date() },
+      }).sort({ createdAt: -1 });
+      activeDropOtp = dropOtpDoc
+        ? { otp: dropOtpDoc.code, expiresAt: dropOtpDoc.expiresAt }
+        : null;
     }
 
     const { eligibleAt, windowExpiresAt } = computeReturnWindowForOrder(order);
@@ -880,6 +896,7 @@ export const getReturnDetails = async (req, res) => {
       returnQcAt: order.returnQcAt,
       returnQcNote: order.returnQcNote,
       returnPickupOtp: activeOtp,
+      returnDropOtp: activeDropOtp,
     };
 
     return handleResponse(res, 200, "Return details fetched", payload);
@@ -1631,7 +1648,7 @@ export const assignReturnDelivery = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { id: userId, role } = req.user;
-    const { deliveryBoyId } = req.body || {};
+    const { deliveryBoyId, mode } = req.body || {};
 
     const orderKey = orderMatchQueryFromRouteParam(orderId);
     if (!orderKey) {
@@ -1644,12 +1661,13 @@ export const assignReturnDelivery = async (req, res) => {
     }
 
     const isOwnerSeller = role === "seller" && order.seller?.toString() === userId;
+    const isAdmin = role === "admin";
 
-    if (!isOwnerSeller) {
+    if (!isOwnerSeller && !isAdmin) {
       return handleResponse(
         res,
         403,
-        "Only the seller can assign a delivery partner for return pickup.",
+        "Only the seller or admin can assign a delivery partner for return pickup.",
       );
     }
 
@@ -1666,15 +1684,18 @@ export const assignReturnDelivery = async (req, res) => {
         ? deliveryBoyId.trim()
         : null;
 
-    if (role === "seller" && !riderId) {
+    // Sellers pick between broadcasting to nearby platform riders ("admin_rider")
+    // or handling the return themselves outside the app ("own", see submitReturnSelfCollection).
+    // Admins may still hand-pick a specific rider directly (no mode required).
+    if (isOwnerSeller && mode !== "admin_rider" && !riderId) {
       return handleResponse(
         res,
         400,
-        "Please select a delivery partner to assign return pickup.",
+        "Please choose how the return pickup should be handled.",
       );
     }
 
-    // If Admin/Seller manually specified a rider
+    // If Admin manually specified a rider
     if (riderId) {
       const partner = await Delivery.findById(riderId);
       if (!partner) {
@@ -1682,11 +1703,12 @@ export const assignReturnDelivery = async (req, res) => {
       }
       order.returnDeliveryBoy = riderId;
     } else {
-      // If undefined/empty object, we want nearby riders to pick it up via broadcast (available orders pool)
+      // Broadcast to nearby riders (available orders pool) — first to accept wins.
       // `orderQueryService` will serve orders where `returnStatus="return_pickup_assigned"` and `returnDeliveryBoy=null`
       order.returnDeliveryBoy = null;
     }
 
+    order.returnFulfillmentMode = "admin_rider";
     order.returnStatus = "return_pickup_assigned";
 
     await order.save();
@@ -1748,6 +1770,64 @@ export const assignReturnDelivery = async (req, res) => {
       "Return pickup assigned successfully",
       order,
     );
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+/* ===============================
+   SELF-COLLECT RETURN (Seller's own pickup, outside the app)
+================================ */
+export const submitReturnSelfCollection = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { id: userId, role } = req.user;
+    const { images, note } = req.body || {};
+
+    if (role !== "seller") {
+      return handleResponse(res, 403, "Only the seller can mark a return as self-collected.");
+    }
+
+    const orderKey = orderMatchQueryFromRouteParam(orderId);
+    if (!orderKey) return handleResponse(res, 404, "Order not found");
+
+    const order = await Order.findOne(orderKey);
+    if (!order) return handleResponse(res, 404, "Order not found");
+
+    if (order.seller?.toString() !== userId) {
+      return handleResponse(res, 403, "Only the seller can mark a return as self-collected.");
+    }
+
+    if (order.returnStatus !== "return_approved") {
+      return handleResponse(
+        res,
+        400,
+        "Self-collection can only be recorded for approved returns.",
+      );
+    }
+
+    if (!Array.isArray(images) || images.length === 0) {
+      return handleResponse(res, 400, "At least one proof image is required.");
+    }
+
+    const now = new Date();
+    order.returnFulfillmentMode = "own";
+    order.returnPickupImages = images.slice(0, 10);
+    if (note) order.returnPickupConditionNote = String(note).trim().slice(0, 500);
+    order.returnPickedAt = now;
+    order.returnDeliveredBackAt = now;
+    order.returnStatus = "returned";
+
+    await order.save();
+
+    emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_COMPLETED, {
+      orderId: order.orderId,
+      sellerId: order.seller,
+      customerId: order.customer,
+      data: { message: "Seller collected the product directly. Admin QC pending." },
+    });
+
+    return handleResponse(res, 200, "Return marked as self-collected. Admin will review the product.", order);
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }
@@ -1919,7 +1999,10 @@ export const completeReturnAndRefund = async (order) => {
   }
 
   // 2. Seller adjustment (cancel payout if on hold, else debit available balance)
-  if (order.seller && (refundAmount > 0 || commission > 0)) {
+  // Note: the return delivery commission is never billed to the seller here —
+  // the platform absorbs it for the admin_rider path (rider is credited below),
+  // and the "own" path has no in-app wallet transaction for it at all.
+  if (order.seller && refundAmount > 0) {
     const isHeld =
       order.settlementStatus?.sellerPayout === "HOLD" ||
       order.financeFlags?.sellerPayoutHeld;
@@ -1944,7 +2027,7 @@ export const completeReturnAndRefund = async (order) => {
       }
     } else {
       // If payment was already released (Available balance), we must debit to recover funds.
-      const adjustment = Math.max(0, refundAmount + commission);
+      const adjustment = Math.max(0, refundAmount);
       try {
         const { debitWallet } = await import("../services/finance/walletService.js");
         await debitWallet({
@@ -1958,7 +2041,7 @@ export const completeReturnAndRefund = async (order) => {
       }
     }
 
-    const adjustment = Math.max(0, refundAmount + commission);
+    const adjustment = Math.max(0, refundAmount);
     await Transaction.create({
       user: order.seller,
       userModel: "Seller",
