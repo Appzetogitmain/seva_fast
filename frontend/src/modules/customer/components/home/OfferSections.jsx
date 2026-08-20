@@ -12,15 +12,26 @@ import { mapProductForCustomerListing } from "../../utils/productPricing";
 const OfferSections = ({ sections }) => {
   if (!sections || sections.length === 0) return null;
 
+  const validSections = [...sections]
+    .map((section) => {
+      const sectionProducts = (section.productIds || [])
+        .filter((p) => typeof p === "object" && p !== null)
+        .map((p) => mapProductForCustomerListing(p));
+      return {
+        ...section,
+        sectionProducts,
+      };
+    })
+    .filter((section) => section.sectionProducts.length > 0)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  if (validSections.length === 0) return null;
+
   return (
     <div className="w-full px-0 pt-0 pb-2 md:pb-4">
-      {[...sections]
-        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-        .map((section) => {
-          const bgColor = getBackgroundColorByValue(section.backgroundColor);
-          const sectionProducts = (section.productIds || [])
-            .filter((p) => typeof p === "object" && p !== null)
-            .map((p) => mapProductForCustomerListing(p));
+      {validSections.map((section) => {
+        const bgColor = getBackgroundColorByValue(section.backgroundColor);
+        const { sectionProducts } = section;
 
           return (
             <motion.div

@@ -15,6 +15,8 @@ import {
   buildHeaderGradient,
   buildMiniCartColor,
   buildSearchBarBackgroundColor,
+  getContrastingColor,
+  isLightColor,
   shiftHex,
 } from "../../utils/headerTheme";
 import LogoImage from "../../../../assets/Logo.png";
@@ -40,12 +42,13 @@ function buildActiveTabPath(l, r) {
 function CategoryNavColumn({
   cat,
   isActive,
-  categoryAccent,
+  categoryAccent = "#0F172A",
   onCategorySelect,
-  headerFontColor,
-  headerIconColor,
+  headerFontColor = "#0F172A",
+  headerIconColor = "#0F172A",
 }) {
-  const iconColor = headerIconColor || "#111111";
+  const iconColor = "#0F172A";
+  const fontColor = "#0F172A";
   const colRef = useRef(null);
   const labelRef = useRef(null);
   const [lr, setLr] = useState({ l: 22, r: 78 });
@@ -84,17 +87,23 @@ function CategoryNavColumn({
       }}
       onClick={() => onCategorySelect && onCategorySelect(cat)}
       style={{
-        borderBottomColor: isActive ? "transparent" : categoryAccent,
+        borderBottomColor: isActive ? "transparent" : "rgba(15, 23, 42, 0.18)",
       }}
       className="relative z-[2] flex min-w-[48px] shrink-0 cursor-pointer flex-col items-center gap-0.5 border-b-2 px-2 pb-0.5 pt-0.5 snap-start md:min-w-[58px]">
       <div className="relative z-10 flex h-9 w-9 items-center justify-center md:h-11 md:w-11">
         {typeof cat.icon === "function" ||
           (typeof cat.icon === "object" && cat.icon.$$typeof) ? (
           <cat.icon
+            color="#0F172A"
+            size={22}
+            stroke="#0F172A"
+            className="text-[#0F172A]"
+            style={{ color: "#0F172A", fill: "currentColor" }}
             sx={{
               fontSize: { xs: 20, md: 24 },
-              color: iconColor,
-              opacity: isActive ? 1 : 0.62,
+              color: "#0F172A",
+              fill: "#0F172A",
+              opacity: isActive ? 1 : 0.72,
               transition: "opacity 0.2s, transform 0.2s",
             }}
           />
@@ -104,7 +113,7 @@ function CategoryNavColumn({
             alt={cat.name}
             loading="lazy"
             className="h-5 w-5 object-contain md:h-6 md:w-6"
-            style={{ opacity: isActive ? 1 : 0.62 }}
+            style={{ opacity: isActive ? 1 : 0.72 }}
           />
         )}
       </div>
@@ -112,12 +121,12 @@ function CategoryNavColumn({
         <span
           ref={labelRef}
           className={cn(
-            "relative z-10 mx-auto block max-w-[72px] truncate px-1 pb-0.5 text-center text-[8px] uppercase tracking-tight md:max-w-[88px] md:text-[10px]",
-            isActive ? "font-black" : "font-semibold",
+            "relative z-10 mx-auto block max-w-[72px] truncate px-1 pb-0.5 text-center text-[8.5px] uppercase tracking-tight md:max-w-[88px] md:text-[10px]",
+            isActive ? "font-black drop-shadow-xs" : "font-bold",
           )}
           style={{
-            color: isActive ? iconColor : (headerFontColor || "#111111"),
-            opacity: isActive ? 1 : 0.68,
+            color: "#0F172A",
+            opacity: isActive ? 1 : 0.78,
           }}>
           {cat.name}
         </span>
@@ -136,8 +145,8 @@ function CategoryNavColumn({
           <path
             d={pathD}
             fill="none"
-            stroke={categoryAccent}
-            strokeWidth="2"
+            stroke="#0F172A"
+            strokeWidth="2.5"
             strokeLinecap="butt"
             strokeLinejoin="round"
           />
@@ -287,12 +296,14 @@ const MainLocationHeader = ({
   );
 
   const baseHeaderColor = activeCategory?.headerColor || "var(--primary)";
-  const headerFontColor = activeCategory?.headerFontColor || "#111827";
-  const headerIconColor = activeCategory?.headerIconColor || "#111111";
+  const isLightBg = isLightColor(baseHeaderColor);
+
+  const headerFontColor = "#0F172A";
+  const headerIconColor = "#0F172A";
+  const categoryAccent = "#0F172A";
 
   const headerGradient = buildHeaderGradient(baseHeaderColor);
   const searchBarBg = buildSearchBarBackgroundColor(baseHeaderColor);
-  const categoryAccent = headerIconColor;
 
   useEffect(() => {
     const c = buildMiniCartColor(baseHeaderColor);
@@ -582,6 +593,7 @@ const MainLocationHeader = ({
                     onCategorySelect={onCategorySelect}
                     headerFontColor={headerFontColor}
                     headerIconColor={headerIconColor}
+                    isLightBg={isLightBg}
                   />
                 );
               })}

@@ -13,6 +13,9 @@ import PetsIcon from "@mui/icons-material/Pets";
 import SportsSoccerIcon from "@mui/icons-material/SportsSoccer";
 import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import SpaIcon from "@mui/icons-material/Spa";
+import LocalCafeIcon from "@mui/icons-material/LocalCafe";
+import CheckroomIcon from "@mui/icons-material/Checkroom";
 
 import { motion, useScroll, useTransform } from "framer-motion";
 import { isMobileOrWebView } from "@/core/utils/deviceUtils";
@@ -37,6 +40,7 @@ import { mapProductForCustomerListing } from "../utils/productPricing";
 import LowestPriceSection from "../components/home/LowestPriceSection";
 import OfferSections from "../components/home/OfferSections";
 import PlatformBannerSlider from "../components/home/PlatformBannerSlider";
+import LocalServiceProvidersSection from "../components/home/LocalServiceProvidersSection";
 import ServiceUnavailableSection from "@shared/components/ServiceUnavailableSection";
 import { CustomPhotoOrderModal } from "../components/shared/CustomPhotoOrderModal";
 
@@ -130,6 +134,31 @@ const CATEGORY_METADATA = {
       accent: "text-brand-900",
     },
     banner: { title: "SPORTS", subtitle: "GEAR", floatingElements: "confetti" },
+  },
+  Beauty: {
+    icon: SpaIcon,
+    theme: DEFAULT_CATEGORY_THEME,
+    banner: { title: "BEAUTY", subtitle: "GLOW & CARE", floatingElements: "sparkles" },
+  },
+  "Beauty & Cosmetics": {
+    icon: SpaIcon,
+    theme: DEFAULT_CATEGORY_THEME,
+    banner: { title: "BEAUTY & COSMETICS", subtitle: "GLOW & CARE", floatingElements: "sparkles" },
+  },
+  "Baby Care": {
+    icon: ChildCareIcon,
+    theme: DEFAULT_CATEGORY_THEME,
+    banner: { title: "BABY CARE", subtitle: "LITTLE ONE", floatingElements: "bubbles" },
+  },
+  Food: {
+    icon: LocalCafeIcon,
+    theme: DEFAULT_CATEGORY_THEME,
+    banner: { title: "FOOD & DRINKS", subtitle: "FRESH & DELICIOUS", floatingElements: "sparkles" },
+  },
+  Fashion: {
+    icon: CheckroomIcon,
+    theme: DEFAULT_CATEGORY_THEME,
+    banner: { title: "FASHION", subtitle: "TRENDING STYLES", floatingElements: "sparkles" },
   },
 };
 
@@ -304,9 +333,11 @@ const Home = () => {
         nextHomeData.subcategoryMap = subMap;
         nextHomeData.headerCategoryMap = headerToCategories;
         const formattedHeaders = dbCats.filter((cat) => cat.type === "header").map((cat) => {
-          const catName = cat.name;
-          const meta = CATEGORY_METADATA[catName] || CATEGORY_METADATA[catName.toUpperCase()] || { icon: Sparkles, theme: DEFAULT_CATEGORY_THEME, banner: { title: catName.toUpperCase(), subtitle: "TOP PICKS", floatingElements: "sparkles" } };
-          const IconComp = (cat.iconId && ICON_COMPONENTS[cat.iconId]) || meta.icon || Sparkles;
+          const catName = cat.name || "";
+          const normalized = catName.trim().toLowerCase();
+          const matchedKey = Object.keys(CATEGORY_METADATA).find(k => k.toLowerCase() === normalized || normalized.includes(k.toLowerCase()));
+          const meta = (matchedKey && CATEGORY_METADATA[matchedKey]) || CATEGORY_METADATA[catName] || { icon: SpaIcon, theme: DEFAULT_CATEGORY_THEME, banner: { title: catName.toUpperCase(), subtitle: "TOP PICKS", floatingElements: "sparkles" } };
+          const IconComp = (cat.iconId && ICON_COMPONENTS[cat.iconId]) || meta.icon || SpaIcon;
           return { ...cat, id: cat._id, icon: IconComp, theme: meta.theme, banner: { ...meta.banner, textColor: "text-white" } };
         });
         nextHomeData.formattedHeaders = formattedHeaders;
@@ -486,7 +517,7 @@ const Home = () => {
   };
 
   return (
-    <div className={`min-h-screen pt-[190px] md:pt-[250px] ${products.length === 0 && !isLoading ? "bg-white" : "bg-[#F5F7F8]"}`}>
+    <div className={`min-h-screen pt-[208px] sm:pt-[216px] md:pt-[250px] ${products.length === 0 && !isLoading ? "bg-white" : "bg-[#F5F7F8]"}`}>
       <div className={cn("contents", isProductDetailOpen && "hidden md:contents")}>
         <MainLocationHeader categories={categories} activeCategory={activeCategory} onCategorySelect={setActiveCategory} />
       </div>
@@ -495,21 +526,13 @@ const Home = () => {
         <ServiceUnavailableSection embedded />
       ) : (
         <>
-            <motion.div ref={heroRef} className="block md:hidden will-change-transform" style={isMobile ? { opacity: 1 } : { opacity, y, scale, pointerEvents }}>
-              <div className="relative w-full overflow-hidden">
-                {heroConfig.banners?.items?.length ? (
+            {heroConfig.banners?.items?.length > 0 && (
+              <motion.div ref={heroRef} className="block md:hidden will-change-transform" style={isMobile ? { opacity: 1 } : { opacity, y, scale, pointerEvents }}>
+                <div className="relative w-full overflow-hidden">
                   <ExperienceBannerCarousel section={{ title: "" }} items={heroConfig.banners.items} fullWidth edgeToEdge />
-                ) : (
-                  <div className="w-full h-[190px] bg-[#ecfeff] p-6 relative overflow-hidden flex items-center border-y border-primary/10 shadow-sm">
-                    <div className="relative z-10 w-3/5 flex flex-col items-start gap-2">
-                      <h4 className="text-2xl font-black text-[#1A1A1A] tracking-tight">Get <span className="text-primary">Products</span></h4>
-                      <button className="bg-[#FF1E56] text-white px-6 py-2.5 rounded-2xl font-black text-xs tracking-wide">Order now</button>
-                    </div>
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl -mt-12 -mr-12" />
-                  </div>
-                )}
-              </div>
-            </motion.div>
+                </div>
+              </motion.div>
+            )}
 
           <PromoMarquee />
           <div className="px-4 lg:px-8 max-w-7xl mx-auto">
@@ -522,8 +545,11 @@ const Home = () => {
             )}
             <OfferSections sections={offerSections} />
 
+            {/* Local Service Providers Section */}
+            <LocalServiceProvidersSection />
+
             {sectionsForRenderer.length > 0 && (
-              <div className="flex flex-col relative z-20 pb-32">
+              <div className="flex flex-col relative z-20 pb-32 mt-3 sm:mt-4">
                 <SectionRenderer sections={sectionsForRenderer} productsById={productsById} categoriesById={categoryMap} subcategoriesById={subcategoryMap} />
               </div>
             )}

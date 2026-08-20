@@ -18,7 +18,7 @@ const QuickCategorySlider = ({ categories, onCategoryClick }) => {
   if (!categories || categories.length === 0) return null;
 
   return (
-    <div className="w-full mb-5 -mt-[24px] md:mt-3 overflow-hidden relative group z-20">
+    <div className="w-full mb-4 sm:mb-5 mt-1 sm:mt-2 md:mt-3 overflow-hidden relative group z-20">
       <div
         className="relative overflow-hidden bg-white shadow-[0_14px_28px_rgba(15,23,42,0.09)]"
         style={{

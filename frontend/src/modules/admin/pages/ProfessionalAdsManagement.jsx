@@ -23,8 +23,10 @@ import {
     ChevronDown,
     X,
     Upload,
-    User
+    User,
+    Crop
 } from 'lucide-react';
+import ImageCropperModal from '@shared/components/ui/ImageCropperModal';
 
 const ProfessionalAdsManagement = () => {
     const { showToast } = useToast();
@@ -41,6 +43,8 @@ const ProfessionalAdsManagement = () => {
     const [categoryPriceType, setCategoryPriceType] = useState('free');
     const [categoryPrice, setCategoryPrice] = useState('');
     const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+    const [cropModalOpen, setCropModalOpen] = useState(false);
+    const [imageToCrop, setImageToCrop] = useState(null);
 
     // Ads Moderation State
     const [ads, setAds] = useState([]);
@@ -132,30 +136,53 @@ const ProfessionalAdsManagement = () => {
         setIsCategoryModalOpen(true);
     };
 
-    const handleUploadIconFile = async (e) => {
-        const file = e.target.files[0];
+    const handleSelectIconFile = (e) => {
+        const file = e.target.files?.[0];
         if (!file) return;
 
+        if (file.size > 25 * 1024 * 1024) {
+            showToast('File size is too large! Please choose a smaller image.', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            setImageToCrop(reader.result);
+            setCropModalOpen(true);
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    };
+
+    const handleCropComplete = async (croppedFile) => {
+        setCropModalOpen(false);
         try {
             setIsUploadingIcon(true);
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', croppedFile);
 
             const res = await adminApi.uploadMedia(formData);
             if (res.data?.success && (res.data.result?.secureUrl || res.data.result?.url)) {
                 setCategoryIcon(res.data.result.secureUrl || res.data.result.url);
-                showToast('Icon uploaded successfully', 'success');
+                showToast('Image cropped & uploaded successfully', 'success');
             } else if (res.data?.secureUrl || res.data?.url) {
                 setCategoryIcon(res.data.secureUrl || res.data.url);
-                showToast('Icon uploaded successfully', 'success');
+                showToast('Image cropped & uploaded successfully', 'success');
             } else {
-                showToast('Failed to upload image', 'error');
+                showToast('Failed to upload cropped image', 'error');
             }
         } catch (error) {
             console.error("Icon upload error:", error);
-            showToast('Error uploading icon file', 'error');
+            showToast('Error uploading image file', 'error');
         } finally {
             setIsUploadingIcon(false);
+        }
+    };
+
+    const handleOpenCropperForExisting = () => {
+        if (categoryIcon && categoryIcon.startsWith('http')) {
+            setImageToCrop(categoryIcon);
+            setCropModalOpen(true);
         }
     };
 
@@ -683,6 +710,19 @@ const ProfessionalAdsManagement = () => {
                                         placeholder="e.g. 🔧 or Image URL"
                                         className="flex-1 px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                     />
+                                    
+                                    {categoryIcon && categoryIcon.startsWith('http') && (
+                                        <button
+                                            type="button"
+                                            onClick={handleOpenCropperForExisting}
+                                            className="h-14 px-3 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-[16px] border border-amber-200 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                                            title="Crop & Re-position image"
+                                        >
+                                            <Crop className="h-4 w-4" />
+                                            <span className="hidden sm:inline">Crop</span>
+                                        </button>
+                                    )}
+
                                     <label className="cursor-pointer shrink-0 flex flex-col items-center justify-center h-14 w-14 bg-slate-50 hover:bg-slate-100 border border-slate-200 border-dashed rounded-[16px] transition-all relative overflow-hidden group">
                                         {isUploadingIcon ? (
                                             <Loader2 className="h-5 w-5 text-brand-500 animate-spin" />
@@ -691,14 +731,14 @@ const ProfessionalAdsManagement = () => {
                                         ) : (
                                             <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-slate-600">
                                                 <Upload className="h-5 w-5" />
-                                                <span className="text-[8px] font-black uppercase mt-0.5">File</span>
+                                                <span className="text-[8px] font-black uppercase mt-0.5">Upload</span>
                                             </div>
                                         )}
                                         <input
                                             type="file"
                                             accept="image/*"
                                             className="hidden"
-                                            onChange={handleUploadIconFile}
+                                            onChange={handleSelectIconFile}
                                             disabled={isUploadingIcon}
                                         />
                                     </label>
@@ -1142,6 +1182,16 @@ const ProfessionalAdsManagement = () => {
                     </div>
                 </div>
             )}
+
+            {/* IMAGE CROPPER MODAL */}
+            <ImageCropperModal
+                isOpen={cropModalOpen}
+                imageSrc={imageToCrop}
+                aspectRatio={16 / 10}
+                title="Crop Service Category Image"
+                onCropComplete={handleCropComplete}
+                onClose={() => setCropModalOpen(false)}
+            />
         </div>
     );
 };

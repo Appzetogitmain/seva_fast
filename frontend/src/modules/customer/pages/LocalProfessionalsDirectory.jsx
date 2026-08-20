@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { customerApi } from '../services/customerApi';
 import { useToast } from '@shared/components/ui/Toast';
 import {
@@ -20,17 +20,27 @@ import {
 
 const LocalProfessionalsDirectory = () => {
     const { showToast } = useToast();
+    const [searchParams] = useSearchParams();
+    const urlCategoryId = searchParams.get('categoryId') || searchParams.get('category') || '';
+
     const [isLoading, setIsLoading] = useState(true);
     const [categories, setCategories] = useState([]);
     const [professionals, setProfessionals] = useState([]);
 
     // Search & Filter State
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategoryId, setSelectedCategoryId] = useState('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState(urlCategoryId);
     const [selectedCity, setSelectedCity] = useState('Indore'); // Default to Indore
     const [lat, setLat] = useState('');
     const [lng, setLng] = useState('');
     const [isGeoActive, setIsGeoActive] = useState(false);
+
+    useEffect(() => {
+        const idFromUrl = searchParams.get('categoryId') || searchParams.get('category') || '';
+        if (idFromUrl) {
+            setSelectedCategoryId(idFromUrl);
+        }
+    }, [searchParams]);
 
     // Selected professional catalog view modal state
     const [activeCatalogProfessional, setActiveCatalogProfessional] = useState(null);

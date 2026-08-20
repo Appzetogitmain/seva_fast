@@ -72,7 +72,7 @@ const SectionRenderer = ({ sections = [], productsById = {}, categoriesById = {}
           const items = section.config?.banners?.items || [];
           if (!items.length) return null;
           return (
-            <div key={section._id || sectionKey} className="-mt-8 md:-mt-8">
+            <div key={section._id || sectionKey} className="my-2 sm:my-3">
               <ExperienceBannerCarousel section={section} items={items} slideGap={12} />
             </div>
           );
