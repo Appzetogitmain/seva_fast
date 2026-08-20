@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, X, ChevronDown, Sparkles, Crop, ZoomIn, ZoomOut, Check, RotateCw, MessageSquare, ChevronRight, History } from 'lucide-react';
+import {
+    Camera, X, ChevronDown, Sparkles, Crop, ZoomIn, ZoomOut,
+    Check, MessageSquare, ChevronRight, History, Upload,
+    MapPin, Store, FileText, Send, ImagePlus, Trash2
+} from 'lucide-react';
 import axiosInstance from '@core/api/axios';
 import { useAuth } from '@core/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-// Helper to compress camera/large photos before upload
+/* ─── image compression helper ─── */
 const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) => {
     if (!file.type.startsWith('image/')) return file;
 
@@ -37,10 +41,7 @@ const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 
 
                 canvas.toBlob(
                     (blob) => {
-                        if (!blob) {
-                            resolve(file);
-                            return;
-                        }
+                        if (!blob) { resolve(file); return; }
                         const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
                             type: 'image/jpeg',
                             lastModified: Date.now(),
@@ -57,6 +58,8 @@ const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 
     });
 };
 
+/* ════════════════════════════════════════════════════════════ */
+
 export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     const { isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
@@ -71,7 +74,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Crop state
+    /* crop state */
     const [isCropping, setIsCropping] = useState(false);
     const [rawImageSrc, setRawImageSrc] = useState(null);
     const [zoom, setZoom] = useState(1);
@@ -82,9 +85,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     const cropImgRef = useRef(null);
 
     useEffect(() => {
-        if (isOpen && city.length > 2) {
-            fetchSellers();
-        }
+        if (isOpen && city.length > 2) fetchSellers();
     }, [city, isOpen]);
 
     const fetchSellers = async () => {
@@ -96,15 +97,14 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
         }
     };
 
+    /* ─── file & crop handlers ─── */
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
             const selectedFile = e.target.files[0];
-            
             if (selectedFile.size > 25 * 1024 * 1024) {
                 toast.error("Photo size bahut badi hai! Kripya choti photo upload karein.");
                 return;
             }
-
             const reader = new FileReader();
             reader.onload = () => {
                 setRawImageSrc(reader.result);
@@ -116,60 +116,40 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
         }
     };
 
-    // Crop dragging
     const handleMouseDown = (e) => {
         setIsDragging(true);
         const clientX = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
         const clientY = e.clientY || (e.touches && e.touches[0]?.clientY) || 0;
         setDragStart({ x: clientX - cropOffset.x, y: clientY - cropOffset.y });
     };
-
     const handleMouseMove = (e) => {
         if (!isDragging) return;
         const clientX = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
         const clientY = e.clientY || (e.touches && e.touches[0]?.clientY) || 0;
-        setCropOffset({
-            x: clientX - dragStart.x,
-            y: clientY - dragStart.y,
-        });
+        setCropOffset({ x: clientX - dragStart.x, y: clientY - dragStart.y });
     };
-
-    const handleMouseUp = () => {
-        setIsDragging(false);
-    };
+    const handleMouseUp = () => setIsDragging(false);
 
     const handleApplyCrop = async () => {
         if (!cropContainerRef.current || !cropImgRef.current) return;
-        
         try {
             const container = cropContainerRef.current.getBoundingClientRect();
             const img = cropImgRef.current;
-
             const canvas = document.createElement('canvas');
-            const targetWidth = 800;
-            const targetHeight = 800;
-            canvas.width = targetWidth;
-            canvas.height = targetHeight;
+            const targetWidth = 800, targetHeight = 800;
+            canvas.width = targetWidth; canvas.height = targetHeight;
             const ctx = canvas.getContext('2d');
-
             const renderedImgRect = img.getBoundingClientRect();
-            
             const scaleX = img.naturalWidth / renderedImgRect.width;
             const scaleY = img.naturalHeight / renderedImgRect.height;
-
             const sx = (container.left - renderedImgRect.left) * scaleX;
             const sy = (container.top - renderedImgRect.top) * scaleY;
             const sWidth = container.width * scaleX;
             const sHeight = container.height * scaleY;
-
             ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
-
             canvas.toBlob(async (blob) => {
                 if (blob) {
-                    const croppedFile = new File([blob], `order_photo_${Date.now()}.jpg`, {
-                        type: 'image/jpeg',
-                        lastModified: Date.now(),
-                    });
+                    const croppedFile = new File([blob], `order_photo_${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
                     const compressed = await compressImage(croppedFile);
                     setFile(compressed);
                     setFilePreview(URL.createObjectURL(compressed));
@@ -183,355 +163,314 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
             setIsCropping(false);
         }
     };
+    const handleCancelCrop = () => { setIsCropping(false); setRawImageSrc(null); };
 
-    const handleCancelCrop = () => {
-        setIsCropping(false);
-        setRawImageSrc(null);
-    };
-
+    /* ─── submit ─── */
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        // 1. Check if user is logged in
-        if (!isAuthenticated || !user) {
-            toast.error("Please login first to send photo order!");
-            onClose();
-            navigate('/login');
-            return;
-        }
-
+        if (!isAuthenticated || !user) { toast.error("Please login first to send photo order!"); onClose(); navigate('/login'); return; }
         if (!file && !notes.trim()) return toast.error("Please provide an image or write an enquiry");
         if (!selectedSellerId) return toast.error("Please select a seller");
 
         try {
             setIsSubmitting(true);
-            
             let photoUrl = "";
             if (file) {
-                if (file.size > 10 * 1024 * 1024) {
-                    toast.error("Photo size bahut badi hai (Max 10MB)! Kripya choti photo upload karein.");
-                    setIsSubmitting(false);
-                    return;
-                }
-
+                if (file.size > 10 * 1024 * 1024) { toast.error("Photo size bahut badi hai (Max 10MB)!"); setIsSubmitting(false); return; }
                 setIsUploading(true);
                 const formData = new FormData();
                 formData.append('file', file);
-                
-                const uploadRes = await axiosInstance.post('/media/upload', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-                
+                const uploadRes = await axiosInstance.post('/media/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
                 photoUrl = uploadRes.data.result.url;
                 setIsUploading(false);
             }
-
-            await axiosInstance.post('/photo-orders', {
-                sellerId: selectedSellerId,
-                photoUrl,
-                notes,
-                city
-            });
-
+            await axiosInstance.post('/photo-orders', { sellerId: selectedSellerId, photoUrl, notes, city });
             toast.success("Enquiry/Order sent to seller!");
-            setIsSubmitting(false);
-            setIsUploading(false);
-            onClose();
-            // Reset
-            setFile(null);
-            setFilePreview('');
-            setCity('');
-            setSelectedSellerId('');
-            setNotes('');
-            // Direct navigate to orders page photo tab
+            setIsSubmitting(false); setIsUploading(false); onClose();
+            setFile(null); setFilePreview(''); setCity(''); setSelectedSellerId(''); setNotes('');
             navigate('/orders?tab=photo');
         } catch (error) {
-            setIsUploading(false);
-            setIsSubmitting(false);
-
+            setIsUploading(false); setIsSubmitting(false);
             const status = error.response?.status;
-            if (status === 401 || status === 403) {
-                toast.error("Please login first!");
-                onClose();
-                navigate('/login');
-            } else if (error.response?.data?.message?.includes("file size") || error.response?.data?.message?.includes("File too large")) {
+            if (status === 401 || status === 403) { toast.error("Please login first!"); onClose(); navigate('/login'); }
+            else if (error.response?.data?.message?.includes("file size") || error.response?.data?.message?.includes("File too large")) {
                 toast.error("Photo size bahut badi hai! Kripya choti photo select karein.");
-            } else {
-                toast.error(error.response?.data?.message || "Order bhejne me samasya aayi. Kripya punah prayas karein.");
-            }
+            } else { toast.error(error.response?.data?.message || "Order bhejne me samasya aayi. Kripya punah prayas karein."); }
         }
     };
 
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl relative animate-in fade-in zoom-in duration-200">
-                
-                {/* Image Cropper View */}
-                {isCropping && rawImageSrc ? (
-                    <div className="flex flex-col h-full bg-slate-900 text-white select-none">
-                        <div className="p-4 flex items-center justify-between border-b border-slate-800">
-                            <div className="flex items-center gap-2">
-                                <Crop size={18} className="text-brand-400" />
-                                <span className="font-semibold text-sm">Crop & Adjust Photo</span>
+    const selectedSeller = sellers.find(s => s._id === selectedSellerId);
+
+    /* ─────────── CROP VIEW ─────────── */
+    if (isCropping && rawImageSrc) {
+        return (
+            <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/70 backdrop-blur-md p-3">
+                <div className="bg-slate-900 rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
+                    <div className="p-4 flex items-center justify-between border-b border-white/10">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+                                <Crop size={16} className="text-white" />
                             </div>
-                            <button onClick={handleCancelCrop} className="p-1.5 hover:bg-slate-800 rounded-full text-slate-400">
-                                <X size={18} />
+                            <div>
+                                <p className="font-bold text-sm text-white">Crop & Adjust</p>
+                                <p className="text-[10px] text-slate-400">Drag to reposition • Zoom to resize</p>
+                            </div>
+                        </div>
+                        <button onClick={handleCancelCrop} className="p-2 hover:bg-white/10 rounded-full text-slate-400 transition-colors">
+                            <X size={18} />
+                        </button>
+                    </div>
+
+                    <div
+                        className="relative w-full h-72 bg-black flex items-center justify-center overflow-hidden cursor-move touch-none"
+                        onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
+                        onTouchStart={handleMouseDown} onTouchMove={handleMouseMove} onTouchEnd={handleMouseUp}
+                    >
+                        <img ref={cropImgRef} src={rawImageSrc} alt="Crop target"
+                            style={{ transform: `translate(${cropOffset.x}px, ${cropOffset.y}px) scale(${zoom})`, maxWidth: 'none', maxHeight: 'none', userSelect: 'none', pointerEvents: 'none' }}
+                            className="transition-transform duration-75"
+                        />
+                        <div ref={cropContainerRef}
+                            className="absolute pointer-events-none w-56 h-56 border-2 border-dashed border-white/80 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"
+                        />
+                    </div>
+
+                    <div className="p-4 bg-slate-950/80 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <ZoomOut size={16} className="text-slate-400 shrink-0" />
+                            <input type="range" min="0.8" max="3" step="0.05" value={zoom}
+                                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                            />
+                            <ZoomIn size={16} className="text-slate-400 shrink-0" />
+                        </div>
+                        <div className="flex gap-3">
+                            <button type="button" onClick={handleCancelCrop}
+                                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-sm transition-colors">
+                                Cancel
                             </button>
-                        </div>
-
-                        {/* Crop Area */}
-                        <div 
-                            className="relative w-full h-72 bg-black flex items-center justify-center overflow-hidden cursor-move touch-none"
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onTouchStart={handleMouseDown}
-                            onTouchMove={handleMouseMove}
-                            onTouchEnd={handleMouseUp}
-                        >
-                            <img
-                                ref={cropImgRef}
-                                src={rawImageSrc}
-                                alt="Crop target"
-                                style={{
-                                    transform: `translate(${cropOffset.x}px, ${cropOffset.y}px) scale(${zoom})`,
-                                    maxWidth: 'none',
-                                    maxHeight: 'none',
-                                    userSelect: 'none',
-                                    pointerEvents: 'none',
-                                }}
-                                className="transition-transform duration-75"
-                            />
-                            {/* Visual Crop Frame */}
-                            <div 
-                                ref={cropContainerRef}
-                                className="absolute pointer-events-none w-56 h-56 border-2 border-dashed border-white/80 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.6)]"
-                            />
-                        </div>
-
-                        {/* Controls */}
-                        <div className="p-4 bg-slate-950 space-y-4">
-                            <div className="flex items-center gap-3">
-                                <ZoomOut size={16} className="text-slate-400" />
-                                <input
-                                    type="range"
-                                    min="0.8"
-                                    max="3"
-                                    step="0.05"
-                                    value={zoom}
-                                    onChange={(e) => setZoom(parseFloat(e.target.value))}
-                                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                                />
-                                <ZoomIn size={16} className="text-slate-400" />
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button
-                                    type="button"
-                                    onClick={handleCancelCrop}
-                                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-sm transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleApplyCrop}
-                                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg transition-all"
-                                >
-                                    <Check size={16} /> Apply Crop
-                                </button>
-                            </div>
+                            <button type="button" onClick={handleApplyCrop}
+                                className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg transition-all">
+                                <Check size={16} /> Apply Crop
+                            </button>
                         </div>
                     </div>
-                ) : (
-                    /* Main Form */
-                    <>
-                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                <Camera size={18} className="text-brand-600" />
-                                Custom Photo Order
-                            </h3>
-                            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500">
-                                <X size={18} />
-                            </button>
-                        </div>
+                </div>
+            </div>
+        );
+    }
 
-                        {/* 2 Options Bar */}
-                        <div className="flex border-b border-slate-200 bg-white">
-                            <button
-                                type="button"
-                                className="flex-1 py-3 text-xs sm:text-sm font-bold border-b-2 border-brand-600 text-brand-600 flex items-center justify-center gap-1.5 bg-brand-50/50"
-                            >
-                                <Camera size={16} /> 1. Send New Photo
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onClose();
-                                    navigate('/orders?tab=photo');
-                                }}
-                                className="flex-1 py-3 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50 flex items-center justify-center gap-1.5 transition-all group"
-                            >
-                                <MessageSquare size={16} className="text-indigo-600 group-hover:scale-110 transition-transform" />
-                                <span>2. My Orders & Chats</span>
-                                <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                            </button>
-                        </div>
+    /* ─────────── MAIN FORM VIEW ─────────── */
+    return (
+        <div className="fixed inset-0 z-[600] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl relative animate-in fade-in slide-in-from-bottom-4 duration-300 max-h-[92vh]">
 
-                        <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
-                            {/* Shortcut card to My Orders */}
-                            <div 
-                                onClick={() => {
-                                    onClose();
-                                    navigate('/orders?tab=photo');
-                                }}
-                                className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:border-indigo-300 transition-all shadow-sm group"
-                            >
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                                        <History size={16} />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-800">Track Previous Photo Orders</p>
-                                        <p className="text-[11px] text-slate-500 font-medium">Check seller replies, quotes & chat</p>
-                                    </div>
-                                </div>
-                                <span className="text-xs font-bold text-indigo-600 flex items-center group-hover:translate-x-1 transition-transform">
-                                    View Orders <ChevronRight size={14} />
-                                </span>
+                {/* ── Gradient Header ── */}
+                <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 px-5 py-4">
+                    {/* decorative circles */}
+                    <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 blur-sm" />
+                    <div className="absolute -left-4 -bottom-8 w-20 h-20 rounded-full bg-white/5" />
+
+                    <div className="relative flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/30">
+                                <Camera size={20} className="text-white" />
                             </div>
-
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Your City</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="Type your city to find sellers..." 
-                                    value={city} 
-                                    onChange={(e) => setCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-brand-500 outline-none transition-colors"
-                                />
+                                <h3 className="font-bold text-white text-base tracking-tight">Custom Photo Order</h3>
+                                <p className="text-[11px] text-indigo-200 font-medium">Send enquiry with photo to any seller</p>
                             </div>
-                            
-                            {city.length > 2 && (
-                                <div className="relative">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Select Seller</label>
-                                    <div className="relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsOpenDropdown(!isOpenDropdown)}
-                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-brand-500 outline-none transition-colors text-left flex items-center justify-between font-semibold text-slate-700"
-                                        >
-                                            <span>
-                                                {selectedSellerId 
-                                                    ? `${sellers.find(s => s._id === selectedSellerId)?.name || 'Seller'} (${sellers.find(s => s._id === selectedSellerId)?.shopName || 'Store'})` 
-                                                    : '-- Choose a seller --'
-                                                }
-                                            </span>
-                                            <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${isOpenDropdown ? 'rotate-180' : ''}`} />
-                                        </button>
+                        </div>
+                        <button onClick={onClose}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 text-white/80 transition-colors">
+                            <X size={16} />
+                        </button>
+                    </div>
+                </div>
 
-                                        {isOpenDropdown && (
-                                            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                                                <div 
-                                                    onClick={() => {
-                                                        setSelectedSellerId('');
-                                                        setIsOpenDropdown(false);
-                                                    }}
-                                                    className="px-4 py-2.5 hover:bg-slate-50 text-xs font-semibold text-slate-400 cursor-pointer transition-colors"
-                                                >
-                                                    -- Choose a seller --
-                                                </div>
-                                                {sellers.length === 0 ? (
-                                                    <div className="px-4 py-3 text-xs font-semibold text-slate-400 text-center">
-                                                        No enabled sellers found in this city
+                {/* ── Track Orders Banner ── */}
+                <div
+                    onClick={() => { onClose(); navigate('/orders?tab=photo'); }}
+                    className="mx-4 mt-4 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/70 rounded-xl px-3.5 py-3 flex items-center gap-3 cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all group active:scale-[0.98]"
+                >
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-200">
+                        <History size={17} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-bold text-slate-800 leading-tight">Track Previous Orders</p>
+                        <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">View replies, quotes & chat with sellers</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-amber-600">
+                        <span className="text-[11px] font-bold hidden sm:inline">View</span>
+                        <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                </div>
+
+                {/* ── Form Body ── */}
+                <form onSubmit={handleSubmit} className="px-4 pt-4 pb-5 space-y-4 overflow-y-auto flex-1">
+
+                    {/* City Input */}
+                    <div className="space-y-1.5">
+                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            <MapPin size={12} className="text-indigo-500" />
+                            Your City
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Type your city to find sellers..."
+                            value={city}
+                            onChange={(e) => setCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                        />
+                    </div>
+
+                    {/* Seller Dropdown */}
+                    {city.length > 2 && (
+                        <div className="space-y-1.5 relative">
+                            <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                <Store size={12} className="text-indigo-500" />
+                                Select Seller
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setIsOpenDropdown(!isOpenDropdown)}
+                                className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm outline-none transition-all text-left flex items-center justify-between font-semibold ${
+                                    isOpenDropdown ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200'
+                                } ${selectedSellerId ? 'text-slate-800' : 'text-slate-400'}`}
+                            >
+                                <span className="truncate">
+                                    {selectedSeller
+                                        ? `${selectedSeller.name} — ${selectedSeller.shopName || 'Store'}`
+                                        : '— Choose a seller —'}
+                                </span>
+                                <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 shrink-0 ml-2 ${isOpenDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {isOpenDropdown && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-1 duration-150">
+                                    <div onClick={() => { setSelectedSellerId(''); setIsOpenDropdown(false); }}
+                                        className="px-4 py-2.5 hover:bg-slate-50 text-xs font-medium text-slate-400 cursor-pointer transition-colors">
+                                        — Choose a seller —
+                                    </div>
+                                    {sellers.length === 0 ? (
+                                        <div className="px-4 py-4 text-center">
+                                            <Store size={20} className="text-slate-300 mx-auto mb-1.5" />
+                                            <p className="text-xs font-semibold text-slate-400">No sellers found in this city</p>
+                                        </div>
+                                    ) : (
+                                        sellers.map(s => (
+                                            <div key={s._id}
+                                                onClick={() => { setSelectedSellerId(s._id); setIsOpenDropdown(false); }}
+                                                className={`px-4 py-2.5 hover:bg-indigo-50 text-sm cursor-pointer border-t border-slate-50 transition-colors flex items-center justify-between gap-2 ${selectedSellerId === s._id ? 'bg-indigo-50' : ''}`}
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 text-xs font-black">
+                                                        {(s.name || 'S')[0].toUpperCase()}
                                                     </div>
-                                                ) : (
-                                                    sellers.map(s => (
-                                                        <div
-                                                            key={s._id}
-                                                            onClick={() => {
-                                                                setSelectedSellerId(s._id);
-                                                                setIsOpenDropdown(false);
-                                                            }}
-                                                            className="px-4 py-2.5 hover:bg-slate-50 text-sm font-semibold text-slate-700 cursor-pointer border-t border-slate-50 transition-colors flex items-center justify-between"
-                                                        >
-                                                            <span>{s.name}</span>
-                                                            <span className="text-xs text-slate-400 font-normal">({s.shopName || 'Store'})</span>
-                                                        </div>
-                                                    ))
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-semibold text-slate-800 truncate">{s.name}</p>
+                                                        <p className="text-[11px] text-slate-400 truncate">{s.shopName || 'Store'}</p>
+                                                    </div>
+                                                </div>
+                                                {selectedSellerId === s._id && (
+                                                    <Check size={16} className="text-indigo-600 shrink-0" />
                                                 )}
                                             </div>
-                                        )}
-                                    </div>
+                                        ))
+                                    )}
                                 </div>
                             )}
+                        </div>
+                    )}
 
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Upload Photo (Optional)</label>
-                                {filePreview ? (
-                                    <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 p-2 flex items-center gap-3">
-                                        <img src={filePreview} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm" />
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-semibold text-slate-800 truncate">{file?.name}</div>
-                                            <div className="text-[11px] text-green-600 font-medium">Ready & Cropped</div>
+                    {/* Upload Photo */}
+                    <div className="space-y-1.5">
+                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            <ImagePlus size={12} className="text-indigo-500" />
+                            Upload Photo <span className="normal-case font-medium text-slate-400">(Optional)</span>
+                        </label>
+
+                        {filePreview ? (
+                            <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+                                <div className="flex items-center gap-3 p-3">
+                                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shrink-0 shadow-sm">
+                                        <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-semibold text-slate-800 truncate">{file?.name}</p>
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            <span className="text-[11px] text-emerald-600 font-semibold">Ready & Cropped</span>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setFile(null);
-                                                setFilePreview('');
-                                            }}
-                                            className="p-1.5 hover:bg-slate-200 rounded-full text-slate-400 hover:text-red-500 transition-colors"
-                                        >
-                                            <X size={16} />
-                                        </button>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">
+                                            {file ? `${(file.size / 1024).toFixed(0)} KB` : ''}
+                                        </p>
                                     </div>
-                                ) : (
-                                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center text-center relative bg-slate-50 hover:bg-slate-100 transition-colors">
-                                        <Camera size={24} className="text-slate-400 mb-2" />
-                                        <span className="text-sm font-medium text-slate-600">Tap to select or capture image</span>
-                                        <span className="text-[11px] text-slate-400 mt-0.5">Crop & zoom available on select</span>
-                                        <input 
-                                            type="file" 
-                                            accept="image/*, .jpg, .jpeg, .png, .webp, .heic, .heif"
-                                            onChange={handleFileChange}
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                        />
-                                    </div>
-                                )}
+                                    <button type="button"
+                                        onClick={() => { setFile(null); setFilePreview(''); }}
+                                        className="p-2 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition-all">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">General Enquiry / Notes {file ? '(Optional)' : '(Required if no photo)'}</label>
-                                <textarea 
-                                    rows="2"
-                                    placeholder="Type your general enquiry, list of items, or specific instructions..." 
-                                    value={notes} 
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-brand-500 outline-none transition-colors resize-none"
+                        ) : (
+                            <div className="relative border-2 border-dashed border-slate-200 rounded-xl p-5 flex flex-col items-center justify-center text-center bg-gradient-to-b from-slate-50 to-white hover:border-indigo-300 hover:bg-indigo-50/30 transition-all group cursor-pointer">
+                                <div className="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-500 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                                    <Upload size={22} />
+                                </div>
+                                <p className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 transition-colors">
+                                    Tap to select or capture
+                                </p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                    JPG, PNG, WEBP • Max 25 MB • Crop & zoom included
+                                </p>
+                                <input
+                                    type="file"
+                                    accept="image/*, .jpg, .jpeg, .png, .webp, .heic, .heif"
+                                    onChange={handleFileChange}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
                             </div>
+                        )}
+                    </div>
 
-                            <button 
-                                type="submit" 
-                                disabled={isSubmitting || (!file && !notes.trim()) || !selectedSellerId}
-                                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:active:scale-100"
-                            >
-                                {isSubmitting ? (
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                    <Camera size={18} />
-                                )}
-                                {isUploading ? "Uploading Image..." : "Send Request"}
-                            </button>
-                        </form>
-                    </>
-                )}
+                    {/* Notes / Enquiry */}
+                    <div className="space-y-1.5">
+                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            <FileText size={12} className="text-indigo-500" />
+                            Enquiry / Notes
+                            <span className="normal-case font-medium text-slate-400">
+                                {file ? '(Optional)' : '(Required if no photo)'}
+                            </span>
+                        </label>
+                        <textarea
+                            rows="3"
+                            placeholder="Describe your requirements, list items, or special instructions..."
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all resize-none"
+                        />
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                        type="submit"
+                        disabled={isSubmitting || (!file && !notes.trim()) || !selectedSellerId}
+                        className="w-full py-3.5 bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 bg-[length:200%_100%] hover:bg-right text-white font-bold rounded-xl shadow-lg shadow-indigo-200/50 transition-all duration-500 active:scale-[0.97] flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:shadow-none disabled:active:scale-100 text-sm"
+                    >
+                        {isSubmitting ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <Send size={16} />
+                        )}
+                        {isUploading ? "Uploading Photo..." : isSubmitting ? "Sending..." : "Send Request to Seller"}
+                    </button>
+                </form>
             </div>
         </div>
     );
 };
 export default CustomPhotoOrderModal;
-

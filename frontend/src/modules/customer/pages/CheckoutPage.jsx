@@ -74,6 +74,8 @@ import CheckoutRecommendedProducts from "./checkout/components/CheckoutRecommend
 import CheckoutWishlistSection from "./checkout/components/CheckoutWishlistSection";
 import CheckoutOrderSuccess from "./checkout/components/CheckoutOrderSuccess";
 
+const CHECKOUT_ADDRESS_STORAGE_KEY = "sevafast_checkout_address_v1";
+
 const createEmptyAddress = () => ({
   type: "Home",
   name: "",
@@ -82,6 +84,23 @@ const createEmptyAddress = () => ({
   city: "",
   phone: "",
 });
+
+const getInitialCheckoutAddress = () => {
+  try {
+    const saved =
+      typeof window !== "undefined"
+        ? window.sessionStorage.getItem(CHECKOUT_ADDRESS_STORAGE_KEY) ||
+          window.localStorage.getItem(CHECKOUT_ADDRESS_STORAGE_KEY)
+        : null;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && (parsed.address || parsed.formattedAddress)) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return createEmptyAddress();
+};
 
 const normalizeRegisteredPhone = (phone) => {
   const raw = String(phone || "").trim();
@@ -146,6 +165,7 @@ const CheckoutPage = () => {
     refreshLocation,
     isFetchingLocation,
     updateLocation,
+    refreshAddresses,
   } = useAppLocation();
   const navigate = useNavigate();
 
@@ -167,7 +187,7 @@ const CheckoutPage = () => {
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const postOrderNavigateRef = useRef(null);
   const previewDebounceRef = useRef(null);
-  const [currentAddress, setCurrentAddress] = useState(createEmptyAddress);
+  const [currentAddress, setCurrentAddress] = useState(getInitialCheckoutAddress);
   const [isEditAddressOpen, setIsEditAddressOpen] = useState(false);
   const [editAddressForm, setEditAddressForm] = useState(createEmptyAddress);
   const [showRecipientForm, setShowRecipientForm] = useState(false);
@@ -229,30 +249,43 @@ const CheckoutPage = () => {
   );
 
   // Derived display values for primary delivery card
-  const displayName = savedRecipient?.name || registeredName || currentAddress.name;
+  const displayName = savedRecipient?.name || currentAddress.name || registeredName;
   const displayPhone =
-    savedRecipient?.phone || registeredPhone || currentAddress.phone;
+    savedRecipient?.phone || currentAddress.phone || registeredPhone;
   const displayAddress = savedRecipient
     ? `${savedRecipient.completeAddress}${savedRecipient.landmark ? `, ${savedRecipient.landmark}` : ""}${savedRecipient.pincode ? ` - ${savedRecipient.pincode}` : ""}`
-    : `${currentAddress.address}${currentAddress.landmark ? `, ${currentAddress.landmark}` : ""}, ${currentAddress.city}`;
+    : `${currentAddress.address || ""}${currentAddress.landmark ? `, ${currentAddress.landmark}` : ""}${currentAddress.city ? `, ${currentAddress.city}` : ""}`;
+
+  // Sync currentAddress changes to persistent storage
+  useEffect(() => {
+    if (currentAddress && (currentAddress.address || currentAddress.formattedAddress)) {
+      try {
+        const toStore = JSON.stringify(currentAddress);
+        window.sessionStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
+        window.localStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
+      } catch {}
+    }
+  }, [currentAddress]);
 
   useEffect(() => {
     if (!user) return;
 
     setCurrentAddress((prev) => ({
       ...prev,
-      name: registeredName || prev.name,
-      phone: registeredPhone || prev.phone,
+      name: prev.name || registeredName,
+      phone: prev.phone || registeredPhone,
     }));
     setEditAddressForm((prev) => ({
       ...prev,
-      name: registeredName || prev.name,
-      phone: registeredPhone || prev.phone,
+      name: prev.name || registeredName,
+      phone: prev.phone || registeredPhone,
     }));
   }, [registeredName, registeredPhone, user]);
 
   useEffect(() => {
     if (savedRecipient) return;
+    // If currentAddress is already populated, do not overwrite it with old defaults
+    if (currentAddress?.address) return;
 
     const primarySaved = locationSavedAddresses[0];
     const addressText = primarySaved?.address || currentLocation?.name || "";
@@ -268,8 +301,8 @@ const CheckoutPage = () => {
 
       return {
         ...prev,
-        name: registeredName || prev.name,
-        phone: registeredPhone || prev.phone,
+        name: prev.name || registeredName,
+        phone: prev.phone || registeredPhone,
         address: addressText,
         city: cityText || prev.city,
         ...(primarySaved?.location
@@ -286,11 +319,17 @@ const CheckoutPage = () => {
       };
     });
   }, [
-    savedRecipient,
+    currentAddress?.address,
+    currentLocation?.city,
+    currentLocation?.latitude,
+    currentLocation?.longitude,
+    currentLocation?.name,
+    currentLocation?.pincode,
+    currentLocation?.state,
     locationSavedAddresses,
-    currentLocation,
     registeredName,
     registeredPhone,
+    savedRecipient,
   ]);
 
   useEffect(() => {
@@ -397,9 +436,15 @@ const CheckoutPage = () => {
     removeFromCart(item.id, item.variantSku);
     showToast(`${item.name} moved to wishlist`, "success");
   };
-
   const handleOpenEditAddress = () => {
-    setEditAddressForm(currentAddress);
+    setEditAddressForm({
+      ...currentAddress,
+      name: currentAddress.name || registeredName || "",
+      phone: currentAddress.phone || registeredPhone || "",
+      address: currentAddress.address || "",
+      landmark: currentAddress.landmark || "",
+      city: currentAddress.city || "",
+    });
     setIsEditAddressOpen(true);
   };
 
@@ -414,28 +459,14 @@ const CheckoutPage = () => {
     const q = String(addressText || "").trim();
     if (!q) return null;
 
-    const cacheKey = `addr:${q}`;
-    const cached = getCachedGeocode(cacheKey);
-    if (cached?.location?.lat && cached?.location?.lng) {
-      return cached.location;
-    }
-
     try {
       const resp = await customerApi.geocodeAddress(q);
       const loc = resp.data?.result?.location;
       if (isValidLatLng(loc)) {
-        setCachedGeocode(cacheKey, { location: { lat: loc.lat, lng: loc.lng } });
         return { lat: loc.lat, lng: loc.lng };
       }
-    } catch (e) {
-      const serverMsg =
-        e?.response?.data?.message ||
-        e?.response?.data?.error?.message ||
-        e?.message ||
-        null;
-      const err = new Error(serverMsg || "Could not geocode address");
-      err.__serverMsg = serverMsg;
-      throw err;
+    } catch {
+      // ignore
     }
 
     return null;
@@ -486,16 +517,24 @@ const CheckoutPage = () => {
         return;
       }
 
-      setCurrentAddress({
-        type: addr.label,
-        name: registeredName || currentAddress.name,
+      const selectedObj = {
+        type: addr.label || "Home",
+        name: currentAddress.name || registeredName,
         address: rawText,
-        city: "",
-        phone: registeredPhone || currentAddress.phone,
-        landmark: "",
+        city: addr.city || "",
+        phone: currentAddress.phone || registeredPhone || addr.phone || "",
+        landmark: addr.landmark || "",
         ...(pid ? { placeId: pid } : {}),
         ...(resolvedLoc ? { location: resolvedLoc } : {}),
-      });
+      };
+
+      setCurrentAddress(selectedObj);
+
+      try {
+        const toStore = JSON.stringify(selectedObj);
+        window.sessionStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
+        window.localStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
+      } catch {}
 
       if (resolvedLoc) {
         updateLocation(
@@ -520,11 +559,11 @@ const CheckoutPage = () => {
 
   const handleSaveEditedAddress = async () => {
     if (
-      !editAddressForm.name.trim() ||
-      !editAddressForm.address.trim() ||
-      !editAddressForm.city.trim()
+      !editAddressForm.name?.trim() ||
+      !editAddressForm.address?.trim() ||
+      !editAddressForm.city?.trim()
     ) {
-      showToast("Please fill name, address and city", "error");
+      showToast("Please fill name, complete address and city", "error");
       return;
     }
 
@@ -570,6 +609,45 @@ const CheckoutPage = () => {
     };
 
     setCurrentAddress(updatedAddrObj);
+
+    // Save immediately to persistent storage
+    try {
+      const toStore = JSON.stringify(updatedAddrObj);
+      window.sessionStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
+      window.localStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
+    } catch {}
+
+    // Save to user profile in backend if logged in
+    try {
+      const profileRes = await customerApi.getProfile();
+      const profile = profileRes.data?.result ?? profileRes.data?.data ?? profileRes.data;
+      const existingAddrs = Array.isArray(profile?.addresses) ? [...profile.addresses] : [];
+
+      const newAddrPayload = {
+        label: (editAddressForm.type || "home").toLowerCase(),
+        fullAddress: editAddressForm.address,
+        landmark: editAddressForm.landmark || "",
+        city: editAddressForm.city || "",
+        ...(location ? { location } : {}),
+        ...(placeId ? { placeId } : {}),
+        ...(formattedAddress ? { formattedAddress } : {}),
+      };
+
+      if (existingAddrs.length > 0) {
+        existingAddrs[0] = { ...existingAddrs[0], ...newAddrPayload };
+      } else {
+        existingAddrs.push(newAddrPayload);
+      }
+
+      await customerApi.updateProfile({
+        name: editAddressForm.name,
+        phone: editAddressForm.phone || profile?.phone,
+        addresses: existingAddrs,
+      });
+      refreshAddresses?.();
+    } catch (err) {
+      console.warn("Could not save address to profile:", err);
+    }
 
     // Persist to LocationContext and localStorage so future checkouts & home screen use the edited address
     updateLocation(
@@ -1460,36 +1538,60 @@ const CheckoutPage = () => {
               <DialogTitle>Edit Delivery Address</DialogTitle>
               <DialogDescription>Update the details of your current delivery address.</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-address" className="text-xs font-semibold text-slate-700">Address</Label>
+            <div className="grid gap-3 py-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid gap-1">
+                  <Label htmlFor="edit-name" className="text-xs font-semibold text-slate-700">Contact Name*</Label>
+                  <Input
+                    id="edit-name"
+                    value={editAddressForm.name || ""}
+                    onChange={(e) => setEditAddressForm((prev) => ({ ...prev, name: e.target.value }))}
+                    className="h-10 text-sm"
+                    placeholder="Receiver's name"
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="edit-phone" className="text-xs font-semibold text-slate-700">Phone Number*</Label>
+                  <Input
+                    id="edit-phone"
+                    value={editAddressForm.phone || ""}
+                    onChange={(e) => setEditAddressForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    className="h-10 text-sm"
+                    placeholder="10-digit mobile number"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="edit-address" className="text-xs font-semibold text-slate-700">Complete Address*</Label>
                 <Input
                   id="edit-address"
-                  value={editAddressForm.address}
+                  value={editAddressForm.address || ""}
                   onChange={(e) => setEditAddressForm((prev) => ({ ...prev, address: e.target.value }))}
-                  className="h-10"
+                  className="h-10 text-sm"
                   placeholder="House, street, area"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-landmark" className="text-xs font-semibold text-slate-700">Nearest Landmark (optional)</Label>
-                <Input
-                  id="edit-landmark"
-                  value={editAddressForm.landmark || ""}
-                  onChange={(e) => setEditAddressForm((prev) => ({ ...prev, landmark: e.target.value }))}
-                  className="h-10"
-                  placeholder="e.g. Near City Mall, Opp. Temple"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-city" className="text-xs font-semibold text-slate-700">City / Pincode</Label>
-                <Input
-                  id="edit-city"
-                  value={editAddressForm.city}
-                  onChange={(e) => setEditAddressForm((prev) => ({ ...prev, city: e.target.value }))}
-                  className="h-10"
-                  placeholder="City - Pincode"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid gap-1">
+                  <Label htmlFor="edit-landmark" className="text-xs font-semibold text-slate-700">Nearest Landmark</Label>
+                  <Input
+                    id="edit-landmark"
+                    value={editAddressForm.landmark || ""}
+                    onChange={(e) => setEditAddressForm((prev) => ({ ...prev, landmark: e.target.value }))}
+                    className="h-10 text-sm"
+                    placeholder="e.g. Near City Mall"
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="edit-city" className="text-xs font-semibold text-slate-700">City / Pincode*</Label>
+                  <Input
+                    id="edit-city"
+                    value={editAddressForm.city || ""}
+                    onChange={(e) => setEditAddressForm((prev) => ({ ...prev, city: e.target.value }))}
+                    className="h-10 text-sm"
+                    placeholder="City, State, Pincode"
+                  />
+                </div>
               </div>
             </div>
             <DialogFooter className="mt-2">

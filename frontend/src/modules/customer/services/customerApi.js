@@ -159,7 +159,10 @@ export const customerApi = {
   reverseGeocode: (lat, lng, params = {}) =>
     axiosInstance.get("/maps/reverse-geocode", { params: { lat, lng, ...params } }),
 
-  // Push (FCM) test
+  // Push & In-App Notifications
+  getNotifications: (params = {}) => axiosInstance.get("/notifications", { params }),
+  markNotificationRead: (id) => axiosInstance.patch(`/notifications/read/${id}`),
+  markAllNotificationsRead: () => axiosInstance.patch("/notifications/read"),
   testPushNotification: () => axiosInstance.post("/push/test"),
   getTestPushNotificationStatus: (orderId) =>
     axiosInstance.get(`/push/test-status/${encodeURIComponent(String(orderId || "").trim())}`),

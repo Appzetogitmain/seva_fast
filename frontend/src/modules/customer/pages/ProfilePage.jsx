@@ -19,6 +19,7 @@ import {
 } from '@core/firebase/pushClient';
 import { formatDate } from '@shared/utils/formatDate';
 import { CustomPhotoOrderModal } from '../components/shared/CustomPhotoOrderModal';
+import { CustomerNotificationsModal } from '../components/shared/CustomerNotificationsModal';
 
 const TEST_PUSH_STATUS_POLL_INTERVAL_MS = 1500;
 const TEST_PUSH_STATUS_MAX_ATTEMPTS = 20;
@@ -76,7 +77,11 @@ const ProfilePage = () => {
     const [isTestingPush, setIsTestingPush] = React.useState(false);
     const [isCustomOrderModalOpen, setIsCustomOrderModalOpen] = React.useState(false);
     const [isReferralTreeModalOpen, setIsReferralTreeModalOpen] = React.useState(false);
+    const [isNotificationsModalOpen, setIsNotificationsModalOpen] = React.useState(false);
+    const [unreadNotificationsCount, setUnreadNotificationsCount] = React.useState(0);
     const [targetDetails, setTargetDetails] = React.useState(null);
+    const [isSharingCard, setIsSharingCard] = React.useState(false);
+    const membershipCardRef = React.useRef(null);
 
     React.useEffect(() => {
         const fetchTargetDetails = async () => {
@@ -88,10 +93,22 @@ const ProfilePage = () => {
             }
         };
         fetchTargetDetails();
+
+        const fetchUnreadCount = async () => {
+            try {
+                const res = await customerApi.getNotifications();
+                const raw = res.data?.result || res.data?.results || res.data?.data || res.data || [];
+                const list = Array.isArray(raw) ? raw : (raw.items || []);
+                setUnreadNotificationsCount(list.filter(n => !n.isRead && !n.read).length);
+            } catch (e) {
+                // Best-effort
+            }
+        };
+        fetchUnreadCount();
     }, []);
 
     React.useEffect(() => {
-        if (isReferralTreeModalOpen || isCustomOrderModalOpen) {
+        if (isReferralTreeModalOpen || isCustomOrderModalOpen || isNotificationsModalOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = '';
@@ -99,7 +116,7 @@ const ProfilePage = () => {
         return () => {
             document.body.style.overflow = '';
         };
-    }, [isReferralTreeModalOpen, isCustomOrderModalOpen]);
+    }, [isReferralTreeModalOpen, isCustomOrderModalOpen, isNotificationsModalOpen]);
 
     const handleShare = async (url, label = appName) => {
         const shareUrl = url || window.location.origin;
@@ -120,6 +137,94 @@ const ProfilePage = () => {
                 toast.error('Could not share at this time.');
             }
         }
+    };
+
+    /**
+     * Captures the exact membership card as a pixel-perfect high-res image
+     * using native browser SVG foreignObject rasterization (html-to-image).
+     */
+    const handleShareCardAsImage = async (url, label = appName) => {
+        if (isSharingCard) return;
+        setIsSharingCard(true);
+        try {
+            const cardElement = membershipCardRef.current;
+            if (!cardElement) {
+                toast.error('Card element not ready.');
+                return;
+            }
+
+            toast.info('Preparing card image...');
+
+            // Dynamically import html-to-image
+            const htmlToImage = await import('html-to-image');
+
+            // Generate exact 1:1 high-resolution blob
+            const blob = await htmlToImage.toBlob(cardElement, {
+                pixelRatio: 3,
+                quality: 0.95,
+                cacheBust: true,
+                backgroundColor: '#ececec',
+            });
+
+            if (!blob) {
+                toast.error('Failed to generate card image.');
+                return;
+            }
+
+            const fileName = `${(appName || 'SEVAFAST').replace(/\s+/g, '_')}_Card_${referralCode || 'share'}.png`;
+            const file = new File([blob], fileName, { type: 'image/png' });
+
+            const shareUrl = url || window.location.origin;
+            const shareText = `Check out ${label}! Join now: ${shareUrl}`;
+
+            // Try sharing with file (mobile native share)
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: appName,
+                    text: shareText,
+                    files: [file],
+                });
+                return;
+            }
+
+            // Fallback: Web share without file or download
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: appName,
+                        text: shareText,
+                        url: shareUrl,
+                    });
+                } catch (fallbackErr) {
+                    if (fallbackErr?.name !== 'AbortError') {
+                        downloadBlob(blob, fileName);
+                    }
+                }
+                return;
+            }
+
+            // Final fallback: direct download
+            downloadBlob(blob, fileName);
+            toast.success('Card image downloaded!');
+        } catch (error) {
+            if (error?.name !== 'AbortError') {
+                console.error('Card share error:', error);
+                toast.error('Could not share the card image.');
+            }
+        } finally {
+            setIsSharingCard(false);
+        }
+    };
+
+    /** Helper: trigger download of the blob as PNG */
+    const downloadBlob = (blob, fileName) => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(link.href), 1500);
     };
 
     const formatIndiaPhone = (value) => {
@@ -143,8 +248,7 @@ const ProfilePage = () => {
     const profilePhotoUrl = user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || user?.phone || 'customer')}`;
     const qrSrc = (data, size = 120) =>
         `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
-    const goldText =
-        'bg-gradient-to-b from-[#c9a227] via-[#8b6914] to-[#5c4508] bg-clip-text text-transparent';
+    const goldText = 'text-[#967117] font-bold';
     const benefitNames = purchasedPlanNames.length > 0 ? purchasedPlanNames : [];
 
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -228,23 +332,13 @@ const ProfilePage = () => {
                     <ChevronLeft size={22} className="text-slate-800" />
                 </button>
                 <h1 className="text-xl font-semibold text-slate-900 tracking-tight">My Profile</h1>
-                <div className="ml-auto flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={handleTestPush}
-                        disabled={isTestingPush}
-                        title="Test push notification"
-                        className="w-10 h-10 flex items-center justify-center rounded-full transition-colors border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        <Bell size={18} className={isTestingPush ? "text-slate-400" : "text-slate-700"} />
-                    </button>
-                </div>
             </div>
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-4">
 
                 {/* User Identity Card — SEVAFAST membership layout */}
                 <div
+                    ref={membershipCardRef}
                     onClick={() => setIsReferralTreeModalOpen(true)}
                     className="group relative mb-2 cursor-pointer overflow-hidden rounded-3xl border border-slate-300/70 bg-[#ececec] shadow-[0_18px_40px_-20px_rgba(15,23,42,0.4)] transition-all duration-300 hover:brightness-[1.02] active:scale-[0.995]"
                 >
@@ -269,7 +363,7 @@ const ProfilePage = () => {
                                         <p className="truncate text-[14px] font-black uppercase tracking-[0.04em] text-slate-900 sm:text-[15px]">
                                             {(appName || 'SEVAFAST').replace(/\s+/g, '')}
                                         </p>
-                                        <p className="bg-gradient-to-r from-[#9b7bb8] to-[#e07a3a] bg-clip-text text-[8px] font-extrabold uppercase tracking-[0.11em] text-transparent sm:text-[9px]">
+                                        <p className="text-[8px] font-black uppercase tracking-[0.11em] text-[#d96520] sm:text-[9px]">
                                             Big Saving Shopping
                                         </p>
                                     </div>
@@ -277,14 +371,19 @@ const ProfilePage = () => {
                                 <div className="flex shrink-0 items-center gap-1">
                                     <button
                                         type="button"
+                                        disabled={isSharingCard}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleShare(siteReferUrl, appName);
+                                            handleShareCardAsImage(siteReferUrl, appName);
                                         }}
-                                        className="rounded-md bg-white/80 p-1.5 text-slate-700 shadow-sm ring-1 ring-slate-200/80 transition hover:bg-white"
-                                        title="Share"
+                                        className="rounded-md bg-white/80 p-1.5 text-slate-700 shadow-sm ring-1 ring-slate-200/80 transition hover:bg-white disabled:opacity-50"
+                                        title="Share card as image"
                                     >
-                                        <Share2 size={12} />
+                                        {isSharingCard ? (
+                                            <span className="block h-3 w-3 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+                                        ) : (
+                                            <Share2 size={12} />
+                                        )}
                                     </button>
                                     <Link
                                         to="/profile/edit"
@@ -366,12 +465,13 @@ const ProfilePage = () => {
                                 <div className="flex flex-col items-center">
                                     <button
                                         type="button"
+                                        disabled={isSharingCard}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleShare(appReferUrl, 'App referral');
+                                            handleShareCardAsImage(appReferUrl, 'App referral');
                                         }}
-                                        className="mb-0.5 self-start text-[#2f6fed]"
-                                        title="Share app referral"
+                                        className="mb-0.5 self-start text-[#2f6fed] disabled:opacity-50"
+                                        title="Share app referral with card image"
                                     >
                                         <Share2 size={11} />
                                     </button>
@@ -390,12 +490,13 @@ const ProfilePage = () => {
                                 <div className="flex flex-col items-center">
                                     <button
                                         type="button"
+                                        disabled={isSharingCard}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleShare(siteReferUrl, 'Site referral');
+                                            handleShareCardAsImage(siteReferUrl, 'Site referral');
                                         }}
-                                        className="mb-0.5 self-start text-[#2f6fed]"
-                                        title="Share site referral"
+                                        className="mb-0.5 self-start text-[#2f6fed] disabled:opacity-50"
+                                        title="Share site referral with card image"
                                     >
                                         <Share2 size={11} />
                                     </button>
@@ -425,6 +526,7 @@ const ProfilePage = () => {
                                         src={profilePhotoUrl}
                                         alt={user?.name || 'Profile'}
                                         className="h-full w-full object-cover"
+                                        crossOrigin="anonymous"
                                     />
                                 </div>
                                 <span className="mt-1 text-[8px] font-semibold text-white/95 sm:text-[9px]">
@@ -448,12 +550,13 @@ const ProfilePage = () => {
                                         </div>
                                         <button
                                             type="button"
+                                            disabled={isSharingCard}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleShare(cardReferUrl, 'Card referral');
+                                                handleShareCardAsImage(cardReferUrl, 'Card referral');
                                             }}
-                                            className="absolute -right-5 bottom-5 text-[#2f6fed] sm:-right-6"
-                                            title="Share card referral"
+                                            className="absolute -right-5 bottom-5 text-[#2f6fed] sm:-right-6 disabled:opacity-50"
+                                            title="Share card referral with image"
                                         >
                                             <Share2 size={12} />
                                         </button>
@@ -580,6 +683,16 @@ const ProfilePage = () => {
                                 color="var(--primary)"
                                 bg="rgba(16,185,129,0.10)"
                             />
+                            <div onClick={() => setIsNotificationsModalOpen(true)}>
+                                <MenuItem
+                                    icon={Bell}
+                                    label="Notifications"
+                                    sub={unreadNotificationsCount > 0 ? `${unreadNotificationsCount} unread notification${unreadNotificationsCount > 1 ? 's' : ''}` : "View order & system updates"}
+                                    color="#f59e0b"
+                                    bg="rgba(245,158,11,0.12)"
+                                    badge={unreadNotificationsCount > 0 ? unreadNotificationsCount : null}
+                                />
+                            </div>
                             <MenuItem
                                 icon={CreditCard}
                                 label="Order Transactions"
@@ -686,17 +799,22 @@ const ProfilePage = () => {
                 onClose={() => setIsReferralTreeModalOpen(false)}
                 user={user}
             />
+            <CustomerNotificationsModal
+                isOpen={isNotificationsModalOpen}
+                onClose={() => setIsNotificationsModalOpen(false)}
+                onUnreadCountChange={setUnreadNotificationsCount}
+            />
             {signOutDialog}
         </div>
     );
 };
 
 
-const MenuItem = ({ icon: Icon, label, sub, path, color = '#334155', bg = 'rgba(148,163,184,0.12)' }) => (
+const MenuItem = ({ icon: Icon, label, sub, path, color = '#334155', bg = 'rgba(148,163,184,0.12)', badge = null }) => (
     <Link to={path || '#'} className="px-4 py-3.5 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors group">
         <div className="flex items-center gap-3">
             <div
-                className="h-10 w-10 rounded-lg flex items-center justify-center"
+                className="h-10 w-10 rounded-lg flex items-center justify-center relative shrink-0"
                 style={{ backgroundColor: bg }}
             >
                 <Icon
@@ -706,7 +824,14 @@ const MenuItem = ({ icon: Icon, label, sub, path, color = '#334155', bg = 'rgba(
                 />
             </div>
             <div>
-                <h3 className="text-sm font-semibold text-slate-800">{label}</h3>
+                <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-slate-800">{label}</h3>
+                    {badge !== null && badge > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-600 text-white">
+                            {badge}
+                        </span>
+                    )}
+                </div>
                 {sub && <p className="text-[11px] text-slate-500 mt-0.5">{sub}</p>}
             </div>
         </div>
