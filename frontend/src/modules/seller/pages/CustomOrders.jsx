@@ -2,11 +2,14 @@ import React, { useState, useEffect } from "react";
 import axiosInstance from "@core/api/axios";
 import { toast } from "sonner";
 import { HiOutlinePhotograph, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineClock } from "react-icons/hi";
+import { MessageCircle, Phone } from "lucide-react";
 import { formatDate } from "@shared/utils/formatDate";
+import { PhotoOrderChatDrawer } from "./PhotoOrderChatDrawer";
 
 const CustomOrders = () => {
     const [orders, setOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedOrderForChat, setSelectedOrderForChat] = useState(null);
 
     const fetchOrders = async () => {
         try {
@@ -102,13 +105,22 @@ const CustomOrders = () => {
 
                                 {order.notes && (
                                     <div className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.notes}</p>
+                                        <p className="text-sm text-gray-700 whitespace-pre-wrap line-clamp-2">{order.notes}</p>
                                     </div>
                                 )}
                                 
                                 <p className="text-xs text-gray-400 mb-4 text-right">
                                     Received: {formatDate(order.createdAt)}
                                 </p>
+
+                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                    <button 
+                                        onClick={() => setSelectedOrderForChat(order)}
+                                        className="col-span-2 flex items-center justify-center gap-2 w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium rounded-lg border border-indigo-200 transition-colors"
+                                    >
+                                        <MessageCircle size={16} /> Open Chat
+                                    </button>
+                                </div>
 
                                 <div className="grid grid-cols-2 gap-2">
                                     {order.status === 'Pending' && (
@@ -142,6 +154,12 @@ const CustomOrders = () => {
                     ))}
                 </div>
             )}
+            
+            <PhotoOrderChatDrawer 
+                isOpen={!!selectedOrderForChat} 
+                onClose={() => setSelectedOrderForChat(null)} 
+                order={selectedOrderForChat} 
+            />
         </div>
     );
 };

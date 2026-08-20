@@ -76,6 +76,16 @@ export const initSocket = (io) => {
       socket.leave(`order:${orderId}`);
     });
 
+    socket.on("join_photo_chat", (orderId) => {
+      if (!orderId) return;
+      socket.join(`photo_chat:${orderId}`);
+    });
+
+    socket.on("leave_photo_chat", (orderId) => {
+      if (!orderId) return;
+      socket.leave(`photo_chat:${orderId}`);
+    });
+
     socket.on("join_ticket", async (ticketId) => {
       const raw = typeof ticketId === "string" ? ticketId.trim() : "";
       if (!raw || !mongoose.Types.ObjectId.isValid(raw)) return;

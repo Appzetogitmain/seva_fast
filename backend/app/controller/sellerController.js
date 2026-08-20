@@ -186,7 +186,7 @@ export const getSellerProfile = async (req, res) => {
 ================================ */
 export const updateSellerProfile = async (req, res) => {
   try {
-    const { name, shopName, phone, address, locality, pincode, city, state, lat, lng, radius } = req.body;
+    const { name, shopName, phone, address, locality, pincode, city, state, lat, lng, radius, acceptsPhotoOrders } = req.body;
 
     // Find seller
     const seller = await Seller.findById(req.user.id);
@@ -203,6 +203,7 @@ export const updateSellerProfile = async (req, res) => {
     if (pincode !== undefined) seller.pincode = pincode;
     if (city !== undefined) seller.city = city;
     if (state !== undefined) seller.state = state;
+    if (acceptsPhotoOrders !== undefined) seller.acceptsPhotoOrders = acceptsPhotoOrders;
 
     // Validate and update geo data
     let locationChanged = false;

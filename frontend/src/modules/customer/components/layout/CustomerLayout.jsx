@@ -9,15 +9,17 @@ import WelcomeScratchCardModal from '../WelcomeScratchCardModal';
 import { customerApi } from '../../services/customerApi';
 import { useProductDetail } from '../../context/ProductDetailContext';
 import { cn } from '@/lib/utils';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@core/context/AuthContext';
-import { onReturnPickupOtp, onReturnDropOtp } from '@core/services/orderSocket';
+import { onReturnPickupOtp, onReturnDropOtp, onPhotoOrderMessage, onPhotoOrderStatusAlert } from '@core/services/orderSocket';
 import { toast } from 'sonner';
-import { ShieldCheck, Package } from 'lucide-react';
+import { ShieldCheck, Package, MessageSquare, ChevronRight, Camera } from 'lucide-react';
 import { isBirthdayToday } from '@shared/utils/birthdayUtils';
+import { notificationSound } from '@core/utils/notificationSound';
 
 const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = false, showCart: showCartProp, showBottomNav: showBottomNavProp }) => {
     const location = useLocation();
+    const navigate = useNavigate();
     const { isOpen: isProductDetailOpen } = useProductDetail();
     const { user, token } = useAuth();
     const isBirthday = !!user?.dateOfBirth && isBirthdayToday(user.dateOfBirth);
@@ -52,7 +54,7 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
         fetchEligibility();
     }, [user]);
 
-    // Listen for Return OTPs (Real-time Alert for Customer)
+    // Listen for Return OTPs & Photo Order Messages (Real-time Alert for Customer)
     useEffect(() => {
         if (!token || !user) return;
 
@@ -104,11 +106,95 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
             ), { duration: 15000, position: 'top-center' });
         });
 
+        // Real-time Photo Order Message Alert
+        const cleanupPhotoMessage = onPhotoOrderMessage(() => token, (payload) => {
+            console.log('[CustomerLayout] Photo Order Message Received:', payload);
+            try {
+                notificationSound.playOrderAlertSound();
+            } catch (e) {}
+
+            toast.custom((t) => (
+                <div 
+                    onClick={() => {
+                        toast.dismiss(t);
+                        navigate(`/orders?tab=photo&orderId=${payload.orderId || ''}`);
+                    }}
+                    className="bg-white border-2 border-indigo-500 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-top-full duration-300 max-w-md w-full cursor-pointer hover:bg-slate-50 transition-colors"
+                >
+                    <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 shrink-0">
+                            <MessageSquare size={22} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-slate-900 truncate">
+                                    Message from {payload.sellerName || 'Seller'}
+                                </h3>
+                                <span className="text-[10px] bg-indigo-50 text-indigo-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
+                                    Photo Order
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-600 font-medium mt-1 line-clamp-2">
+                                {payload.text || 'You have received a message regarding your photo order.'}
+                            </p>
+                            <div className="mt-2 flex items-center gap-1 text-xs font-bold text-indigo-600">
+                                <span>Tap to view & reply</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ), { duration: 10000, position: 'top-center' });
+        });
+
+        // Real-time Photo Order Status Alert
+        const cleanupPhotoStatus = onPhotoOrderStatusAlert(() => token, (payload) => {
+            console.log('[CustomerLayout] Photo Order Status Alert:', payload);
+            try {
+                notificationSound.playOrderAlertSound();
+            } catch (e) {}
+
+            toast.custom((t) => (
+                <div 
+                    onClick={() => {
+                        toast.dismiss(t);
+                        navigate(`/orders?tab=photo&orderId=${payload.orderId || ''}`);
+                    }}
+                    className="bg-white border-2 border-blue-500 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-top-full duration-300 max-w-md w-full cursor-pointer hover:bg-slate-50 transition-colors"
+                >
+                    <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
+                            <Camera size={22} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-slate-900 truncate">
+                                    Photo Order {payload.status}
+                                </h3>
+                                <span className="text-[10px] bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
+                                    Status Update
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-600 font-medium mt-1">
+                                {payload.sellerName || 'The seller'} marked your photo order as {payload.status}.
+                            </p>
+                            <div className="mt-2 flex items-center gap-1 text-xs font-bold text-blue-600">
+                                <span>Tap to view order</span>
+                                <ChevronRight size={14} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ), { duration: 10000, position: 'top-center' });
+        });
+
         return () => {
             cleanupPickup();
             cleanupDrop();
+            cleanupPhotoMessage();
+            cleanupPhotoStatus();
         };
-    }, [token, user]);
+    }, [token, user, navigate]);
 
     // Route-based visibility logic
     const path = location.pathname.replace(/\/$/, '') || '/';

@@ -255,3 +255,37 @@ export function onDeliveryOtpValidated(getToken, handler) {
     s.off("delivery:otp:validated", wrappedHandler);
   };
 }
+
+export function onPhotoOrderMessage(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("photo_order:new_message", handler);
+  return () => s.off("photo_order:new_message", handler);
+}
+
+export function onPhotoOrderStatusAlert(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("photo_order:status_alert", handler);
+  return () => s.off("photo_order:status_alert", handler);
+}
+
+export function joinPhotoChatRoom(orderId, getToken) {
+  const s = getOrderSocket(getToken);
+  if (!s || !orderId) return;
+  s.emit("join_photo_chat", orderId);
+}
+
+export function leavePhotoChatRoom(orderId, getToken) {
+  const s = getOrderSocket(getToken);
+  if (!s || !orderId) return;
+  s.emit("leave_photo_chat", orderId);
+}
+
+export function onPhotoChatMessage(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("photo_chat_message", handler);
+  return () => s.off("photo_chat_message", handler);
+}
+

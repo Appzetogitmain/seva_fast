@@ -162,6 +162,17 @@ const SellerProfile = () => {
     }
   };
 
+  const togglePhotoOrders = async () => {
+    try {
+      const newVal = !profile.acceptsPhotoOrders;
+      await sellerApi.updateProfile({ acceptsPhotoOrders: newVal });
+      setProfile((prev) => ({ ...prev, acceptsPhotoOrders: newVal }));
+      toast.success(newVal ? "Now accepting photo orders" : "No longer accepting photo orders");
+    } catch (error) {
+      toast.error("Failed to update photo order setting");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -212,6 +223,20 @@ const SellerProfile = () => {
                   }`}
                 />
                 {profile?.isActive ? "Active" : "Inactive"}
+              </button>
+              <button
+                onClick={togglePhotoOrders}
+                className={`group flex items-center gap-2 px-3.5 py-1 text-[9px] sm:text-[10px] font-black uppercase tracking-[2px] rounded-full border transition-all hover:scale-105 active:scale-95 shadow-md ${
+                  profile?.acceptsPhotoOrders
+                    ? "bg-indigo-500 text-white border-indigo-400"
+                    : "bg-slate-200 text-slate-500 border-slate-300"
+                }`}>
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    profile?.acceptsPhotoOrders ? "bg-indigo-200 animate-pulse" : "bg-slate-400"
+                  }`}
+                />
+                {profile?.acceptsPhotoOrders ? "Accepting Photo Orders" : "No Photo Orders"}
               </button>
             </div>
             
