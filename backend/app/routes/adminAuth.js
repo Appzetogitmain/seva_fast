@@ -64,6 +64,7 @@ import {
     deleteSellerPlan,
     assignSellerPlanToSeller,
 } from "../controller/sellerPlanController.js";
+import { getAdminPhotoOrders, getAdminPhotoOrderChat, toggleAdminPhotoOrderChat } from "../controller/photoOrderController.js";
 import { getAuthActivityLogs } from "../controller/authActivityController.js";
 import {
     exportAdminFinanceStatementController,
@@ -220,6 +221,10 @@ router.put("/seller-plans/:id", verifyToken, allowRoles("admin"), updateSellerPl
 router.delete("/seller-plans/:id", verifyToken, allowRoles("admin"), deleteSellerPlan);
 router.post("/sellers/:id/assign-plan", verifyToken, allowRoles("admin"), assignSellerPlanToSeller);
 
+// Custom Photo Orders (Admin & Sub-Admin)
+router.get("/photo-orders", verifyToken, allowRoles("admin", "sub-admin"), getAdminPhotoOrders);
+router.get("/photo-orders/:id/chat", verifyToken, allowRoles("admin", "sub-admin"), getAdminPhotoOrderChat);
+router.patch("/photo-orders/:id/toggle-chat", verifyToken, allowRoles("admin", "sub-admin"), toggleAdminPhotoOrderChat);
 
 router.get(
     "/delivery-partners",

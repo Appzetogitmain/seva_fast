@@ -133,6 +133,7 @@ const BillingCharges = () => {
         riderEarningExtraFeePerKg: 10,
         riderExpressEarning: 100,
         riderExtraEarningPerKmBeyondSlabs: 0,
+        sellerDeliveryFeeSharePercent: 80,
     });
 
     const [commissions, setCommissions] = useState({
@@ -206,6 +207,7 @@ const BillingCharges = () => {
                         riderEarningExtraFeePerKg: s.riderEarningExtraFeePerKg ?? prev.riderEarningExtraFeePerKg,
                         riderExpressEarning: s.riderExpressEarning ?? prev.riderExpressEarning,
                         riderExtraEarningPerKmBeyondSlabs: s.riderExtraEarningPerKmBeyondSlabs ?? prev.riderExtraEarningPerKmBeyondSlabs,
+                        sellerDeliveryFeeSharePercent: s.sellerDeliveryFeeSharePercent ?? prev.sellerDeliveryFeeSharePercent,
                     }));
                 }
             } catch (error) {
@@ -519,6 +521,35 @@ const BillingCharges = () => {
                                             />
                                             <p className="text-[10px] font-medium text-slate-400 italic">For deliveries beyond your farthest defined band (e.g. past 15km). 0 = flat rate no matter how far.</p>
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* Seller's share of delivery fee (after rider is paid) */}
+                                <div className="pt-6 border-t border-slate-100">
+                                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1">
+                                        Seller's Share of Delivery Fee
+                                    </h4>
+                                    <p className="text-[10px] font-bold text-slate-400 italic mb-4">
+                                        The rider is always paid first, in full. Whatever's left over from what the customer paid is split by this %
+                                        between seller and admin. Set to 0 to give sellers nothing from delivery fee.
+                                    </p>
+                                    <div className="max-w-xs space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seller's cut of the remainder (%)</label>
+                                        <div className="relative group">
+                                            <input
+                                                type="number" min="0" max="100" step="1"
+                                                value={slabExtras.sellerDeliveryFeeSharePercent}
+                                                onChange={(e) => handleSlabExtraChange('sellerDeliveryFeeSharePercent', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                                className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10"
+                                            />
+                                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 bg-slate-50 rounded-2xl p-4 text-[11px] font-bold text-slate-500">
+                                        Example: customer pays ₹50 delivery, rider earns ₹40 → ₹10 remains → seller gets{" "}
+                                        <span className="text-emerald-600">₹{(10 * slabExtras.sellerDeliveryFeeSharePercent / 100).toFixed(2)}</span>, admin keeps{" "}
+                                        <span className="text-slate-700">₹{(10 * (100 - slabExtras.sellerDeliveryFeeSharePercent) / 100).toFixed(2)}</span>.
+                                        If the rider earns ₹50 or more, nothing remains and seller gets ₹0 regardless of this %.
                                     </div>
                                 </div>
 

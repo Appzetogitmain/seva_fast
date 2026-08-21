@@ -165,7 +165,7 @@ export const sendChatMessage = async (req, res) => {
         const { id } = req.params;
         const userId = req.user.id;
         const role = req.user.role;
-        const { text, type, estimatedPrice, sellerContactPhone } = req.body;
+        const { text, type, estimatedPrice, sellerContactPhone, imageUrl } = req.body;
 
         const order = await PhotoOrder.findById(id);
         if (!order) return handleResponse(res, 404, "Order not found");
@@ -178,6 +178,11 @@ export const sendChatMessage = async (req, res) => {
             return handleResponse(res, 403, "Unauthorized access");
         }
 
+        // Check if chat is disabled by admin
+        if (order.chatDisabled) {
+            return handleResponse(res, 403, "Chat has been disabled by an administrator");
+        }
+
         const senderRole = role === 'seller' ? 'seller' : 'customer';
 
         const newMessage = {
@@ -185,6 +190,7 @@ export const sendChatMessage = async (req, res) => {
             senderId: userId,
             text,
             type: type || 'text',
+            imageUrl,
             estimatedPrice,
             sellerContactPhone
         };
@@ -216,13 +222,20 @@ export const sendChatMessage = async (req, res) => {
                     orderId: order._id,
                     sellerName: sellerName,
                     type: type || 'text',
-                    text: text || (type === 'reply_card' ? `Sent a price quote: ₹${estimatedPrice || ''}` : type === 'contact_card' ? 'Shared contact details' : 'New message'),
+                    text: text || (type === 'image' ? 'Sent a photo' : type === 'reply_card' ? `Sent a price quote: ₹${estimatedPrice || ''}` : type === 'contact_card' ? 'Shared contact details' : 'New message'),
                     message: savedMessage
                 });
 
                 io.to(`customer:${order.customer}`).emit("photo_order_status_update", order);
             } else {
                 // Customer sent a message -> notify seller
+                io.to(`seller:${order.seller}`).emit("photo_order:new_message", {
+                    orderId: order._id,
+                    customerName: req.user.name || "Customer",
+                    type: type || 'text',
+                    text: text || (type === 'image' ? 'Sent a photo' : 'New message'),
+                    message: savedMessage
+                });
                 io.to(`seller:${order.seller}`).emit("photo_order_status_update", order);
             }
         } catch (err) {
@@ -230,6 +243,123 @@ export const sendChatMessage = async (req, res) => {
         }
 
         return handleResponse(res, 201, "Message sent", savedMessage);
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
+/* ===============================
+   ADMIN: GET ALL PHOTO ORDERS
+ ================================ */
+export const getAdminPhotoOrders = async (req, res) => {
+    try {
+        const { role, assignedZones } = req.user;
+        let sellerQuery = {};
+        
+        // If sub-admin, restrict to sellers in their assigned zones
+        if (role === 'sub-admin' && assignedZones && assignedZones.length > 0) {
+            sellerQuery = { zoneId: { $in: assignedZones } };
+        } else if (role === 'sub-admin') {
+            return handleResponse(res, 200, "No zones assigned", []);
+        }
+
+        let photoOrderQuery = {};
+
+        // Find allowed sellers first for sub-admin
+        if (role === 'sub-admin') {
+            const allowedSellers = await Seller.find(sellerQuery).select('_id').lean();
+            const allowedSellerIds = allowedSellers.map(s => s._id);
+            photoOrderQuery = { seller: { $in: allowedSellerIds } };
+        }
+
+        const orders = await PhotoOrder.find(photoOrderQuery)
+            .populate("customer", "name phone email")
+            .populate("seller", "name shopName phone city address")
+            .sort({ createdAt: -1 });
+            
+        return handleResponse(res, 200, "Fetched photo orders successfully", orders);
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
+/* ===============================
+   ADMIN: GET PHOTO ORDER CHAT
+ ================================ */
+export const getAdminPhotoOrderChat = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { role, assignedZones } = req.user;
+
+        const order = await PhotoOrder.findById(id).populate("seller", "zoneId");
+        if (!order) return handleResponse(res, 404, "Order not found");
+
+        // Verify access for sub-admin
+        if (role === 'sub-admin') {
+            if (!assignedZones || assignedZones.length === 0) {
+                return handleResponse(res, 403, "Unauthorized access: No zones assigned");
+            }
+            if (!order.seller || !assignedZones.includes(order.seller.zoneId?.toString())) {
+                return handleResponse(res, 403, "Unauthorized access: Order outside your assigned zone");
+            }
+        }
+
+        return handleResponse(res, 200, "Messages fetched successfully", order.messages || []);
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
+/* ===============================
+   ADMIN: TOGGLE PHOTO ORDER CHAT
+ ================================ */
+export const toggleAdminPhotoOrderChat = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { chatDisabled, chatDisabledReason } = req.body;
+        const { role, assignedZones } = req.user;
+
+        const order = await PhotoOrder.findById(id).populate("seller", "zoneId");
+        if (!order) return handleResponse(res, 404, "Order not found");
+
+        // Verify access for sub-admin
+        if (role === 'sub-admin') {
+            if (!assignedZones || assignedZones.length === 0) {
+                return handleResponse(res, 403, "Unauthorized access: No zones assigned");
+            }
+            if (!order.seller || !assignedZones.includes(order.seller.zoneId?.toString())) {
+                return handleResponse(res, 403, "Unauthorized access: Order outside your assigned zone");
+            }
+        }
+
+        order.chatDisabled = chatDisabled;
+        if (chatDisabled) {
+            order.chatDisabledReason = chatDisabledReason || "Chat has been disabled by an administrator.";
+        } else {
+            order.chatDisabledReason = "";
+        }
+
+        await order.save();
+
+        try {
+            const io = getIO();
+            const statusPayload = {
+                orderId: order._id,
+                chatDisabled: order.chatDisabled,
+                chatDisabledReason: order.chatDisabledReason
+            };
+            
+            io.to(`photo_chat:${id}`).emit("photo_chat_status_update", statusPayload);
+            io.to(`customer:${order.customer}`).emit("photo_chat_status_update", statusPayload);
+            io.to(`seller:${order.seller._id}`).emit("photo_chat_status_update", statusPayload);
+        } catch (err) {
+            console.error("Socket error emitting chat status update:", err);
+        }
+
+        return handleResponse(res, 200, `Chat ${chatDisabled ? 'disabled' : 'enabled'} successfully`, {
+            chatDisabled: order.chatDisabled,
+            chatDisabledReason: order.chatDisabledReason
+        });
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }

@@ -19,6 +19,7 @@ import Pagination from '@shared/components/ui/Pagination';
 import { adminApi } from '../services/adminApi';
 import { toast } from 'sonner';
 import { formatDate } from '@shared/utils/formatDate';
+import MlmBannerManagerModal from '../components/MlmBannerManagerModal';
 
 const getTreeStats = (tree) => {
     let total = 0;
@@ -284,6 +285,7 @@ const ReferralsAndSubscriptions = () => {
     const [pageSize, setPageSize] = useState(25);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [isMlmModalOpen, setIsMlmModalOpen] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -347,6 +349,16 @@ const ReferralsAndSubscriptions = () => {
                     <div className="ds-stat-card-icon bg-amber-50">
                         <Gift className="ds-icon-lg text-amber-600" />
                     </div>
+                }
+                actions={
+                    <button
+                        type="button"
+                        onClick={() => setIsMlmModalOpen(true)}
+                        className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs rounded-xl shadow-md hover:shadow-orange-500/30 transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+                    >
+                        <Sparkles className="w-4 h-4" />
+                        <span>Customize MLM Banner</span>
+                    </button>
                 }
             />
 
@@ -540,6 +552,10 @@ const ReferralsAndSubscriptions = () => {
                     customer={selectedCustomerForTree}
                 />
             )}
+            <MlmBannerManagerModal
+                isOpen={isMlmModalOpen}
+                onClose={() => setIsMlmModalOpen(false)}
+            />
         </div>
     );
 };

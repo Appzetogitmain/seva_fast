@@ -31,6 +31,7 @@ import { useNavigate } from "react-router-dom";
 import { exportToCSV } from "@/lib/exportUtils";
 import { useSellerEarnings } from "../context/SellerEarningsContext";
 import { formatDate } from "@shared/utils/formatDate";
+import ProfitSummarySection from "../components/ProfitSummarySection";
 
 const Earnings = () => {
   const navigate = useNavigate();
@@ -269,6 +270,8 @@ const Earnings = () => {
           </div>
         </Card>
       </BlurFade>
+
+      <ProfitSummarySection />
 
       {/* Withdrawal Modal */}
       <AnimatePresence>

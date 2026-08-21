@@ -97,6 +97,8 @@ const ALLOWED_KEYS = [
   "riderEarningExtraFeePerKg",
   "riderExpressEarning",
   "riderExtraEarningPerKmBeyondSlabs",
+  "sellerDeliveryFeeSharePercent",
+  "mlmPromo",
 ];
 
 function flattenForMongoSet(prefix, value, target) {
@@ -234,6 +236,25 @@ const updateSettingsSchema = Joi.object({
   riderEarningExtraFeePerKg: Joi.number().min(0),
   riderExpressEarning: Joi.number().min(0),
   riderExtraEarningPerKmBeyondSlabs: Joi.number().min(0),
+  sellerDeliveryFeeSharePercent: Joi.number().min(0).max(100),
+  mlmPromo: Joi.object({
+    enabled: Joi.boolean(),
+    badgeText: Joi.string().allow("").max(100),
+    title: Joi.string().allow("").max(200),
+    subtitle: Joi.string().allow("").max(300),
+    ctaText: Joi.string().allow("").max(100),
+    ctaLink: Joi.string().allow("").max(500),
+    bannerBgColor: Joi.string().allow("").max(100),
+    customImageUrl: Joi.string().allow("").max(2000),
+    steps: Joi.array().items(
+      Joi.object({
+        stepNumber: Joi.number(),
+        title: Joi.string().allow("").max(100),
+        subtitle: Joi.string().allow("").max(200),
+        iconType: Joi.string().allow("").max(50),
+      })
+    ),
+  }).unknown(true),
 }).unknown(false);
 
 /**
@@ -254,7 +275,7 @@ export const getPublicSettings = async (req, res) => {
       async () => {
         const existing = await Setting.findOne(filter)
           .select(
-            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg createdAt updatedAt",
+            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo createdAt updatedAt",
           )
           .lean();
         return existing || null;
@@ -272,6 +293,22 @@ export const getPublicSettings = async (req, res) => {
     settings.firstOrderDiscountPercent = settings.firstOrderDiscountPercent ?? 10;
     settings.firstOrderFreeDelivery = settings.firstOrderFreeDelivery ?? true;
     settings.welcomeScratchCardEnabled = settings.welcomeScratchCardEnabled ?? true;
+    settings.mlmPromo = settings.mlmPromo || {
+      enabled: true,
+      badgeText: "SEVAFAST MLM",
+      title: "JOIN SEVAFAST MULTI LEVEL MARKETING",
+      subtitle: "Earn More, Refer More, Grow Your Network!",
+      ctaText: "JOIN NOW",
+      ctaLink: "/plans",
+      bannerBgColor: "#FFF6F0",
+      customImageUrl: "",
+      steps: [
+        { stepNumber: 1, title: "Register Free", subtitle: "Instant Activation", iconType: "edit" },
+        { stepNumber: 2, title: "Refer Your Friends", subtitle: "Share Referral Code", iconType: "users" },
+        { stepNumber: 3, title: "They Shop, You Earn", subtitle: "Direct & Team Commissions", iconType: "bag" },
+        { stepNumber: 4, title: "Unlimited Income", subtitle: "Multi-Level Growth", iconType: "income" },
+      ],
+    };
 
     return handleResponse(res, 200, "Settings fetched successfully", settings);
   } catch (error) {

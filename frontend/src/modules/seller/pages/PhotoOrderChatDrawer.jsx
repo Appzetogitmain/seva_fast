@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, Send, Phone, MessageCircle, FileText, IndianRupee } from "lucide-react";
+import { X, Send, Phone, MessageCircle, FileText, IndianRupee, Paperclip, Loader2, Download } from "lucide-react";
 import axiosInstance from "@core/api/axios";
 import { useAuth } from "@core/context/AuthContext";
-import { joinPhotoChatRoom, leavePhotoChatRoom, onPhotoChatMessage } from "@core/services/orderSocket";
+import { joinPhotoChatRoom, leavePhotoChatRoom, onPhotoChatMessage, onPhotoChatStatusUpdate } from "@core/services/orderSocket";
 import { toast } from "sonner";
 import { formatTime } from "@shared/utils/formatDate";
 
@@ -11,13 +11,27 @@ export const PhotoOrderChatDrawer = ({ isOpen, onClose, order }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [isChatDisabled, setIsChatDisabled] = useState(false);
+    const [disabledReason, setDisabledReason] = useState("");
     
     // Reply Card state
     const [showReplyForm, setShowReplyForm] = useState(false);
     const [replyNote, setReplyNote] = useState("");
     const [estimatedPrice, setEstimatedPrice] = useState("");
+    const [isUploading, setIsUploading] = useState(false);
 
     const messagesEndRef = useRef(null);
+    const fileInputRef = useRef(null);
+
+    // Lock body scroll when drawer is open to prevent background page from scrolling
+    useEffect(() => {
+        if (!isOpen) return;
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = originalOverflow;
+        };
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen || !order) return;
@@ -34,6 +48,11 @@ export const PhotoOrderChatDrawer = ({ isOpen, onClose, order }) => {
             }
         };
 
+        if (order.chatDisabled !== undefined) {
+            setIsChatDisabled(order.chatDisabled);
+            setDisabledReason(order.chatDisabledReason || "");
+        }
+
         fetchMessages();
 
         // Socket setup
@@ -48,9 +67,17 @@ export const PhotoOrderChatDrawer = ({ isOpen, onClose, order }) => {
             });
         });
 
+        const unSubStatus = onPhotoChatStatusUpdate(getToken, (payload) => {
+            if (payload?.orderId === order._id) {
+                setIsChatDisabled(payload.chatDisabled);
+                setDisabledReason(payload.chatDisabledReason);
+            }
+        });
+
         return () => {
             leavePhotoChatRoom(order._id, getToken);
             if (typeof unSubMsg === 'function') unSubMsg();
+            if (typeof unSubStatus === 'function') unSubStatus();
             setShowReplyForm(false);
         };
     }, [isOpen, order, token]);
@@ -80,6 +107,46 @@ export const PhotoOrderChatDrawer = ({ isOpen, onClose, order }) => {
         } catch (err) {
             toast.error("Failed to send message");
             setNewMessage(textToSend);
+        }
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("entityType", "other");
+            formData.append("resourceType", "image");
+
+            const uploadRes = await axiosInstance.post("/media/upload", formData, {
+                headers: { "Content-Type": "multipart/form-data" }
+            });
+
+            const uploadedUrl = uploadRes.data.result?.url || uploadRes.data.url || uploadRes.data?.data?.url;
+
+            if (uploadedUrl) {
+                const res = await axiosInstance.post(`/seller-photo-orders/${order._id}/chat`, {
+                    type: 'image',
+                    imageUrl: uploadedUrl
+                });
+                const sentMsg = res.data.result || res.data.results;
+                if (sentMsg) {
+                    setMessages((prev) => {
+                        const exists = prev.some(m => (m._id && sentMsg._id && m._id === sentMsg._id));
+                        return exists ? prev : [...prev, sentMsg];
+                    });
+                }
+            }
+        } catch (err) {
+            toast.error("Failed to upload image");
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
         }
     };
 
@@ -130,9 +197,29 @@ export const PhotoOrderChatDrawer = ({ isOpen, onClose, order }) => {
         }
     };
 
+    const handleDownload = async (url) => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `photo-${Date.now()}.jpg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            toast.error("Failed to download image");
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
+        <>
+        {/* Backdrop overlay to block interactions with page behind */}
+        <div className="fixed inset-0 z-[599] bg-black/20" onClick={onClose} />
         <div className="fixed inset-y-0 right-0 z-[600] w-full sm:w-96 bg-slate-50 shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300">
             {/* Header */}
             <div className="bg-white px-4 py-3 border-b border-slate-200 flex items-center justify-between shadow-sm z-10">
@@ -193,7 +280,7 @@ export const PhotoOrderChatDrawer = ({ isOpen, onClose, order }) => {
             )}
 
             {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 bg-slate-50" style={{ overscrollBehavior: 'contain' }}>
                 {/* Initial Context Message */}
                 <div className="flex flex-col items-center mb-6">
                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-100 px-2.5 py-1 rounded-full">Order Request</span>
@@ -241,6 +328,28 @@ export const PhotoOrderChatDrawer = ({ isOpen, onClose, order }) => {
                             );
                         }
 
+                        if (msg.type === "image" && msg.imageUrl) {
+                            return (
+                                <div key={msg._id || msg.createdAt} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                                    <div className={`max-w-[80%] rounded-2xl p-1.5 shadow-sm ${isMe ? "bg-indigo-600 rounded-br-none" : "bg-white border border-slate-200 rounded-bl-none"}`}>
+                                        <div className="relative group">
+                                            <img src={msg.imageUrl} alt="Chat Attachment" className="w-full h-auto max-h-64 object-cover rounded-xl pointer-events-none" />
+                                            <button 
+                                                onClick={() => handleDownload(msg.imageUrl)}
+                                                className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
+                                                title="Download Photo"
+                                            >
+                                                <Download size={16} />
+                                            </button>
+                                        </div>
+                                        <span className={`text-[10px] mt-1 mb-1 block px-2 text-right ${isMe ? "text-indigo-200" : "text-slate-400"}`}>
+                                            {formatTime(msg.createdAt)}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        }
+
                         // Normal text bubble
                         return (
                             <div key={msg._id || msg.createdAt} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
@@ -258,8 +367,32 @@ export const PhotoOrderChatDrawer = ({ isOpen, onClose, order }) => {
             </div>
 
             {/* Input Area */}
+            {isChatDisabled ? (
+                <div className="bg-red-50 p-4 border-t border-red-100 flex flex-col items-center justify-center text-red-600 text-center">
+                    <span className="font-bold text-sm mb-1 flex items-center gap-2">
+                        <X size={16} /> Chat Disabled by Administrator
+                    </span>
+                    {disabledReason && <span className="text-xs opacity-90">{disabledReason}</span>}
+                </div>
+            ) : (
             <form onSubmit={handleSendMessage} className="bg-white p-3 border-t border-slate-200">
                 <div className="flex items-center gap-2">
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        ref={fileInputRef} 
+                        onChange={handleImageUpload} 
+                        className="hidden" 
+                    />
+                    <button 
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors disabled:opacity-50"
+                        title="Attach Photo"
+                    >
+                        {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
+                    </button>
                     <input 
                         type="text"
                         value={newMessage}
@@ -269,13 +402,15 @@ export const PhotoOrderChatDrawer = ({ isOpen, onClose, order }) => {
                     />
                     <button 
                         type="submit"
-                        disabled={!newMessage.trim()}
+                        disabled={!newMessage.trim() || isUploading}
                         className="p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Send size={18} />
                     </button>
                 </div>
             </form>
+            )}
         </div>
+        </>
     );
 };

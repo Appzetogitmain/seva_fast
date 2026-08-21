@@ -1,6 +1,7 @@
 import Order from "../models/order.js";
 import Transaction from "../models/transaction.js";
 import Product from "../models/product.js";
+import Seller from "../models/seller.js";
 import handleResponse from "../utils/helper.js";
 import mongoose from "mongoose";
 import Wallet from "../models/wallet.js";
@@ -10,6 +11,10 @@ import {
   sellerOrderRevenueAmount,
   sellerOrderCostAmount,
   sellerOrderProfitAmount,
+  sellerOrderSellingPriceAmount,
+  sellerOrderCommissionAmount,
+  sellerOrderDeliveryEarningAmount,
+  sellerOrderCommissionExemptFlag,
 } from "../utils/sellerRevenue.js";
 import { releaseExpiredHeldSellerPayouts } from "../services/finance/orderFinanceService.js";
 import { formatDate, formatTime } from "../utils/formatDate.js";
@@ -433,6 +438,160 @@ export const getSellerEarnings = async (req, res) => {
                 customer: t.type === 'Withdrawal' ? 'Bank Transfer' : 'Customer',
                 ref: t.order ? `#${t.order.orderId}` : t.reference || t._id
             }))
+        });
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
+const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100;
+
+const emptyProfitBucket = () => ({
+    orderCount: 0,
+    sellingPrice: 0,
+    purchaseCost: 0,
+    commission: 0,
+    deliveryEarning: 0,
+    totalDeduction: 0,
+    netProfit: 0,
+    payout: 0,
+});
+
+function normalizeProfitBucket(raw) {
+    if (!raw) return emptyProfitBucket();
+    const sellingPrice = roundMoney(raw.sellingPrice);
+    const purchaseCost = roundMoney(raw.purchaseCost);
+    const commission = roundMoney(raw.commission);
+    const deliveryEarning = roundMoney(raw.deliveryEarning);
+    return {
+        orderCount: Number(raw.orderCount || 0),
+        sellingPrice,
+        purchaseCost,
+        commission,
+        deliveryEarning,
+        totalDeduction: roundMoney(purchaseCost + commission),
+        netProfit: roundMoney(raw.netProfit),
+        payout: roundMoney(raw.payout),
+    };
+}
+
+function divideBucket(bucket, count) {
+    if (!count) return emptyProfitBucket();
+    return {
+        orderCount: 1,
+        sellingPrice: roundMoney(bucket.sellingPrice / count),
+        purchaseCost: roundMoney(bucket.purchaseCost / count),
+        commission: roundMoney(bucket.commission / count),
+        deliveryEarning: roundMoney(bucket.deliveryEarning / count),
+        totalDeduction: roundMoney(bucket.totalDeduction / count),
+        netProfit: roundMoney(bucket.netProfit / count),
+        payout: roundMoney(bucket.payout / count),
+    };
+}
+
+/* ===============================
+   GET SELLER PROFIT SUMMARY (per-order + day/month/year)
+================================ */
+export const getSellerProfitSummary = async (req, res) => {
+    try {
+        const sellerId = req.user.id;
+        const sellerOid = new mongoose.Types.ObjectId(sellerId);
+
+        const seller = await Seller.findById(sellerId)
+            .select("commissionModel subscription oneTimeChargePaid")
+            .lean();
+
+        const now = new Date();
+        const isSubscriptionActive =
+            seller?.commissionModel === "PLAN_BASED" &&
+            seller?.subscription?.status === "active" &&
+            seller?.subscription?.expiresAt &&
+            new Date(seller.subscription.expiresAt) > now;
+        const isExempt =
+            isSubscriptionActive ||
+            (seller?.commissionModel === "ONE_TIME" && seller?.oneTimeChargePaid);
+
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const startOfMonth = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1);
+        const startOfYear = new Date(startOfToday.getFullYear(), 0, 1);
+
+        const groupStage = {
+            $group: {
+                _id: null,
+                orderCount: { $sum: 1 },
+                sellingPrice: { $sum: sellerOrderSellingPriceAmount() },
+                purchaseCost: { $sum: sellerOrderCostAmount() },
+                commission: { $sum: sellerOrderCommissionAmount() },
+                deliveryEarning: { $sum: sellerOrderDeliveryEarningAmount() },
+                netProfit: { $sum: sellerOrderProfitAmount() },
+                payout: { $sum: sellerOrderEarningAmount() },
+            },
+        };
+        const dateBucket = (startDate) =>
+            startDate
+                ? [{ $match: { deliveredAt: { $gte: startDate } } }, groupStage]
+                : [groupStage];
+
+        const [result] = await Order.aggregate([
+            { $match: sellerDeliveredOrderMatch(sellerOid) },
+            {
+                $facet: {
+                    today: dateBucket(startOfToday),
+                    thisMonth: dateBucket(startOfMonth),
+                    thisYear: dateBucket(startOfYear),
+                    allTime: dateBucket(null),
+                    recentOrders: [
+                        { $sort: { deliveredAt: -1 } },
+                        { $limit: 25 },
+                        {
+                            $project: {
+                                _id: 0,
+                                orderId: 1,
+                                deliveredAt: 1,
+                                payoutStatus: { $ifNull: ["$settlementStatus.sellerPayout", "PENDING"] },
+                                commissionExempt: sellerOrderCommissionExemptFlag(),
+                                sellingPrice: sellerOrderSellingPriceAmount(),
+                                purchaseCost: sellerOrderCostAmount(),
+                                commission: sellerOrderCommissionAmount(),
+                                deliveryEarning: sellerOrderDeliveryEarningAmount(),
+                                netProfit: sellerOrderProfitAmount(),
+                                payout: sellerOrderEarningAmount(),
+                            },
+                        },
+                    ],
+                },
+            },
+        ]);
+
+        const allTimeBucket = normalizeProfitBucket(result?.allTime?.[0]);
+
+        return handleResponse(res, 200, "Profit summary fetched successfully", {
+            planStatus: {
+                commissionModel: seller?.commissionModel || "CATEGORY_WISE",
+                isExempt,
+                planName: seller?.subscription?.planName || null,
+                expiresAt: seller?.subscription?.expiresAt || null,
+            },
+            summary: {
+                perOrderAvg: divideBucket(allTimeBucket, allTimeBucket.orderCount),
+                today: normalizeProfitBucket(result?.today?.[0]),
+                thisMonth: normalizeProfitBucket(result?.thisMonth?.[0]),
+                thisYear: normalizeProfitBucket(result?.thisYear?.[0]),
+                allTime: allTimeBucket,
+            },
+            recentOrders: (result?.recentOrders || []).map((order) => ({
+                orderId: order.orderId,
+                deliveredAt: order.deliveredAt,
+                payoutStatus: order.payoutStatus,
+                commissionExempt: order.commissionExempt,
+                sellingPrice: roundMoney(order.sellingPrice),
+                purchaseCost: roundMoney(order.purchaseCost),
+                commission: roundMoney(order.commission),
+                deliveryEarning: roundMoney(order.deliveryEarning),
+                netProfit: roundMoney(order.netProfit),
+                payout: roundMoney(order.payout),
+            })),
         });
     } catch (error) {
         return handleResponse(res, 500, error.message);

@@ -401,6 +401,17 @@ const settingSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+        // Seller's cut of what's LEFT of the delivery fee after the rider is
+        // paid (rider is always paid first, in full). E.g. 80 = seller gets
+        // 80% of the remainder, admin keeps the rest. 0 = sellers get nothing
+        // from delivery fee at all. If the rider's payout consumes the whole
+        // fee (or more), there's nothing left to split regardless of this %.
+        sellerDeliveryFeeSharePercent: {
+            type: Number,
+            default: 80,
+            min: 0,
+            max: 100,
+        },
 
         // First Order Welcome Offer & Scratch Card Config
         firstOrderDiscountPercent: {
@@ -416,6 +427,59 @@ const settingSchema = new mongoose.Schema(
         welcomeScratchCardEnabled: {
             type: Boolean,
             default: true,
+        },
+
+        // MLM Promotional Section Configuration
+        mlmPromo: {
+            enabled: {
+                type: Boolean,
+                default: true,
+            },
+            badgeText: {
+                type: String,
+                default: "SEVAFAST MLM",
+            },
+            title: {
+                type: String,
+                default: "JOIN SEVAFAST MULTI LEVEL MARKETING",
+            },
+            subtitle: {
+                type: String,
+                default: "Earn More, Refer More, Grow Your Network!",
+            },
+            ctaText: {
+                type: String,
+                default: "JOIN NOW",
+            },
+            ctaLink: {
+                type: String,
+                default: "/plans",
+            },
+            bannerBgColor: {
+                type: String,
+                default: "#FFF6F0",
+            },
+            customImageUrl: {
+                type: String,
+                default: "",
+            },
+            steps: {
+                type: [
+                    {
+                        _id: false,
+                        stepNumber: { type: Number, default: 1 },
+                        title: { type: String, default: "Register Free" },
+                        subtitle: { type: String, default: "Quick & Easy" },
+                        iconType: { type: String, default: "edit" },
+                    },
+                ],
+                default: () => [
+                    { stepNumber: 1, title: "Register Free", subtitle: "Instant Activation", iconType: "edit" },
+                    { stepNumber: 2, title: "Refer Your Friends", subtitle: "Share Referral Code", iconType: "users" },
+                    { stepNumber: 3, title: "They Shop, You Earn", subtitle: "Direct & Team Commissions", iconType: "bag" },
+                    { stepNumber: 4, title: "Unlimited Income", subtitle: "Multi-Level Growth", iconType: "income" },
+                ],
+            },
         },
     },
     {

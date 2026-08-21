@@ -289,3 +289,9 @@ export function onPhotoChatMessage(getToken, handler) {
   return () => s.off("photo_chat_message", handler);
 }
 
+export function onPhotoChatStatusUpdate(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("photo_chat_status_update", handler);
+  return () => s.off("photo_chat_status_update", handler);
+}

@@ -220,4 +220,9 @@ export const adminApi = {
     deleteStorePromotionPlan: (id) => axiosInstance.delete(`/store-promotions/admin/plans/${id}`),
     getAdminStorePromotionPurchases: () => axiosInstance.get('/store-promotions/admin/purchases'),
     updateStorePromotionCampaignStatus: (id, data) => axiosInstance.patch(`/store-promotions/admin/purchases/${id}/status`, data),
+
+    // Custom Photo Orders (Admin & Sub-Admin)
+    getAdminPhotoOrders: () => axiosInstance.get('/admin/photo-orders'),
+    getAdminPhotoOrderChat: (id) => axiosInstance.get(`/admin/photo-orders/${id}/chat`),
+    toggleAdminPhotoOrderChat: (id, data) => axiosInstance.patch(`/admin/photo-orders/${id}/toggle-chat`, data),
 };

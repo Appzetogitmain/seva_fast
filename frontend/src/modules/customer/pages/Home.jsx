@@ -41,6 +41,7 @@ import LowestPriceSection from "../components/home/LowestPriceSection";
 import OfferSections from "../components/home/OfferSections";
 import PlatformBannerSlider from "../components/home/PlatformBannerSlider";
 import LocalServiceProvidersSection from "../components/home/LocalServiceProvidersSection";
+import MlmPromotionalBanner from "../components/home/MlmPromotionalBanner";
 import ServiceUnavailableSection from "@shared/components/ServiceUnavailableSection";
 import { CustomPhotoOrderModal } from "../components/shared/CustomPhotoOrderModal";
 
@@ -538,6 +539,10 @@ const Home = () => {
           <div className="px-4 lg:px-8 max-w-7xl mx-auto">
             <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => navigate(`/category/${id}`)} />
             <LowestPriceSection products={lowestPriceProducts} onSeeAll={() => navigate("/category/all")} />
+            
+            {/* MLM Multi-Level Marketing Promotional Banner */}
+            <MlmPromotionalBanner />
+
             {activePlatformAds && activePlatformAds.length > 0 && (
               <div className="pt-4 pb-4">
                 <PlatformBannerSlider ads={activePlatformAds} />

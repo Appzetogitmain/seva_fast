@@ -101,6 +101,22 @@ const AdminSettings = () => {
         firstOrderDiscountPercent: 10,
         firstOrderFreeDelivery: true,
         welcomeScratchCardEnabled: true,
+        mlmPromo: {
+            enabled: true,
+            badgeText: "SEVAFAST MLM",
+            title: "JOIN SEVAFAST MULTI LEVEL MARKETING",
+            subtitle: "Earn More, Refer More, Grow Your Network!",
+            ctaText: "JOIN NOW",
+            ctaLink: "/plans",
+            bannerBgColor: "#FFF6F0",
+            customImageUrl: "",
+            steps: [
+                { stepNumber: 1, title: "Register Free", subtitle: "Instant Activation", iconType: "edit" },
+                { stepNumber: 2, title: "Refer Your Friends", subtitle: "Share Referral Code", iconType: "users" },
+                { stepNumber: 3, title: "They Shop, You Earn", subtitle: "Direct & Team Commissions", iconType: "bag" },
+                { stepNumber: 4, title: "Unlimited Income", subtitle: "Multi-Level Growth", iconType: "income" },
+            ],
+        },
     });
 
     useEffect(() => {
@@ -118,6 +134,7 @@ const AdminSettings = () => {
                         firstOrderDiscountPercent: data.firstOrderDiscountPercent ?? 10,
                         firstOrderFreeDelivery: data.firstOrderFreeDelivery ?? true,
                         welcomeScratchCardEnabled: data.welcomeScratchCardEnabled ?? true,
+                        mlmPromo: data.mlmPromo || prev.mlmPromo,
                     }));
                 }
             } catch (error) {
@@ -165,6 +182,30 @@ const AdminSettings = () => {
 
     const handleInputChange = (field, value) => {
         setSettings(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleMlmPromoChange = (field, value) => {
+        setSettings(prev => ({
+            ...prev,
+            mlmPromo: {
+                ...(prev.mlmPromo || {}),
+                [field]: value,
+            },
+        }));
+    };
+
+    const handleMlmStepChange = (index, field, value) => {
+        setSettings(prev => {
+            const steps = [...(prev.mlmPromo?.steps || [])];
+            steps[index] = { ...(steps[index] || {}), [field]: value };
+            return {
+                ...prev,
+                mlmPromo: {
+                    ...(prev.mlmPromo || {}),
+                    steps,
+                },
+            };
+        });
     };
 
     const handleProductApprovalToggle = (field) => {
@@ -309,6 +350,7 @@ const AdminSettings = () => {
 
     const tabs = [
         { id: 'general', label: 'General', icon: Settings },
+        { id: 'mlmPromo', label: 'MLM Promo Banner', icon: Sparkles },
         { id: 'welcomeOffer', label: 'Welcome Scratch Card & Offer', icon: Gift },
         { id: 'branding', label: 'Branding', icon: Globe },
         { id: 'certificate', label: 'Seller Certificate', icon: Award },
@@ -1129,6 +1171,159 @@ const AdminSettings = () => {
                                 </div>
                             </div>
                         </Card>
+                    )}
+
+                    {/* MLM Promo Banner Settings */}
+                    {activeTab === 'mlmPromo' && (
+                        <div className="space-y-6">
+                            <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
+                                <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-3">
+                                            MLM Promotional Banner Configuration
+                                            <div className="p-1 bg-orange-100 text-orange-600 rounded-lg">
+                                                <Sparkles className="h-4 w-4" />
+                                            </div>
+                                        </h3>
+                                        <p className="text-xs text-slate-500 font-medium mt-1">
+                                            Control the banner on the customer homepage that attracts customers to join your MLM network
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-bold text-slate-600">Banner Enabled</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleMlmPromoChange('enabled', !settings.mlmPromo?.enabled)}
+                                            className={cn(
+                                                "relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none",
+                                                settings.mlmPromo?.enabled ? "bg-orange-500" : "bg-slate-200"
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    "inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform duration-200",
+                                                    settings.mlmPromo?.enabled ? "translate-x-7" : "translate-x-1"
+                                                )}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                Badge Text
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={settings.mlmPromo?.badgeText || ''}
+                                                onChange={(e) => handleMlmPromoChange('badgeText', e.target.value)}
+                                                placeholder="e.g. SEVAFAST MLM"
+                                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500/20"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                Button Action Link
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={settings.mlmPromo?.ctaLink || ''}
+                                                onChange={(e) => handleMlmPromoChange('ctaLink', e.target.value)}
+                                                placeholder="e.g. /plans"
+                                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500/20"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                Main Banner Title
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={settings.mlmPromo?.title || ''}
+                                                onChange={(e) => handleMlmPromoChange('title', e.target.value)}
+                                                placeholder="e.g. JOIN SEVAFAST MULTI LEVEL MARKETING"
+                                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500/20"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                CTA Button Text
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={settings.mlmPromo?.ctaText || ''}
+                                                onChange={(e) => handleMlmPromoChange('ctaText', e.target.value)}
+                                                placeholder="e.g. JOIN NOW"
+                                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500/20"
+                                            />
+                                        </div>
+
+                                        <div className="md:col-span-2 space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                Subtitle / Tagline
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={settings.mlmPromo?.subtitle || ''}
+                                                onChange={(e) => handleMlmPromoChange('subtitle', e.target.value)}
+                                                placeholder="e.g. Earn More, Refer More, Grow Your Network!"
+                                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-orange-500/20"
+                                            />
+                                        </div>
+
+                                        <div className="md:col-span-2 space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                Optional Full Graphic Image URL (Overrides Vector Diagram)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={settings.mlmPromo?.customImageUrl || ''}
+                                                onChange={(e) => handleMlmPromoChange('customImageUrl', e.target.value)}
+                                                placeholder="https://... (Leave empty to use the built-in dynamic vector illustration)"
+                                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-normal text-slate-900 outline-none focus:ring-2 focus:ring-orange-500/20"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Steps Customization */}
+                                    <div className="pt-4 border-t border-slate-100 space-y-3">
+                                        <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                                            4 Benefit Process Steps
+                                        </h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {(settings.mlmPromo?.steps || []).map((step, idx) => (
+                                                <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+                                                    <span className="text-xs font-extrabold text-orange-600">
+                                                        Step {step.stepNumber || idx + 1}
+                                                    </span>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={step.title || ''}
+                                                            onChange={(e) => handleMlmStepChange(idx, 'title', e.target.value)}
+                                                            placeholder="Step Title"
+                                                            className="text-xs font-bold px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-orange-500"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={step.subtitle || ''}
+                                                            onChange={(e) => handleMlmStepChange(idx, 'subtitle', e.target.value)}
+                                                            placeholder="Short Note"
+                                                            className="text-xs font-medium px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-orange-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
                     )}
                 </div>
             </div>

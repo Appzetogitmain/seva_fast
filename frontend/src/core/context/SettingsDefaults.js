@@ -54,6 +54,22 @@ export const DEFAULT_SETTINGS = {
     sellerCreateRequiresApproval: false,
     sellerEditRequiresApproval: false,
   },
+  mlmPromo: {
+    enabled: true,
+    badgeText: "SEVAFAST MLM",
+    title: "JOIN SEVAFAST MULTI LEVEL MARKETING",
+    subtitle: "Earn More, Refer More, Grow Your Network!",
+    ctaText: "JOIN NOW",
+    ctaLink: "/plans",
+    bannerBgColor: "#FFF6F0",
+    customImageUrl: "",
+    steps: [
+      { stepNumber: 1, title: "Register Free", subtitle: "Instant Activation", iconType: "edit" },
+      { stepNumber: 2, title: "Refer Your Friends", subtitle: "Share Referral Code", iconType: "users" },
+      { stepNumber: 3, title: "They Shop, You Earn", subtitle: "Direct & Team Commissions", iconType: "bag" },
+      { stepNumber: 4, title: "Unlimited Income", subtitle: "Multi-Level Growth", iconType: "income" },
+    ],
+  },
 };
 
 /**

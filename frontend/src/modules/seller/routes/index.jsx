@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import DashboardLayout from "@shared/layout/DashboardLayout";
 import Orders from "../pages/Orders";
 import { socketService } from "@core/services/socket";
+import { onPhotoOrderMessage } from "@core/services/orderSocket";
 import { toast } from "sonner";
 import { useAuth } from "@core/context/AuthContext";
 import SellerCertificateModal from "../components/SellerCertificateModal";
@@ -111,7 +112,7 @@ const playBeep = () => {
 
 const SellerRoutes = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
   useEffect(() => {
     const handleNewPhotoOrder = (order) => {
@@ -141,8 +142,38 @@ const SellerRoutes = () => {
     };
 
     socketService.on("new_photo_order", handleNewPhotoOrder);
-    return () => socketService.off("new_photo_order", handleNewPhotoOrder);
-  }, [navigate]);
+
+    const cleanupMessage = onPhotoOrderMessage(token, (payload) => {
+      playBeep();
+      toast.custom((t) => (
+        <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-indigo-500 flex flex-col gap-2 w-80">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+              <HiOutlinePhoto size={20} />
+            </div>
+            <div>
+              <h4 className="font-bold text-gray-900">Message from {payload.customerName || "Customer"}</h4>
+              <p className="text-sm text-gray-500 line-clamp-1">{payload.text || 'Sent a message'}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => {
+              toast.dismiss(t);
+              navigate(`/seller/photo-orders`);
+            }}
+            className="mt-2 w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            Reply
+          </button>
+        </div>
+      ), { duration: 8000 });
+    });
+
+    return () => {
+      socketService.off("new_photo_order", handleNewPhotoOrder);
+      cleanupMessage();
+    };
+  }, [navigate, token]);
 
   return (
     <DashboardLayout navItems={navItems} title="Seller Panel">

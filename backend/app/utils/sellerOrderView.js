@@ -76,7 +76,8 @@ export function sanitizeOrderForSellerView(order) {
   const deliveryFee = Number(
     order.pricing?.deliveryFee ?? order.paymentBreakdown?.deliveryFeeCharged ?? 0,
   );
-  const { sellerDeliveryFeeShare } = splitDeliveryFee(deliveryFee);
+  const riderPayoutTotal = Number(order.paymentBreakdown?.riderPayoutTotal ?? 0);
+  const { sellerDeliveryFeeShare } = splitDeliveryFee(deliveryFee, riderPayoutTotal);
   const productEarning = roundCurrency(
     Math.max(earning - sellerDeliveryFeeShare, 0),
   );

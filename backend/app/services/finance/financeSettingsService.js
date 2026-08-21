@@ -40,6 +40,7 @@ const DEFAULT_FINANCE_SETTINGS = {
   riderEarningExtraFeePerKg: 10,
   riderExpressEarning: 100,
   riderExtraEarningPerKmBeyondSlabs: 0,
+  sellerDeliveryFeeSharePercent: 80,
   handlingFeeStrategy: HANDLING_FEE_STRATEGY.HIGHEST_CATEGORY_FEE,
   codEnabled: true,
   onlineEnabled: true,
@@ -137,6 +138,10 @@ export function normalizeFinanceSettings(raw = {}) {
     riderEarningExtraFeePerKg: roundCurrency(raw.riderEarningExtraFeePerKg ?? DEFAULT_FINANCE_SETTINGS.riderEarningExtraFeePerKg),
     riderExpressEarning: roundCurrency(raw.riderExpressEarning ?? DEFAULT_FINANCE_SETTINGS.riderExpressEarning),
     riderExtraEarningPerKmBeyondSlabs: roundCurrency(raw.riderExtraEarningPerKmBeyondSlabs ?? DEFAULT_FINANCE_SETTINGS.riderExtraEarningPerKmBeyondSlabs),
+    sellerDeliveryFeeSharePercent: Math.min(
+      100,
+      Math.max(0, Number(raw.sellerDeliveryFeeSharePercent ?? DEFAULT_FINANCE_SETTINGS.sellerDeliveryFeeSharePercent)),
+    ),
     handlingFeeStrategy,
     codEnabled: raw.codEnabled ?? DEFAULT_FINANCE_SETTINGS.codEnabled,
     onlineEnabled: raw.onlineEnabled ?? DEFAULT_FINANCE_SETTINGS.onlineEnabled,

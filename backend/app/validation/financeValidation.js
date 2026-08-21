@@ -180,6 +180,7 @@ export const updateDeliverySettingsSchema = Joi.object({
   riderEarningExtraFeePerKg: Joi.number().min(0).optional(),
   riderExpressEarning: Joi.number().min(0).optional(),
   riderExtraEarningPerKmBeyondSlabs: Joi.number().min(0).optional(),
+  sellerDeliveryFeeSharePercent: Joi.number().min(0).max(100).optional(),
 }).or(
   "deliveryPricingMode",
   "pricingMode",

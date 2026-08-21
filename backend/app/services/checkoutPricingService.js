@@ -255,7 +255,6 @@ function applyGlobalHandlingFeeToSellerBreakdowns(
 
     const productSubtotal = Number(breakdown.productSubtotal || 0);
     const deliveryFeeCharged = Number(breakdown.deliveryFeeCharged || 0);
-    const deliveryFeeBase = Number(breakdown.deliveryFeeBase ?? deliveryFeeCharged);
     const discountTotal = Number(breakdown.discountTotal || 0);
     const taxTotal = Number(breakdown.taxTotal || 0);
     const adminProductCommissionTotal = Number(breakdown.adminProductCommissionTotal || 0);
@@ -266,7 +265,6 @@ function applyGlobalHandlingFeeToSellerBreakdowns(
 
     const logistics = recalculateLogisticsEarnings({
       deliveryFeeCharged,
-      deliveryFeeBase,
       handlingFeeCharged,
       adminProductCommissionTotal,
       tipTotal: breakdown.tipTotal || 0,
@@ -277,6 +275,10 @@ function applyGlobalHandlingFeeToSellerBreakdowns(
       riderPayoutDistance: breakdown.riderPayoutDistance || 0,
       riderPayoutBonus: breakdown.riderPayoutBonus || 0,
       riderPayoutTotal: breakdown.riderPayoutTotal || 0,
+      // Same admin-configured % used by the original generateOrderPaymentBreakdown
+      // call — carried via the settings snapshot so this redistribution pass
+      // (triggered by handling-fee reallocation) stays consistent with it.
+      sellerDeliveryFeeSharePercent: breakdown.snapshots?.deliverySettings?.sellerDeliveryFeeSharePercent,
     });
     Object.assign(breakdown, logistics);
     breakdown.sellerPayoutTotal = round2(

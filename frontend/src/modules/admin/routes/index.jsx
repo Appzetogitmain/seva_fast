@@ -110,9 +110,10 @@ const AuthActivityLogs = React.lazy(() => import("../pages/AuthActivityLogs"));
 const AdminProfile = React.lazy(() => import("../pages/AdminProfile"));
 const PlanManagement = React.lazy(() => import("../pages/PlanManagement"));
 const AdminReviews = React.lazy(() => import("../pages/AdminReviews"));
-const WhatsAppCampaigns = React.lazy(() => import("../pages/WhatsAppCampaigns"));
-const WhatsAppTemplates = React.lazy(() => import("../pages/WhatsAppTemplates"));
+// const WhatsAppCampaigns = React.lazy(() => import("../pages/WhatsAppCampaigns"));
+// const WhatsAppTemplates = React.lazy(() => import("../pages/WhatsAppTemplates"));
 const StorePromotions = React.lazy(() => import("../pages/StorePromotions"));
+const AdminPhotoOrders = React.lazy(() => import("../pages/AdminPhotoOrders"));
 
 const navItems = [
   {
@@ -150,8 +151,8 @@ const navItems = [
       { label: "Create Sections", path: "/admin/experience-studio" },
       { label: "Hero & categories per page", path: "/admin/hero-categories" },
       { label: "Send Notifications", path: "/admin/notifications" },
-      { label: "WhatsApp Campaigns", path: "/admin/whatsapp-campaigns" },
-      { label: "WhatsApp Templates", path: "/admin/whatsapp-templates" },
+      // { label: "WhatsApp Campaigns", path: "/admin/whatsapp-campaigns" },
+      // { label: "WhatsApp Templates", path: "/admin/whatsapp-templates" },
       { label: "Coupons & Promos", path: "/admin/coupons" },
       { label: "Offer Sections", path: "/admin/offer-sections" },
       { label: "Shop by Store", path: "/admin/shop-by-store" },
@@ -237,6 +238,7 @@ const navItems = [
       { label: "Cancelled", path: "/admin/orders/cancelled" },
       { label: "Returned", path: "/admin/orders/returned" },
       { label: "Return Requests", path: "/admin/returns" },
+      { label: "Photo Orders", path: "/admin/photo-orders" },
     ],
   },
   {
@@ -344,8 +346,8 @@ const AdminRoutes = () => {
         <Route path="/experience-studio" element={<SubadminRoute permission="Marketing Tools"><ContentManager /></SubadminRoute>} />
         <Route path="/hero-categories" element={<SubadminRoute permission="Marketing Tools"><HeroCategoriesPerPage /></SubadminRoute>} />
         <Route path="/notifications" element={<SubadminRoute permission="Marketing Tools"><NotificationComposer /></SubadminRoute>} />
-        <Route path="/whatsapp-campaigns" element={<SubadminRoute permission="Marketing Tools"><WhatsAppCampaigns /></SubadminRoute>} />
-        <Route path="/whatsapp-templates" element={<SubadminRoute permission="Marketing Tools"><WhatsAppTemplates /></SubadminRoute>} />
+        {/* <Route path="/whatsapp-campaigns" element={<SubadminRoute permission="Marketing Tools"><WhatsAppCampaigns /></SubadminRoute>} /> */}
+        {/* <Route path="/whatsapp-templates" element={<SubadminRoute permission="Marketing Tools"><WhatsAppTemplates /></SubadminRoute>} /> */}
         <Route path="/store-promotions" element={<SubadminRoute permission="Marketing Tools"><StorePromotions /></SubadminRoute>} />
         <Route path="/offers" element={<SubadminRoute permission="Marketing Tools"><OffersManagement /></SubadminRoute>} />
         <Route path="/offer-sections" element={<SubadminRoute permission="Marketing Tools"><OfferSectionsManagement /></SubadminRoute>} />
@@ -372,6 +374,7 @@ const AdminRoutes = () => {
         <Route path="/orders/:status" element={<SubadminRoute permission="Orders"><OrdersList /></SubadminRoute>} />
         <Route path="/orders/view/:orderId" element={<SubadminRoute permission="Orders"><OrderDetail /></SubadminRoute>} />
         <Route path="/returns" element={<SubadminRoute permission="Orders"><Returns /></SubadminRoute>} />
+        <Route path="/photo-orders" element={<SubadminRoute permission="Orders"><AdminPhotoOrders /></SubadminRoute>} />
         <Route path="/billing" element={<SubadminRoute permission="Fees & Charges"><BillingCharges /></SubadminRoute>} />
         <Route path="/legal-documents" element={<SubadminRoute permission="Legal Documents"><AdminLegalDocuments /></SubadminRoute>} />
         <Route path="/settings" element={<SubadminRoute permission="Settings"><AdminSettings /></SubadminRoute>} />
