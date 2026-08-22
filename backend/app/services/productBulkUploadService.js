@@ -566,6 +566,7 @@ export async function bulkCreateProductsFromRows(rows, { sellerId }) {
 
   const errors = [];
   const products = [];
+  const batchNames = new Set();
   let created = 0;
 
   for (let i = 0; i < rows.length; i++) {
@@ -578,6 +579,26 @@ export async function bulkCreateProductsFromRows(rows, { sellerId }) {
         errors.push({ row: excelRow, name: "", message: "Product name is required" });
         continue;
       }
+
+      const trimmedName = name.trim();
+      const lowerName = trimmedName.toLowerCase();
+      if (batchNames.has(lowerName)) {
+        errors.push({ row: excelRow, name, message: `Duplicate product "${trimmedName}" in the same upload file` });
+        continue;
+      }
+
+      const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const existingProduct = await Product.findOne({
+        sellerId,
+        name: { $regex: new RegExp(`^${escapedName}$`, 'i') }
+      }).lean();
+
+      if (existingProduct) {
+        errors.push({ row: excelRow, name, message: `Product "${trimmedName}" already exists in your inventory` });
+        continue;
+      }
+
+      batchNames.add(lowerName);
 
       const price = cellNum(row, "price");
       if (price === null || price < 0) {
