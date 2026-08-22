@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { sellerApi } from "../services/sellerApi";
+import { Sparkles, Camera, UploadCloud, Check, Loader2 } from "lucide-react";
 
 const CardTitle = (Icon, text) => (
   <span className="inline-flex items-center">
@@ -35,6 +36,7 @@ const CardTitle = (Icon, text) => (
 const AddProduct = () => {
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
+  const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
 
   const uniqueSuffix = useMemo(() => Math.random().toString(36).substring(2, 6).toUpperCase(), []);
 
@@ -51,16 +53,9 @@ const AddProduct = () => {
     return String(sku || "").toUpperCase() === makeSku(name, index);
   }, [makeSku]);
 
-  const [formData, setFormData] = useState(() => {
-    const saved = localStorage.getItem("seller_add_product_draft");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return {
-      name: "",
-      slug: "",
+  const getBlankFormData = React.useCallback(() => ({
+    name: "",
+    slug: "",
     sku: "",
     description: "",
     price: "",
@@ -73,6 +68,7 @@ const AddProduct = () => {
     header: "",
     status: "active",
     tags: "",
+    aiGenerated: false,
     weight: "",
     weightVal: "",
     weightUnit: "kg",
@@ -84,10 +80,12 @@ const AddProduct = () => {
     isReturnable: true,
     returnWindowDays: 1,
     mainImage: null,
+    mainImageFile: null,
     galleryImages: [],
+    galleryFiles: [],
     variants: [
       {
-        id: crypto.randomUUID(),
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
         name: "",
         price: "",
         salePrice: "",
@@ -96,11 +94,124 @@ const AddProduct = () => {
         sku: "",
       },
     ],
+  }), []);
+
+  const [formData, setFormData] = useState(() => {
+    const saved = localStorage.getItem("seller_add_product_draft");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      name: "",
+      slug: "",
+      sku: "",
+      description: "",
+      price: "",
+      salePrice: "",
+      costPrice: "",
+      stock: "",
+      lowStockAlert: 5,
+      category: "",
+      subcategory: "",
+      header: "",
+      status: "active",
+      tags: "",
+      aiGenerated: false,
+      weight: "",
+      weightVal: "",
+      weightUnit: "kg",
+      packageLength: "",
+      packageBreadth: "",
+      packageHeight: "",
+      deliveryType: "instant",
+      brand: "",
+      isReturnable: true,
+      returnWindowDays: 1,
+      mainImage: null,
+      galleryImages: [],
+      variants: [
+        {
+          id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+          name: "",
+          price: "",
+          salePrice: "",
+          costPrice: "",
+          stock: "",
+          sku: "",
+        },
+      ],
     };
   });
 
   const [dbCategories, setDbCategories] = useState([]);
   const [isLoadingCats, setIsLoadingCats] = useState(true);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiSuggestedTitle, setAiSuggestedTitle] = useState(null);
+
+  const handleDiscard = (shouldNavigate = false) => {
+    localStorage.removeItem("seller_add_product_draft");
+    setFormData(getBlankFormData());
+    setAiSuggestedTitle(null);
+    toast.success("Draft discarded. Form cleared for new product.");
+    if (shouldNavigate) {
+      navigate("/seller/products");
+    }
+  };
+
+  const handleAutoFillFromPhoto = async (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Data = reader.result.replace(/^data:(.*,)?/, "");
+      const previewUrl = reader.result;
+
+      // Immediately set the uploaded image as main cover
+      setFormData((prev) => ({
+        ...prev,
+        mainImage: previewUrl,
+        mainImageFile: file,
+      }));
+
+      setIsAnalyzingImage(true);
+      try {
+        const res = await sellerApi.generateListingFromImage({
+          imageBase64: base64Data,
+          mimeType: file.type || "image/jpeg",
+        });
+
+        const data = res.data.result || res.data.data || {};
+
+        setFormData((prev) => ({
+          ...prev,
+          name: data.title || prev.name,
+          description: data.description || prev.description,
+          tags: data.tags || prev.tags,
+          brand: data.brand || prev.brand,
+          weightVal: data.weightVal || prev.weightVal,
+          weightUnit: data.weightUnit || prev.weightUnit || "kg",
+          deliveryType: data.deliveryType || prev.deliveryType || "instant",
+          header: data.header || prev.header,
+          category: data.category || prev.category,
+          subcategory: data.subcategory || prev.subcategory,
+          aiGenerated: true,
+        }));
+
+        if (data.title) {
+          setAiSuggestedTitle(data.title);
+        }
+
+        toast.success(`AI identified "${data.title || "product"}" and auto-filled details!`);
+      } catch (err) {
+        console.error("AI image analysis failed:", err);
+        toast.error(err.response?.data?.message || "Could not auto-fill from photo. Please fill manually.");
+      } finally {
+        setIsAnalyzingImage(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     localStorage.setItem("seller_add_product_draft", JSON.stringify(formData));
@@ -149,6 +260,41 @@ const AddProduct = () => {
   }, []);
 
   const categories = dbCategories;
+
+  const selectedCategoryName = categories
+    .find((h) => (h._id || h.id) === formData.header)
+    ?.children?.find((c) => (c._id || c.id) === formData.category)?.name;
+
+  const handleGenerateWithAi = async () => {
+    if (!formData.name.trim()) {
+      toast.error("Enter a product name first");
+      return;
+    }
+    setIsGeneratingAi(true);
+    try {
+      const res = await sellerApi.generateAiListing({
+        name: formData.name,
+        categoryName: selectedCategoryName,
+        notes: formData.description,
+        existingTags: formData.tags
+          ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean)
+          : [],
+      });
+      const result = res.data?.result || {};
+      setFormData((prev) => ({
+        ...prev,
+        description: result.description || prev.description,
+        tags: Array.isArray(result.tags) ? result.tags.join(", ") : prev.tags,
+        aiGenerated: true,
+      }));
+      setAiSuggestedTitle(result.title || null);
+      toast.success("Generated with AI — review before saving");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to generate listing");
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
 
   const handleSave = async () => {
     // Validate required fields
@@ -239,6 +385,7 @@ const AddProduct = () => {
 
       // Tags
       data.append("tags", formData.tags);
+      data.append("aiGenerated", formData.aiGenerated);
 
       // Images
       if (formData.mainImageFile) {
@@ -319,11 +466,27 @@ const AddProduct = () => {
             Fill in the details below to list a new item in your store.
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" className="flex-1 md:flex-none" onClick={() => navigate(-1)}>
+        <div className="flex gap-2.5 flex-wrap items-center">
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1 md:flex-none text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+            onClick={() => handleDiscard(false)}
+            title="Clear all fields and discard draft"
+          >
+            <HiOutlineTrash className="mr-1.5 h-4 w-4" />
+            Discard / Clear
+          </Button>
+          <Button 
+            type="button"
+            variant="outline" 
+            className="flex-1 md:flex-none text-slate-600" 
+            onClick={() => handleDiscard(true)}
+          >
             Cancel
           </Button>
           <Button
+            type="button"
             onClick={handleSave}
             disabled={isSaving}
             className="flex-1 md:flex-none md:min-w-[140px]">
@@ -342,6 +505,68 @@ const AddProduct = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Main Content Column */}
         <div className="lg:col-span-2 space-y-6">
+          {/* AI Image-to-Listing Auto-Fill Card */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-primary/10 via-orange-500/10 to-amber-400/10 border-2 border-dashed border-primary/40 rounded-2xl p-4 sm:p-5 shadow-xs transition-all hover:border-primary">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-primary to-orange-500 text-white flex items-center justify-center shadow-md shadow-primary/20 shrink-0">
+                  <Sparkles size={22} className="animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                      Image-to-Listing Auto-Fill
+                    </h3>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-primary text-white uppercase tracking-wider">
+                      AI Magic
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                    Product photo upload karein — Gemini AI automatically <strong>Title, Description, Tags, Category & Weight</strong> fill kar dega!
+                  </p>
+                </div>
+              </div>
+
+              <label className="cursor-pointer shrink-0 w-full sm:w-auto">
+                <div className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all ${
+                  isAnalyzingImage 
+                    ? "bg-slate-200 text-slate-500 cursor-not-allowed" 
+                    : "bg-primary text-white hover:bg-primary/90 hover:scale-102 cursor-pointer"
+                }`}>
+                  {isAnalyzingImage ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin text-primary" />
+                      <span>Scanning Photo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera size={16} />
+                      <span>Upload Photo & Auto-Fill</span>
+                    </>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={isAnalyzingImage}
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleAutoFillFromPhoto(e.target.files[0]);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+
+            {isAnalyzingImage && (
+              <div className="mt-3 pt-3 border-t border-primary/20 flex items-center gap-2 text-xs font-semibold text-primary animate-pulse">
+                <Sparkles size={14} className="animate-spin" />
+                <span>Gemini AI is analyzing product packaging, brand, description, and matching catalog categories...</span>
+              </div>
+            )}
+          </div>
+
           {/* General Information */}
           <Card
             title={CardTitle(HiOutlineTag, "General Information")}
@@ -376,20 +601,71 @@ const AddProduct = () => {
                   className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
                   placeholder="e.g. Premium Basmati Rice"
                 />
+                {aiSuggestedTitle && aiSuggestedTitle !== formData.name && (
+                  <div className="flex items-center gap-2 text-xs bg-brand-50 text-brand-700 rounded-lg px-3 py-2 mt-1">
+                    <HiOutlineSparkles className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex-1 font-medium">AI suggestion: "{aiSuggestedTitle}"</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, name: aiSuggestedTitle }))
+                      }
+                      className="font-bold underline shrink-0 hover:text-brand-900"
+                    >
+                      Use this title
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5 flex flex-col">
-                <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
-                  About this item
-                </label>
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    About this item
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateWithAi}
+                    disabled={isGeneratingAi || !formData.name.trim()}
+                    className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-brand-600 hover:text-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isGeneratingAi ? (
+                      <HiOutlineArrowPath className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <HiOutlineSparkles className="h-3.5 w-3.5" />
+                    )}
+                    {isGeneratingAi ? "Generating..." : "Generate with AI"}
+                  </button>
+                </div>
                 <textarea
                   value={formData.description}
                   onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
+                    setFormData((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                      aiGenerated: false,
+                    }))
                   }
                   onWheel={(e) => e.stopPropagation()}
                   onTouchMove={(e) => e.stopPropagation()}
                   className="w-full px-4 py-3 bg-slate-100 border-none rounded-2xl text-sm font-semibold min-h-[140px] max-h-[260px] outline-none transition-all focus:ring-2 focus:ring-primary/5 resize-none overflow-y-auto custom-scrollbar"
-                  placeholder="Describe the item here..."
+                  placeholder="Describe the item here, or click Generate with AI"
+                />
+              </div>
+              <div className="space-y-1.5 flex flex-col">
+                <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                  Search Tags <span className="text-slate-400 font-normal normal-case">(comma-separated)</span>
+                </label>
+                <input
+                  value={formData.tags}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      tags: e.target.value,
+                      aiGenerated: false,
+                    }))
+                  }
+                  className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
+                  placeholder="e.g. basmati rice, premium, 5kg"
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -897,6 +1173,47 @@ const AddProduct = () => {
                       We show this image on the search page and the main
                       store listing. Make sure it is clear and bright.
                     </p>
+                    {formData.mainImage && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (formData.mainImageFile) {
+                            handleAutoFillFromPhoto(formData.mainImageFile);
+                          } else if (formData.mainImage) {
+                            const base64Data = formData.mainImage.replace(/^data:(.*,)?/, "");
+                            setIsAnalyzingImage(true);
+                            sellerApi.generateListingFromImage({ imageBase64: base64Data })
+                              .then((res) => {
+                                const data = res.data.result || res.data.data || {};
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  name: data.title || prev.name,
+                                  description: data.description || prev.description,
+                                  tags: data.tags || prev.tags,
+                                  brand: data.brand || prev.brand,
+                                  weightVal: data.weightVal || prev.weightVal,
+                                  weightUnit: data.weightUnit || prev.weightUnit || "kg",
+                                  deliveryType: data.deliveryType || prev.deliveryType || "instant",
+                                  header: data.header || prev.header,
+                                  category: data.category || prev.category,
+                                  subcategory: data.subcategory || prev.subcategory,
+                                  aiGenerated: true,
+                                }));
+                                toast.success(`AI identified "${data.title || "product"}" and auto-filled details!`);
+                              })
+                              .catch(() => toast.error("Could not auto-fill from photo."))
+                              .finally(() => setIsAnalyzingImage(false));
+                          }
+                        }}
+                        disabled={isAnalyzingImage}
+                        className="mt-2 text-primary border-primary/30 bg-primary/5 hover:bg-primary/10 text-xs font-bold"
+                      >
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5 animate-pulse" />
+                        Auto-Fill Details from this Photo
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -972,9 +1289,10 @@ const AddProduct = () => {
                 </p>
                 <div className="pt-2 space-y-2">
                   <Button
+                    type="button"
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="w-full">
+                    className="w-full font-bold">
                     {isSaving ? (
                       <>
                         <HiOutlineArrowPath className="mr-2 h-4 w-4 animate-spin" />
@@ -985,9 +1303,18 @@ const AddProduct = () => {
                     )}
                   </Button>
                   <Button
+                    type="button"
                     variant="outline"
-                    className="w-full"
-                    onClick={() => navigate(-1)}>
+                    className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                    onClick={() => handleDiscard(false)}>
+                    <HiOutlineTrash className="mr-1.5 h-4 w-4" />
+                    Discard & Clear Form
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-slate-600"
+                    onClick={() => handleDiscard(true)}>
                     Cancel
                   </Button>
                 </div>

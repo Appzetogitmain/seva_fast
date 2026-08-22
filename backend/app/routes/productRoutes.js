@@ -13,6 +13,8 @@ import {
     bulkUploadProducts,
 } from "../controller/productController.js";
 import { adjustStock, getStockHistory } from "../controller/stockController.js";
+import { generateProductListing, generateListingFromImage } from "../controller/productAiController.js";
+import { getSentimentIntelligence } from "../controller/reviewAiController.js";
 import Product from "../models/product.js";
 import Seller from "../models/seller.js";
 import { loadSubadminZones, enforceZoneAccess } from "../middleware/zoneRestrictionMiddleware.js";
@@ -22,6 +24,7 @@ import {
     optionalVerifyToken,
     requireApprovedSeller,
 } from "../middleware/authMiddleware.js";
+import { aiRouteRateLimiter } from "../middleware/securityMiddlewares.js";
 import multer from "multer";
 
 const storage = multer.memoryStorage();
@@ -44,6 +47,30 @@ router.get("/", optionalVerifyToken, getProducts);
 router.get("/seller/me", verifyToken, allowRoles("seller"), requireApprovedSeller, getSellerProducts);
 router.get("/stock-history", verifyToken, allowRoles("seller"), requireApprovedSeller, getStockHistory);
 router.post("/adjust-stock", verifyToken, allowRoles("seller"), requireApprovedSeller, adjustStock);
+router.post(
+  "/ai/generate-listing",
+  verifyToken,
+  allowRoles("seller"),
+  requireApprovedSeller,
+  aiRouteRateLimiter,
+  generateProductListing
+);
+router.post(
+  "/ai/generate-listing-from-image",
+  verifyToken,
+  allowRoles("seller"),
+  requireApprovedSeller,
+  aiRouteRateLimiter,
+  generateListingFromImage
+);
+router.get(
+  "/ai/sentiment-intelligence",
+  verifyToken,
+  allowRoles("seller", "admin"),
+  requireApprovedSeller,
+  aiRouteRateLimiter,
+  getSentimentIntelligence
+);
 router.get(
   "/bulk/template",
   verifyToken,

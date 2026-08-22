@@ -7,6 +7,7 @@ import { onPhotoOrderMessage } from "@core/services/orderSocket";
 import { toast } from "sonner";
 import { useAuth } from "@core/context/AuthContext";
 import SellerCertificateModal from "../components/SellerCertificateModal";
+import SellerChatbotWidget from "../components/SellerChatbotWidget";
 import {
   HiOutlineSquares2X2,
   HiOutlineCube,
@@ -48,29 +49,20 @@ const ProductDemands = React.lazy(() => import("../pages/ProductDemands"));
 
 const navItems = [
   { label: "Dashboard", path: "/seller", icon: HiOutlineSquares2X2, end: true },
-  { label: "🚀 Boost Store", path: "/seller/promotions", icon: HiOutlineSparkles },
-  { label: "Products", path: "/seller/products", icon: HiOutlineCube },
-  { label: "Customer Demands", path: "/seller/demands", icon: HiOutlineCube },
+  {
+    label: "Products",
+    icon: HiOutlineCube,
+    children: [
+      { label: "All Products", path: "/seller/products", icon: HiOutlineCube },
+      { label: "Add Product", path: "/seller/products/add", icon: HiOutlineCube },
+      { label: "Bulk Upload", path: "/seller/products/bulk", icon: HiOutlineCube },
+    ],
+  },
+  { label: "Product Demands", path: "/seller/demands", icon: HiOutlineSparkles },
   { label: "Stock", path: "/seller/inventory", icon: HiOutlineArchiveBox },
   { label: "Orders", path: "/seller/orders", icon: HiOutlineTruck },
   { label: "Photo Orders", path: "/seller/photo-orders", icon: HiOutlinePhoto },
   { label: "Returns", path: "/seller/returns", icon: HiOutlineArchiveBox },
-  { label: "Track Orders", path: "/seller/tracking", icon: HiOutlineMapPin },
-  {
-    label: "Sales Reports",
-    path: "/seller/analytics",
-    icon: HiOutlineChartBarSquare,
-  },
-  {
-    label: "Money Request",
-    path: "/seller/withdrawals",
-    icon: HiOutlineCurrencyDollar,
-  },
-  {
-    label: "Payment History",
-    path: "/seller/transactions",
-    icon: HiOutlineCreditCard,
-  },
   {
     label: "Earnings",
     path: "/seller/earnings",
@@ -179,6 +171,7 @@ const SellerRoutes = () => {
     <DashboardLayout navItems={navItems} title="Seller Panel">
       <SubscriptionExpiryModal />
       <StorePromotionExpiryModal />
+      <SellerChatbotWidget />
       {user && user.certificate && !user.certificate.accepted && (
         <SellerCertificateModal seller={user} />
       )}

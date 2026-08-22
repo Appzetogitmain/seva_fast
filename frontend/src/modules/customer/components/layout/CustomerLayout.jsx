@@ -6,6 +6,7 @@ import MiniCart from '../shared/MiniCart';
 import MobileFooterMessage from './MobileFooterMessage';
 import BirthdayHeaderCelebration from '../shared/BirthdayHeaderCelebration';
 import WelcomeScratchCardModal from '../WelcomeScratchCardModal';
+import ChatbotWidget from '../ChatbotWidget';
 import { customerApi } from '../../services/customerApi';
 import { useProductDetail } from '../../context/ProductDetailContext';
 import { cn } from '@/lib/utils';
@@ -263,6 +264,7 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                 freeDelivery={welcomeOffer.freeDelivery}
                 userId={user?._id || user?.id || 'guest'}
             />
+            <ChatbotWidget />
         </div>
     );
 };

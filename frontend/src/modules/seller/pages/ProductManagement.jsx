@@ -30,6 +30,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { sellerApi } from "../services/sellerApi";
 import { toast } from "sonner";
 import Pagination from "@shared/components/ui/Pagination";
+import { Sparkles } from "lucide-react";
+import SentimentIntelligenceModal from "../components/SentimentIntelligenceModal";
 
 const ProductManagement = () => {
   const navigate = useNavigate();
@@ -39,6 +41,8 @@ const ProductManagement = () => {
   const [products, setProducts] = useState([]);
   const [dbCategories, setDbCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedAiProduct, setSelectedAiProduct] = useState(null);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [total, setTotal] = useState(0);
@@ -913,15 +917,29 @@ const ProductManagement = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end space-x-2">
+                    <div className="flex items-center justify-end space-x-1.5">
+                      <button
+                        onClick={() => {
+                          setSelectedAiProduct(p);
+                          setIsAiModalOpen(true);
+                        }}
+                        className="p-1.5 hover:text-primary hover:bg-primary/10 rounded-lg transition-all text-primary/80"
+                        title="AI Sentiment & Return Intelligence"
+                      >
+                        <Sparkles className="h-4 w-4 animate-pulse" />
+                      </button>
                       <button
                         onClick={() => openEditModal(p)}
-                        className="p-1 hover:text-brand-600 rounded-lg transition-all text-slate-500">
+                        className="p-1.5 hover:text-brand-600 rounded-lg transition-all text-slate-500"
+                        title="Edit Product"
+                      >
                         <HiOutlinePencilSquare className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteClick(p)}
-                        className="p-1 hover:text-rose-600 rounded-lg transition-all text-slate-500">
+                        className="p-1.5 hover:text-rose-600 rounded-lg transition-all text-slate-500"
+                        title="Delete Product"
+                      >
                         <HiOutlineTrash className="h-4 w-4" />
                       </button>
                     </div>
@@ -1696,6 +1714,17 @@ const ProductManagement = () => {
           </div>
         </div>
       </Modal>
+
+      {/* AI Review & Sentiment Intelligence Modal */}
+      <SentimentIntelligenceModal
+        isOpen={isAiModalOpen}
+        onClose={() => {
+          setIsAiModalOpen(false);
+          setSelectedAiProduct(null);
+        }}
+        productId={selectedAiProduct?._id}
+        productName={selectedAiProduct?.name}
+      />
     </div >
   );
 };

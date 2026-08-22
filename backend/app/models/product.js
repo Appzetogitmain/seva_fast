@@ -74,6 +74,13 @@ const productSchema = new mongoose.Schema(
             type: String,
             trim: true,
         }],
+        // True when the seller used AI-generated description/tags without editing
+        // them (Gemini cataloging assistant) — for admin/ops audit visibility only,
+        // does not affect any pricing/commission/moderation logic.
+        aiGenerated: {
+            type: Boolean,
+            default: false,
+        },
         mainImage: {
             type: String, // Cloudinary URL
         },

@@ -31,6 +31,8 @@ import authActivityRoute from "./authActivityRoutes.js";
 import { whatsappAdminRouter } from "../modules/whatsapp/whatsapp.routes.js";
 import storePromotionRoute from "./storePromotionRoutes.js";
 import productDemandRoute from "./productDemandRoutes.js";
+import customerAiRoute from "./customerAiRoutes.js";
+import sellerAiRoute from "./sellerAiRoutes.js";
 
 import express from "express";
 import { ensureDatabaseConnected } from "../middleware/databaseMiddleware.js";
@@ -76,6 +78,8 @@ const setupRoutes = (app) => {
     router.use("/admin/whatsapp", whatsappAdminRouter);
     router.use("/store-promotions", storePromotionRoute);
     router.use("/product-demands", productDemandRoute);
+    router.use("/customer/ai", customerAiRoute);
+    router.use("/seller/ai", sellerAiRoute);
 
     app.use("/api", router);
 }

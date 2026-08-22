@@ -17,9 +17,10 @@ import { BlurFade } from "@/components/ui/blur-fade";
 import { MagicCard } from "@/components/ui/magic-card";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, Sparkles } from "lucide-react";
 import { onReturnDropOtp, onSellerReturnRequested } from "@core/services/orderSocket";
 import { formatDateTime } from "@shared/utils/formatDate";
+import SentimentIntelligenceModal from "../components/SentimentIntelligenceModal";
 
 const Returns = () => {
     const { showToast } = useToast();
@@ -30,6 +31,7 @@ const Returns = () => {
     const [selectedReturn, setSelectedReturn] = useState(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
     const [rejectReason, setRejectReason] = useState("");
     const [submittingReject, setSubmittingReject] = useState(false);
     const [assigningPickup, setAssigningPickup] = useState(false);
@@ -331,11 +333,18 @@ const Returns = () => {
                             Review and manage customer return requests.
                         </p>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex gap-2 flex-shrink-0 items-center">
+                        <Button
+                            onClick={() => setIsAiModalOpen(true)}
+                            className="flex items-center space-x-1.5 sm:space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-primary to-orange-500 hover:from-primary/90 hover:to-orange-500/90 shadow-md shadow-primary/20 border-0 transition-all cursor-pointer"
+                        >
+                            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />
+                            <span>AI Return Intelligence</span>
+                        </Button>
                         <Button
                             onClick={fetchReturns}
                             variant="outline"
-                            className="flex items-center space-x-1.5 sm:space-x-2 px-3 py-2 sm:px-5 sm:py-2.5 rounded-lg text-xs sm:text-sm font-bold text-slate-600 bg-white hover:bg-slate-50 border-slate-200"
+                            className="flex items-center space-x-1.5 sm:space-x-2 px-3 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 bg-white hover:bg-slate-50 border-slate-200"
                         >
                             <HiOutlineArrowPath className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             <span className="hidden sm:inline">REFRESH</span>
@@ -1001,6 +1010,12 @@ const Returns = () => {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* AI Return & Sentiment Intelligence Modal */}
+            <SentimentIntelligenceModal
+                isOpen={isAiModalOpen}
+                onClose={() => setIsAiModalOpen(false)}
+            />
         </div>
     );
 };

@@ -10,6 +10,10 @@ export const sellerApi = {
     getProductById: (id) => axiosInstance.get(`/products/${id}`),
     createProduct: (data) => axiosInstance.post('/products', data),
     updateProduct: (id, data) => axiosInstance.put(`/products/${id}`, data),
+    generateAiListing: (data) => axiosInstance.post('/products/ai/generate-listing', data),
+    generateListingFromImage: (data) => axiosInstance.post('/products/ai/generate-listing-from-image', data),
+    getSentimentIntelligence: (params) => axiosInstance.get('/products/ai/sentiment-intelligence', { params }),
+    aiChat: (data) => axiosInstance.post('/seller/ai/chat', data),
     deleteProduct: (id) => axiosInstance.delete(`/products/${id}`),
     downloadBulkTemplate: () =>
         axiosInstance.get('/products/bulk/template', { responseType: 'blob' }),
