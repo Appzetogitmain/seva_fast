@@ -28,7 +28,7 @@ const ADMIN_BOOTSTRAP_RATE_LIMIT_MAX = () =>
 const AI_RATE_LIMIT_WINDOW_MS = () =>
   parseInt(process.env.AI_RATE_LIMIT_WINDOW_MS || "60000", 10);
 const AI_RATE_LIMIT_MAX = () =>
-  parseInt(process.env.AI_RATE_LIMIT_MAX || "10", 10);
+  parseInt(process.env.AI_RATE_LIMIT_MAX || "60", 10);
 
 export const globalApiRateLimiter = createRateLimiter({
   namespace: "global",

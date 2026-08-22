@@ -833,6 +833,24 @@ export const createProduct = async (req, res) => {
     if (!productData.name) {
       return handleResponse(res, 400, "Product name is required");
     }
+
+    const trimmedName = String(productData.name).trim();
+    productData.name = trimmedName;
+
+    // Check if seller already has a product with this exact name (case-insensitive)
+    const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const existingProduct = await Product.findOne({
+      sellerId: productData.sellerId,
+      name: { $regex: new RegExp(`^${escapedName}$`, 'i') }
+    }).lean();
+
+    if (existingProduct) {
+      return handleResponse(
+        res,
+        400,
+        `A product named "${trimmedName}" already exists in your inventory. You cannot add the same product multiple times.`
+      );
+    }
     
     // Auto-generate slug
     if (!productData.slug || productData.slug.trim() === "") {
@@ -1026,8 +1044,27 @@ export const updateProduct = async (req, res) => {
     }
 
     if (productData.name) {
+      const trimmedName = String(productData.name).trim();
+      productData.name = trimmedName;
+
+      // Check if another product belonging to this seller already has this name
+      const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const duplicateProduct = await Product.findOne({
+        _id: { $ne: id },
+        sellerId: product.sellerId,
+        name: { $regex: new RegExp(`^${escapedName}$`, 'i') }
+      }).lean();
+
+      if (duplicateProduct) {
+        return handleResponse(
+          res,
+          400,
+          `A product named "${trimmedName}" already exists in your inventory. You cannot have duplicate product names.`
+        );
+      }
+
       if (!productData.slug || productData.slug.trim() === "") {
-        productData.slug = slugify(productData.name);
+        productData.slug = slugify(trimmedName);
       } else {
         productData.slug = slugify(productData.slug);
       }
