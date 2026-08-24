@@ -207,7 +207,8 @@ export default function ChatbotWidget() {
       const { reply, messages: updatedHistory, products, action, actionPayload } = res.data.result || {};
       
       if (action === "ADD_TO_CART" && actionPayload) {
-        addToCart(actionPayload);
+        // skipConfirm=true: chatbot silently handles cross-seller cart replacement
+        await addToCart(actionPayload, { skipConfirm: true });
       } else if (action === "REMOVE_FROM_CART" && actionPayload) {
         removeFromCart(actionPayload.productId, actionPayload.variantSku);
       }
@@ -377,7 +378,7 @@ export default function ChatbotWidget() {
           <div key={idx} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
             <div className={`max-w-[88%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed shadow-xs ${
               msg.role === "user" 
-                ? "bg-primary text-white font-medium rounded-tr-xs" 
+                ? "bg-orange-500 text-white font-medium rounded-tr-xs" 
                 : "bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs"
             }`}>
               {msg.role === "user" ? (

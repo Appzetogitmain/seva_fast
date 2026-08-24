@@ -158,330 +158,325 @@ export const handleChat = async (req, res) => {
     let pendingAction = null;
     let pendingActionPayload = null;
 
+    // ── Helper: execute a single tool call and return the toolResult ─────────
+    const executeTool = async (toolCall) => {
+      const { name, args = {} } = toolCall;
+
+      if (name === "search_products") {
+        const { query = "", max_budget, sort_by } = args;
+        let dbQuery = { status: "active" };
+        
+        if (query && query.trim()) {
+          const cleanQ = query.trim();
+          dbQuery.$or = [
+            { name: { $regex: cleanQ, $options: "i" } },
+            { tags: { $regex: cleanQ, $options: "i" } },
+            { description: { $regex: cleanQ, $options: "i" } }
+          ];
+        }
+
+        if (max_budget && Number(max_budget) > 0) {
+          const num = Number(max_budget);
+          const budgetFilter = {
+            $or: [
+              { salePrice: { $lte: num, $gt: 0 } },
+              { price: { $lte: num } },
+              { "variants.price": { $lte: num } },
+              { "variants.salePrice": { $lte: num, $gt: 0 } }
+            ]
+          };
+          if (dbQuery.$or) {
+            dbQuery = { $and: [ { $or: dbQuery.$or }, budgetFilter ] };
+          } else {
+            dbQuery = { ...dbQuery, ...budgetFilter };
+          }
+        }
+        
+        let sortOption = { createdAt: -1 };
+        if (sort_by === "price_asc") sortOption = { salePrice: 1, price: 1 };
+        if (sort_by === "price_desc") sortOption = { price: -1, salePrice: -1 };
+
+        const products = await Product.find(dbQuery)
+          .sort(sortOption)
+          .limit(10)
+          .select("name price salePrice mainImage thumbnail galleryImages _id unit variants stock")
+          .lean();
+
+        if (products.length > 0) {
+          const productIds = products.map(p => p._id);
+          const reviewStats = await Review.aggregate([
+            { $match: { productId: { $in: productIds } } },
+            { $group: { _id: "$productId", avgRating: { $avg: "$rating" }, count: { $sum: 1 } } }
+          ]);
+          const statsMap = {};
+          reviewStats.forEach(r => {
+            statsMap[String(r._id)] = { rating: Number(r.avgRating.toFixed(1)), totalReviews: r.count };
+          });
+
+          let enriched = products.map(p => {
+            const v = p.variants?.[0];
+            const effectivePrice = Number(p.salePrice) > 0
+              ? Number(p.salePrice)
+              : (v && Number(v.salePrice) > 0 ? Number(v.salePrice) : Number(p.price || v?.price || 0));
+            const originalMrp = Number(p.price || v?.price || effectivePrice);
+            const img = p.mainImage || p.thumbnail || p.galleryImages?.[0] || "";
+            const hasStock = p.stock > 0 || (p.variants && p.variants.some(variant => variant.stock > 0));
+            return {
+              id: String(p._id),
+              name: p.name,
+              price: effectivePrice,
+              mrp: originalMrp > effectivePrice ? originalMrp : null,
+              thumbnail: img,
+              rating: statsMap[String(p._id)]?.rating || null,
+              reviewsCount: statsMap[String(p._id)]?.totalReviews || 0,
+              inStock: hasStock
+            };
+          });
+
+          if (sort_by === "rating") {
+            enriched.sort((a, b) => {
+              const rA = typeof a.rating === 'number' ? a.rating : 0;
+              const rB = typeof b.rating === 'number' ? b.rating : 0;
+              return rB - rA;
+            });
+          }
+
+          attachedProducts = enriched.slice(0, 6);
+          return {
+            products: attachedProducts.map(p => ({
+              id: p.id,
+              name: p.name,
+              price: `₹${p.price}`,
+              mrp: p.mrp ? `₹${p.mrp}` : undefined,
+              rating: p.rating ? `${p.rating} / 5` : undefined,
+              reviewsCount: p.reviewsCount || 0,
+              inStock: p.inStock ? "Yes" : "No (Out of stock)"
+            }))
+          };
+        } else {
+          return { products: "No matching products found in store right now." };
+        }
+      }
+
+      if (name === "get_order_status") {
+        const { order_id } = args;
+        const cleanId = String(order_id || "").trim();
+        let order = null;
+        if (cleanId) {
+          order = await Order.findOne({
+            $or: [
+              { orderId: cleanId.toUpperCase() },
+              { _id: cleanId.match(/^[0-9a-fA-F]{24}$/) ? cleanId : null }
+            ].filter(Boolean)
+          })
+          .select("orderId orderStatus totalAmount paymentStatus createdAt items")
+          .lean();
+        }
+        if (order) {
+          return {
+            orderId: order.orderId,
+            status: order.orderStatus,
+            totalAmount: order.totalAmount,
+            paymentStatus: order.paymentStatus,
+            itemCount: order.items?.length || 0,
+            createdAt: order.createdAt
+          };
+        }
+        return { error: `Order #${cleanId} not found. Please verify the Order ID.` };
+      }
+
+      if (name === "get_subscription_plans") {
+        const plans = await Plan.find({ isActive: true })
+          .sort({ sortOrder: 1, price: 1 })
+          .select("name price originalPrice description features validityDays")
+          .lean();
+        return {
+          plans: plans.map(p => ({
+            name: p.name,
+            price: p.price,
+            originalPrice: p.originalPrice,
+            description: p.description,
+            validityDays: p.validityDays,
+            features: p.features?.map(f => `${f.label}: ${f.value}${f.unit !== 'Boolean' ? f.unit : ''}`)
+          }))
+        };
+      }
+
+      if (name === "get_active_coupons") {
+        const now = new Date();
+        const coupons = await Coupon.find({
+          status: "active",
+          $or: [
+            { expiryDate: { $gte: now } },
+            { expiryDate: null },
+            { isNeverExpire: true }
+          ]
+        })
+        .limit(5)
+        .select("code title description discountType discountValue minOrderAmount")
+        .lean();
+        return { coupons: coupons.length > 0 ? coupons : "No active coupons at this moment." };
+      }
+
+      if (name === "get_faqs") {
+        const { query = "" } = args;
+        const faqQuery = { status: "published" };
+        if (query && query.trim()) {
+          faqQuery.$or = [
+            { question: { $regex: query.trim(), $options: "i" } },
+            { answer: { $regex: query.trim(), $options: "i" } }
+          ];
+        }
+        const faqs = await FAQ.find(faqQuery).limit(4).select("question answer category").lean();
+        return { faqs: faqs.length > 0 ? faqs : "No specific FAQ found for this query." };
+      }
+
+      if (name === "get_categories") {
+        const categories = await Category.find({ status: "active" })
+          .limit(10)
+          .select("name image")
+          .lean();
+        return { categories: categories.map(c => c.name) };
+      }
+
+      if (name === "add_to_cart") {
+        const { product_id, variant_sku } = args;
+        if (!product_id) return { error: "product_id is required" };
+
+        const prod = await Product.findOne({ _id: product_id, status: "active" }).lean();
+        if (!prod) return { error: "Product not found or unavailable." };
+
+        // Check delivery radius
+        let isDeliverable = true;
+        if (lat && lng) {
+          const nearbySellerIds = await getNearbySellerIdsForCustomer(lat, lng);
+          const nearbySellerSet = new Set(nearbySellerIds.map(String));
+          const sellerIdForProduct = String(prod.sellerId?._id || prod.sellerId);
+          const isScheduled = prod.deliveryType === "scheduled";
+          if (!isScheduled && !nearbySellerSet.has(sellerIdForProduct)) {
+            isDeliverable = false;
+          }
+        }
+
+        if (!isDeliverable) return { error: "This product is not deliverable to your current location." };
+
+        // Check stock
+        let availableStock = prod.stock || 0;
+        let effectivePrice = Number(prod.salePrice) > 0 ? Number(prod.salePrice) : Number(prod.price || 0);
+        let selectedVariantSku = variant_sku || "";
+
+        if (prod.variants && prod.variants.length > 0) {
+          let v = null;
+          if (variant_sku) {
+            v = prod.variants.find(v => v.sku === variant_sku || v.name === variant_sku);
+          }
+          if (!v) {
+            v = prod.variants.find(v => v.stock > 0) || prod.variants[0];
+          }
+          if (v) {
+            availableStock = typeof v.stock === 'number' ? v.stock : prod.stock || 0;
+            effectivePrice = Number(v.salePrice) > 0 ? Number(v.salePrice) : Number(v.price || prod.salePrice || prod.price || 0);
+            selectedVariantSku = v.sku || v.name || "";
+          }
+        }
+
+        if (availableStock > 0) {
+          pendingAction = "ADD_TO_CART";
+          pendingActionPayload = {
+            id: String(prod._id),
+            _id: String(prod._id),
+            name: prod.name,
+            price: effectivePrice,
+            salePrice: prod.salePrice,
+            image: prod.mainImage || prod.thumbnail,
+            sellerId: prod.sellerId,
+            variants: prod.variants,
+            variantSku: selectedVariantSku,
+          };
+          return { success: true, message: `"${prod.name}" added to cart successfully! ✅` };
+        } else {
+          return { error: `Sorry, "${prod.name}" is currently out of stock and cannot be added to cart.` };
+        }
+      }
+
+      if (name === "remove_from_cart") {
+        const { product_id, variant_sku } = args;
+        if (!product_id) return { error: "product_id is required" };
+        pendingAction = "REMOVE_FROM_CART";
+        pendingActionPayload = { productId: product_id, variantSku: variant_sku || "" };
+        return { success: true, message: "Item removed from cart." };
+      }
+
+      return { error: `Unknown tool: ${name}` };
+    };
+    // ── End helper ────────────────────────────────────────────────────────────
+
+    // ── Multi-turn agentic tool loop ──────────────────────────────────────────
+    // Keep calling Gemini + executing tools until it returns a plain text reply
+    // (or we hit the safety cap of 5 iterations to prevent runaway loops).
     let response = await generateChatResponse({
       messages,
       systemInstruction: CUSTOMER_SYSTEM_INSTRUCTION,
       tools,
     });
 
-    const functionCalls = response.functionCalls || [];
-    
-    if (functionCalls.length > 0) {
+    let iterations = 0;
+    const MAX_ITERATIONS = 5;
+
+    while (iterations < MAX_ITERATIONS) {
+      const functionCalls = response.functionCalls || [];
+      if (functionCalls.length === 0) break; // Gemini returned text — we're done
+
+      iterations++;
       const toolCall = functionCalls[0];
       let toolResult = {};
 
       try {
-        if (toolCall.name === "search_products") {
-          const { query = "", max_budget, sort_by } = toolCall.args || {};
-          let dbQuery = { status: "active" };
-          
-          if (query && query.trim()) {
-            const cleanQ = query.trim();
-            dbQuery.$or = [
-              { name: { $regex: cleanQ, $options: "i" } },
-              { tags: { $regex: cleanQ, $options: "i" } },
-              { description: { $regex: cleanQ, $options: "i" } }
-            ];
-          }
-
-          if (max_budget && Number(max_budget) > 0) {
-            const num = Number(max_budget);
-            const budgetFilter = {
-              $or: [
-                { salePrice: { $lte: num, $gt: 0 } },
-                { price: { $lte: num } },
-                { "variants.price": { $lte: num } },
-                { "variants.salePrice": { $lte: num, $gt: 0 } }
-              ]
-            };
-            
-            if (dbQuery.$or) {
-              dbQuery = { $and: [ { $or: dbQuery.$or }, budgetFilter ] };
-            } else {
-              dbQuery = { ...dbQuery, ...budgetFilter };
-            }
-          }
-          
-          let sortOption = { createdAt: -1 };
-          if (sort_by === "price_asc") sortOption = { salePrice: 1, price: 1 };
-          if (sort_by === "price_desc") sortOption = { price: -1, salePrice: -1 };
-
-          const products = await Product.find(dbQuery)
-            .sort(sortOption)
-            .limit(10)
-            .select("name price salePrice mainImage thumbnail galleryImages _id unit variants")
-            .lean();
-
-          if (products.length > 0) {
-            // Aggregate live customer ratings from Review collection
-            const productIds = products.map(p => p._id);
-            const reviewStats = await Review.aggregate([
-              { $match: { productId: { $in: productIds } } },
-              { $group: { _id: "$productId", avgRating: { $avg: "$rating" }, count: { $sum: 1 } } }
-            ]);
-
-            const statsMap = {};
-            reviewStats.forEach(r => {
-              statsMap[String(r._id)] = {
-                rating: Number(r.avgRating.toFixed(1)),
-                totalReviews: r.count
-              };
-            });
-
-            let enriched = products.map(p => {
-              const v = p.variants?.[0];
-              const effectivePrice = Number(p.salePrice) > 0
-                ? Number(p.salePrice)
-                : (v && Number(v.salePrice) > 0 ? Number(v.salePrice) : Number(p.price || v?.price || 0));
-              
-              const originalMrp = Number(p.price || v?.price || effectivePrice);
-              const img = p.mainImage || p.thumbnail || p.galleryImages?.[0] || "";
-
-              return {
-                id: p._id,
-                name: p.name,
-                price: effectivePrice,
-                mrp: originalMrp > effectivePrice ? originalMrp : null,
-                thumbnail: img,
-                rating: statsMap[String(p._id)]?.rating || null,
-                reviewsCount: statsMap[String(p._id)]?.totalReviews || 0
-              };
-            });
-
-            if (sort_by === "rating") {
-              enriched.sort((a, b) => {
-                const rA = typeof a.rating === 'number' ? a.rating : 0;
-                const rB = typeof b.rating === 'number' ? b.rating : 0;
-                return rB - rA;
-              });
-            }
-
-            attachedProducts = enriched.slice(0, 6);
-            toolResult = {
-              products: attachedProducts.map(p => ({
-                name: p.name,
-                price: `₹${p.price}`,
-                mrp: p.mrp ? `₹${p.mrp}` : undefined,
-                rating: p.rating ? `${p.rating} / 5` : undefined,
-                reviewsCount: p.reviewsCount || 0
-              }))
-            };
-          } else {
-            toolResult = { products: "No matching products found in store right now." };
-          }
-        } 
-        else if (toolCall.name === "get_order_status") {
-          const { order_id } = toolCall.args || {};
-          const cleanId = String(order_id || "").trim();
-          let order = null;
-          
-          if (cleanId) {
-            order = await Order.findOne({
-              $or: [
-                { orderId: cleanId.toUpperCase() },
-                { _id: cleanId.match(/^[0-9a-fA-F]{24}$/) ? cleanId : null }
-              ].filter(Boolean)
-            })
-            .select("orderId orderStatus totalAmount paymentStatus createdAt items")
-            .lean();
-          }
-
-          if (order) {
-            toolResult = {
-              orderId: order.orderId,
-              status: order.orderStatus,
-              totalAmount: order.totalAmount,
-              paymentStatus: order.paymentStatus,
-              itemCount: order.items?.length || 0,
-              createdAt: order.createdAt
-            };
-          } else {
-            toolResult = { error: `Order #${cleanId} not found. Please verify the Order ID.` };
-          }
-        }
-        else if (toolCall.name === "get_subscription_plans") {
-          const plans = await Plan.find({ isActive: true })
-            .sort({ sortOrder: 1, price: 1 })
-            .select("name price originalPrice description features validityDays")
-            .lean();
-          toolResult = {
-            plans: plans.map(p => ({
-              name: p.name,
-              price: p.price,
-              originalPrice: p.originalPrice,
-              description: p.description,
-              validityDays: p.validityDays,
-              features: p.features?.map(f => `${f.label}: ${f.value}${f.unit !== 'Boolean' ? f.unit : ''}`)
-            }))
-          };
-        }
-        else if (toolCall.name === "get_active_coupons") {
-          const now = new Date();
-          const coupons = await Coupon.find({
-            status: "active",
-            $or: [
-              { expiryDate: { $gte: now } },
-              { expiryDate: null },
-              { isNeverExpire: true }
-            ]
-          })
-          .limit(5)
-          .select("code title description discountType discountValue minOrderAmount")
-          .lean();
-          toolResult = { coupons: coupons.length > 0 ? coupons : "No active coupons at this moment." };
-        }
-        else if (toolCall.name === "get_faqs") {
-          const { query = "" } = toolCall.args || {};
-          const faqQuery = { status: "published" };
-          if (query && query.trim()) {
-            faqQuery.$or = [
-              { question: { $regex: query.trim(), $options: "i" } },
-              { answer: { $regex: query.trim(), $options: "i" } }
-            ];
-          }
-          const faqs = await FAQ.find(faqQuery).limit(4).select("question answer category").lean();
-          toolResult = { faqs: faqs.length > 0 ? faqs : "No specific FAQ found for this query." };
-        }
-        else if (toolCall.name === "get_categories") {
-          const categories = await Category.find({ status: "active" })
-            .limit(10)
-            .select("name image")
-            .lean();
-          toolResult = { categories: categories.map(c => c.name) };
-        }
-        else if (toolCall.name === "add_to_cart") {
-          const { product_id, variant_sku } = toolCall.args || {};
-          if (!product_id) {
-            toolResult = { error: "product_id is required" };
-          } else {
-            const prod = await Product.findOne({ _id: product_id, status: "active" }).lean();
-            if (!prod) {
-              toolResult = { error: "Product not found or unavailable." };
-            } else {
-              // check delivery radius
-              let isDeliverable = true;
-              if (lat && lng) {
-                const nearbySellerIds = await getNearbySellerIdsForCustomer(lat, lng);
-                const nearbySellerSet = new Set(nearbySellerIds.map(String));
-                const sellerIdForProduct = String(prod.sellerId?._id || prod.sellerId);
-                const isScheduled = prod.deliveryType === "scheduled";
-                if (!isScheduled && !nearbySellerSet.has(sellerIdForProduct)) {
-                  isDeliverable = false;
-                }
-              }
-
-              if (!isDeliverable) {
-                toolResult = { error: "This product is not deliverable to your current location." };
-              } else {
-                // check stock
-                let availableStock = prod.stock || 0;
-                let effectivePrice = prod.salePrice || prod.price;
-                
-                if (variant_sku && prod.variants && prod.variants.length > 0) {
-                  const v = prod.variants.find(v => v.sku === variant_sku || v.name === variant_sku);
-                  if (v) {
-                    availableStock = v.stock;
-                    effectivePrice = v.salePrice || v.price;
-                  }
-                }
-
-                if (availableStock > 0) {
-                  toolResult = { success: true, message: "Stock verified. Added to cart successfully." };
-                  pendingAction = "ADD_TO_CART";
-                  pendingActionPayload = {
-                    id: prod._id,
-                    _id: prod._id,
-                    name: prod.name,
-                    price: effectivePrice,
-                    salePrice: prod.salePrice,
-                    image: prod.mainImage || prod.thumbnail,
-                    sellerId: prod.sellerId,
-                    variantSku: variant_sku || "",
-                  };
-                } else {
-                  toolResult = { error: "Sorry, this product is currently out of stock." };
-                }
-              }
-            }
-          }
-        }
-        else if (toolCall.name === "remove_from_cart") {
-          const { product_id, variant_sku } = toolCall.args || {};
-          if (!product_id) {
-            toolResult = { error: "product_id is required" };
-          } else {
-            toolResult = { success: true, message: "Action dispatched to frontend to remove from cart." };
-            pendingAction = "REMOVE_FROM_CART";
-            pendingActionPayload = {
-              productId: product_id,
-              variantSku: variant_sku || "",
-            };
-          }
-        }
+        toolResult = await executeTool(toolCall);
       } catch (toolErr) {
         console.error("[CustomerAI] Tool execution error:", toolErr);
         toolResult = { error: "Failed to fetch live data from database." };
       }
 
-      // Preserve candidate content including thought signatures for model turn
+      // Append model's function-call turn
       if (response.candidates?.[0]?.content) {
         messages.push(response.candidates[0].content);
       } else {
-        messages.push({
-          role: "model",
-          parts: [{ functionCall: toolCall }],
-        });
+        messages.push({ role: "model", parts: [{ functionCall: toolCall }] });
       }
 
-      // Send tool execution output back to Gemini
+      // Append tool result turn
       messages.push({
         role: "user",
-        parts: [{
-          functionResponse: {
-            name: toolCall.name,
-            response: toolResult
-          }
-        }]
+        parts: [{ functionResponse: { name: toolCall.name, response: toolResult } }]
       });
 
-      // Try to get model's natural conversational response
+      // Call Gemini again WITH tools so it can chain another tool call if needed
       try {
-        const secondResponse = await generateChatResponse({
+        response = await generateChatResponse({
           messages,
           systemInstruction: CUSTOMER_SYSTEM_INSTRUCTION,
+          tools,
         });
-
-        if (secondResponse?.text) {
-          response = secondResponse;
-        } else if (secondResponse?.candidates?.[0]?.content?.parts) {
-          const textParts = secondResponse.candidates[0].content.parts
-            .filter(p => p.text && !p.thought)
-            .map(p => p.text);
-          if (textParts.length > 0) {
-            response = { text: textParts.join("\n") };
-          }
-        }
-      } catch (secondErr) {
-        console.warn("[CustomerAI] Second LLM call skipped/rate-limited, generating direct response:", secondErr.message);
+      } catch (loopErr) {
+        console.warn("[CustomerAI] Loop LLM call failed:", loopErr.message);
+        break;
       }
     }
+    // ── End loop ──────────────────────────────────────────────────────────────
 
     let replyText = response.text;
     if (!replyText && response.candidates?.[0]?.content?.parts) {
       const textParts = response.candidates[0].content.parts
         .filter(p => p.text && !p.thought)
         .map(p => p.text);
-      if (textParts.length > 0) {
-        replyText = textParts.join("\n");
-      }
+      if (textParts.length > 0) replyText = textParts.join("\n");
     }
 
     if (!replyText) {
-      if (attachedProducts.length > 0) {
-        replyText = "Here are the matching products from our store:";
-      } else {
-        replyText = "I found what you were looking for:";
-      }
+      replyText = attachedProducts.length > 0
+        ? "Here are the matching products from our store:"
+        : "I found what you were looking for:";
     }
 
     return handleResponse(res, 200, "Success", { 

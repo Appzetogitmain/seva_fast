@@ -99,7 +99,7 @@ export const CartProvider = ({ children }) => {
     };
   }, [cart, isAuthenticated]);
 
-  const addToCart = async (product) => {
+  const addToCart = async (product, { skipConfirm = false } = {}) => {
     // Bug 238 Check: Prevent multi-store ordering
     if (cart.length > 0) {
       const extractId = (val) => (val && typeof val === 'object' && val._id ? String(val._id) : String(val || ''));
@@ -107,13 +107,15 @@ export const CartProvider = ({ children }) => {
       const newSellerId = extractId(product.sellerId) || extractId(product.seller);
 
       if (existingSellerId && newSellerId && existingSellerId !== newSellerId) {
-        const confirmReplace = window.confirm(
-          "Your cart contains items from another store. Do you want to clear your cart and add this item instead?"
-        );
-        
-        if (!confirmReplace) return;
+        // skipConfirm=true is used by chatbot to silently clear-and-replace
+        if (!skipConfirm) {
+          const confirmReplace = window.confirm(
+            "Your cart contains items from another store. Do you want to clear your cart and add this item instead?"
+          );
+          if (!confirmReplace) return false;
+        }
 
-        // Clear cart first
+        // Clear cart first (backend + local)
         if (isAuthenticated) {
           try {
             await customerApi.clearCart();
@@ -161,13 +163,34 @@ export const CartProvider = ({ children }) => {
     if (isAuthenticated) {
       pendingRequestsRef.current += 1;
       try {
-        const response = await customerApi.addToCart({
-          productId: id,
-          variantSku,
-          quantity: 1,
-        });
+        let response = null;
+        try {
+          response = await customerApi.addToCart({
+            productId: id,
+            variantSku,
+            quantity: 1,
+          });
+        } catch (apiErr) {
+          const errMsg = String(apiErr?.response?.data?.message || apiErr?.message || "");
+          if (skipConfirm || errMsg.toLowerCase().includes("another store")) {
+            try {
+              await customerApi.clearCart();
+              response = await customerApi.addToCart({
+                productId: id,
+                variantSku,
+                quantity: 1,
+              });
+            } catch (retryErr) {
+              throw retryErr;
+            }
+          } else {
+            throw apiErr;
+          }
+        }
         pendingRequestsRef.current -= 1;
-        await syncCart(response.data.result.items);
+        if (response?.data?.result?.items) {
+          await syncCart(response.data.result.items);
+        }
       } catch (error) {
         pendingRequestsRef.current -= 1;
         console.error("Error adding to cart on backend", error);
