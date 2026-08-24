@@ -246,6 +246,7 @@ const ProductDetailPage = () => {
     const isOutOfStock = selectedVariant
         ? (selectedVariant.stock <= 0)
         : (selectedProduct?.stock <= 0);
+    const isOutOfRadius = selectedProduct?.isOutOfRadius === true;
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -634,7 +635,16 @@ const ProductDetailPage = () => {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    {isOutOfStock ? (
+                                                    {isOutOfRadius ? (
+                                                        <motion.button
+                                                            whileHover={{ scale: 1.02, y: -2 }}
+                                                            whileTap={{ scale: 0.98 }}
+                                                            disabled={true}
+                                                            className="bg-red-50 text-red-500 h-10 px-5 rounded-xl font-black text-[11px] flex items-center gap-2 shadow-sm transition-all uppercase tracking-widest border border-red-200 cursor-not-allowed"
+                                                        >
+                                                            NOT IN YOUR AREA
+                                                        </motion.button>
+                                                    ) : isOutOfStock ? (
                                                         <motion.button
                                                             whileHover={{ scale: 1.02, y: -2 }}
                                                             whileTap={{ scale: 0.98 }}

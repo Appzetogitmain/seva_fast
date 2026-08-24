@@ -1352,7 +1352,9 @@ export const getProductById = async (req, res) => {
       const sellerIdForProduct = String(product?.sellerId?._id || product?.sellerId);
       const isScheduled = product.deliveryType === "scheduled";
       if (!isScheduled && (!nearbySellerSet || !nearbySellerSet.has(sellerIdForProduct))) {
-        return handleResponse(res, 404, "Product not available in your area");
+        // Return product but mark as out of delivery radius
+        // This prevents 404 errors on direct links and allows frontend to show a clear "Not Deliverable" message
+        product.isOutOfRadius = true;
       }
     }
 

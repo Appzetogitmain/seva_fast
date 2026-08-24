@@ -4,6 +4,8 @@ import { FiMessageSquare, FiX, FiSend, FiCamera, FiLoader, FiMic, FiMicOff, FiVo
 import { Sparkles, Bot, User, Volume2, Mic, Radio } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import { useCart } from "../context/CartContext";
+import { useLocation as useAppLocation } from '../context/LocationContext';
 
 export default function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,6 +22,8 @@ export default function ChatbotWidget() {
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
   const navigate = useNavigate();
+  const { addToCart, removeFromCart } = useCart();
+  const { currentLocation } = useAppLocation();
 
   const prompts = [
     "Kya dhoondh rahe hain? 🔍",
@@ -136,7 +140,9 @@ export default function ChatbotWidget() {
     }
 
     try {
+      setVoiceMode(true);
       const recognition = new SpeechRecognition();
+      let finalTranscript = "";
       recognition.lang = speechLang; // Dynamic: en-IN (English/Hinglish), hi-IN (Hindi), gu-IN (Gujarati), mr-IN (Marathi)
       recognition.interimResults = true;
       recognition.continuous = false;
@@ -149,6 +155,7 @@ export default function ChatbotWidget() {
           .join('');
         
         if (transcript) {
+          finalTranscript = transcript;
           setInput(transcript);
         }
       };
@@ -160,6 +167,9 @@ export default function ChatbotWidget() {
 
       recognition.onend = () => {
         setIsListening(false);
+        if (finalTranscript.trim()) {
+          handleSend(null, finalTranscript);
+        }
       };
 
       recognitionRef.current = recognition;
@@ -170,16 +180,17 @@ export default function ChatbotWidget() {
     }
   };
 
-  const handleSend = async (e) => {
+  const handleSend = async (e, textOverride = null) => {
     e?.preventDefault();
-    if (!input.trim() && !isLoading) return;
+    const finalInput = textOverride || input;
+    if (!finalInput.trim() && !isLoading) return;
 
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
     }
 
-    const userMessage = { role: "user", parts: [{ text: input }] };
+    const userMessage = { role: "user", parts: [{ text: finalInput }] };
     const newMessages = [...messages, userMessage];
     
     setMessages(newMessages);
@@ -187,8 +198,19 @@ export default function ChatbotWidget() {
     setIsLoading(true);
 
     try {
-      const res = await aiApi.chat({ messages: newMessages });
-      const { reply, messages: updatedHistory, products } = res.data.result || {};
+      const params = {
+        messages: newMessages,
+        lat: currentLocation?.latitude,
+        lng: currentLocation?.longitude,
+      };
+      const res = await aiApi.chat(params);
+      const { reply, messages: updatedHistory, products, action, actionPayload } = res.data.result || {};
+      
+      if (action === "ADD_TO_CART" && actionPayload) {
+        addToCart(actionPayload);
+      } else if (action === "REMOVE_FROM_CART" && actionPayload) {
+        removeFromCart(actionPayload.productId, actionPayload.variantSku);
+      }
       
       setMessages([
         ...updatedHistory,

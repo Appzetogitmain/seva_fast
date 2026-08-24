@@ -148,7 +148,9 @@ export default function SellerChatbotWidget() {
     }
 
     try {
+      setVoiceMode(true);
       const recognition = new SpeechRecognition();
+      let finalTranscript = "";
       recognition.lang = speechLang; // Dynamic: en-IN (English/Hinglish), hi-IN (Hindi), gu-IN (Gujarati), mr-IN (Marathi)
       recognition.interimResults = true;
       recognition.continuous = false;
@@ -161,6 +163,7 @@ export default function SellerChatbotWidget() {
           .join('');
         
         if (transcript) {
+          finalTranscript = transcript;
           setInput(transcript);
         }
       };
@@ -172,6 +175,9 @@ export default function SellerChatbotWidget() {
 
       recognition.onend = () => {
         setIsListening(false);
+        if (finalTranscript.trim()) {
+          handleSend(null, finalTranscript);
+        }
       };
 
       recognitionRef.current = recognition;
@@ -182,16 +188,17 @@ export default function SellerChatbotWidget() {
     }
   };
 
-  const handleSend = async (e) => {
+  const handleSend = async (e, textOverride = null) => {
     e?.preventDefault();
-    if (!input.trim() && !isLoading) return;
+    const finalInput = textOverride || input;
+    if (!finalInput.trim() && !isLoading) return;
 
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
     }
 
-    const userMessage = { role: "user", content: input };
+    const userMessage = { role: "user", content: finalInput };
     const newMessages = [...messages, userMessage];
     
     setMessages(newMessages);

@@ -7,6 +7,7 @@ import FAQ from "../models/faq.js";
 import Category from "../models/category.js";
 import Plan from "../models/plan.js";
 import Review from "../models/review.js";
+import { getNearbySellerIdsForCustomer } from "../services/customerVisibilityService.js";
 
 const CUSTOMER_SYSTEM_INSTRUCTION = `
 You are "Seva AI", the official smart and multilingual (Marathi, Gujarati, Hindi, Hinglish, Bengali, Tamil, Telugu, Kannada, English) assistant for "Seva Fast" - India's premier hyper-local quick-commerce, home services & community referral platform.
@@ -119,17 +120,43 @@ const tools = [
       properties: {},
     },
   },
+  {
+    name: "add_to_cart",
+    description: "Use this tool to add a product to the user's cart after verifying stock availability. First, you MUST search for the product using search_products if you don't already have the product_id.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        product_id: { type: "STRING", description: "The unique MongoDB ObjectId of the product to add." },
+        variant_sku: { type: "STRING", description: "Optional variant SKU if applicable." },
+      },
+      required: ["product_id"],
+    },
+  },
+  {
+    name: "remove_from_cart",
+    description: "Use this tool to remove a product from the user's cart. You need the product_id to remove it.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        product_id: { type: "STRING", description: "The unique MongoDB ObjectId of the product to remove." },
+        variant_sku: { type: "STRING", description: "Optional variant SKU if applicable." },
+      },
+      required: ["product_id"],
+    },
+  },
 ];
 
 export const handleChat = async (req, res) => {
   try {
-    const { messages } = req.body;
+    const { messages, lat, lng } = req.body;
     
     if (!messages || !Array.isArray(messages)) {
       return handleResponse(res, 400, "Messages array is required");
     }
 
     let attachedProducts = [];
+    let pendingAction = null;
+    let pendingActionPayload = null;
 
     let response = await generateChatResponse({
       messages,
@@ -322,6 +349,75 @@ export const handleChat = async (req, res) => {
             .lean();
           toolResult = { categories: categories.map(c => c.name) };
         }
+        else if (toolCall.name === "add_to_cart") {
+          const { product_id, variant_sku } = toolCall.args || {};
+          if (!product_id) {
+            toolResult = { error: "product_id is required" };
+          } else {
+            const prod = await Product.findOne({ _id: product_id, status: "active" }).lean();
+            if (!prod) {
+              toolResult = { error: "Product not found or unavailable." };
+            } else {
+              // check delivery radius
+              let isDeliverable = true;
+              if (lat && lng) {
+                const nearbySellerIds = await getNearbySellerIdsForCustomer(lat, lng);
+                const nearbySellerSet = new Set(nearbySellerIds.map(String));
+                const sellerIdForProduct = String(prod.sellerId?._id || prod.sellerId);
+                const isScheduled = prod.deliveryType === "scheduled";
+                if (!isScheduled && !nearbySellerSet.has(sellerIdForProduct)) {
+                  isDeliverable = false;
+                }
+              }
+
+              if (!isDeliverable) {
+                toolResult = { error: "This product is not deliverable to your current location." };
+              } else {
+                // check stock
+                let availableStock = prod.stock || 0;
+                let effectivePrice = prod.salePrice || prod.price;
+                
+                if (variant_sku && prod.variants && prod.variants.length > 0) {
+                  const v = prod.variants.find(v => v.sku === variant_sku || v.name === variant_sku);
+                  if (v) {
+                    availableStock = v.stock;
+                    effectivePrice = v.salePrice || v.price;
+                  }
+                }
+
+                if (availableStock > 0) {
+                  toolResult = { success: true, message: "Stock verified. Added to cart successfully." };
+                  pendingAction = "ADD_TO_CART";
+                  pendingActionPayload = {
+                    id: prod._id,
+                    _id: prod._id,
+                    name: prod.name,
+                    price: effectivePrice,
+                    salePrice: prod.salePrice,
+                    image: prod.mainImage || prod.thumbnail,
+                    sellerId: prod.sellerId,
+                    variantSku: variant_sku || "",
+                  };
+                } else {
+                  toolResult = { error: "Sorry, this product is currently out of stock." };
+                }
+              }
+            }
+          }
+        }
+        else if (toolCall.name === "remove_from_cart") {
+          const { product_id, variant_sku } = toolCall.args || {};
+          if (!product_id) {
+            toolResult = { error: "product_id is required" };
+          } else {
+            toolResult = { success: true, message: "Action dispatched to frontend to remove from cart." };
+            pendingAction = "REMOVE_FROM_CART";
+            pendingActionPayload = {
+              productId: product_id,
+              variantSku: variant_sku || "",
+            };
+          }
+        }
       } catch (toolErr) {
         console.error("[CustomerAI] Tool execution error:", toolErr);
         toolResult = { error: "Failed to fetch live data from database." };
@@ -388,7 +484,13 @@ export const handleChat = async (req, res) => {
       }
     }
 
-    return handleResponse(res, 200, "Success", { reply: replyText, messages, products: attachedProducts });
+    return handleResponse(res, 200, "Success", { 
+      reply: replyText, 
+      messages, 
+      products: attachedProducts,
+      action: pendingAction,
+      actionPayload: pendingActionPayload
+    });
   } catch (error) {
     console.error("[CustomerAI] handleChat error:", error?.message, error?.code);
     if (error instanceof AiServiceError) {
