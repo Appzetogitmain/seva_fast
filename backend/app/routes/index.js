@@ -33,6 +33,7 @@ import storePromotionRoute from "./storePromotionRoutes.js";
 import productDemandRoute from "./productDemandRoutes.js";
 import customerAiRoute from "./customerAiRoutes.js";
 import sellerAiRoute from "./sellerAiRoutes.js";
+import adminAiRoute from "./adminAiRoutes.js";
 
 import express from "express";
 import { ensureDatabaseConnected } from "../middleware/databaseMiddleware.js";
@@ -80,6 +81,7 @@ const setupRoutes = (app) => {
     router.use("/product-demands", productDemandRoute);
     router.use("/customer/ai", customerAiRoute);
     router.use("/seller/ai", sellerAiRoute);
+    router.use("/admin/ai", adminAiRoute);
 
     app.use("/api", router);
 }

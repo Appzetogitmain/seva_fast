@@ -5,6 +5,7 @@ import { useSupportUnread } from "@core/context/SupportUnreadContext";
 import { useAuth } from "@core/context/AuthContext";
 import { useEffect } from "react";
 import { getOrderSocket } from "@/core/services/orderSocket";
+import AdminChatbotWidget from "../components/AdminChatbotWidget";
 import {
   LayoutDashboard,
   Tag,
@@ -323,6 +324,7 @@ const AdminRoutes = () => {
 
   return (
     <DashboardLayout navItems={navItemsWithBadges} title="Admin Center">
+      <AdminChatbotWidget />
       <Routes>
         <Route path="/" element={<SubadminRoute permission="Dashboard"><Dashboard /></SubadminRoute>} />
         <Route path="/users" element={<SubadminRoute permission="Sub-Admins"><UserManagement /></SubadminRoute>} />

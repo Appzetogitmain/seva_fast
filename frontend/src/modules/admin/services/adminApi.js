@@ -84,6 +84,9 @@ export const adminApi = {
     getBroadcastAudienceStats: () => axiosInstance.get('/notifications/broadcast/audience-stats'),
     getAuthActivityLogs: (params) => axiosInstance.get('/admin/auth-activity', { params }),
 
+    // AI Assistant
+    aiChat: (data) => axiosInstance.post('/admin/ai/chat', data),
+
     // WhatsApp campaigns
     getWhatsAppConfigStatus: () => axiosInstance.get('/admin/whatsapp/config-status'),
     uploadWhatsAppCampaignImage: (file) => {
