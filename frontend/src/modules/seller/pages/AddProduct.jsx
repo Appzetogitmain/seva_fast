@@ -1144,20 +1144,34 @@ const AddProduct = () => {
                 </label>
                 <div className="flex flex-col md:flex-row items-start gap-6">
                   <div className="w-48 aspect-square rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center group hover:border-primary hover:bg-primary/5 transition-all cursor-pointer overflow-hidden relative">
-                    <input
-                      type="file"
-                      accept="image/*,video/*"
-                      capture="environment"
-                      className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      onChange={(e) => handleImageUpload(e, "main")}
-                    />
                     {formData.mainImage ? (
-                      <img
-                        src={formData.mainImage}
-                        className="w-full h-full object-cover"
-                      />
+                      <>
+                        <img
+                          src={formData.mainImage}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setFormData({ ...formData, mainImage: null, mainImageFile: null });
+                          }}
+                          className="absolute top-2 right-2 p-1.5 bg-white text-rose-500 rounded-full shadow-md hover:bg-rose-50 transition-colors z-20"
+                          title="Remove cover photo"
+                        >
+                          <HiOutlineTrash className="h-4 w-4" />
+                        </button>
+                      </>
                     ) : (
                       <>
+                        <input
+                          type="file"
+                          accept="image/*,video/*"
+                          capture="environment"
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                          onChange={(e) => handleImageUpload(e, "main")}
+                        />
                         <HiOutlinePhoto className="h-10 w-10 text-slate-200 group-hover:text-primary transition-colors" />
                         <p className="text-[9px] font-bold text-slate-600 mt-2 uppercase tracking-widest group-hover:text-primary">
                           Upload Cover
@@ -1229,10 +1243,34 @@ const AddProduct = () => {
                       key={i}
                       className="aspect-square rounded-md border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center group hover:border-primary hover:bg-primary/5 transition-all cursor-pointer relative overflow-hidden">
                       {formData.galleryImages[i - 1] ? (
-                        <img
-                          src={formData.galleryImages[i - 1]}
-                          className="w-full h-full object-cover"
-                        />
+                        <>
+                          <img
+                            src={formData.galleryImages[i - 1]}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const newImages = [...formData.galleryImages];
+                              newImages.splice(i - 1, 1);
+                              const newFiles = [...(formData.galleryFiles || [])];
+                              if (newFiles.length > i - 1) {
+                                newFiles.splice(i - 1, 1);
+                              }
+                              setFormData({
+                                ...formData,
+                                galleryImages: newImages,
+                                galleryFiles: newFiles
+                              });
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-white text-rose-500 rounded-full shadow-sm hover:bg-rose-50 transition-colors z-20"
+                            title="Remove photo"
+                          >
+                            <HiOutlineTrash className="h-3 w-3" />
+                          </button>
+                        </>
                       ) : (
                         <>
                           <input

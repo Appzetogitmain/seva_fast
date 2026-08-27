@@ -65,6 +65,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
 
     const [file, setFile] = useState(null);
+    const [originalFile, setOriginalFile] = useState(null);
     const [filePreview, setFilePreview] = useState('');
     const [city, setCity] = useState('');
     const [sellers, setSellers] = useState([]);
@@ -98,21 +99,19 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     };
 
     /* ─── file & crop handlers ─── */
-    const handleFileChange = (e) => {
+    const handleFileChange = async (e) => {
         if (e.target.files && e.target.files[0]) {
             const selectedFile = e.target.files[0];
             if (selectedFile.size > 25 * 1024 * 1024) {
                 toast.error("Photo size bahut badi hai! Kripya choti photo upload karein.");
                 return;
             }
-            const reader = new FileReader();
-            reader.onload = () => {
-                setRawImageSrc(reader.result);
-                setZoom(1);
-                setCropOffset({ x: 0, y: 0 });
-                setIsCropping(true);
-            };
-            reader.readAsDataURL(selectedFile);
+            
+            setOriginalFile(selectedFile);
+            
+            const compressed = await compressImage(selectedFile);
+            setFile(compressed);
+            setFilePreview(URL.createObjectURL(compressed));
         }
     };
 
@@ -187,7 +186,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
             await axiosInstance.post('/photo-orders', { sellerId: selectedSellerId, photoUrl, notes, city });
             toast.success("Enquiry/Order sent to seller!");
             setIsSubmitting(false); setIsUploading(false); onClose();
-            setFile(null); setFilePreview(''); setCity(''); setSelectedSellerId(''); setNotes('');
+            setFile(null); setOriginalFile(null); setFilePreview(''); setCity(''); setSelectedSellerId(''); setNotes('');
             navigate('/orders?tab=photo');
         } catch (error) {
             setIsUploading(false); setIsSubmitting(false);
@@ -403,17 +402,33 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                                         <p className="text-xs font-semibold text-slate-800 truncate">{file?.name}</p>
                                         <div className="flex items-center gap-1.5 mt-1">
                                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                            <span className="text-[11px] text-emerald-600 font-semibold">Ready & Cropped</span>
+                                            <span className="text-[11px] text-emerald-600 font-semibold">Ready to Send</span>
                                         </div>
                                         <p className="text-[10px] text-slate-400 mt-0.5">
                                             {file ? `${(file.size / 1024).toFixed(0)} KB` : ''}
                                         </p>
                                     </div>
-                                    <button type="button"
-                                        onClick={() => { setFile(null); setFilePreview(''); }}
-                                        className="p-2 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition-all">
-                                        <Trash2 size={16} />
-                                    </button>
+                                    <div className="flex gap-1">
+                                        <button type="button"
+                                            onClick={() => {
+                                                const reader = new FileReader();
+                                                reader.onload = () => {
+                                                    setRawImageSrc(reader.result);
+                                                    setZoom(1);
+                                                    setCropOffset({ x: 0, y: 0 });
+                                                    setIsCropping(true);
+                                                };
+                                                reader.readAsDataURL(originalFile || file);
+                                            }}
+                                            className="p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-500 transition-all">
+                                            <Crop size={16} />
+                                        </button>
+                                        <button type="button"
+                                            onClick={() => { setFile(null); setOriginalFile(null); setFilePreview(''); }}
+                                            className="p-2 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition-all">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ) : (

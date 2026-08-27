@@ -563,7 +563,7 @@ const Home = () => {
           {/* Floating Action Button for Custom Photo Order */}
           <button
             onClick={() => setIsCustomOrderModalOpen(true)}
-            className={`fixed ${cartCount > 0 ? 'bottom-[140px]' : 'bottom-20'} right-4 md:bottom-8 md:right-8 z-[100] bg-indigo-600 border-2 border-white text-white px-4 py-3 md:px-5 md:py-3.5 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.3)] hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 group`}
+            className={`fixed ${cartCount > 0 ? 'bottom-[140px]' : 'bottom-20'} left-4 md:bottom-8 md:left-8 z-[100] bg-indigo-600 border-2 border-white text-white px-4 py-3 md:px-5 md:py-3.5 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.3)] hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 group`}
             title="Send Custom Photo Order"
           >
             <Camera size={22} className="group-hover:animate-pulse" />
