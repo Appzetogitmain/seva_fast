@@ -169,18 +169,19 @@ export const AuthProvider = ({ children }) => {
                 } catch (error) {
                     console.error('Failed to fetch profile:', error);
                     const statusCode = error?.response?.status;
-                    // Only clear session for confirmed auth failures (401).
-                    // 403 can be role/plan restrictions and should not log users out.
+                    // Bug #271: this used to force-clear the stored token/session on a 401
+                    // here, which directly contradicted the site-wide policy in
+                    // core/api/axios.js — "Preserving stored auth tokens; session data is
+                    // only cleared by explicit logout." A 401 on the profile fetch can be
+                    // transient (server hiccup, brief token-refresh race, etc.), and since
+                    // this file is shared by every role, force-logging out here was auto
+                    // signing users out from under them. Mirror axios.js: never clear the
+                    // token/session from here — only an explicit logout() call may do that.
                     if (statusCode === 401) {
-                        const storageKey = ROLE_STORAGE_KEYS[currentRole];
-                        if (storageKey) {
-                            localStorage.removeItem(storageKey);
-                        }
-                        setAuthData((prev) => ({
-                            ...prev,
-                            [currentRole]: null,
-                        }));
-                        setUser(null);
+                        console.warn(
+                            '[auth] Received 401 fetching profile. Preserving stored auth token; session is only cleared by explicit logout.',
+                            { role: currentRole }
+                        );
                     }
                 } finally {
                     setIsLoading(false);

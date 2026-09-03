@@ -18,6 +18,7 @@ import {
   XCircle,
   Calendar,
   Droplet,
+  Briefcase,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Lottie from "lottie-react";
@@ -41,6 +42,22 @@ const DELIVERY_TEST_OTP = "123456";
 const isDeliveryTestPhone = (phone) =>
   DELIVERY_TEST_PHONES.has(String(phone || "").replace(/\D/g, "").slice(-10));
 
+// A valid Indian mobile number is 10 digits and starts with 6, 7, 8 or 9.
+const isValidIndianMobile = (phone) => /^[6-9]\d{9}$/.test(String(phone || ""));
+
+// Bug 275/277: persist in-progress signup (step + fields) across a T&C/Privacy
+// tab visit or a hard page refresh, so the rider doesn't lose their work.
+const SIGNUP_DRAFT_KEY = "delivery_signup_draft";
+
+const loadSignupDraft = () => {
+  try {
+    const raw = sessionStorage.getItem(SIGNUP_DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 const DeliveryAuth = () => {
   const navigate = useNavigate();
   const { settings } = useSettings();
@@ -48,29 +65,34 @@ const DeliveryAuth = () => {
   const logoUrl = settings?.logoUrl || "";
   const { login } = useAuth();
 
+  // Loaded once per mount; used to seed initial state below.
+  const [signupDraft] = useState(loadSignupDraft);
+
   // mode: "login" | "signup"
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState(signupDraft ? "signup" : "login");
   const [step, setStep] = useState("form"); // "form" | "otp"
 
   // Login state
   const [loginPhone, setLoginPhone] = useState("");
 
   // Signup state
-  const [signupStep, setSignupStep] = useState(1);
-  const [signupName, setSignupName] = useState("");
-  const [signupPhone, setSignupPhone] = useState("");
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupAddress, setSignupAddress] = useState("");
-  const [signupDob, setSignupDob] = useState("");
-  const [signupBloodGroup, setSignupBloodGroup] = useState("");
-  const [signupVehicle, setSignupVehicle] = useState("bike");
-  const [signupVehicleNumber, setSignupVehicleNumber] = useState("");
-  const [signupDLNumber, setSignupDLNumber] = useState("");
-  const [signupPanNumber, setSignupPanNumber] = useState("");
-  const [signupAadharNumber, setSignupAadharNumber] = useState("");
-  const [signupAccountNumber, setSignupAccountNumber] = useState("");
-  const [signupIfsc, setSignupIfsc] = useState("");
-  const [signupAccountHolder, setSignupAccountHolder] = useState("");
+  const [signupStep, setSignupStep] = useState(signupDraft?.signupStep || 1);
+  const [signupName, setSignupName] = useState(signupDraft?.signupName || "");
+  const [signupPhone, setSignupPhone] = useState(signupDraft?.signupPhone || "");
+  const [signupEmail, setSignupEmail] = useState(signupDraft?.signupEmail || "");
+  const [signupAddress, setSignupAddress] = useState(signupDraft?.signupAddress || "");
+  const [signupDob, setSignupDob] = useState(signupDraft?.signupDob || "");
+  const [signupBloodGroup, setSignupBloodGroup] = useState(signupDraft?.signupBloodGroup || "");
+  const [signupVehicle, setSignupVehicle] = useState(signupDraft?.signupVehicle || "bike");
+  const [signupVehicleNumber, setSignupVehicleNumber] = useState(signupDraft?.signupVehicleNumber || "");
+  const [signupDLNumber, setSignupDLNumber] = useState(signupDraft?.signupDLNumber || "");
+  const [signupPanNumber, setSignupPanNumber] = useState(signupDraft?.signupPanNumber || "");
+  const [signupAadharNumber, setSignupAadharNumber] = useState(signupDraft?.signupAadharNumber || "");
+  const [signupAccountNumber, setSignupAccountNumber] = useState(signupDraft?.signupAccountNumber || "");
+  const [signupIfsc, setSignupIfsc] = useState(signupDraft?.signupIfsc || "");
+  const [signupAccountHolder, setSignupAccountHolder] = useState(signupDraft?.signupAccountHolder || "");
+  const [signupExperience, setSignupExperience] = useState(signupDraft?.signupExperience || "");
+  const [signupPreferredArea, setSignupPreferredArea] = useState(signupDraft?.signupPreferredArea || "");
   const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState("");
@@ -99,6 +121,76 @@ const DeliveryAuth = () => {
     return () => clearInterval(interval);
   }, [step, timer]);
 
+  // Bug 275/277: keep the in-progress signup draft (step + fields) in
+  // sessionStorage so a T&C/Privacy tap-out or a refresh doesn't lose it.
+  useEffect(() => {
+    if (mode !== "signup") return;
+    try {
+      sessionStorage.setItem(
+        SIGNUP_DRAFT_KEY,
+        JSON.stringify({
+          signupStep,
+          signupName,
+          signupPhone,
+          signupEmail,
+          signupAddress,
+          signupDob,
+          signupBloodGroup,
+          signupVehicle,
+          signupVehicleNumber,
+          signupDLNumber,
+          signupPanNumber,
+          signupAadharNumber,
+          signupAccountNumber,
+          signupIfsc,
+          signupAccountHolder,
+          signupExperience,
+          signupPreferredArea,
+        }),
+      );
+    } catch {
+      /* sessionStorage unavailable (e.g. private mode) — ignore */
+    }
+  }, [
+    mode,
+    signupStep,
+    signupName,
+    signupPhone,
+    signupEmail,
+    signupAddress,
+    signupDob,
+    signupBloodGroup,
+    signupVehicle,
+    signupVehicleNumber,
+    signupDLNumber,
+    signupPanNumber,
+    signupAadharNumber,
+    signupAccountNumber,
+    signupIfsc,
+    signupAccountHolder,
+    signupExperience,
+    signupPreferredArea,
+  ]);
+
+  // Bug 280: pressing the hardware/browser back button while on the OTP step
+  // should return to the phone-entry step instead of exiting the auth flow.
+  useEffect(() => {
+    if (step !== "otp") return undefined;
+    window.history.pushState({ deliveryAuthOtpStep: true }, "");
+    const handlePopState = () => {
+      setStep("form");
+      setOtp(["", "", "", "", "", ""]);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [step]);
+
+  // Bug 276: scroll the focused field into view so it isn't hidden behind
+  // the on-screen keyboard on mobile.
+  const handleFieldFocus = (e) => {
+    e.target.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   const handleDLUpload = (file) => {
     setDlFile(file || null);
   };
@@ -115,15 +207,15 @@ const DeliveryAuth = () => {
     try {
       setLoading(true);
       if (mode === "login") {
-        if (!loginPhone || loginPhone.length < 10) {
-          toast.error("Please enter a valid 10-digit phone number");
+        if (!isValidIndianMobile(loginPhone)) {
+          toast.error("Please enter a valid 10-digit phone number starting with 6-9");
           return;
         }
         const res = await deliveryApi.sendLoginOtp({ phone: loginPhone });
         toast.success(res.data?.message || "OTP sent!");
       } else {
         if (!signupName.trim()) { toast.error("Please enter your name"); return; }
-        if (!signupPhone || signupPhone.length < 10) { toast.error("Please enter a valid 10-digit phone number"); return; }
+        if (!isValidIndianMobile(signupPhone)) { toast.error("Please enter a valid 10-digit phone number starting with 6-9"); return; }
         if (!profileImageFile) { toast.error("Please upload your profile photo"); return; }
 
         const formData = new FormData();
@@ -141,6 +233,8 @@ const DeliveryAuth = () => {
         formData.append("ifsc", signupIfsc);
         if (signupAadharNumber) formData.append("aadharNumber", signupAadharNumber);
         if (signupPanNumber) formData.append("panNumber", signupPanNumber);
+        if (signupExperience) formData.append("experienceYears", signupExperience);
+        if (signupPreferredArea) formData.append("preferredArea", signupPreferredArea);
 
         if (profileImageFile) formData.append("profileImage", profileImageFile);
         if (aadharFile) formData.append("aadhar", aadharFile);
@@ -181,6 +275,15 @@ const DeliveryAuth = () => {
       const otpString = otp.join("");
       const response = await deliveryApi.verifyOtp({ phone, otp: otpString });
       const { token, delivery } = response.data.result;
+
+      if (mode === "signup") {
+        // Signup submitted successfully (approved or pending) — clear the draft.
+        try {
+          sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+        } catch {
+          /* ignore */
+        }
+      }
 
       if (!delivery?.isVerified) {
         if (mode === "signup") {
@@ -269,8 +372,8 @@ const DeliveryAuth = () => {
 
   return (
     <div className="min-h-screen bg-[#F0F4FF] flex flex-col items-center justify-center p-5 pt-20 font-['Outfit',_sans-serif]">
-      {/* Absolute Logo Bar - outside the card */}
-      <div className="absolute top-0 left-0 right-0 z-50 flex justify-center pt-4">
+      {/* Fixed Logo Bar - stays pinned even on long, scrolling forms */}
+      <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4">
         <div className="w-14 h-14 rounded-2xl bg-white/85 backdrop-blur-sm border border-brand-100 shadow-sm flex items-center justify-center overflow-hidden">
           {logoUrl ? (
             <img
@@ -417,6 +520,7 @@ const DeliveryAuth = () => {
                                   val = val.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
                                   setSignupName(val);
                                 }}
+                                onFocus={handleFieldFocus}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                                 placeholder="Enter your full name"
                               />
@@ -432,6 +536,7 @@ const DeliveryAuth = () => {
                                 type="tel"
                                 value={signupPhone}
                                 onChange={(e) => setSignupPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                                onFocus={handleFieldFocus}
                                 maxLength={10}
                                 className="w-full pl-24 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                                 placeholder="00000 00000"
@@ -447,6 +552,7 @@ const DeliveryAuth = () => {
                                 type="email"
                                 value={signupEmail}
                                 onChange={(e) => setSignupEmail(e.target.value)}
+                                onFocus={handleFieldFocus}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                                 placeholder="example@gmail.com"
                               />
@@ -468,6 +574,7 @@ const DeliveryAuth = () => {
                                     setValidationErrors(prev => ({ ...prev, address: "" }));
                                   }
                                 }}
+                                onFocus={handleFieldFocus}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all resize-none h-24"
                                 placeholder="Complete building address..."
                               />
@@ -486,6 +593,7 @@ const DeliveryAuth = () => {
                                   type="date"
                                   value={signupDob}
                                   onChange={(e) => setSignupDob(e.target.value)}
+                                  onFocus={handleFieldFocus}
                                   className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all uppercase"
                                 />
                               </div>
@@ -497,6 +605,7 @@ const DeliveryAuth = () => {
                                 <select
                                   value={signupBloodGroup}
                                   onChange={(e) => setSignupBloodGroup(e.target.value)}
+                                  onFocus={handleFieldFocus}
                                   className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all appearance-none"
                                 >
                                   <option value="">Select...</option>
@@ -520,8 +629,8 @@ const DeliveryAuth = () => {
                                 toast.error("Please fill all personal information fields and upload photo");
                                 return;
                               }
-                              if (signupPhone.length !== 10) {
-                                toast.error("Please enter a valid 10-digit phone number");
+                              if (!isValidIndianMobile(signupPhone)) {
+                                toast.error("Please enter a valid 10-digit phone number starting with 6-9");
                                 return;
                               }
                               setSignupStep(2);
@@ -589,6 +698,7 @@ const DeliveryAuth = () => {
                                   const val = e.target.value.replace(/[^a-zA-Z0-9\s]/g, "").toUpperCase();
                                   setSignupVehicleNumber(val);
                                 }}
+                                onFocus={handleFieldFocus}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                                 placeholder={isCycleVehicle ? "HERO CYCLE / FRAME NO. (Optional)" : "KA 05 MN 8921"}
                               />
@@ -609,8 +719,48 @@ const DeliveryAuth = () => {
                                   const val = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
                                   setSignupDLNumber(val);
                                 }}
+                                onFocus={handleFieldFocus}
                                 className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                                 placeholder={isCycleVehicle ? "AADHAAR / OTHER ID (Optional)" : "DL-1420110012345"}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Delivery Experience (Years)</label>
+                            <div className="relative">
+                              <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={signupExperience}
+                                maxLength={2}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, "").slice(0, 2);
+                                  setSignupExperience(val);
+                                }}
+                                onFocus={handleFieldFocus}
+                                className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
+                                placeholder="e.g. 2"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Preferred Work Area</label>
+                            <div className="relative">
+                              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
+                              <input
+                                type="text"
+                                value={signupPreferredArea}
+                                maxLength={80}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
+                                  setSignupPreferredArea(val);
+                                }}
+                                onFocus={handleFieldFocus}
+                                className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
+                                placeholder="Area/locality you'd like to deliver in"
                               />
                             </div>
                           </div>
@@ -630,6 +780,14 @@ const DeliveryAuth = () => {
                                 }
                                 if (!isCycleVehicle && !signupDLNumber) {
                                   toast.error("Please enter your driving license number");
+                                  return;
+                                }
+                                if (!signupExperience) {
+                                  toast.error("Please enter your delivery experience");
+                                  return;
+                                }
+                                if (!signupPreferredArea) {
+                                  toast.error("Please enter your preferred work area");
                                   return;
                                 }
                                 setSignupStep(3);
@@ -655,6 +813,7 @@ const DeliveryAuth = () => {
                               type="text"
                               value={signupAadharNumber}
                               onChange={(e) => setSignupAadharNumber(e.target.value.replace(/\D/g, "").slice(0, 12))}
+                              onFocus={handleFieldFocus}
                               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all font-mono"
                               placeholder="0000 0000 0000"
                             />
@@ -674,6 +833,7 @@ const DeliveryAuth = () => {
                                   setValidationErrors(prev => ({ ...prev, pan: "" }));
                                 }
                               }}
+                              onFocus={handleFieldFocus}
                               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all font-mono"
                               placeholder="ABCDE1234F"
                             />
@@ -692,6 +852,7 @@ const DeliveryAuth = () => {
                                 val = val.replace(/^\s+/, "").replace(/\s{2,}/g, " ");
                                 setSignupAccountHolder(val);
                               }}
+                              onFocus={handleFieldFocus}
                               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                               placeholder="AS PER BANK RECORDS"
                             />
@@ -711,6 +872,7 @@ const DeliveryAuth = () => {
                                   setValidationErrors(prev => ({ ...prev, account: "" }));
                                 }
                               }}
+                              onFocus={handleFieldFocus}
                               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                               placeholder="000000000000"
                             />
@@ -733,6 +895,7 @@ const DeliveryAuth = () => {
                                   setValidationErrors(prev => ({ ...prev, ifsc: "" }));
                                 }
                               }}
+                              onFocus={handleFieldFocus}
                               className="w-full px-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
                               placeholder="HDFC0001234"
                             />
@@ -873,9 +1036,9 @@ const DeliveryAuth = () => {
 
                       <p className="text-center text-xs text-gray-400 font-semibold pt-1">
                         By joining, you agree to our{" "}
-                        <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand-500 font-bold hover:underline">Terms</a>
+                        <a href="/terms?for=delivery" target="_blank" rel="noopener noreferrer" className="text-brand-500 font-bold hover:underline">Terms</a>
                         {" "}&amp;{" "}
-                        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand-500 font-bold hover:underline">Privacy Policy</a>
+                        <a href="/privacy?for=delivery" target="_blank" rel="noopener noreferrer" className="text-brand-500 font-bold hover:underline">Privacy Policy</a>
                       </p>
                     </div>
                   )}
@@ -985,8 +1148,8 @@ const DeliveryAuth = () => {
                     />
                     <label htmlFor="terms" className="text-xs text-gray-500 leading-relaxed cursor-pointer">
                       I confirm my phone number is correct and I agree to the{" "}
-                      <Link to="/terms" target="_blank" className="text-brand-600 font-bold hover:underline">Terms of Service</Link> &amp;{" "}
-                      <Link to="/privacy" target="_blank" className="text-brand-600 font-bold hover:underline">Privacy Policy</Link>.
+                      <Link to="/terms?for=delivery" target="_blank" className="text-brand-600 font-bold hover:underline">Terms of Service</Link> &amp;{" "}
+                      <Link to="/privacy?for=delivery" target="_blank" className="text-brand-600 font-bold hover:underline">Privacy Policy</Link>.
                     </label>
                   </div>
 

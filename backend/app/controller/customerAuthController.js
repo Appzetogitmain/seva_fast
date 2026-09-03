@@ -304,6 +304,7 @@ export const updateCustomerProfile = async (req, res) => {
         if (payload.name) customer.name = payload.name;
         if (payload.email !== undefined) customer.email = payload.email || undefined;
         if (payload.profileImage !== undefined) customer.profileImage = payload.profileImage || "";
+        if (payload.phone) customer.phone = payload.phone;
         if (payload.addresses) customer.addresses = payload.addresses;
         if (payload.dateOfBirth !== undefined) {
             applyDateOfBirthToCustomer(customer, payload.dateOfBirth);
@@ -315,6 +316,9 @@ export const updateCustomerProfile = async (req, res) => {
 
         return handleResponse(res, 200, "Profile updated successfully", updatedCustomer);
     } catch (error) {
+        if (error.code === 11000 && error.keyPattern?.phone) {
+            return handleResponse(res, 409, "This phone number is already in use by another account");
+        }
         return handleResponse(res, error.statusCode || 500, error.message);
     }
 };

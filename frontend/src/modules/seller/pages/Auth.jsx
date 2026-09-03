@@ -252,12 +252,12 @@ const Auth = () => {
     if (
       (isEmailField &&
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentValue || "")) ||
-      (!isEmailField && !/^[0-9]{10}$/.test(currentValue || ""))
+      (!isEmailField && !/^[6-9][0-9]{9}$/.test(currentValue || ""))
     ) {
       toast.error(
         isEmailField
           ? "Enter a valid email before requesting OTP."
-          : "Enter a valid 10-digit phone number before requesting OTP.",
+          : "Enter a valid 10-digit phone number starting with 6-9 before requesting OTP.",
       );
       return;
     }
@@ -431,6 +431,18 @@ const Auth = () => {
     isProcessing.current = true;
 
     try {
+      // Login accepts either an email or a phone number in one field —
+      // if it looks like an email (contains "@"), make sure it's a
+      // properly formatted one before hitting the API.
+      if (isLogin) {
+        const identifier = formData.email || "";
+        if (identifier.includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
+          toast.error("Please enter a valid email address.");
+          isProcessing.current = false;
+          return;
+        }
+      }
+
       // Basic client-side validation for signup
       if (!isLogin) {
         if (!formData.name.trim()) {
@@ -446,8 +458,8 @@ const Auth = () => {
           isProcessing.current = false;
           return;
         }
-        if (!/^[0-9]{10}$/.test(phone)) {
-          toast.error("Please enter a valid 10-digit contact number.");
+        if (!/^[6-9][0-9]{9}$/.test(phone)) {
+          toast.error("Please enter a valid 10-digit contact number starting with 6-9.");
           isProcessing.current = false;
           return;
         }
@@ -652,7 +664,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#fcfaff] p-6 font-['Outfit'] overflow-hidden relative">
+    <div className="flex flex-col min-h-screen items-center justify-center gap-4 bg-[#fcfaff] p-6 font-['Outfit'] overflow-hidden relative">
       {/* Elegant Ambient Background */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] bg-slate-100/50 rounded-full blur-[120px]" />
@@ -665,6 +677,19 @@ const Auth = () => {
         className="relative z-10 w-full max-w-[1000px] min-h-[600px] max-h-[90vh] bg-white rounded-lg shadow-[0_50px_120px_rgba(0,0,0,0.04)] border border-white flex flex-col md:flex-row overflow-hidden">
         {/* Visual Side Panel */}
         <div className="hidden md:flex w-[45%] bg-linear-to-br from-slate-900 via-slate-950 to-black relative flex-col items-center justify-center p-10 overflow-hidden">
+          {/* Brand Logo */}
+          <div className="absolute top-6 left-6 z-20 inline-flex items-center gap-2.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={`${appName} logo`}
+                className="h-7 w-7 rounded-md object-contain bg-white/90"
+              />
+            ) : (
+              <Store className="h-5 w-5 text-white/80" />
+            )}
+            <span className="text-xs font-bold text-white/90">{appName}</span>
+          </div>
           {/* Abstract Decorative Circles */}
           <div className="absolute inset-0 opacity-20">
             <div className="absolute top-0 left-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
@@ -735,6 +760,22 @@ const Auth = () => {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
               className="space-y-8 py-4 md:py-6">
+              <div className="flex md:hidden items-center gap-2.5">
+                <div className="h-10 w-10 shrink-0 rounded-xl bg-slate-50 border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={`${appName} logo`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Store size={18} className="text-slate-700" />
+                  )}
+                </div>
+                <span className="text-sm font-black text-slate-900 tracking-tight">
+                  {appName} Seller
+                </span>
+              </div>
               <div className="space-y-4">
                 <span className="inline-block px-4 py-1 bg-slate-100 text-slate-800 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200 text-center whitespace-normal w-full sm:w-auto">
                   {isLogin
@@ -789,6 +830,7 @@ const Auth = () => {
                             type="text"
                             name="shopName"
                             required
+                            maxLength={50}
                             placeholder="Shop / Business Name"
                             className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                             value={formData.shopName}
@@ -808,8 +850,8 @@ const Auth = () => {
                         required
                         inputMode={isLogin ? "text" : "email"}
                         autoComplete="email"
-                        placeholder={isLogin ? "Business Email or Phone" : "Business Email"}
-                        className="w-full pl-12 pr-28 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                        placeholder={isLogin ? "Email or Phone" : "Email"}
+                        className={`w-full pl-12 ${isLogin ? "pr-6" : "pr-28"} py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400`}
                         value={formData.email}
                         onChange={handleChange}
                       />
@@ -892,7 +934,7 @@ const Auth = () => {
                             disabled={
                               verifications.phone.isSending ||
                               verifications.phone.status === "verified" ||
-                              !/^[0-9]{10}$/.test(formData.phone || "")
+                              !/^[6-9][0-9]{9}$/.test(formData.phone || "")
                             }
                             className={`absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${verifications.phone.status === "verified"
                               ? "bg-brand-100 text-brand-700 cursor-default"
@@ -1491,9 +1533,14 @@ const Auth = () => {
         </div>
       </motion.div>
 
-      {/* Bottom Tagline */}
-      <div className="absolute bottom-6 flex items-center gap-4 text-slate-300 text-[10px] font-black uppercase tracking-[6px]">
-        Empowering Business Digitalization
+      {/* Bottom Tagline & Copyright */}
+      <div className="relative z-10 flex flex-col items-center gap-1.5 text-center px-4">
+        <span className="flex items-center gap-4 text-slate-300 text-[10px] font-black uppercase tracking-[6px]">
+          Empowering Business Digitalization
+        </span>
+        <span className="text-slate-300 text-[10px] font-bold tracking-widest">
+          Made with Sevafast
+        </span>
       </div>
 
       {isMapOpen && (
@@ -1553,7 +1600,7 @@ const Auth = () => {
                     <input
                       type="email"
                       autoComplete="email"
-                      placeholder="Business Email"
+                      placeholder="Email"
                       className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
                       value={fpEmail}
                       onChange={(e) => setFpEmail(e.target.value.replace(/\s+/g, "").toLowerCase())}

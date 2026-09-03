@@ -32,6 +32,15 @@ export const LocationProvider = ({ children }) => {
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [locationError, setLocationError] = useState(null);
 
+  // Tracks whether the initial location resolution (from cache, or from the
+  // user explicitly allowing/declining the permission card below) has
+  // completed. Screens that depend on the customer's real address (e.g. Home)
+  // can use this to avoid rendering with the hardcoded default location.
+  const [locationResolved, setLocationResolved] = useState(false);
+  // Controls the "allow location access" card shown before we ever ask the
+  // browser for geolocation permission on a device with no saved location.
+  const [showLocationPermission, setShowLocationPermission] = useState(false);
+
   // Update the current location.
   // By default this does NOT change saved addresses; only explicit
   // address actions should touch the saved list.
@@ -290,12 +299,12 @@ export const LocationProvider = ({ children }) => {
   }, [refreshAddresses]);
 
   // On mount: restore a previously resolved location from cache. If there is
-  // none (first visit on this device), actively ask the browser for
-  // permission and use the real location — geolocation does not require a
-  // user gesture to show the permission prompt, so this is safe to call
-  // straight from an effect. Only fall back to the hardcoded default if the
-  // user denies permission, the request fails, or geolocation isn't
-  // supported at all.
+  // none (first visit on this device, or no saved address yet), show a
+  // clear "allow location" card and wait for the customer to explicitly
+  // allow or decline before resolving — Home should not render with the
+  // hardcoded default location while that decision is pending. Only fall
+  // back to the hardcoded default once the user explicitly declines, or the
+  // permission request fails/is unsupported.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -317,6 +326,7 @@ export const LocationProvider = ({ children }) => {
             },
             { persist: false, updateSavedHome: false },
           );
+          setLocationResolved(true);
           return;
         }
       }
@@ -324,18 +334,37 @@ export const LocationProvider = ({ children }) => {
       // ignore parse errors, fall through to a fresh location request
     }
 
-    // No usable cached location — prompt for permission and use the real
-    // location. If denied/unsupported/failed, fall back to the default.
-    fetchAndCacheLocation().then((result) => {
-      if (!result.ok) {
-        updateLocation(currentLocation, {
-          persist: true,
-          updateSavedHome: false,
-        });
-      }
-    });
+    // No usable cached location — surface the permission card instead of
+    // silently falling back to the default.
+    setShowLocationPermission(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Called when the customer taps "Allow Location Access" on the permission
+  // card. Triggering the browser's geolocation prompt from a direct tap also
+  // ensures it reliably appears in mobile WebViews that suppress it when
+  // called without a user gesture.
+  const requestLocationPermission = useCallback(async () => {
+    const result = await fetchAndCacheLocation();
+    if (!result.ok) {
+      // Permission denied/unsupported/failed — fall back to the default now
+      // that the user has had an explicit chance to allow it.
+      updateLocation(currentLocation, { persist: true, updateSavedHome: false });
+    }
+    setShowLocationPermission(false);
+    setLocationResolved(true);
+    return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLocation]);
+
+  // Called when the customer explicitly dismisses the permission card
+  // without allowing location access.
+  const declineLocationPermission = useCallback(() => {
+    updateLocation(currentLocation, { persist: true, updateSavedHome: false });
+    setShowLocationPermission(false);
+    setLocationResolved(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLocation]);
 
   const locationValue = useMemo(() => ({
     currentLocation,
@@ -346,8 +375,22 @@ export const LocationProvider = ({ children }) => {
     isFetchingLocation,
     locationError,
     refreshLocation: fetchAndCacheLocation,
+    locationResolved,
+    showLocationPermission,
+    requestLocationPermission,
+    declineLocationPermission,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [currentLocation, savedAddresses, isFetchingLocation, locationError, refreshAddresses]);
+  }), [
+    currentLocation,
+    savedAddresses,
+    isFetchingLocation,
+    locationError,
+    refreshAddresses,
+    locationResolved,
+    showLocationPermission,
+    requestLocationPermission,
+    declineLocationPermission,
+  ]);
 
   return (
     <LocationContext.Provider value={locationValue}>

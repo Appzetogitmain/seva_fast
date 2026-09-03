@@ -167,6 +167,10 @@ export const signupSeller = async (req, res) => {
             return handleResponse(res, 400, "All fields are required");
         }
 
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+            return handleResponse(res, 400, "Please enter a valid email address.");
+        }
+
         if (!panNumber && !aadhaarNumber) {
             return handleResponse(res, 400, "Either PAN Number or Aadhaar Number is compulsory.");
         }
@@ -270,8 +274,13 @@ export const signupSeller = async (req, res) => {
 
         if (referralCode) {
             const User = (await import("../models/customer.js")).default;
-            referrerUser = await User.findOne({ referralCode: referralCode.toUpperCase() });
-            
+            const normalizedReferralCode = String(referralCode).trim().toUpperCase();
+            referrerUser = await User.findOne({ referralCode: normalizedReferralCode });
+
+            if (!referrerUser) {
+                return handleResponse(res, 400, "Invalid referral code. Please check and try again.");
+            }
+
             if (referrerUser && referrerUser.currentPlan && referrerUser.planExpiry > new Date()) {
                 const Plan = (await import("../models/plan.js")).default;
                 const plan = await Plan.findById(referrerUser.currentPlan);
@@ -396,7 +405,11 @@ export const loginSeller = async (req, res) => {
         const seller = await Seller.findOne(query).select("+password");
 
         if (!seller) {
-            return handleResponse(res, 404, "Seller not found");
+            return handleResponse(
+                res,
+                404,
+                "This store isn't registered. Please sign up first.",
+            );
         }
 
         const isMatch = await seller.comparePassword(password);

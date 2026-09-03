@@ -489,12 +489,17 @@ const Home = () => {
       });
   }, [products]);
   const effectiveQuickCategories = useMemo(() => {
+    // Prefer the admin's saved arrangement (heroConfig.categoryIds) first — for header
+    // pages this is fetched scoped to the active header (see fetchHeroConfig above) — and
+    // only fall back to the raw DB insertion order (headerCategoryMap) when the admin
+    // hasn't saved an order yet. Reversing this priority is what caused the header
+    // category order to reshuffle back to DB order on every refresh (bug #33).
+    const ids = heroConfig.categoryIds || [];
+    if (ids.length > 0) { const resolved = ids.map((id) => categoryMap[id]).filter(Boolean).map((c) => ({ id: c._id, name: c.name, image: c.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png" })); if (resolved.length > 0) return resolved; }
     if (activeCategory?._id && activeCategory._id !== "all") {
       const byHeader = headerCategoryMap[String(activeCategory._id)] || [];
       if (byHeader.length > 0) return byHeader;
     }
-    const ids = heroConfig.categoryIds || [];
-    if (ids.length > 0) { const resolved = ids.map((id) => categoryMap[id]).filter(Boolean).map((c) => ({ id: c._id, name: c.name, image: c.image || "https://cdn-icons-png.flaticon.com/128/2321/2321831.png" })); if (resolved.length > 0) return resolved; }
     return quickCategories;
   }, [activeCategory?._id, headerCategoryMap, heroConfig.categoryIds, categoryMap, quickCategories]);
 
@@ -518,7 +523,7 @@ const Home = () => {
   };
 
   return (
-    <div className={`min-h-screen pt-[208px] sm:pt-[216px] md:pt-[250px] ${products.length === 0 && !isLoading ? "bg-white" : "bg-[#F5F7F8]"}`}>
+    <div className={`min-h-screen pt-[208px] sm:pt-[216px] md:pt-[170px] ${products.length === 0 && !isLoading ? "bg-white" : "bg-[#F5F7F8]"}`}>
       <div className={cn("contents", isProductDetailOpen && "hidden md:contents")}>
         <MainLocationHeader categories={categories} activeCategory={activeCategory} onCategorySelect={setActiveCategory} />
       </div>

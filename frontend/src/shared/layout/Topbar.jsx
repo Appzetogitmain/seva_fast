@@ -50,7 +50,18 @@ const Topbar = ({ onMenuClick }) => {
             return;
         }
         if (isAdmin) {
-            navigate(`/admin/orders/all?search=${encodeURIComponent(q)}`);
+            // Only the Orders list currently reads a `?search=` query param. Route within
+            // that section (preserving its sub-tab, e.g. pending/delivered) when already
+            // there, or from the Dashboard (whose "recent orders" widget is the closest
+            // thing to a default landing search). Everywhere else — Products, Customers,
+            // Categories, Sellers, etc. — already has its own on-page search/filter box,
+            // so don't hijack navigation away from whatever the admin is looking at.
+            const path = location.pathname;
+            const isOrdersContext = path === '/admin' || path.startsWith('/admin/orders');
+            if (isOrdersContext) {
+                const target = path.startsWith('/admin/orders') ? path : '/admin/orders/all';
+                navigate(`${target}?search=${encodeURIComponent(q)}`);
+            }
         }
     };
 

@@ -1101,7 +1101,14 @@ const OrderDetails = () => {
                     </div>
                   </div>
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="icon" className="h-9 w-9">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() =>
+                        toast.info("Chat isn't available yet — please call the customer instead.")
+                      }
+                    >
                       <MessageSquare size={18} />
                     </Button>
                     {(isReturn ? order.seller?.phone : order.address?.phone) && (
@@ -1162,7 +1169,7 @@ const OrderDetails = () => {
         >
           <AlertTriangle className="text-yellow-600 mr-3 mt-0.5 flex-shrink-0" size={18} />
           <p className="text-sm text-yellow-800 leading-relaxed">
-            <strong>Note:</strong> Handle eggs with care. Call customer if location is hard to find.
+            <strong>Note:</strong> Call customer if location is hard to find.
           </p>
         </motion.div>
 

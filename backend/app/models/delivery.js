@@ -86,6 +86,16 @@ const deliverySchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
+
+        experienceYears: {
+            type: Number,
+            min: 0,
+        },
+
+        preferredArea: {
+            type: String,
+            trim: true,
+        },
         profileImage: {
             type: String,
             trim: true,

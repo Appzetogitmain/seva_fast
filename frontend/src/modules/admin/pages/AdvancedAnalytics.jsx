@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from '@shared/components/ui/Card';
 import Badge from '@shared/components/ui/Badge';
+import { adminApi } from '../services/adminApi';
 import {
     HiOutlineArrowTrendingUp,
     HiOutlineArrowTrendingDown,
@@ -33,9 +34,46 @@ import {
 } from 'recharts';
 import { cn } from '@/lib/utils';
 
+const formatCurrency = (value) => `₹${Math.round(value || 0).toLocaleString('en-IN')}`;
+
 const AdvancedAnalytics = () => {
     const { showToast } = useToast();
     const [timeRange, setTimeRange] = useState('7d');
+
+    // Bug #311: this page used to be 100% hardcoded mock data with no API call at
+    // all. `goals` and `salesData` below are now real, sourced from
+    // GET /admin/analytics/overview (backend/app/services/admin/dashboardService.js
+    // getAdminAnalyticsOverview), which defines "revenue" the same way the rest of
+    // the codebase already does (getAdminDashboardStats): sum of pricing.total for
+    // delivered orders — gross order value, not seller payout or platform
+    // commission. Category mix / delivery heatmap / retention / top-regions below
+    // remain illustrative placeholders — they weren't part of the reported bug
+    // (revenue/order numbers only) and would need their own real aggregations.
+    const [isLoadingOverview, setIsLoadingOverview] = useState(true);
+    const [goals, setGoals] = useState(null);
+    const [salesData, setSalesData] = useState([]);
+
+    useEffect(() => {
+        let cancelled = false;
+        setIsLoadingOverview(true);
+        adminApi.getAnalyticsOverview({ range: timeRange })
+            .then((response) => {
+                if (cancelled) return;
+                const result = response?.data?.result || {};
+                setGoals(result.goals || null);
+                setSalesData(Array.isArray(result.salesData) ? result.salesData : []);
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                console.error('Failed to load analytics overview:', error);
+                showToast('Failed to load analytics data', 'error');
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoadingOverview(false);
+            });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [timeRange]);
 
     // Mock functions
     const handleDownloadReport = () => {
@@ -49,17 +87,9 @@ const AdvancedAnalytics = () => {
         showToast('Loading detailed customer segmentation data...', 'info');
     };
 
-    // Mock Data
-    const salesData = [
-        { name: 'Mon', revenue: 45000, orders: 120 },
-        { name: 'Tue', revenue: 52000, orders: 145 },
-        { name: 'Wed', revenue: 48000, orders: 132 },
-        { name: 'Thu', revenue: 61000, orders: 168 },
-        { name: 'Fri', revenue: 55000, orders: 154 },
-        { name: 'Sat', revenue: 82000, orders: 210 },
-        { name: 'Sun', revenue: 95000, orders: 245 },
-    ];
-
+    // Mock Data — category mix / delivery heatmap / retention / top-regions are
+    // out of scope for bug #311 (revenue/order figures only); left as illustrative
+    // placeholders until those get their own real aggregations.
     const categoryData = [
         { name: 'Grocery', value: 45, color: '#6366f1' },
         { name: 'Electronics', value: 25, color: '#f59e0b' },
@@ -118,10 +148,10 @@ const AdvancedAnalytics = () => {
             {/* Goals Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                    { label: 'Gross Revenue', value: '₹5,42,000', trend: '+12.5%', icon: HiOutlineBanknotes, color: 'indigo' },
-                    { label: 'Total Orders', value: '1,248', trend: '+8.2%', icon: HiOutlineShoppingBag, color: 'emerald' },
-                    { label: 'Active Sellers', value: '84', trend: '+2', icon: HiOutlineUsers, color: 'amber' },
-                    { label: 'Avg Order Value', value: '₹434', trend: '-2.1%', icon: HiOutlineBolt, color: 'rose' },
+                    { label: 'Gross Revenue', value: isLoadingOverview ? '—' : formatCurrency(goals?.grossRevenue), trend: goals?.grossRevenueTrend || '+0%', icon: HiOutlineBanknotes, color: 'indigo' },
+                    { label: 'Total Orders', value: isLoadingOverview ? '—' : Number(goals?.totalOrders || 0).toLocaleString('en-IN'), trend: goals?.totalOrdersTrend || '+0%', icon: HiOutlineShoppingBag, color: 'emerald' },
+                    { label: 'Active Sellers', value: isLoadingOverview ? '—' : Number(goals?.activeSellers || 0).toLocaleString('en-IN'), trend: goals?.activeSellersTrend || '+0', icon: HiOutlineUsers, color: 'amber' },
+                    { label: 'Avg Order Value', value: isLoadingOverview ? '—' : formatCurrency(goals?.avgOrderValue), trend: goals?.avgOrderValueTrend || '+0%', icon: HiOutlineBolt, color: 'rose' },
                 ].map((goal, i) => (
                     <Card key={i} className="p-6 border-none shadow-xl ring-1 ring-slate-100 bg-white group hover:scale-[1.02] transition-all">
                         <div className="flex items-center justify-between mb-4">

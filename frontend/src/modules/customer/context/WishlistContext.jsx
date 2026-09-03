@@ -97,6 +97,7 @@ export const WishlistProvider = ({ children }) => {
       try {
         const response = await customerApi.addToWishlist({
           productId: product.id || product._id,
+          variantSku: product.variantSku || product.listingVariantSku || "",
         });
         const backendWishlist = response.data.result.products.map((p) => ({
           ...p,
@@ -111,8 +112,9 @@ export const WishlistProvider = ({ children }) => {
     } else {
       setWishlist((prev) => {
         const id = product.id || product._id;
+        const variantSku = product.variantSku || product.listingVariantSku || "";
         if (prev.some((item) => (item.id || item._id) === id)) return prev;
-        return [...prev, { ...product, id }];
+        return [...prev, { ...product, id, variantSku, listingVariantSku: variantSku || product.listingVariantSku }];
       });
     }
   };
@@ -142,7 +144,10 @@ export const WishlistProvider = ({ children }) => {
     const id = product.id || product._id;
     if (isAuthenticated) {
       try {
-        const response = await customerApi.toggleWishlist({ productId: id });
+        const response = await customerApi.toggleWishlist({
+          productId: id,
+          variantSku: product.variantSku || product.listingVariantSku || "",
+        });
         const backendWishlist = response.data.result.products.map((p) => ({
           ...p,
           id: p._id,

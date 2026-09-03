@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, Heart, User, Menu, MapPin, Mic } from 'lucide-react';
+import { Search, ShoppingCart, Heart, User, Menu, MapPin, Mic, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useWishlist } from '../../context/WishlistContext';
 import { useCart } from '../../context/CartContext';
 import { useLocation as useAppLocation } from "../../context/LocationContext";
 import { useSettings } from '@core/context/SettingsContext';
 import LocationDrawer from '../shared/LocationDrawer';
+import { CustomerNotificationsModal } from '../shared/CustomerNotificationsModal';
+import { customerApi } from '../../services/customerApi';
 
 const Header = () => {
     const navigate = useNavigate();
@@ -17,6 +19,22 @@ const Header = () => {
     const isCheckoutPage = location.pathname === '/checkout';
     const [isLocationOpen, setIsLocationOpen] = useState(false);
     const { currentLocation, refreshLocation } = useAppLocation();
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+    React.useEffect(() => {
+        const fetchUnreadCount = async () => {
+            try {
+                const res = await customerApi.getNotifications();
+                const raw = res.data?.result || res.data?.results || res.data?.data || res.data || [];
+                const list = Array.isArray(raw) ? raw : (raw.items || []);
+                setUnreadNotificationsCount(list.filter(n => !n.isRead && !n.read).length);
+            } catch (e) {
+                // Best-effort
+            }
+        };
+        fetchUnreadCount();
+    }, []);
 
     // Search placeholder animation
     const [searchPlaceholder, setSearchPlaceholder] = useState('Search ');
@@ -98,6 +116,20 @@ const Header = () => {
                             </div>
                         </div>
                     </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsNotificationsOpen(true)}
+                        className="relative h-10 w-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-sm active:scale-95 transition-transform cursor-pointer"
+                        aria-label="Notifications"
+                    >
+                        <Bell size={20} className="text-white" />
+                        {unreadNotificationsCount > 0 && (
+                            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[9px] font-bold text-white flex items-center justify-center border border-white shadow-sm">
+                                {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                            </span>
+                        )}
+                    </button>
                 </div>
 
                 {/* Main Header Capsule */}
@@ -169,6 +201,20 @@ const Header = () => {
 
                     {/* Desktop Right Icons */}
                     <div className="hidden md:flex items-center gap-4">
+                        <button
+                            type="button"
+                            onClick={() => setIsNotificationsOpen(true)}
+                            className="relative flex items-center justify-center p-2 hover:bg-slate-50 rounded-full transition-colors group cursor-pointer"
+                            aria-label="Notifications"
+                        >
+                            <Bell className="h-6 w-6 text-slate-600 group-hover:text-[var(--primary)] transition-colors" />
+                            {unreadNotificationsCount > 0 && (
+                                <span className="absolute top-0 right-0 h-5 w-5 rounded-full bg-primary text-[10px] font-bold text-white flex items-center justify-center border-2 border-white shadow-sm animate-in zoom-in duration-300">
+                                    {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                                </span>
+                            )}
+                        </button>
+
                         <Link to="/wishlist" className="relative flex items-center justify-center p-2 hover:bg-slate-50 rounded-full transition-colors group">
                             <Heart className="h-6 w-6 text-slate-600 group-hover:text-[var(--primary)] transition-colors" />
                             {wishlistCount > 0 && (
@@ -198,6 +244,13 @@ const Header = () => {
             <LocationDrawer
                 isOpen={isLocationOpen}
                 onClose={() => setIsLocationOpen(false)}
+            />
+
+            {/* Notifications Modal */}
+            <CustomerNotificationsModal
+                isOpen={isNotificationsOpen}
+                onClose={() => setIsNotificationsOpen(false)}
+                onUnreadCountChange={setUnreadNotificationsCount}
             />
         </header>
     );

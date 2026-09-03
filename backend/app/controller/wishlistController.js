@@ -14,6 +14,59 @@ function sanitizeWishlist(wishlist) {
   return wishlist;
 }
 
+// Applies the customer's remembered variant selection (if any) onto each
+// populated wishlist product so the frontend's existing "listingVariantSku"
+// based default-variant logic (used on the product card / cart) picks the
+// same variant the customer had selected when they wishlisted the item.
+function applyVariantSelections(wishlist) {
+  if (!wishlist || !Array.isArray(wishlist.products)) return wishlist;
+  const selections = Array.isArray(wishlist.variantSelections)
+    ? wishlist.variantSelections
+    : [];
+  if (!selections.length) return wishlist;
+
+  const variantByProductId = new Map(
+    selections
+      .filter((entry) => entry && entry.product && entry.variantSku)
+      .map((entry) => [String(entry.product), entry.variantSku])
+  );
+
+  wishlist.products = wishlist.products.map((product) => {
+    if (!product || !product._id) return product;
+    const variantSku = variantByProductId.get(String(product._id));
+    if (!variantSku) return product;
+    return { ...product, variantSku, listingVariantSku: variantSku };
+  });
+
+  return wishlist;
+}
+
+function upsertVariantSelection(wishlist, productId, variantSku) {
+  if (!Array.isArray(wishlist.variantSelections)) {
+    wishlist.variantSelections = [];
+  }
+  const existingIndex = wishlist.variantSelections.findIndex(
+    (entry) => String(entry.product) === String(productId)
+  );
+  if (variantSku) {
+    if (existingIndex > -1) {
+      wishlist.variantSelections[existingIndex].variantSku = variantSku;
+    } else {
+      wishlist.variantSelections.push({ product: productId, variantSku });
+    }
+  } else if (existingIndex > -1) {
+    // No variant supplied this time; drop any stale prior selection.
+    wishlist.variantSelections.splice(existingIndex, 1);
+  }
+}
+
+function removeVariantSelection(wishlist, productId) {
+  if (!Array.isArray(wishlist.variantSelections)) return;
+  wishlist.variantSelections = wishlist.variantSelections.filter(
+    (entry) => String(entry.product) !== String(productId)
+  );
+}
+
 async function findCustomerVisibleProductById(productId) {
   if (!productId) return null;
   return Product.findOne({
@@ -33,7 +86,7 @@ async function fetchPopulatedWishlist(wishlistId) {
     })
     .lean();
 
-  return sanitizeWishlist(wishlist);
+  return applyVariantSelections(sanitizeWishlist(wishlist));
 }
 
 /* ===============================
@@ -92,7 +145,7 @@ export const getWishlist = async (req, res) => {
 export const addToWishlist = async (req, res) => {
   try {
     const customerId = req.user.id;
-    const { productId } = req.body;
+    const { productId, variantSku } = req.body;
     const product = await findCustomerVisibleProductById(productId);
     if (!product) {
       return handleResponse(res, 404, "Product is not available for wishlist");
@@ -107,6 +160,7 @@ export const addToWishlist = async (req, res) => {
     if (!wishlist.products.includes(productId)) {
       wishlist.products.push(productId);
     }
+    upsertVariantSelection(wishlist, productId, variantSku);
 
     await wishlist.save();
     const updatedWishlist = await fetchPopulatedWishlist(wishlist._id);
@@ -139,6 +193,7 @@ export const removeFromWishlist = async (req, res) => {
     wishlist.products = wishlist.products.filter(
       (id) => id.toString() !== productId,
     );
+    removeVariantSelection(wishlist, productId);
 
     await wishlist.save();
     const updatedWishlist = await fetchPopulatedWishlist(wishlist._id);
@@ -160,7 +215,7 @@ export const removeFromWishlist = async (req, res) => {
 export const toggleWishlist = async (req, res) => {
   try {
     const customerId = req.user.id;
-    const { productId } = req.body;
+    const { productId, variantSku } = req.body;
     const product = await findCustomerVisibleProductById(productId);
 
     let wishlist = await Wishlist.findOne({ customerId });
@@ -174,12 +229,14 @@ export const toggleWishlist = async (req, res) => {
 
     if (index > -1) {
       wishlist.products.splice(index, 1);
+      removeVariantSelection(wishlist, productId);
       message = "Product removed from wishlist";
     } else {
       if (!product) {
         return handleResponse(res, 404, "Product is not available for wishlist");
       }
       wishlist.products.push(productId);
+      upsertVariantSelection(wishlist, productId, variantSku);
       message = "Product added to wishlist";
     }
 

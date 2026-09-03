@@ -119,12 +119,6 @@ const ApplicationPending = () => {
             >
               Back To Seller Login
             </Link>
-            <Link
-              to="/seller/auth"
-              className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/5 text-white px-5 py-3 text-sm font-bold hover:bg-white/10 transition-colors"
-            >
-              Go To Seller Login
-            </Link>
           </div>
         </motion.div>
       </div>

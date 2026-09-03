@@ -674,7 +674,7 @@ const ProductManagement = () => {
               className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 border-none rounded-xl text-xs font-semibold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/5 transition-all outline-none"
             />
           </div>
-          <div className="flex gap-2 shrink-0 w-full lg:w-auto">
+          <div className="relative flex gap-2 shrink-0 w-full lg:w-auto">
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
@@ -693,7 +693,7 @@ const ProductManagement = () => {
               ))}
             </select>
 
-            <div className="relative" ref={filterDropdownRef}>
+            <div ref={filterDropdownRef}>
               <button
                 onClick={() => setIsFilterOpen((prev) => !prev)}
                 className="flex items-center space-x-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
@@ -824,7 +824,22 @@ const ProductManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((p) => (
+              {filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 mb-3">
+                        <HiOutlineMagnifyingGlass className="h-6 w-6" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-900">No products found</p>
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        Try adjusting your search or filters.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredProducts.map((p) => (
                 <tr
                   key={p._id || p.id}
                   className="hover:bg-gray-50/50 transition-colors group border-b border-gray-100 last:border-b-0">
@@ -945,7 +960,8 @@ const ProductManagement = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>

@@ -126,6 +126,16 @@ export function getOrderStatusLabel(order) {
 }
 
 /**
+ * Short, consistent display id for an order — last 10 characters with a `#`
+ * prefix. Mirrors the pattern already used in SellerOrderAlertModal; use this
+ * everywhere an order id is shown in the UI instead of the raw Mongo id.
+ */
+export function formatOrderId(orderId) {
+  if (!orderId) return "";
+  return `#${String(orderId).slice(-10)}`;
+}
+
+/**
  * Admin sidebar uses path segments like `processed` and `out-for-delivery`.
  * Map route param → whether an order belongs in that view.
  */

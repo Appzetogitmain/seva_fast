@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { customerApi } from '../services/customerApi';
+import { isValidIndianPhone } from '../utils/phoneValidation';
 import BgImage from '@/assets/image.png';
 import PlanCard from '@/shared/components/ui/PlanCard';
 
@@ -135,8 +136,8 @@ const CustomerAuth = () => {
 
     const handleSendOtp = async (e) => {
         e?.preventDefault();
-        if (formData.phone.length !== 10) {
-            toast.error('Enter valid 10-digit number');
+        if (!isValidIndianPhone(formData.phone)) {
+            toast.error('Enter a valid 10-digit mobile number starting with 6-9');
             return;
         }
         setIsLoading(true);

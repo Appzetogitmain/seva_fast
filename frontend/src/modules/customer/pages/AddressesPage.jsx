@@ -16,6 +16,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { customerApi } from '../services/customerApi';
 import { useLocation } from '../context/LocationContext';
+import { normalizePhoneNumber, isValidIndianPhone } from '../utils/phoneValidation';
 
 const AddressesPage = () => {
     const navigate = useNavigate();
@@ -34,7 +35,8 @@ const AddressesPage = () => {
             const raw = Array.isArray(profile?.addresses) ? profile.addresses : [];
             setRawAddresses(raw);
             setProfileName(profile?.name ?? '');
-            setProfilePhone(profile?.phone ?? '');
+            const normalizedProfilePhone = normalizePhoneNumber(profile?.phone);
+            setProfilePhone(normalizedProfilePhone);
             setAddresses(raw.map((addr, idx) => ({
                 id: addr._id ?? idx,
                 type: (addr.label || 'home').charAt(0).toUpperCase() + (addr.label || 'home').slice(1),
@@ -43,7 +45,7 @@ const AddressesPage = () => {
                 city: addr.city,
                 state: addr.state,
                 pincode: addr.pincode,
-                phone: profile?.phone ?? '',
+                phone: normalizedProfilePhone,
                 isDefault: idx === 0
             })));
         } catch {
@@ -171,10 +173,10 @@ const AddressesPage = () => {
         const landmark = addForm.landmark?.trim();
         const state = addForm.state?.trim();
         const pincode = addForm.pincode?.trim();
-        const phone = addForm.phone?.trim();
+        const phone = normalizePhoneNumber(addForm.phone);
 
         if (!name) return toast.error('Please enter your full name');
-        if (!phone || !/^\d{10}$/.test(phone.replace(/\D/g, ''))) return toast.error('Please enter a valid 10-digit phone number');
+        if (!isValidIndianPhone(phone)) return toast.error('Please enter a valid 10-digit mobile number starting with 6-9');
         if (!address) return toast.error('Please enter the address');
         if (!city) return toast.error('Please enter the city');
         if (!state) return toast.error('Please enter the state');
@@ -260,14 +262,14 @@ const AddressesPage = () => {
         if (!selectedAddress) return;
         
         const name = editForm.name?.trim();
-        const phone = editForm.phone?.trim();
+        const phone = normalizePhoneNumber(editForm.phone);
         const address = editForm.address?.trim();
         const city = editForm.city?.trim();
         const state = editForm.state?.trim();
         const pincode = editForm.pincode?.trim();
 
         if (!name) return toast.error('Please enter your full name');
-        if (!phone || !/^\d{10}$/.test(phone.replace(/\D/g, ''))) return toast.error('Please enter a valid 10-digit phone number');
+        if (!isValidIndianPhone(phone)) return toast.error('Please enter a valid 10-digit mobile number starting with 6-9');
         if (!address) return toast.error('Please enter the address');
         if (!city) return toast.error('Please enter the city');
         if (!state) return toast.error('Please enter the state');

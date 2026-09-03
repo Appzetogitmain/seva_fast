@@ -86,7 +86,7 @@ const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap 
             key={idx}
             className={cn(
               "relative shrink-0 overflow-hidden bg-slate-100 flex items-center justify-center box-border",
-              fullWidth ? "h-[190px] rounded-none px-0" : "h-[190px] px-4 md:px-8"
+              fullWidth ? "h-[190px] sm:h-[240px] md:h-[300px] lg:h-[380px] xl:h-[420px] rounded-none px-0" : "h-[190px] sm:h-[240px] md:h-[300px] lg:h-[380px] xl:h-[420px] px-4 md:px-8"
             )}
             style={{ width: `${100 / totalItems}%` }}
           >

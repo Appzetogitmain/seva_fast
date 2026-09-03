@@ -31,6 +31,10 @@ import { Sparkles, Camera, UploadCloud, Check, Loader2 } from "lucide-react";
 const AI_IMAGE_MAX_DIMENSION = 1280;
 const AI_IMAGE_JPEG_QUALITY = 0.82;
 
+// Product photo/gallery uploads: reject oversized files up front with a
+// friendly message instead of letting a raw upload/server error surface.
+const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+
 const compressImageForAi = (file) =>
   new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -385,6 +389,13 @@ const AddProduct = () => {
         toast.error(`Sale price must be less than regular price for variant "${variant.name || 'main'}".`);
         return;
       }
+      if (variant.costPrice) {
+        const effectiveSellingPrice = Number(variant.salePrice) || Number(variant.price) || 0;
+        if (Number(variant.costPrice) > effectiveSellingPrice) {
+          toast.error(`Cost price cannot be higher than the selling price for variant "${variant.name || 'main'}".`);
+          return;
+        }
+      }
     }
 
     setIsSaving(true);
@@ -462,6 +473,11 @@ const AddProduct = () => {
   const handleImageUpload = (e, type) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      if (file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
+        toast.error("Image is too large — please choose a photo under 5MB.");
+        e.target.value = "";
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         if (type === "main") {
@@ -1206,7 +1222,6 @@ const AddProduct = () => {
                         <input
                           type="file"
                           accept="image/*,video/*"
-                          capture="environment"
                           className="absolute inset-0 opacity-0 cursor-pointer z-10"
                           onChange={(e) => handleImageUpload(e, "main")}
                         />
@@ -1286,7 +1301,6 @@ const AddProduct = () => {
                           <input
                             type="file"
                             accept="image/*,video/*"
-                            capture="environment"
                             className="absolute inset-0 opacity-0 cursor-pointer z-10"
                             onChange={(e) => handleImageUpload(e, "gallery")}
                           />

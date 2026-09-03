@@ -50,6 +50,11 @@ const getPaymentStatus = (order) => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
+// Matches the short-order-id convention used elsewhere in the customer app
+// (OrderDetailPage, OrderTransactionsPage, CheckoutPage, etc.) so a long
+// Mongo ObjectId fallback never gets displayed in full on the invoice.
+const truncateOrderId = (id) => String(id || '').slice(-8);
+
 const formatOrderStatus = (status) => {
   const raw = String(status || 'pending').trim();
   return raw
@@ -287,7 +292,7 @@ const InvoiceModal = ({ isOpen, onClose, order }) => {
 
   if (!order) return null;
 
-  const invoiceId = order.orderId || order.id;
+  const invoiceId = truncateOrderId(order.orderId || order.id);
   const billedToName = order.address?.name || order.customer?.name || 'Customer';
   const billedToPhone = order.address?.phone || order.customer?.phone || '—';
   const addressLines = buildAddressLines(order.address);
@@ -362,6 +367,7 @@ const InvoiceModal = ({ isOpen, onClose, order }) => {
       {isOpen && (
         <>
           <motion.div
+            id="invoice-modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -369,6 +375,7 @@ const InvoiceModal = ({ isOpen, onClose, order }) => {
             className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
           >
             <motion.div
+              id="invoice-modal-card"
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 24 }}
@@ -390,7 +397,7 @@ const InvoiceModal = ({ isOpen, onClose, order }) => {
                 </button>
               </div>
 
-              <div className="overflow-y-auto flex-1 p-4 sm:p-6">
+              <div id="invoice-modal-body" className="overflow-y-auto flex-1 p-4 sm:p-6">
                 <div
                   ref={invoiceRef}
                   id="printable-invoice"
@@ -562,13 +569,52 @@ const InvoiceModal = ({ isOpen, onClose, order }) => {
               @media print {
                 body * { visibility: hidden; }
                 #printable-invoice, #printable-invoice * { visibility: visible; }
+
+                /* The modal chrome (backdrop, card, scrollable wrapper) is
+                   fixed/relative + max-height + overflow:hidden on screen.
+                   visibility:hidden keeps their layout box around, and since
+                   #printable-invoice is positioned relative to that clipped,
+                   vh-capped ancestor, printing was clipping/duplicating the
+                   invoice across several broken pages. Collapse the chrome to
+                   zero-height static boxes and let the invoice flow normally
+                   as the only thing on the printed page. */
+                #invoice-modal-overlay,
+                #invoice-modal-card,
+                #invoice-modal-body {
+                  position: static !important;
+                  inset: auto !important;
+                  height: 0 !important;
+                  min-height: 0 !important;
+                  max-height: none !important;
+                  overflow: visible !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                  background: none !important;
+                }
+
                 #printable-invoice {
-                  position: absolute;
-                  left: 0;
-                  top: 0;
+                  position: static !important;
                   width: 100%;
+                  max-height: none !important;
+                  overflow: visible !important;
                   border: none;
                   border-radius: 0;
+                  box-shadow: none !important;
+                  margin: 0 !important;
+                }
+
+                #printable-invoice table,
+                #printable-invoice tr,
+                #printable-invoice td,
+                #printable-invoice th {
+                  page-break-inside: avoid;
+                }
+
+                @page {
+                  size: A4;
+                  margin: 12mm;
                 }
               }
             `}

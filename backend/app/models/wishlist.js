@@ -14,6 +14,22 @@ const wishlistSchema = new mongoose.Schema(
                 ref: "Product",
             },
         ],
+        // Remembers which variant the customer had selected when a product
+        // (with variants) was added to the wishlist, so it can be restored
+        // when the item is later moved into the cart.
+        variantSelections: [
+            {
+                _id: false,
+                product: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "Product",
+                },
+                variantSku: {
+                    type: String,
+                    default: "",
+                },
+            },
+        ],
     },
     { timestamps: true }
 );

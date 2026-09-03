@@ -269,7 +269,7 @@ const ProductDetailPage = () => {
 
     const toggleWishlist = (e) => {
         e.stopPropagation();
-        toggleWishlistGlobal(selectedProduct);
+        toggleWishlistGlobal({ ...selectedProduct, variantSku: variantKey || "" });
         showToast(
             isWishlisted ? `${selectedProduct.name} removed from wishlist` : `${selectedProduct.name} added to wishlist`,
             isWishlisted ? 'info' : 'success'

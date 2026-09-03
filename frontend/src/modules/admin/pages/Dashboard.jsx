@@ -28,6 +28,7 @@ import {
     Cell
 } from 'recharts';
 import { cn } from '@/lib/utils';
+import { formatOrderId } from '@/shared/utils/orderStatus';
 import { toast } from 'sonner';
 import { formatDate, formatTime, formatDateTime, isSameCalendarDay } from '@shared/utils/formatDate';
 
@@ -293,7 +294,7 @@ const AdminDashboard = () => {
                                             className="group hover:bg-gray-50/50 transition-all cursor-pointer"
                                             onClick={() => navigate(`/admin/orders/view/${String(order.id).replace('#', '')}`)}
                                         >
-                                            <td className="py-4 text-sm font-semibold text-primary">{order.id}</td>
+                                            <td className="py-4 text-sm font-semibold text-primary">{formatOrderId(order.id)}</td>
                                             <td className="py-4">
                                                 <div className="flex items-center space-x-2">
                                                     <div className="h-7 w-7 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-semibold text-gray-500 ring-2 ring-white shadow-sm uppercase">

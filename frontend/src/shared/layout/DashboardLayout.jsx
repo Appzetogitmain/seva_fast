@@ -367,6 +367,28 @@ const DashboardLayout = ({ children, navItems, title }) => {
     }, [location.pathname]);
 
     // Admin: document scroll + visible right scrollbar; reset to top on route change
+    //
+    // Bug #31 ("admin pages should scroll independently") was investigated but NOT
+    // converted to a per-page `overflow-y: auto` content pane. Reasons, so this doesn't
+    // get re-attempted blind:
+    //  1. `useLockBodyScroll` (frontend/src/shared/hooks/useLockBodyScroll.js) is used by
+    //     ~8 admin/seller pages and the shared Modal component to lock background scroll
+    //     while a modal is open. It locks `document.body`/`document.documentElement`
+    //     directly. If the real scrolling happened inside a `<main>` container instead of
+    //     the document, that lock would stop doing anything on desktop and every one of
+    //     those modals would silently regain background scroll — reintroducing bugs like
+    //     #274/#281 (which this same batch fixes) across the whole admin app.
+    //  2. `frontend/src/modules/admin/pages/Returns.jsx` has its own inline
+    //     `window.scrollY` / `document.body` scroll-lock (same assumption).
+    //  3. `useLockBodyScroll` also pauses `window.__lenis` — the Lenis smooth-scroll
+    //     library is wired to the window/document scroll, not a specific container, so
+    //     moving to a contained scroll pane would need Lenis re-target work outside this
+    //     file too.
+    // Net effect: this is a cross-cutting change touching modal scroll-locking and Lenis
+    // config well beyond DashboardLayout, with real regression risk to already-fixed
+    // scroll-lock bugs. Left as document-level scroll per the existing (intentional)
+    // architecture; flagging here for whoever picks this up next with Lenis + the lock
+    // hook both re-targeted at the new scroll container in the same change.
     useEffect(() => {
         if (!isAdminApp) return undefined;
         const html = document.documentElement;
@@ -479,7 +501,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
     };
 
     return (
-        <div className="min-h-screen mesh-gradient-light relative overflow-x-hidden">
+        <div className="min-h-screen mesh-gradient-light relative">
             {/* Background Blobs for depth */}
             <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] -z-10 animate-pulse pointer-events-none"></div>
             <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-brand-500/5 rounded-full blur-[120px] -z-10 animate-pulse pointer-events-none" style={{ animationDelay: '2s' }}></div>
@@ -492,7 +514,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
             />
             <div className={cn("transition-all duration-300", (role === "admin" || role === "seller" || role === "sub-admin") ? "pl-0 md:pl-72" : "pl-72")}>
                 <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
-                <main className={cn("p-4 md:p-6 min-h-screen", (role === "admin" || role === "seller" || role === "sub-admin") ? "pt-20 md:pt-6 pb-24 md:pb-6" : "pt-20")}>
+                <main className={cn("p-4 md:p-6 min-h-screen overflow-x-hidden", (role === "admin" || role === "seller" || role === "sub-admin") ? "pt-20 md:pt-6 pb-24 md:pb-6" : "pt-20")}>
                     <div className="w-full pb-12">
                         <SellerOrdersContext.Provider
                             value={{

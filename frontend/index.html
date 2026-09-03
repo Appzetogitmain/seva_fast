@@ -3,9 +3,18 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/png" href="/seva-fast-logo.png" />
-  <link rel="apple-touch-icon" href="/seva-fast-logo.png" />
-  <meta name="theme-color" content="#ffffff" />
+  <!-- Bug #268: the source mark has a lot of transparent padding, which made the
+       favicon look tiny in the browser tab. favicon.png/apple-touch-icon.png are
+       tightly-cropped, upscaled renditions of the same logo so it actually fills
+       the icon frame; seva-fast-logo.png is left untouched since it's also used
+       as the general in-app brand logo (Topbar, Sidebar, etc). -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <!-- Matches the seller/admin app's Topbar (bg-white/70 blur over the
+       .mesh-gradient-light page background, #fdfdfd) so the mobile status
+       bar blends with the actual header instead of showing pure white. -->
+  <meta name="theme-color" content="#fdfdfd" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

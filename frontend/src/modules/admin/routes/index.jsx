@@ -115,6 +115,7 @@ const AdminReviews = React.lazy(() => import("../pages/AdminReviews"));
 // const WhatsAppTemplates = React.lazy(() => import("../pages/WhatsAppTemplates"));
 const StorePromotions = React.lazy(() => import("../pages/StorePromotions"));
 const AdminPhotoOrders = React.lazy(() => import("../pages/AdminPhotoOrders"));
+const AdvancedAnalytics = React.lazy(() => import("../pages/AdvancedAnalytics"));
 
 const navItems = [
   {
@@ -123,6 +124,12 @@ const navItems = [
     icon: LayoutDashboard,
     color: "indigo",
     end: true,
+  },
+  {
+    label: "Advanced Analytics",
+    path: "/admin/analytics",
+    icon: PieChart,
+    color: "fuchsia",
   },
   {
     label: "Categories",
@@ -327,6 +334,7 @@ const AdminRoutes = () => {
       <AdminChatbotWidget />
       <Routes>
         <Route path="/" element={<SubadminRoute permission="Dashboard"><Dashboard /></SubadminRoute>} />
+        <Route path="/analytics" element={<SubadminRoute permission="Advanced Analytics"><AdvancedAnalytics /></SubadminRoute>} />
         <Route path="/users" element={<SubadminRoute permission="Sub-Admins"><UserManagement /></SubadminRoute>} />
         <Route path="/zones" element={<SubadminRoute permission="Zones"><ZoneManagement /></SubadminRoute>} />
         <Route path="/profile" element={<AdminProfile />} />

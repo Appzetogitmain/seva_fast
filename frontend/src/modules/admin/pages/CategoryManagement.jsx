@@ -492,7 +492,7 @@ const CategoryManagement = () => {
                                     type="text"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    placeholder={activeView === 'tree' ? "Search catalog..." : "Search subcategories..."}
+                                    placeholder="Search category..."
                                     className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 border-none rounded-xl text-xs font-semibold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/5 transition-all outline-none"
                                 />
                                 {searchTerm && (

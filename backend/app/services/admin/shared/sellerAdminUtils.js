@@ -84,6 +84,7 @@ export function formatSellerApplication(seller) {
     category: seller.category || "General",
     applicationDate: formatDate(createdAt),
     receivedAt: formatTime(createdAt),
+    createdAt: createdAt.toISOString(),
     status:
       seller.applicationStatus ||
       (seller.isVerified ? "approved" : "pending"),

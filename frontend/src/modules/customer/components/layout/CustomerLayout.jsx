@@ -7,6 +7,7 @@ import MobileFooterMessage from './MobileFooterMessage';
 import BirthdayHeaderCelebration from '../shared/BirthdayHeaderCelebration';
 import WelcomeScratchCardModal from '../WelcomeScratchCardModal';
 import ChatbotWidget from '../ChatbotWidget';
+import LocationPermissionCard from '../shared/LocationPermissionCard';
 import { customerApi } from '../../services/customerApi';
 import { useProductDetail } from '../../context/ProductDetailContext';
 import { cn } from '@/lib/utils';
@@ -204,9 +205,18 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
     const hideBottomNavRoutes = ['/checkout', '/search', '/chat'];
     const hideCartRoutes = ['/checkout', '/chat'];
 
+    // /terms and /privacy are shared pages: the delivery and seller apps link
+    // into them with ?for=delivery / ?for=seller (see legalContent.js audience).
+    // A rider or seller tapping through shouldn't see the customer bottom nav —
+    // but a customer visiting the same pages (no/`for=customer`) still should.
+    const legalAudience = new URLSearchParams(location.search).get('for');
+    const isNonCustomerLegalPage =
+        (path === '/terms' || path === '/privacy') &&
+        (legalAudience === 'delivery' || legalAudience === 'seller');
+
     // If props are passed, use them. Otherwise, use route-based logic.
     const showHeader = showHeaderProp !== undefined ? showHeaderProp : (!hideHeaderRoutes.includes(path) && !path.startsWith('/category') && !path.startsWith('/orders'));
-    const showBottomNav = showBottomNavProp !== undefined ? showBottomNavProp : !hideBottomNavRoutes.includes(path);
+    const showBottomNav = showBottomNavProp !== undefined ? showBottomNavProp : (!hideBottomNavRoutes.includes(path) && !isNonCustomerLegalPage);
     const showCart = showCartProp !== undefined ? showCartProp : (!hideCartRoutes.includes(path) && !path.startsWith('/orders'));
 
     // Condition to hide the MobileFooterMessage ("India's last minute app") on specific pages
@@ -265,6 +275,7 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                 userId={user?._id || user?.id || 'guest'}
             />
             <ChatbotWidget />
+            <LocationPermissionCard />
         </div>
     );
 };

@@ -28,6 +28,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { adminApi } from '../services/adminApi';
 import { formatDate } from '@shared/utils/formatDate';
+import { useLockBodyScroll } from '@/shared/hooks/useLockBodyScroll';
 
 const renderVal = (val, { isMono = false, isUppercase = false } = {}) => {
     const text = String(val || '').trim();
@@ -108,15 +109,14 @@ const PendingDeliveryBoys = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchTerm, filterStatus]);
 
-    // Lock body scroll when modal is open
-    React.useEffect(() => {
-        if (viewingRider) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => { document.body.style.overflow = ''; };
-    }, [viewingRider]);
+    // Lock background scroll while the "view application" modal is open.
+    // Bug #281: this used to only set `document.body.style.overflow = 'hidden'`,
+    // but on admin pages the document's actual scrolling element is `<html>`
+    // (see `.admin-app-scroll` in index.css / DashboardLayout.jsx), not `<body>`
+    // — so that line was a no-op and the background stayed fully scrollable.
+    // Use the shared lock hook (same as HeaderCategories, CouponManagement, etc.)
+    // which correctly locks both `<html>` and `<body>`.
+    useLockBodyScroll(Boolean(viewingRider));
 
 
     const filteredRiders = useMemo(() => {
@@ -201,7 +201,11 @@ const PendingDeliveryBoys = () => {
                     </div>
                     <div className="flex items-center gap-3 overflow-x-auto pb-1">
                         <div className="bg-slate-100/50 p-1 rounded-2xl flex items-center shrink-0">
-                            {['all', 'pending', 'missing_info'].map((status) => (
+                            {/* Bug #135: these values must match the real `status` field
+                                ('approved' | 'pending_review' — see mapping above), not the
+                                stale 'pending' / 'missing_info' values that never matched
+                                anything. */}
+                            {['all', 'pending_review', 'approved'].map((status) => (
                                 <button
                                     key={status}
                                     onClick={() => setFilterStatus(status)}
@@ -212,7 +216,7 @@ const PendingDeliveryBoys = () => {
                                             : "text-slate-400 hover:text-slate-600"
                                     )}
                                 >
-                                    {status === 'pending' ? 'PENDING' : status.replace('_', ' ')}
+                                    {status.replace('_', ' ')}
                                 </button>
                             ))}
                         </div>
@@ -607,37 +611,57 @@ const PendingDeliveryBoys = () => {
                                         </div>
 
                                         <div className="space-y-4 mb-8 lg:mb-14">
-                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Submitted Documents ({viewingRider.documents.length})</h4>
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                                                {viewingRider.documents.map((doc, idx) => {
-                                                    const docUrl = viewingRider.documentUrls?.[doc];
-                                                    return (
-                                                        <a
-                                                            key={idx}
-                                                            href={docUrl || "#"}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="group relative aspect-[4/3] bg-slate-100 rounded-[24px] overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all flex flex-col items-center justify-center"
-                                                        >
-                                                            {docUrl ? (
-                                                                <img
-                                                                    src={docUrl}
-                                                                    alt={doc}
-                                                                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                                                />
-                                                            ) : (
-                                                                <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
-                                                                    <FileSearch className="h-8 w-8 text-slate-400 group-hover:text-primary transition-colors" />
-                                                                    <p className="text-[9px] font-black text-slate-500 uppercase mt-2 text-center">{doc}</p>
-                                                                </div>
-                                                            )}
-                                                            <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                                <span className="text-[10px] font-black text-white uppercase tracking-widest">Open {doc}</span>
-                                                            </div>
-                                                        </a>
-                                                    );
-                                                })}
-                                            </div>
+                                            {(() => {
+                                                // Bug #283: the applicant's profile photo is a submitted document
+                                                // too (uploaded alongside aadhar/pan/DL at signup — see
+                                                // deliveryAuthController.js signupDelivery), but it was only ever
+                                                // shown as a small, non-clickable avatar thumbnail up top — the
+                                                // admin had no way to open it full-size like the other KYC docs.
+                                                // Fold it into the same reviewable documents grid.
+                                                const isRealAvatar = viewingRider.avatar
+                                                    && !viewingRider.avatar.includes('emoji')
+                                                    && !viewingRider.avatar.includes('avatar');
+                                                const allDocs = isRealAvatar
+                                                    ? [...viewingRider.documents, 'profilePhoto']
+                                                    : viewingRider.documents;
+                                                const urlFor = (doc) =>
+                                                    doc === 'profilePhoto' ? viewingRider.avatar : viewingRider.documentUrls?.[doc];
+                                                return (
+                                                    <>
+                                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Submitted Documents ({allDocs.length})</h4>
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                                                            {allDocs.map((doc, idx) => {
+                                                                const docUrl = urlFor(doc);
+                                                                return (
+                                                                    <a
+                                                                        key={idx}
+                                                                        href={docUrl || "#"}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="group relative aspect-[4/3] bg-slate-100 rounded-[24px] overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all flex flex-col items-center justify-center"
+                                                                    >
+                                                                        {docUrl ? (
+                                                                            <img
+                                                                                src={docUrl}
+                                                                                alt={doc}
+                                                                                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                                                                                <FileSearch className="h-8 w-8 text-slate-400 group-hover:text-primary transition-colors" />
+                                                                                <p className="text-[9px] font-black text-slate-500 uppercase mt-2 text-center">{doc}</p>
+                                                                            </div>
+                                                                        )}
+                                                                        <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Open {doc === 'profilePhoto' ? 'Photo' : doc}</span>
+                                                                        </div>
+                                                                    </a>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </>
+                                                );
+                                            })()}
                                         </div>
 
                                         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pb-8 sm:pb-8 lg:pb-0">

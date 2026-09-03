@@ -65,7 +65,8 @@ export const signupDelivery = async (req, res) => {
             email, address, vehicleNumber,
             drivingLicenseNumber,
             accountHolder, accountNumber, ifsc,
-            dob, bloodGroup, aadharNumber, panNumber
+            dob, bloodGroup, aadharNumber, panNumber,
+            experienceYears, preferredArea
         } = req.body;
 
         if (!name || !phone) {
@@ -130,6 +131,11 @@ export const signupDelivery = async (req, res) => {
             bloodGroup,
             aadharNumber,
             panNumber,
+            experienceYears:
+                experienceYears !== undefined && experienceYears !== ""
+                    ? Number(experienceYears)
+                    : undefined,
+            preferredArea,
             profileImage: profileImageUrl,
             documents: {
                 aadhar: aadharUrl,
@@ -328,7 +334,9 @@ export const updateDeliveryProfile = async (req, res) => {
             dob,
             bloodGroup,
             aadharNumber,
-            panNumber
+            panNumber,
+            experienceYears,
+            preferredArea
         } = req.body;
 
         const delivery = await Delivery.findById(req.user.id);
@@ -351,6 +359,8 @@ export const updateDeliveryProfile = async (req, res) => {
         if (bloodGroup !== undefined) delivery.bloodGroup = bloodGroup;
         if (aadharNumber !== undefined) delivery.aadharNumber = aadharNumber;
         if (panNumber !== undefined) delivery.panNumber = panNumber;
+        if (experienceYears !== undefined && experienceYears !== "") delivery.experienceYears = Number(experienceYears);
+        if (preferredArea !== undefined) delivery.preferredArea = preferredArea;
 
         await delivery.save();
 

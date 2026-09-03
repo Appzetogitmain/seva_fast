@@ -6,6 +6,102 @@ import { formatDate, formatDateTime } from "../../utils/formatDate.js";
 
 const DASHBOARD_CATEGORY_COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444"];
 
+const ANALYTICS_RANGES = {
+  "24h": { bucket: "hour", count: 24 },
+  "7d": { bucket: "day", count: 7 },
+  "30d": { bucket: "day", count: 30 },
+  "90d": { bucket: "day", count: 90 },
+};
+
+function pctChange(current, previous) {
+  if (!previous) return current > 0 ? 100 : 0;
+  return ((current - previous) / previous) * 100;
+}
+
+function formatTrend(value) {
+  const rounded = Math.round(value * 10) / 10;
+  return `${rounded >= 0 ? "+" : ""}${rounded}%`;
+}
+
+/**
+ * Real revenue/order analytics for the admin "Business Intel" panel.
+ * Mirrors getAdminDashboardStats' definitions so the two pages never disagree:
+ * "revenue" = sum of pricing.total for delivered orders (gross order value,
+ * not seller payout / platform commission), "orders" = all orders placed in
+ * the window regardless of status, "active sellers" = verified sellers.
+ */
+export async function getAdminAnalyticsOverview({ range = "7d", assignedZones } = {}) {
+  const config = ANALYTICS_RANGES[range] || ANALYTICS_RANGES["7d"];
+  const hasZones = Array.isArray(assignedZones) && assignedZones.length > 0;
+  const zoneFilter = hasZones ? { zoneId: { $in: assignedZones } } : {};
+
+  const now = new Date();
+  const msPerBucket = config.bucket === "hour" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  const rangeStart = new Date(now.getTime() - config.count * msPerBucket);
+  const prevRangeStart = new Date(rangeStart.getTime() - config.count * msPerBucket);
+
+  const [currentOrders, previousOrders, activeSellers, prevActiveSellers] = await Promise.all([
+    Order.find({ ...zoneFilter, createdAt: { $gte: rangeStart } })
+      .select("pricing.total status createdAt")
+      .lean(),
+    Order.find({ ...zoneFilter, createdAt: { $gte: prevRangeStart, $lt: rangeStart } })
+      .select("pricing.total status createdAt")
+      .lean(),
+    Seller.countDocuments({ ...zoneFilter, isVerified: true }),
+    Seller.countDocuments({ ...zoneFilter, isVerified: true, createdAt: { $lt: rangeStart } }),
+  ]);
+
+  const sumDeliveredRevenue = (orders) =>
+    orders
+      .filter((o) => o.status === "delivered")
+      .reduce((sum, o) => sum + (o.pricing?.total || 0), 0);
+  const countDeliveredOrders = (orders) => orders.filter((o) => o.status === "delivered").length;
+
+  const grossRevenue = sumDeliveredRevenue(currentOrders);
+  const prevGrossRevenue = sumDeliveredRevenue(previousOrders);
+  const totalOrders = currentOrders.length;
+  const prevTotalOrders = previousOrders.length;
+  const deliveredCount = countDeliveredOrders(currentOrders);
+  const avgOrderValue = deliveredCount > 0 ? grossRevenue / deliveredCount : 0;
+  const prevDeliveredCount = countDeliveredOrders(previousOrders);
+  const prevAvgOrderValue = prevDeliveredCount > 0 ? prevGrossRevenue / prevDeliveredCount : 0;
+
+  // Bucket delivered revenue + order counts across the window for the trend chart.
+  const buckets = [];
+  for (let i = config.count - 1; i >= 0; i--) {
+    const bucketEnd = new Date(now.getTime() - i * msPerBucket);
+    const bucketStart = new Date(bucketEnd.getTime() - msPerBucket);
+    const label =
+      config.bucket === "hour"
+        ? `${String(bucketEnd.getHours()).padStart(2, "0")}:00`
+        : bucketEnd.toLocaleDateString("en-US", { weekday: config.count <= 7 ? "short" : undefined, day: config.count > 7 ? "2-digit" : undefined, month: config.count > 7 ? "short" : undefined });
+    buckets.push({ start: bucketStart, end: bucketEnd, name: label, revenue: 0, orders: 0 });
+  }
+
+  for (const order of currentOrders) {
+    const createdAt = new Date(order.createdAt);
+    const bucket = buckets.find((b) => createdAt >= b.start && createdAt < b.end) || buckets[buckets.length - 1];
+    bucket.orders += 1;
+    if (order.status === "delivered") {
+      bucket.revenue += order.pricing?.total || 0;
+    }
+  }
+
+  return {
+    goals: {
+      grossRevenue,
+      grossRevenueTrend: formatTrend(pctChange(grossRevenue, prevGrossRevenue)),
+      totalOrders,
+      totalOrdersTrend: formatTrend(pctChange(totalOrders, prevTotalOrders)),
+      activeSellers,
+      activeSellersTrend: `${activeSellers - prevActiveSellers >= 0 ? "+" : ""}${activeSellers - prevActiveSellers}`,
+      avgOrderValue,
+      avgOrderValueTrend: formatTrend(pctChange(avgOrderValue, prevAvgOrderValue)),
+    },
+    salesData: buckets.map((b) => ({ name: b.name, revenue: Math.round(b.revenue), orders: b.orders })),
+  };
+}
+
 export async function getAdminDashboardStats(assignedZones) {
   const hasZones = Array.isArray(assignedZones) && assignedZones.length > 0;
 

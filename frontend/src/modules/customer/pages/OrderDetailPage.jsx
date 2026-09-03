@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import InvoiceModal from "../components/order/InvoiceModal";
 import HelpModal from "../components/order/HelpModal";
 import WriteReviewSheet from "../components/shared/WriteReviewSheet";
+import PostDeliveryRatingPrompt from "../components/shared/PostDeliveryRatingPrompt";
 import LiveTrackingMap from "../components/order/LiveTrackingMap";
 import DeliveryOtpDisplay from "../components/DeliveryOtpDisplay";
 import OrderProgressTracker from "../components/order/OrderProgressTracker";
@@ -153,6 +154,7 @@ const OrderDetailPage = () => {
   const [clockTick, setClockTick] = useState(Date.now());
   const [reviewProduct, setReviewProduct] = useState(null);
   const [reviewedMap, setReviewedMap] = useState({}); // productId -> review object
+  const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const parsedReturnWindowMinutes = parseInt(
     import.meta.env.VITE_RETURN_WINDOW_MINUTES || String(24 * 60),
     10,
@@ -508,6 +510,38 @@ const OrderDetailPage = () => {
   };
 
   const status = order ? getLegacyStatusFromOrder(order) : null;
+
+  // Products on this order the customer hasn't reviewed yet.
+  const unreviewedOrderItems = useMemo(() => {
+    if (!order || !Array.isArray(order.items)) return [];
+    return order.items.filter((item) => {
+      const productId = String(item.product?._id || item.product || "");
+      return productId && !reviewedMap[productId];
+    });
+  }, [order, reviewedMap]);
+
+  // Once an order reaches "delivered" (via socket update or on load), nudge
+  // the customer to rate it — shown once per order via localStorage so it
+  // doesn't nag on every visit.
+  useEffect(() => {
+    if (!order || status !== "delivered" || unreviewedOrderItems.length === 0) return;
+    const storageKey = `rating_prompt_shown_${order._id || orderId}`;
+    try {
+      if (window.localStorage.getItem(storageKey) === "true") return;
+      window.localStorage.setItem(storageKey, "true");
+    } catch {
+      // ignore storage errors — worst case the prompt shows again next visit
+    }
+    setShowRatingPrompt(true);
+  }, [order, status, unreviewedOrderItems, orderId]);
+
+  const handleStartRatingFlow = () => {
+    setShowRatingPrompt(false);
+    if (unreviewedOrderItems[0]) {
+      setReviewProduct(unreviewedOrderItems[0]);
+    }
+  };
+
   const isAwaitingOnlinePayment =
     Boolean(order) &&
     order.paymentMode === "ONLINE" &&
@@ -1459,6 +1493,12 @@ const OrderDetailPage = () => {
         order={order}
       />
       <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+      <PostDeliveryRatingPrompt
+        isOpen={showRatingPrompt}
+        items={unreviewedOrderItems}
+        onRate={handleStartRatingFlow}
+        onDismiss={() => setShowRatingPrompt(false)}
+      />
       <AnimatePresence>
         {reviewProduct && (
           <WriteReviewSheet

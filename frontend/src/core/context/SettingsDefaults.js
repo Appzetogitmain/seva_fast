@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS = {
   currencyCode: "INR",
   timezone: "Asia/Kolkata",
   logoUrl: "/seva-fast-logo.png",
-  faviconUrl: "/seva-fast-logo.png",
+  faviconUrl: "/favicon.png",
   primaryColor: "var(--primary)",
   secondaryColor: "#64748b",
   companyName: "",

@@ -36,6 +36,9 @@ const PendingSellers = () => {
         avgReviewTimeHours: 24
     });
     const [searchTerm, setSearchTerm] = useState('');
+    // Bug #72: "Filter by Date" — same preset-range dropdown pattern as OrdersList.jsx
+    const [dateRange, setDateRange] = useState('All Time');
+    const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
     const [viewingSeller, setViewingSeller] = useState(null);
@@ -134,12 +137,42 @@ const PendingSellers = () => {
         urgent: summaryStats.missingInfo
     }), [summaryStats]);
 
+    const matchesDateRange = (createdAt, range) => {
+        if (range === 'All Time') return true;
+        if (!createdAt) return false;
+        const applied = new Date(createdAt);
+        if (Number.isNaN(applied.getTime())) return false;
+
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        if (range === 'Today') {
+            return applied >= startOfToday;
+        }
+        if (range === 'Yesterday') {
+            const startOfYesterday = new Date(startOfToday);
+            startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+            return applied >= startOfYesterday && applied < startOfToday;
+        }
+        if (range === 'Last 7 Days') {
+            const sevenDaysAgo = new Date(startOfToday);
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+            return applied >= sevenDaysAgo;
+        }
+        if (range === 'This Month') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            return applied >= startOfMonth;
+        }
+        return true;
+    };
+
     const filteredSellers = useMemo(() => {
         return pendingSellers.filter(s =>
-            String(s.shopName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            String(s.ownerName || '').toLowerCase().includes(searchTerm.toLowerCase())
+            (String(s.shopName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                String(s.ownerName || '').toLowerCase().includes(searchTerm.toLowerCase())) &&
+            matchesDateRange(s.createdAt, dateRange)
         );
-    }, [pendingSellers, searchTerm]);
+    }, [pendingSellers, searchTerm, dateRange]);
 
     const reviewDocuments = useMemo(() => {
         if (!viewingSeller) {
@@ -286,10 +319,45 @@ const PendingSellers = () => {
                             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/10"
                         />
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all">
-                        <HiOutlineFunnel className="h-4 w-4" />
-                        <span>Filter by Date</span>
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsDateMenuOpen(!isDateMenuOpen)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all active:scale-95"
+                        >
+                            <HiOutlineFunnel className="h-4 w-4" />
+                            <span>{dateRange === 'All Time' ? 'Filter by Date' : dateRange}</span>
+                        </button>
+
+                        <AnimatePresence>
+                            {isDateMenuOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setIsDateMenuOpen(false)} />
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl ring-1 ring-slate-100 p-2 z-20"
+                                    >
+                                        {['All Time', 'Today', 'Yesterday', 'Last 7 Days', 'This Month'].map((range) => (
+                                            <button
+                                                key={range}
+                                                onClick={() => {
+                                                    setDateRange(range);
+                                                    setIsDateMenuOpen(false);
+                                                }}
+                                                className={cn(
+                                                    "w-full text-left px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                                                    dateRange === range ? "bg-brand-50 text-brand-600" : "text-slate-500 hover:bg-slate-50"
+                                                )}
+                                            >
+                                                {range}
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                </>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">

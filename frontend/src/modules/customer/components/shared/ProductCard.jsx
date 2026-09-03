@@ -142,7 +142,7 @@ const ProductCard = React.memo(
           setTimeout(() => setShowHeartPopup(false), 1000);
         }
 
-        toggleWishlistGlobal(product);
+        toggleWishlistGlobal({ ...product, variantSku: defaultVariantSku || "" });
         showToast(
           isWishlisted
             ? `${product.name} removed from wishlist`
@@ -150,7 +150,7 @@ const ProductCard = React.memo(
           isWishlisted ? "info" : "success",
         );
       },
-      [isWishlisted, toggleWishlistGlobal, product, showToast],
+      [isWishlisted, toggleWishlistGlobal, product, defaultVariantSku, showToast],
     );
 
     const handleNotifyMe = React.useCallback(async (e) => {

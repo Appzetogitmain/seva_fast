@@ -27,14 +27,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     getLegacyStatusFromOrder,
     adminRouteMatchesOrder,
+    formatOrderId,
 } from '@/shared/utils/orderStatus';
 import { formatDateTime } from '@shared/utils/formatDate';
-
-const formatOrderIdDisplay = (orderId) => {
-    const id = String(orderId || '').replace(/^#/, '').trim();
-    if (id.length <= 16) return id;
-    return `${id.slice(0, 10)}...${id.slice(-4)}`;
-};
 
 const OrdersList = () => {
     const { status = 'all' } = useParams();
@@ -421,7 +416,7 @@ const OrdersList = () => {
                                                         className="text-[10px] font-bold text-slate-800 font-mono tracking-tight truncate"
                                                         title={`#${order.id}`}
                                                     >
-                                                        #{formatOrderIdDisplay(order.id)}
+                                                        {formatOrderId(order.id)}
                                                     </h4>
                                                     <ArrowUpRight className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-all text-slate-400" />
                                                 </div>

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
     User, MapPin, Package, CreditCard, Wallet, ChevronRight, ChevronDown,
     LogOut, ShieldCheck, Heart, HelpCircle, Info, Edit2, ChevronLeft, Bell,
-    Share2, Copy, Sparkles, Camera, X, Users, Briefcase, FileText
+    Share2, Copy, Sparkles, Camera, X, Users, Briefcase, FileText, History
 } from 'lucide-react';
 import { useAuth } from '@core/context/AuthContext';
 import { useSettings } from '@core/context/SettingsContext';
@@ -682,6 +682,14 @@ const ProfilePage = () => {
                                 path="/orders"
                                 color="var(--primary)"
                                 bg="rgba(16,185,129,0.10)"
+                            />
+                            <MenuItem
+                                icon={History}
+                                label="Photo Order History"
+                                sub="Track your custom photo orders"
+                                path="/orders?tab=photo"
+                                color="#ec4899"
+                                bg="rgba(236,72,153,0.10)"
                             />
                             <div onClick={() => setIsNotificationsModalOpen(true)}>
                                 <MenuItem

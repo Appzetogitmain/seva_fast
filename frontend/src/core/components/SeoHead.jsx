@@ -63,7 +63,7 @@ export default function SeoHead() {
             }
         }
         if (linkFavicon) {
-            linkFavicon.href = faviconUrl || settings.logoUrl || '/seva-fast-logo.png';
+            linkFavicon.href = faviconUrl || settings.logoUrl || '/favicon.png';
         }
     }, [settings]);
 

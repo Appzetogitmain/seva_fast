@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { categoryIcons } from '../constants/categoryIcons';
 import { Search, X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { preventBackdropScroll } from '../hooks/useLockBodyScroll';
 
 // MUI icon library (same as customer app categories)
 import HomeIcon from '@mui/icons-material/Home';
@@ -59,7 +60,11 @@ const IconSelector = ({ selectedIcon, onSelect, onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 z-[310] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-[310] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onWheel={preventBackdropScroll}
+      onTouchMove={preventBackdropScroll}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -91,7 +96,11 @@ const IconSelector = ({ selectedIcon, onSelect, onClose }) => {
         </div>
 
         {/* Icon Grid */}
-        <div className="p-6 overflow-y-auto flex-1 min-h-0">
+        <div
+          className="p-6 overflow-y-auto flex-1 min-h-0 overscroll-contain touch-pan-y"
+          onWheel={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+        >
           <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3">
             {filteredIcons.map((icon) => (
               <button

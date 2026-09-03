@@ -31,7 +31,16 @@ export function getSellerOrderEarning(order) {
   const deliveryFee = Number(
     order.pricing?.deliveryFee ?? order.paymentBreakdown?.deliveryFeeCharged ?? 0,
   );
-  const sellerDeliveryShare = roundMoney(deliveryFee * DELIVERY_FEE_SELLER_SHARE);
+  // Match backend's splitDeliveryFee (pricingService.js): the rider is paid
+  // out of the delivery fee FIRST, and only what's left after that is split
+  // 80/20 between seller and admin. Subtracting the rider's cut before
+  // applying the seller's share avoids overstating what the seller is owed.
+  const riderPayoutTotal = Number(order.paymentBreakdown?.riderPayoutTotal ?? 0);
+  const remainingDeliveryFee = Math.max(
+    roundMoney(deliveryFee) - roundMoney(riderPayoutTotal),
+    0,
+  );
+  const sellerDeliveryShare = roundMoney(remainingDeliveryFee * DELIVERY_FEE_SELLER_SHARE);
   const productEarning = Math.max(subtotal - commission, 0);
 
   return roundMoney(productEarning + sellerDeliveryShare);

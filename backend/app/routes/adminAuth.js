@@ -15,6 +15,7 @@ import {
     updateAdminProfile,
     updateAdminPassword,
     getAdminStats,
+    getAdminAnalytics,
     getDeliveryPartners,
     approveDeliveryPartner,
     rejectDeliveryPartner,
@@ -127,6 +128,12 @@ router.get(
     verifyToken,
     allowRoles("admin"),
     getAdminStats
+);
+router.get(
+    "/analytics/overview",
+    verifyToken,
+    allowRoles("admin"),
+    getAdminAnalytics
 );
 router.get(
     "/finance/summary",
