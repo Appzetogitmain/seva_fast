@@ -933,7 +933,7 @@ const OrderDetailPage = () => {
                   <h3 className="text-sm font-black text-brand-900 uppercase tracking-tight">Payment Required</h3>
                 </div>
                 <p className="text-xs text-brand-700 font-medium leading-relaxed">
-                  Complete your payment of <span className="font-bold">₹{order.pricing.total}</span> to proceed with this order.
+                  Complete your payment of <span className="font-bold">₹{order.pricing?.total}</span> to proceed with this order.
                 </p>
               </div>
               <button
@@ -1245,58 +1245,58 @@ const OrderDetailPage = () => {
           <div className="space-y-2.5 text-sm">
             <div className="flex justify-between text-slate-600">
               <span>Item Total</span>
-              <span className="font-semibold">₹{order.pricing.subtotal}</span>
+              <span className="font-semibold">₹{order.pricing?.subtotal}</span>
             </div>
             <div className="flex justify-between text-slate-600">
               <span>Delivery Fee</span>
               <span
                 className={
-                  order.pricing.deliveryFee === 0 ? "text-brand-600 font-bold" : "font-semibold"
+                  order.pricing?.deliveryFee === 0 ? "text-brand-600 font-bold" : "font-semibold"
                 }>
-                {order.pricing.deliveryFee === 0
+                {order.pricing?.deliveryFee === 0
                   ? "FREE"
-                  : `₹${order.pricing.deliveryFee}`}
+                  : `₹${order.pricing?.deliveryFee}`}
               </span>
             </div>
-            {(order.pricing.platformFee ?? order.paymentBreakdown?.handlingFeeCharged) > 0 && (
+            {(order.pricing?.platformFee ?? order.paymentBreakdown?.handlingFeeCharged) > 0 && (
               <div className="flex justify-between text-slate-600">
                 <span>Handling Fee</span>
                 <span className="font-semibold">
-                  ₹{order.pricing.platformFee ?? order.paymentBreakdown?.handlingFeeCharged}
+                  ₹{order.pricing?.platformFee ?? order.paymentBreakdown?.handlingFeeCharged}
                 </span>
               </div>
             )}
-            {(order.pricing.gst ?? order.paymentBreakdown?.taxTotal) > 0 && (
+            {(order.pricing?.gst ?? order.paymentBreakdown?.taxTotal) > 0 && (
               <div className="flex justify-between text-slate-600">
                 <span>Tax (GST)</span>
                 <span className="font-semibold">
-                  ₹{order.pricing.gst ?? order.paymentBreakdown?.taxTotal}
+                  ₹{order.pricing?.gst ?? order.paymentBreakdown?.taxTotal}
                 </span>
               </div>
             )}
-            {(order.pricing.discount ?? order.paymentBreakdown?.discountTotal) > 0 && (
+            {(order.pricing?.discount ?? order.paymentBreakdown?.discountTotal) > 0 && (
               <div className="flex justify-between text-emerald-600">
                 <span>
                   Discount
                   {order.couponCode ? ` (${order.couponCode})` : ""}
                 </span>
                 <span className="font-semibold">
-                  -₹{order.pricing.discount ?? order.paymentBreakdown?.discountTotal}
+                  -₹{order.pricing?.discount ?? order.paymentBreakdown?.discountTotal}
                 </span>
               </div>
             )}
-            {(order.pricing.walletAmount ?? order.paymentBreakdown?.walletAmount) > 0 && (
+            {(order.pricing?.walletAmount ?? order.paymentBreakdown?.walletAmount) > 0 && (
               <div className="flex justify-between text-emerald-600">
                 <span>Wallet Applied</span>
                 <span className="font-semibold">
-                  -₹{order.pricing.walletAmount ?? order.paymentBreakdown?.walletAmount}
+                  -₹{order.pricing?.walletAmount ?? order.paymentBreakdown?.walletAmount}
                 </span>
               </div>
             )}
-            {order.pricing.tip > 0 && (
+            {order.pricing?.tip > 0 && (
               <div className="flex justify-between text-slate-600">
                 <span>Tip</span>
-                <span className="font-semibold">₹{order.pricing.tip}</span>
+                <span className="font-semibold">₹{order.pricing?.tip}</span>
               </div>
             )}
             <div className="border-t border-slate-100 mt-3 pt-3 flex justify-between items-center">
@@ -1304,7 +1304,7 @@ const OrderDetailPage = () => {
                 Total Amount
               </span>
               <span className="text-xl font-black text-brand-600">
-                ₹{order.pricing.total}
+                ₹{order.pricing?.total}
               </span>
             </div>
           </div>

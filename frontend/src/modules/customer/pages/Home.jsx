@@ -528,7 +528,7 @@ const Home = () => {
       ) : (
         <>
             {heroConfig.banners?.items?.length > 0 && (
-              <motion.div ref={heroRef} className="block md:hidden will-change-transform" style={isMobile ? { opacity: 1 } : { opacity, y, scale, pointerEvents }}>
+              <motion.div ref={heroRef} className="block will-change-transform" style={isMobile ? { opacity: 1 } : { opacity, y, scale, pointerEvents }}>
                 <div className="relative w-full overflow-hidden">
                   <ExperienceBannerCarousel section={{ title: "" }} items={heroConfig.banners.items} fullWidth edgeToEdge />
                 </div>

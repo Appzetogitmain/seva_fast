@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import axiosInstance from '@core/api/axios';
 import { useAuth } from '@core/context/AuthContext';
+import { useLocation } from '../../context/LocationContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -62,6 +63,7 @@ const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 
 
 export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     const { isAuthenticated, user } = useAuth();
+    const { currentLocation } = useLocation();
     const navigate = useNavigate();
 
     const [file, setFile] = useState(null);
@@ -312,10 +314,21 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
 
                     {/* City Input */}
                     <div className="space-y-1.5">
-                        <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            <MapPin size={12} className="text-indigo-500" />
-                            Your City
-                        </label>
+                        <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                <MapPin size={12} className="text-indigo-500" />
+                                Your City
+                            </label>
+                            {currentLocation?.city && (
+                                <button
+                                    type="button"
+                                    onClick={() => setCity(currentLocation.city)}
+                                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-full flex items-center gap-1 cursor-pointer"
+                                >
+                                    <MapPin size={10} /> Auto Detect
+                                </button>
+                            )}
+                        </div>
                         <input
                             type="text"
                             placeholder="Type your city to find sellers..."

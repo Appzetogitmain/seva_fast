@@ -72,6 +72,17 @@ const Auth = () => {
     phone: createInitialVerificationState(),
   });
 
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [fpStep, setFpStep] = useState("email"); // email | otp | reset
+  const [fpEmail, setFpEmail] = useState("");
+  const [fpOtp, setFpOtp] = useState("");
+  const [fpResetToken, setFpResetToken] = useState("");
+  const [fpNewPassword, setFpNewPassword] = useState("");
+  const [fpConfirmPassword, setFpConfirmPassword] = useState("");
+  const [fpShowNewPassword, setFpShowNewPassword] = useState(false);
+  const [fpShowConfirmPassword, setFpShowConfirmPassword] = useState(false);
+  const [fpLoading, setFpLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -317,6 +328,90 @@ const Auth = () => {
         isVerifying: false,
       });
       toast.error(error.response?.data?.message || "Failed to verify OTP");
+    }
+  };
+
+  const openForgotPassword = () => {
+    setFpEmail(
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email || "") ? formData.email : "",
+    );
+    setFpOtp("");
+    setFpResetToken("");
+    setFpNewPassword("");
+    setFpConfirmPassword("");
+    setFpShowNewPassword(false);
+    setFpShowConfirmPassword(false);
+    setFpStep("email");
+    setForgotPasswordOpen(true);
+  };
+
+  const closeForgotPassword = () => {
+    if (fpLoading) return;
+    setForgotPasswordOpen(false);
+  };
+
+  const handleSendResetOtp = async () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fpEmail || "")) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+    setFpLoading(true);
+    try {
+      await sellerApi.sendPasswordResetOtp({ email: fpEmail });
+      toast.success("OTP sent to your registered email.");
+      setFpStep("otp");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to send OTP");
+    } finally {
+      setFpLoading(false);
+    }
+  };
+
+  const handleVerifyResetOtp = async () => {
+    if (!/^\d{6}$/.test(fpOtp || "")) {
+      toast.error("Enter a valid 6-digit OTP.");
+      return;
+    }
+    setFpLoading(true);
+    try {
+      const response = await sellerApi.verifyPasswordResetOtp({
+        email: fpEmail,
+        otp: fpOtp,
+      });
+      setFpResetToken(response.data?.result?.resetToken || "");
+      toast.success("OTP verified. Set your new password.");
+      setFpStep("reset");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to verify OTP");
+    } finally {
+      setFpLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    const newPwd = (fpNewPassword || "").trim();
+    if (newPwd.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+    if (fpNewPassword !== fpConfirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+    setFpLoading(true);
+    try {
+      await sellerApi.resetPassword({
+        email: fpEmail,
+        resetToken: fpResetToken,
+        newPassword: fpNewPassword,
+      });
+      toast.success("Password reset successfully. Please log in.");
+      setForgotPasswordOpen(false);
+      setFormData((prev) => ({ ...prev, email: fpEmail, password: "" }));
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to reset password");
+    } finally {
+      setFpLoading(false);
     }
   };
 
@@ -890,6 +985,17 @@ const Auth = () => {
                       </button>
                     </div>
 
+                    {isLogin && (
+                      <div className="flex justify-end -mt-1">
+                        <button
+                          type="button"
+                          onClick={openForgotPassword}
+                          className="text-xs font-bold text-slate-500 hover:text-slate-900 underline underline-offset-2 transition-colors">
+                          Forgot password?
+                        </button>
+                      </div>
+                    )}
+
                     {!isLogin && (
                       <div className="relative group">
                         <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
@@ -1402,6 +1508,159 @@ const Auth = () => {
           initialRadius={formData.radius}
         />
       )}
+
+      <AnimatePresence>
+        {forgotPasswordOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4"
+            onClick={closeForgotPassword}>
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.98 }}
+              transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-white rounded-lg shadow-[0_50px_120px_rgba(0,0,0,0.25)] p-8 relative">
+              <button
+                type="button"
+                onClick={closeForgotPassword}
+                className="absolute top-4 right-4 text-slate-300 hover:text-slate-600 transition-colors text-xl leading-none"
+                aria-label="Close">
+                ×
+              </button>
+
+              <h2 className="text-xl font-black text-slate-900 tracking-tight mb-1">
+                Reset Password
+              </h2>
+              <p className="text-slate-600 font-medium text-sm mb-6">
+                {fpStep === "email" &&
+                  "Enter your registered business email to receive an OTP."}
+                {fpStep === "otp" &&
+                  `Enter the 6-digit OTP sent to ${fpEmail}.`}
+                {fpStep === "reset" &&
+                  "Set a new password for your seller account."}
+              </p>
+
+              {fpStep === "email" && (
+                <div className="space-y-4">
+                  <div className="relative group">
+                    <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
+                      <Mail size={18} />
+                    </div>
+                    <input
+                      type="email"
+                      autoComplete="email"
+                      placeholder="Business Email"
+                      className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                      value={fpEmail}
+                      onChange={(e) => setFpEmail(e.target.value.replace(/\s+/g, "").toLowerCase())}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendResetOtp}
+                    disabled={fpLoading}
+                    className="w-full bg-slate-900 text-white rounded-lg py-4 text-sm font-black tracking-[2px] hover:bg-black transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
+                    {fpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {fpLoading ? "SENDING..." : "SEND OTP"}
+                  </button>
+                </div>
+              )}
+
+              {fpStep === "otp" && (
+                <div className="space-y-4">
+                  <div className="relative group">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="Enter 6-digit OTP"
+                      className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400 tracking-[4px]"
+                      value={fpOtp}
+                      onChange={(e) => setFpOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleVerifyResetOtp}
+                    disabled={fpLoading || fpOtp.length !== 6}
+                    className="w-full bg-slate-900 text-white rounded-lg py-4 text-sm font-black tracking-[2px] hover:bg-black transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
+                    {fpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {fpLoading ? "VERIFYING..." : "VERIFY OTP"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendResetOtp}
+                    disabled={fpLoading}
+                    className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-900 underline underline-offset-2 transition-colors disabled:opacity-50">
+                    Resend OTP
+                  </button>
+                </div>
+              )}
+
+              {fpStep === "reset" && (
+                <div className="space-y-4">
+                  <div className="relative group">
+                    <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
+                      <Lock size={18} />
+                    </div>
+                    <input
+                      type={fpShowNewPassword ? "text" : "password"}
+                      minLength={6}
+                      maxLength={32}
+                      autoComplete="new-password"
+                      placeholder="New Password"
+                      className="w-full pl-12 pr-14 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                      value={fpNewPassword}
+                      onChange={(e) => setFpNewPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFpShowNewPassword(!fpShowNewPassword)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 transition-colors px-2"
+                      tabIndex="-1">
+                      {fpShowNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <div className="relative group">
+                    <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-violet-600 transition-colors">
+                      <Lock size={18} />
+                    </div>
+                    <input
+                      type={fpShowConfirmPassword ? "text" : "password"}
+                      minLength={6}
+                      maxLength={32}
+                      autoComplete="new-password"
+                      placeholder="Confirm New Password"
+                      className="w-full pl-12 pr-14 py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400"
+                      value={fpConfirmPassword}
+                      onChange={(e) => setFpConfirmPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFpShowConfirmPassword(!fpShowConfirmPassword)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 transition-colors px-2"
+                      tabIndex="-1">
+                      {fpShowConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    disabled={fpLoading}
+                    className="w-full bg-slate-900 text-white rounded-lg py-4 text-sm font-black tracking-[2px] hover:bg-black transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
+                    {fpLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    {fpLoading ? "RESETTING..." : "RESET PASSWORD"}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

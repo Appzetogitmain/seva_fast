@@ -5,9 +5,14 @@ import OtpVerification from "../models/otpVerification.js";
 import { getRedisClient } from "../config/redis.js";
 import { sendSmsIndiaHubOtp } from "./smsIndiaHubService.js";
 import { MOCK_OTP, useRealSMS } from "../utils/otp.js";
-import { sendSellerVerificationOtpEmail, useRealEmailOTP } from "./emailService.js";
+import {
+  sendSellerVerificationOtpEmail,
+  sendSellerPasswordResetOtpEmail,
+  useRealEmailOTP,
+} from "./emailService.js";
 
 const SELLER_SIGNUP_PURPOSE = "seller_signup";
+const SELLER_PASSWORD_RESET_PURPOSE = "seller_password_reset";
 const OTP_EXPIRY_MINUTES = () =>
   parseInt(process.env.SELLER_OTP_EXPIRY_MINUTES || process.env.OTP_EXPIRY_MINUTES || "5", 10);
 const OTP_RESEND_COOLDOWN_SECONDS = () =>
@@ -67,10 +72,10 @@ function generateSellerOtp(channel) {
   return useRealDelivery ? randomOtp(OTP_LENGTH()) : MOCK_OTP;
 }
 
-function hashOtp(channel, target, otp) {
+function hashOtp(channel, target, otp, purpose = SELLER_SIGNUP_PURPOSE) {
   return crypto
     .createHmac("sha256", verificationSecret())
-    .update(`${SELLER_SIGNUP_PURPOSE}:${channel}:${target}:${otp}`)
+    .update(`${purpose}:${channel}:${target}:${otp}`)
     .digest("hex");
 }
 
@@ -192,6 +197,21 @@ async function dispatchEmailOtp({ email, otp }) {
   }
 }
 
+async function dispatchPasswordResetEmailOtp({ email, otp }) {
+  try {
+    await sendSellerPasswordResetOtpEmail({
+      email,
+      otp,
+      expiresInMinutes: OTP_EXPIRY_MINUTES(),
+    });
+  } catch (error) {
+    if (!error.statusCode) {
+      error.statusCode = 502;
+    }
+    throw error;
+  }
+}
+
 async function dispatchPhoneOtp({ phone, otp }) {
   if (useRealSMS()) {
     await sendSmsIndiaHubOtp({ phone, otp });
@@ -212,6 +232,21 @@ function signVerificationToken({ channel, target }) {
     verificationSecret(),
     {
       expiresIn: process.env.SELLER_VERIFICATION_TOKEN_EXPIRY || "2h",
+    },
+  );
+}
+
+function signPasswordResetToken({ target }) {
+  return jwt.sign(
+    {
+      purpose: SELLER_PASSWORD_RESET_PURPOSE,
+      channel: "email",
+      target,
+      verified: true,
+    },
+    verificationSecret(),
+    {
+      expiresIn: process.env.SELLER_PASSWORD_RESET_TOKEN_EXPIRY || "15m",
     },
   );
 }
@@ -436,4 +471,220 @@ export async function verifySellerOtpCode({
       target,
     }),
   };
+}
+
+/* ===============================
+   SELLER PASSWORD RESET (forgot password)
+================================ */
+
+export async function issueSellerPasswordResetOtp({ rawValue, ipAddress = "unknown" }) {
+  const target = normalizeEmail(rawValue);
+
+  const seller = await Seller.findOne({ email: target }).select("_id").lean();
+  if (!seller) {
+    const error = new Error("No seller account found with this email");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const sendAllowed = await incrementWindowCounter(
+    `seller:pwreset:send:email:${target}`,
+    {
+      limit: OTP_SEND_LIMIT_PER_WINDOW(),
+      windowSeconds: OTP_SEND_LIMIT_WINDOW_SECONDS(),
+    },
+  );
+  if (!sendAllowed) {
+    const error = new Error("Too many OTP requests. Please try again later.");
+    error.statusCode = 429;
+    throw error;
+  }
+
+  const now = new Date();
+  let session = await OtpVerification.findOne({
+    purpose: SELLER_PASSWORD_RESET_PURPOSE,
+    channel: "email",
+    target,
+  }).select("+otpHash +expiresAt");
+
+  if (session?.lastSentAt) {
+    const elapsedMs = now.getTime() - new Date(session.lastSentAt).getTime();
+    const cooldownMs = OTP_RESEND_COOLDOWN_SECONDS() * 1000;
+    if (elapsedMs < cooldownMs) {
+      const waitSeconds = Math.ceil((cooldownMs - elapsedMs) / 1000);
+      const error = new Error(`Please wait ${waitSeconds}s before requesting another OTP`);
+      error.statusCode = 429;
+      throw error;
+    }
+  }
+
+  const otp = generateSellerOtp("email");
+  const expiresAt = new Date(now.getTime() + OTP_EXPIRY_MINUTES() * 60 * 1000);
+
+  if (!session) {
+    session = new OtpVerification({
+      purpose: SELLER_PASSWORD_RESET_PURPOSE,
+      channel: "email",
+      target,
+      otpHash: hashOtp("email", target, otp, SELLER_PASSWORD_RESET_PURPOSE),
+      expiresAt,
+      verifiedAt: null,
+      failedAttempts: 0,
+      lastSentAt: now,
+    });
+  } else {
+    session.otpHash = hashOtp("email", target, otp, SELLER_PASSWORD_RESET_PURPOSE);
+    session.expiresAt = expiresAt;
+    session.verifiedAt = null;
+    session.failedAttempts = 0;
+    session.lastSentAt = now;
+  }
+
+  await session.save();
+
+  await dispatchPasswordResetEmailOtp({ email: target, otp });
+
+  console.log(
+    JSON.stringify({
+      level: "info",
+      ts: new Date().toISOString(),
+      event: "seller_password_reset_otp_issued",
+      channel: "email",
+      target: maskEmail(target),
+      ipAddress,
+      mode: useRealEmailOTP() ? "real" : "mock",
+    }),
+  );
+
+  return {
+    sent: true,
+    maskedTarget: maskEmail(target),
+    expiresInSeconds: OTP_EXPIRY_MINUTES() * 60,
+  };
+}
+
+export async function verifySellerPasswordResetOtp({ rawValue, otp, ipAddress = "unknown" }) {
+  const target = normalizeEmail(rawValue);
+  const code = String(otp || "").trim();
+
+  if (!/^\d{6}$/.test(code)) {
+    const error = new Error("Please enter a valid OTP");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const verifyAllowed = await incrementWindowCounter(
+    `seller:pwreset:verify:email:${target}`,
+    {
+      limit: OTP_VERIFY_LIMIT_PER_WINDOW(),
+      windowSeconds: OTP_VERIFY_LIMIT_WINDOW_SECONDS(),
+    },
+  );
+  if (!verifyAllowed) {
+    const error = new Error("Too many verification attempts. Please try again later.");
+    error.statusCode = 429;
+    throw error;
+  }
+
+  const session = await OtpVerification.findOne({
+    purpose: SELLER_PASSWORD_RESET_PURPOSE,
+    channel: "email",
+    target,
+  }).select("+otpHash +expiresAt");
+
+  if (!session || !session.otpHash || !session.expiresAt || session.expiresAt <= new Date()) {
+    const error = new Error("Invalid or expired OTP");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const isValid =
+    hashOtp("email", target, code, SELLER_PASSWORD_RESET_PURPOSE) === session.otpHash;
+  if (!isValid) {
+    session.failedAttempts = (session.failedAttempts || 0) + 1;
+    await session.save();
+
+    if (session.failedAttempts >= OTP_MAX_FAILED_ATTEMPTS()) {
+      await OtpVerification.deleteOne({ _id: session._id });
+    }
+
+    const error = new Error("Invalid or expired OTP");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  session.verifiedAt = new Date();
+  session.failedAttempts = 0;
+  await session.save();
+
+  console.log(
+    JSON.stringify({
+      level: "info",
+      ts: new Date().toISOString(),
+      event: "seller_password_reset_otp_verified",
+      channel: "email",
+      target: maskEmail(target),
+      ipAddress,
+    }),
+  );
+
+  return {
+    verified: true,
+    resetToken: signPasswordResetToken({ target }),
+  };
+}
+
+export async function resetSellerPasswordWithToken({ rawValue, resetToken, newPassword }) {
+  const target = normalizeEmail(rawValue);
+  const password = String(newPassword || "");
+
+  if (password.length < 6) {
+    const error = new Error("Password must be at least 6 characters");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!resetToken) {
+    const error = new Error("Password reset verification is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  let payload;
+  try {
+    payload = jwt.verify(resetToken, verificationSecret());
+  } catch {
+    const error = new Error("Verification expired. Please verify the OTP again.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (
+    payload?.purpose !== SELLER_PASSWORD_RESET_PURPOSE ||
+    payload?.channel !== "email" ||
+    payload?.target !== target ||
+    payload?.verified !== true
+  ) {
+    const error = new Error("Verification does not match the provided email");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const seller = await Seller.findOne({ email: target }).select("+password");
+  if (!seller) {
+    const error = new Error("No seller account found with this email");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  seller.password = password;
+  await seller.save();
+
+  await OtpVerification.deleteOne({
+    purpose: SELLER_PASSWORD_RESET_PURPOSE,
+    channel: "email",
+    target,
+  });
+
+  return { success: true };
 }

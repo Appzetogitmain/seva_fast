@@ -73,6 +73,20 @@ function buildSellerReturnsLink(orderId) {
     : buildAppPath("/seller/returns");
 }
 
+function buildSellerOrderLink(orderId) {
+  const id = String(orderId || "").trim();
+  return id
+    ? buildAppPath(`/seller/orders?orderId=${encodeURIComponent(id)}`)
+    : buildAppPath("/seller/orders");
+}
+
+function buildDeliveryOrderLink(orderId) {
+  const id = String(orderId || "").trim();
+  return id
+    ? buildAppPath(`/delivery/order-details/${encodeURIComponent(id)}`)
+    : buildAppPath("/delivery");
+}
+
 function buildAdminProductsLink(productId) {
   const id = String(productId || "").trim();
   return id
@@ -627,7 +641,11 @@ function eventData(eventType, payload = {}, role) {
           (eventType === NOTIFICATION_EVENTS.RETURN_REQUESTED ||
             eventType === NOTIFICATION_EVENTS.RETURN_COMPLETED)
         ? buildSellerReturnsLink(orderId)
-        : buildOrderLink(orderId);
+        : role === NOTIFICATION_ROLES.SELLER
+          ? buildSellerOrderLink(orderId)
+          : role === NOTIFICATION_ROLES.DELIVERY
+            ? buildDeliveryOrderLink(orderId)
+            : buildOrderLink(orderId);
   return {
     eventType,
     orderId,

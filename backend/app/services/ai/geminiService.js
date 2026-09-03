@@ -150,7 +150,10 @@ export async function analyzeImageStructuredJson({
   prompt,
   systemInstruction,
   responseSchema,
+  timeoutMs = 25000,
 }) {
+  let response;
+  let timeoutHandle;
   try {
     const ai = getClient();
     const contents = [
@@ -174,16 +177,33 @@ export async function analyzeImageStructuredJson({
     };
     if (systemInstruction) config.systemInstruction = systemInstruction;
 
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents,
-      config,
-    });
-
-    return JSON.parse(response.text);
+    response = await Promise.race([
+      ai.models.generateContent({
+        model: MODEL,
+        contents,
+        config,
+      }),
+      new Promise((_, reject) => {
+        timeoutHandle = setTimeout(
+          () => reject(new AiServiceError("Gemini vision request timed out", "TIMEOUT")),
+          timeoutMs,
+        );
+      }),
+    ]);
   } catch (err) {
     if (err instanceof AiServiceError) throw err;
-    throw new AiServiceError(err.message || "Gemini vision analysis failed", "AI_ERROR", err);
+    const status = err?.status || err?.response?.status;
+    const code =
+      status === 429 ? "RATE_LIMITED" : status >= 500 ? "UPSTREAM_ERROR" : "AI_ERROR";
+    throw new AiServiceError(err.message || "Gemini vision analysis failed", code, err);
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+
+  try {
+    return JSON.parse(response.text);
+  } catch (err) {
+    throw new AiServiceError("Gemini returned invalid JSON", "PARSE_ERROR", err);
   }
 }
 

@@ -5,6 +5,9 @@ import {
     issueSellerVerificationOtp,
     verifySellerOtpCode,
     verifySellerVerificationToken,
+    issueSellerPasswordResetOtp,
+    verifySellerPasswordResetOtp,
+    resetSellerPasswordWithToken,
 } from "../services/sellerVerificationService.js";
 import { uploadToCloudinary } from "../services/mediaService.js";
 import { recordAuthActivity } from "../services/authActivityService.js";
@@ -442,6 +445,56 @@ export const loginSeller = async (req, res) => {
         });
     } catch (error) {
         return handleResponse(res, 500, error.message);
+    }
+};
+
+/* ===============================
+   SELLER FORGOT PASSWORD
+================================ */
+export const sendSellerPasswordResetOtp = async (req, res) => {
+    try {
+        const { email } = req.body || {};
+
+        const result = await issueSellerPasswordResetOtp({
+            rawValue: email,
+            ipAddress: req.ip,
+        });
+
+        return handleResponse(res, 200, "OTP sent successfully", result);
+    } catch (error) {
+        return handleResponse(res, error.statusCode || 500, error.message);
+    }
+};
+
+export const verifySellerPasswordResetOtpController = async (req, res) => {
+    try {
+        const { email, otp } = req.body || {};
+
+        const result = await verifySellerPasswordResetOtp({
+            rawValue: email,
+            otp,
+            ipAddress: req.ip,
+        });
+
+        return handleResponse(res, 200, "OTP verified successfully", result);
+    } catch (error) {
+        return handleResponse(res, error.statusCode || 500, error.message);
+    }
+};
+
+export const resetSellerPassword = async (req, res) => {
+    try {
+        const { email, resetToken, newPassword } = req.body || {};
+
+        await resetSellerPasswordWithToken({
+            rawValue: email,
+            resetToken,
+            newPassword,
+        });
+
+        return handleResponse(res, 200, "Password reset successfully");
+    } catch (error) {
+        return handleResponse(res, error.statusCode || 500, error.message);
     }
 };
 

@@ -141,6 +141,45 @@ export async function sendSellerVerificationOtpEmail({
   };
 }
 
+export async function sendSellerPasswordResetOtpEmail({
+  email,
+  otp,
+  expiresInMinutes,
+}) {
+  if (!useRealEmailOTP()) {
+    logger.info("Seller password reset OTP generated in mock mode", {
+      email,
+      otp,
+      mode: "mock",
+    });
+    return {
+      delivered: false,
+      mode: "mock",
+    };
+  }
+
+  const transporter = getTransporter();
+  await transporter.sendMail({
+    from: getMailFrom(),
+    to: email,
+    subject: "Reset your seller account password",
+    text: `Your seller password reset code is ${otp}. This code expires in ${expiresInMinutes} minutes. If you did not request this, please ignore this email.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #0f172a;">
+        <p>Your seller password reset code is:</p>
+        <p style="font-size: 28px; font-weight: 700; letter-spacing: 6px;">${otp}</p>
+        <p>This code expires in ${expiresInMinutes} minutes.</p>
+        <p>If you did not request this password reset, you can safely ignore this email.</p>
+      </div>
+    `,
+  });
+
+  return {
+    delivered: true,
+    mode: "real",
+  };
+}
+
 /**
  * Send seller approval email with Authorized Seller Certificate PDF attached.
  */

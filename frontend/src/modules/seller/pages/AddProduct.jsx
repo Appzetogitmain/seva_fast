@@ -24,6 +24,42 @@ import { toast } from "sonner";
 import { sellerApi } from "../services/sellerApi";
 import { Sparkles, Camera, UploadCloud, Check, Loader2 } from "lucide-react";
 
+// Camera photos routinely come in at 3-10MB; the AI endpoint sends this as a
+// base64 JSON body capped at 1MB server-side, and large images also make the
+// Gemini vision call much slower/likelier to time out. Downscale + re-encode
+// as JPEG before sending so the request stays small and fast.
+const AI_IMAGE_MAX_DIMENSION = 1280;
+const AI_IMAGE_JPEG_QUALITY = 0.82;
+
+const compressImageForAi = (file) =>
+  new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, AI_IMAGE_MAX_DIMENSION / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas is not supported on this device"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", AI_IMAGE_JPEG_QUALITY);
+      resolve({
+        base64Data: dataUrl.replace(/^data:(.*,)?/, ""),
+        mimeType: "image/jpeg",
+      });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not read this image (unsupported format like HEIC?). Please try a JPEG/PNG photo or fill details manually."));
+    };
+    img.src = objectUrl;
+  });
+
 const CardTitle = (Icon, text) => (
   <span className="inline-flex items-center">
     <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 mr-2.5 shrink-0">
@@ -162,55 +198,57 @@ const AddProduct = () => {
 
   const handleAutoFillFromPhoto = async (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64Data = reader.result.replace(/^data:(.*,)?/, "");
-      const previewUrl = reader.result;
 
-      // Immediately set the uploaded image as main cover
+    // Keep the original full-quality file for preview + the real product upload.
+    const preview = new FileReader();
+    preview.onloadend = () => {
       setFormData((prev) => ({
         ...prev,
-        mainImage: previewUrl,
+        mainImage: preview.result,
         mainImageFile: file,
       }));
-
-      setIsAnalyzingImage(true);
-      try {
-        const res = await sellerApi.generateListingFromImage({
-          imageBase64: base64Data,
-          mimeType: file.type || "image/jpeg",
-        });
-
-        const data = res.data.result || res.data.data || {};
-
-        setFormData((prev) => ({
-          ...prev,
-          name: data.title || prev.name,
-          description: data.description || prev.description,
-          tags: data.tags || prev.tags,
-          brand: data.brand || prev.brand,
-          weightVal: data.weightVal || prev.weightVal,
-          weightUnit: data.weightUnit || prev.weightUnit || "kg",
-          deliveryType: data.deliveryType || prev.deliveryType || "instant",
-          header: data.header || prev.header,
-          category: data.category || prev.category,
-          subcategory: data.subcategory || prev.subcategory,
-          aiGenerated: true,
-        }));
-
-        if (data.title) {
-          setAiSuggestedTitle(data.title);
-        }
-
-        toast.success(`AI identified "${data.title || "product"}" and auto-filled details!`);
-      } catch (err) {
-        console.error("AI image analysis failed:", err);
-        toast.error(err.response?.data?.message || "Could not auto-fill from photo. Please fill manually.");
-      } finally {
-        setIsAnalyzingImage(false);
-      }
     };
-    reader.readAsDataURL(file);
+    preview.readAsDataURL(file);
+
+    setIsAnalyzingImage(true);
+    try {
+      // Downscaled/compressed copy for the AI request only — keeps it under
+      // the server's payload limit and makes the Gemini call much faster.
+      const { base64Data, mimeType } = await compressImageForAi(file);
+
+      const res = await sellerApi.generateListingFromImage({
+        imageBase64: base64Data,
+        mimeType,
+      });
+
+      const data = res.data.result || res.data.data || {};
+
+      setFormData((prev) => ({
+        ...prev,
+        name: data.title || prev.name,
+        description: data.description || prev.description,
+        tags: data.tags || prev.tags,
+        brand: data.brand || prev.brand,
+        weightVal: data.weightVal || prev.weightVal,
+        weightUnit: data.weightUnit || prev.weightUnit || "kg",
+        deliveryType: data.deliveryType || prev.deliveryType || "instant",
+        header: data.header || prev.header,
+        category: data.category || prev.category,
+        subcategory: data.subcategory || prev.subcategory,
+        aiGenerated: true,
+      }));
+
+      if (data.title) {
+        setAiSuggestedTitle(data.title);
+      }
+
+      toast.success(`AI identified "${data.title || "product"}" and auto-filled details!`);
+    } catch (err) {
+      console.error("AI image analysis failed:", err);
+      toast.error(err.response?.data?.message || err.message || "Could not auto-fill from photo. Please fill manually.");
+    } finally {
+      setIsAnalyzingImage(false);
+    }
   };
 
   useEffect(() => {
@@ -1192,35 +1230,7 @@ const AddProduct = () => {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          if (formData.mainImageFile) {
-                            handleAutoFillFromPhoto(formData.mainImageFile);
-                          } else if (formData.mainImage) {
-                            const base64Data = formData.mainImage.replace(/^data:(.*,)?/, "");
-                            setIsAnalyzingImage(true);
-                            sellerApi.generateListingFromImage({ imageBase64: base64Data })
-                              .then((res) => {
-                                const data = res.data.result || res.data.data || {};
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  name: data.title || prev.name,
-                                  description: data.description || prev.description,
-                                  tags: data.tags || prev.tags,
-                                  brand: data.brand || prev.brand,
-                                  weightVal: data.weightVal || prev.weightVal,
-                                  weightUnit: data.weightUnit || prev.weightUnit || "kg",
-                                  deliveryType: data.deliveryType || prev.deliveryType || "instant",
-                                  header: data.header || prev.header,
-                                  category: data.category || prev.category,
-                                  subcategory: data.subcategory || prev.subcategory,
-                                  aiGenerated: true,
-                                }));
-                                toast.success(`AI identified "${data.title || "product"}" and auto-filled details!`);
-                              })
-                              .catch(() => toast.error("Could not auto-fill from photo."))
-                              .finally(() => setIsAnalyzingImage(false));
-                          }
-                        }}
+                        onClick={() => handleAutoFillFromPhoto(formData.mainImageFile)}
                         disabled={isAnalyzingImage}
                         className="mt-2 text-primary border-primary/30 bg-primary/5 hover:bg-primary/10 text-xs font-bold"
                       >
