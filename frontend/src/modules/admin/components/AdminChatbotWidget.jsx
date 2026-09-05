@@ -77,6 +77,16 @@ export default function AdminChatbotWidget() {
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
+  // recognition.onend fires asynchronously and calls handleSend from a
+  // closure captured when startVoiceInput() ran — at that point
+  // setVoiceMode(true) hasn't been committed yet, so a plain `voiceMode`
+  // read there is permanently stale (always false) for every mic-triggered
+  // message. Mirror it into a ref so the async callback always sees the
+  // latest value instead of the one frozen at closure-creation time.
+  const voiceModeRef = useRef(voiceMode);
+  useEffect(() => {
+    voiceModeRef.current = voiceMode;
+  }, [voiceMode]);
   const fileInputRef = useRef(null);
 
   const prompts = [
@@ -287,13 +297,13 @@ export default function AdminChatbotWidget() {
 
       setMessages([...newMessages, { role: "model", content: reply }]);
 
-      if (voiceMode && reply) {
+      if (voiceModeRef.current && reply) {
         speakText(reply);
       }
     } catch (error) {
       const errMsg = error?.response?.data?.message || "Sorry, I am having trouble connecting right now. Please try again.";
       setMessages([...newMessages, { role: "model", content: errMsg }]);
-      if (voiceMode) {
+      if (voiceModeRef.current) {
         speakText(errMsg);
       }
     } finally {

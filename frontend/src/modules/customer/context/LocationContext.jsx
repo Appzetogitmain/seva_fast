@@ -8,23 +8,42 @@ import React, {
 } from "react";
 import { customerApi } from "../services/customerApi";
 import { hasValidStoredAuthToken } from "@core/utils/authStorage";
+import { useAuth } from "@core/context/AuthContext";
+import { decodeToken } from "@core/utils/token";
 
 const LocationContext = createContext(undefined);
 // v2 key to force one-time refresh from Google Maps for users
 // who previously only had the default/static location cached.
-const STORAGE_KEY = "location_v2";
+// Scoped per logged-in customer (falls back to a shared "guest" scope while
+// signed out) so a fresh account on a shared device never inherits a
+// different customer's cached — or previously declined/default — location.
+const STORAGE_KEY_PREFIX = "location_v2";
+
+const DEFAULT_LOCATION = {
+  name: "214, Rajshri Palace Colony, Pipliyahana, Indore, Madhya Pradesh 452018, India",
+  time: "12-15 mins",
+  city: "Indore",
+  state: "Madhya Pradesh",
+  pincode: "452018",
+  latitude: 22.711140989838025,
+  longitude: 75.9001552518043,
+};
 
 export const LocationProvider = ({ children }) => {
+  const { token } = useAuth();
+  const customerId = useMemo(() => {
+    if (!token) return null;
+    return decodeToken(token)?.id || null;
+  }, [token]);
+  const storageKey = customerId ? `${STORAGE_KEY_PREFIX}:${customerId}` : `${STORAGE_KEY_PREFIX}:guest`;
+
   // Default location (used until we can resolve a better one)
-  const [currentLocation, setCurrentLocation] = useState({
-    name: "214, Rajshri Palace Colony, Pipliyahana, Indore, Madhya Pradesh 452018, India",
-    time: "12-15 mins",
-    city: "Indore",
-    state: "Madhya Pradesh",
-    pincode: "452018",
-    latitude: 22.711140989838025,
-    longitude: 75.9001552518043,
-  });
+  const [currentLocation, setCurrentLocation] = useState(DEFAULT_LOCATION);
+  // True until currentLocation reflects a real GPS/geocoded position or a
+  // saved address — i.e. it's still the hardcoded placeholder above. Screens
+  // that use currentLocation to prefill a real address (checkout) or to
+  // scope a search radius (Home) must treat this as "no location yet."
+  const [isDefaultLocation, setIsDefaultLocation] = useState(true);
 
   // Address list for drawer UI – will be hydrated from profile API.
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -49,6 +68,11 @@ export const LocationProvider = ({ children }) => {
     { persist = true, updateSavedHome = false } = {},
   ) => {
     setCurrentLocation(newLoc);
+    setIsDefaultLocation(
+      newLoc?.name === DEFAULT_LOCATION.name &&
+        newLoc?.latitude === DEFAULT_LOCATION.latitude &&
+        newLoc?.longitude === DEFAULT_LOCATION.longitude,
+    );
 
     if (updateSavedHome) {
       setSavedAddresses((prev) =>
@@ -70,7 +94,7 @@ export const LocationProvider = ({ children }) => {
           // Internal app properties
           time: newLoc.time,
         };
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        window.localStorage.setItem(storageKey, JSON.stringify(payload));
       } catch {
         // ignore storage errors
       }
@@ -308,8 +332,14 @@ export const LocationProvider = ({ children }) => {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Re-evaluate from scratch whenever the scope changes (e.g. a different
+    // account logs in on this device) — never keep showing a previous
+    // account's resolved location while we check the new scope's cache.
+    setLocationResolved(false);
+    setShowLocationPermission(false);
+
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+      const raw = window.localStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         const addressName = parsed.address || parsed.name;
@@ -334,11 +364,13 @@ export const LocationProvider = ({ children }) => {
       // ignore parse errors, fall through to a fresh location request
     }
 
-    // No usable cached location — surface the permission card instead of
-    // silently falling back to the default.
+    // No usable cached location for this account — surface the permission
+    // card instead of silently falling back to the default.
+    setCurrentLocation(DEFAULT_LOCATION);
+    setIsDefaultLocation(true);
     setShowLocationPermission(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [storageKey]);
 
   // Called when the customer taps "Allow Location Access" on the permission
   // card. Triggering the browser's geolocation prompt from a direct tap also
@@ -368,6 +400,7 @@ export const LocationProvider = ({ children }) => {
 
   const locationValue = useMemo(() => ({
     currentLocation,
+    isDefaultLocation,
     savedAddresses,
     updateLocation,
     addAddress,
@@ -382,6 +415,7 @@ export const LocationProvider = ({ children }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
     currentLocation,
+    isDefaultLocation,
     savedAddresses,
     isFetchingLocation,
     locationError,

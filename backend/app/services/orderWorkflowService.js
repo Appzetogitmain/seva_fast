@@ -311,7 +311,9 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
       seller: sellerId,
       workflowVersion: { $gte: 2 },
       workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
-      sellerPendingExpiresAt: { $gt: now },
+      // No expiry gate here: acceptance stays available for as long as the order
+      // remains SELLER_PENDING. A slow response instead surfaces as a "delayed"
+      // alert (see processSellerTimeoutJob) rather than blocking the seller.
       $or: [
         { paymentMode: { $ne: "ONLINE" } },
         { paymentStatus: "PAID" },
@@ -656,7 +658,7 @@ export async function processSellerTimeoutJob({ orderId }) {
         sellerTimeoutAlert: true,
         sellerTimeoutAlertAt: now,
         attentionRequired: true,
-        attentionReason: "Seller acceptance timeout (> 1 min)",
+        attentionReason: "Seller acceptance delayed (> 10 min)",
       },
     },
     { new: true },
@@ -666,12 +668,12 @@ export async function processSellerTimeoutJob({ orderId }) {
 
   emitOrderStatusUpdate(
     orderId,
-    { 
-      workflowStatus: WORKFLOW_STATUS.SELLER_PENDING, 
+    {
+      workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
       status: "pending",
       sellerTimeoutAlert: true,
       attentionRequired: true,
-      attentionReason: "Seller acceptance timeout (> 1 min)",
+      attentionReason: "Seller acceptance delayed (> 10 min)",
     },
     updated.customer,
     updated.seller,
@@ -683,9 +685,9 @@ export async function processSellerTimeoutJob({ orderId }) {
     customerId: updated.customer,
     userId: updated.customer,
     sellerId: updated.seller,
-    customerMessage: "Your order is being processed by the seller.",
-    sellerMessage: `ACTION REQUIRED: Order #${updated.orderId} is pending acceptance for over 1 min. Please Accept or Cancel.`,
-    adminMessage: `ACTION REQUIRED: Order #${updated.orderId} pending seller acceptance over 1 min.`,
+    customerMessage: "Your order is taking longer than usual to be accepted. We've notified the seller.",
+    sellerMessage: `ACTION REQUIRED: Order #${updated.orderId} is pending acceptance for over 10 min. Please Accept or Reject.`,
+    adminMessage: `ACTION REQUIRED: Order #${updated.orderId} pending seller acceptance over 10 min.`,
   });
 }
 

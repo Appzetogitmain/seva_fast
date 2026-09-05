@@ -104,6 +104,17 @@ const DISPLAY_LABELS = {
   cancelled: "Cancelled",
 };
 
+/**
+ * True once a still-pending order has been flagged by the backend as taking
+ * longer than the seller-response window (see processSellerTimeoutJob, > 10 min).
+ */
+export function isOrderDelayed(order) {
+  if (!order) return false;
+  const bucket = getLegacyStatusFromOrder(order);
+  if (bucket !== "pending") return false;
+  return Boolean(order.attentionRequired || order.sellerTimeoutAlert);
+}
+
 /** Human-readable status for list/detail badges (customer-facing tone). */
 export function getOrderStatusLabel(order) {
   const rs = order?.returnStatus;
@@ -120,6 +131,8 @@ export function getOrderStatusLabel(order) {
       default: return rs.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
     }
   }
+
+  if (isOrderDelayed(order)) return "Delayed";
 
   const bucket = getLegacyStatusFromOrder(order);
   return DISPLAY_LABELS[bucket] || bucket.replace(/_/g, " ");
