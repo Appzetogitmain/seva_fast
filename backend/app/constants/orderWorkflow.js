@@ -14,9 +14,14 @@ export const WORKFLOW_STATUS = {
   CANCELLED: "CANCELLED",
 };
 
-/** Milliseconds — override via env in services */
+/**
+ * Milliseconds — override via env in services.
+ * Seller acceptance itself never expires (see sellerAcceptAtomic); this only
+ * controls when a still-pending order gets flagged "delayed" (sellerTimeoutAlert /
+ * attentionRequired) and the seller + customer are notified.
+ */
 export const DEFAULT_SELLER_TIMEOUT_MS = () =>
-  parseInt(process.env.SELLER_TIMEOUT_MS || "60000", 10);
+  parseInt(process.env.SELLER_TIMEOUT_MS || "600000", 10);
 export const DEFAULT_DELIVERY_TIMEOUT_MS = () =>
   parseInt(process.env.DELIVERY_TIMEOUT_MS || "60000", 10);
 

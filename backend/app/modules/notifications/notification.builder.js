@@ -224,7 +224,7 @@ function eventDefinition(eventType) {
         role: NOTIFICATION_ROLES.SELLER,
         recipientIds: (payload) => normalizeIdList(payload.sellerId || payload.sellerIds),
         title: () => "Action Required: Order Pending",
-        body: (payload) => payload.sellerMessage || `Order #${payload.orderId} is pending acceptance over 1 min.`,
+        body: (payload) => payload.sellerMessage || `Order #${payload.orderId} is pending acceptance over 10 min.`,
       };
     case NOTIFICATION_EVENTS.NO_RIDER_ALERT:
       return {

@@ -21,6 +21,17 @@ export default function SellerChatbotWidget() {
   const recognitionRef = useRef(null);
   const navigate = useNavigate();
 
+  // recognition.onend fires asynchronously and calls handleSend from a
+  // closure captured when startVoiceInput() ran — at that point
+  // setVoiceMode(true) hasn't been committed yet, so a plain `voiceMode`
+  // read there is permanently stale (always false) for every mic-triggered
+  // message. Mirror it into a ref so the async callback always sees the
+  // latest value instead of the one frozen at closure-creation time.
+  const voiceModeRef = useRef(voiceMode);
+  useEffect(() => {
+    voiceModeRef.current = voiceMode;
+  }, [voiceMode]);
+
   const prompts = [
     "Koi sawal? Seva Seller AI se poochein ✨",
     "Orders ya Stock kaise manage karein? 📦",
@@ -206,7 +217,7 @@ export default function SellerChatbotWidget() {
     setIsLoading(true);
 
     try {
-      const res = await sellerApi.aiChat({ message: input, history: messages });
+      const res = await sellerApi.aiChat({ message: finalInput, history: messages });
       const reply = res.data.result?.reply || res.data.data?.reply || "";
       
       setMessages([
@@ -214,7 +225,7 @@ export default function SellerChatbotWidget() {
         { role: "model", content: reply }
       ]);
 
-      if (voiceMode && reply) {
+      if (voiceModeRef.current && reply) {
         speakText(reply);
       }
     } catch (error) {
@@ -223,7 +234,7 @@ export default function SellerChatbotWidget() {
         ...newMessages,
         { role: "model", content: errMsg },
       ]);
-      if (voiceMode) {
+      if (voiceModeRef.current) {
         speakText(errMsg);
       }
     } finally {

@@ -25,6 +25,17 @@ export default function ChatbotWidget() {
   const { addToCart, removeFromCart } = useCart();
   const { currentLocation } = useAppLocation();
 
+  // recognition.onend (below) fires asynchronously and calls handleSend from
+  // a closure captured at the moment startVoiceInput() ran — at that point
+  // setVoiceMode(true) hasn't been committed yet, so a plain `voiceMode`
+  // read there is permanently stale (always false) for every mic-triggered
+  // message. Mirror it into a ref so the async callback always sees the
+  // latest value instead of the one frozen at closure-creation time.
+  const voiceModeRef = useRef(voiceMode);
+  useEffect(() => {
+    voiceModeRef.current = voiceMode;
+  }, [voiceMode]);
+
   const prompts = [
     "Kya dhoondh rahe hain? 🔍",
     "Offers & coupons chahiye? 🏷️",
@@ -223,7 +234,7 @@ export default function ChatbotWidget() {
       ]);
 
       // If Voice Talk Mode is enabled, speak the reply out loud!
-      if (voiceMode && reply) {
+      if (voiceModeRef.current && reply) {
         speakText(reply);
       }
     } catch (error) {
@@ -232,7 +243,7 @@ export default function ChatbotWidget() {
         ...newMessages,
         { role: "model", parts: [{ text: errMsg }] },
       ]);
-      if (voiceMode) {
+      if (voiceModeRef.current) {
         speakText(errMsg);
       }
     } finally {

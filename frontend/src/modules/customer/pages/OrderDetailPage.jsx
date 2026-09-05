@@ -44,7 +44,7 @@ import {
   onReturnPickupOtp,
   onReturnDropOtp,
 } from "@/core/services/orderSocket";
-import { getLegacyStatusFromOrder } from "@/shared/utils/orderStatus";
+import { getLegacyStatusFromOrder, isOrderDelayed } from "@/shared/utils/orderStatus";
 import { formatTime } from "@shared/utils/formatDate";
 
 const coordsToLatLng = (coords) => {
@@ -977,6 +977,26 @@ const OrderDetailPage = () => {
                 Pay Now <ArrowRight size={14} />
               </button>
             </div>
+          </motion.div>
+        )}
+
+        {/* Delayed acceptance banner - seller hasn't responded in over 10 min */}
+        {!isAwaitingOnlinePayment && isOrderDelayed(order) && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-amber-50 rounded-3xl p-5 shadow-sm border border-amber-100 relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Clock size={64} className="text-amber-600" />
+            </div>
+            <div className="relative z-10 flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <h3 className="text-sm font-black text-amber-900 uppercase tracking-tight">Order Delayed</h3>
+            </div>
+            <p className="text-xs text-amber-700 font-medium leading-relaxed relative z-10">
+              This order is taking longer than usual to be accepted. We've notified the seller — it will be confirmed shortly, or you can cancel from below.
+            </p>
           </motion.div>
         )}
 

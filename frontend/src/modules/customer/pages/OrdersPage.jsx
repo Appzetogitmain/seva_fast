@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Package, ChevronRight, Clock, CheckCircle, Loader2, ChevronLeft } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
-import { getOrderStatusLabel, getLegacyStatusFromOrder } from '@/shared/utils/orderStatus';
+import { getOrderStatusLabel, getLegacyStatusFromOrder, isOrderDelayed } from '@/shared/utils/orderStatus';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 import { formatDate, formatTime } from '@shared/utils/formatDate';
 import { getOrderSocket, onOrderStatusUpdate, onPhotoOrderMessage, onPhotoOrderStatusAlert } from '@/core/services/orderSocket';
@@ -131,6 +131,7 @@ const OrdersPage = () => {
                     ) : (
                         orders.map((order) => {
                             const legacy = getLegacyStatusFromOrder(order);
+                            const delayed = isOrderDelayed(order);
                             return (
                                 <Link
                                     to={`/orders/${order.orderId}`}
@@ -172,7 +173,9 @@ const OrdersPage = () => {
                                                         ? 'bg-brand-50 text-brand-700 border-brand-100'
                                                         : legacy === 'cancelled'
                                                             ? 'bg-rose-50 text-rose-700 border-rose-100'
-                                                            : 'bg-brand-50 text-brand-700 border-brand-100'
+                                                            : delayed
+                                                                ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                                                : 'bg-brand-50 text-brand-700 border-brand-100'
                                                 }`}
                                             >
                                                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/80">
@@ -183,7 +186,9 @@ const OrdersPage = () => {
                                                                 ? 'text-brand-600'
                                                                 : legacy === 'cancelled'
                                                                     ? 'text-rose-500'
-                                                                    : 'text-brand-500'
+                                                                    : delayed
+                                                                        ? 'text-amber-500'
+                                                                        : 'text-brand-500'
                                                             }`}
                                                     />
                                                 </span>

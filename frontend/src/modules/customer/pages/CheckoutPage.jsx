@@ -4,6 +4,7 @@ import Lottie from "lottie-react";
 import { useInViewAnimation } from "@/core/hooks/useInViewAnimation";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../../../core/context/AuthContext";
+import { decodeToken } from "@/core/utils/token";
 import { useWishlist } from "../context/WishlistContext";
 import { customerApi } from "../services/customerApi";
 import { useLocation as useAppLocation } from "../context/LocationContext";
@@ -74,7 +75,10 @@ import CheckoutRecommendedProducts from "./checkout/components/CheckoutRecommend
 import CheckoutWishlistSection from "./checkout/components/CheckoutWishlistSection";
 import CheckoutOrderSuccess from "./checkout/components/CheckoutOrderSuccess";
 
-const CHECKOUT_ADDRESS_STORAGE_KEY = "sevafast_checkout_address_v1";
+// Scoped per logged-in customer (see checkoutAddressStorageKey below) so a
+// different account on the same device never sees a previous customer's
+// last-used checkout address.
+const CHECKOUT_ADDRESS_STORAGE_PREFIX = "sevafast_checkout_address_v1";
 
 const createEmptyAddress = () => ({
   type: "Home",
@@ -85,12 +89,12 @@ const createEmptyAddress = () => ({
   phone: "",
 });
 
-const getInitialCheckoutAddress = () => {
+const getInitialCheckoutAddress = (storageKey) => {
   try {
     const saved =
       typeof window !== "undefined"
-        ? window.sessionStorage.getItem(CHECKOUT_ADDRESS_STORAGE_KEY) ||
-          window.localStorage.getItem(CHECKOUT_ADDRESS_STORAGE_KEY)
+        ? window.sessionStorage.getItem(storageKey) ||
+          window.localStorage.getItem(storageKey)
         : null;
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -123,8 +127,19 @@ const CheckoutPage = () => {
   const { wishlist, addToWishlist, fetchFullWishlist, isFullDataFetched } =
     useWishlist();
   const { showToast } = useToast();
-  const { user, isAuthenticated } = useAuth();
+  const { user, token, isAuthenticated } = useAuth();
   const { settings } = useSettings();
+
+  // Scope the cached checkout address to this account (falls back to a
+  // shared "guest" scope while signed out) so a different customer logging
+  // in on the same device never sees a previous account's last-used address.
+  const customerId = useMemo(() => {
+    if (!token) return null;
+    return decodeToken(token)?.id || null;
+  }, [token]);
+  const checkoutAddressStorageKey = customerId
+    ? `${CHECKOUT_ADDRESS_STORAGE_PREFIX}:${customerId}`
+    : `${CHECKOUT_ADDRESS_STORAGE_PREFIX}:guest`;
 
   const wishlistSectionRef = useRef(null);
   const wishlistFetchedRef = useRef(false);
@@ -162,6 +177,7 @@ const CheckoutPage = () => {
   const {
     savedAddresses: locationSavedAddresses,
     currentLocation,
+    isDefaultLocation,
     refreshLocation,
     isFetchingLocation,
     updateLocation,
@@ -187,7 +203,9 @@ const CheckoutPage = () => {
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const postOrderNavigateRef = useRef(null);
   const previewDebounceRef = useRef(null);
-  const [currentAddress, setCurrentAddress] = useState(getInitialCheckoutAddress);
+  const [currentAddress, setCurrentAddress] = useState(() =>
+    getInitialCheckoutAddress(checkoutAddressStorageKey),
+  );
   const [isEditAddressOpen, setIsEditAddressOpen] = useState(false);
   const [editAddressForm, setEditAddressForm] = useState(createEmptyAddress);
   const [showRecipientForm, setShowRecipientForm] = useState(false);
@@ -261,8 +279,8 @@ const CheckoutPage = () => {
     if (currentAddress && (currentAddress.address || currentAddress.formattedAddress)) {
       try {
         const toStore = JSON.stringify(currentAddress);
-        window.sessionStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
-        window.localStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
+        window.sessionStorage.setItem(checkoutAddressStorageKey, toStore);
+        window.localStorage.setItem(checkoutAddressStorageKey, toStore);
       } catch {}
     }
   }, [currentAddress]);
@@ -288,7 +306,12 @@ const CheckoutPage = () => {
     if (currentAddress?.address) return;
 
     const primarySaved = locationSavedAddresses[0];
-    const addressText = primarySaved?.address || currentLocation?.name || "";
+    // Never fall back to currentLocation while it's still the hardcoded
+    // placeholder (no GPS/geocoded fix yet, or the user declined) — a brand
+    // new customer with no saved address should see an empty address to fill
+    // in, not a stranger's default location.
+    const addressText =
+      primarySaved?.address || (!isDefaultLocation ? currentLocation?.name : "") || "";
     if (!addressText) return;
 
     const cityText =
@@ -307,7 +330,8 @@ const CheckoutPage = () => {
         city: cityText || prev.city,
         ...(primarySaved?.location
           ? { location: primarySaved.location }
-          : typeof currentLocation?.latitude === "number" &&
+          : !isDefaultLocation &&
+            typeof currentLocation?.latitude === "number" &&
             typeof currentLocation?.longitude === "number"
             ? {
               location: {
@@ -326,6 +350,7 @@ const CheckoutPage = () => {
     currentLocation?.name,
     currentLocation?.pincode,
     currentLocation?.state,
+    isDefaultLocation,
     locationSavedAddresses,
     registeredName,
     registeredPhone,
@@ -532,8 +557,8 @@ const CheckoutPage = () => {
 
       try {
         const toStore = JSON.stringify(selectedObj);
-        window.sessionStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
-        window.localStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
+        window.sessionStorage.setItem(checkoutAddressStorageKey, toStore);
+        window.localStorage.setItem(checkoutAddressStorageKey, toStore);
       } catch {}
 
       if (resolvedLoc) {
@@ -613,8 +638,8 @@ const CheckoutPage = () => {
     // Save immediately to persistent storage
     try {
       const toStore = JSON.stringify(updatedAddrObj);
-      window.sessionStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
-      window.localStorage.setItem(CHECKOUT_ADDRESS_STORAGE_KEY, toStore);
+      window.sessionStorage.setItem(checkoutAddressStorageKey, toStore);
+      window.localStorage.setItem(checkoutAddressStorageKey, toStore);
     } catch {}
 
     // Save to user profile in backend if logged in
@@ -690,7 +715,10 @@ const CheckoutPage = () => {
       return;
     }
 
-    if (currentLocation?.name) {
+    // Only reuse the cached location as a fallback if it's a real previously
+    // detected position — never the hardcoded placeholder, which would be
+    // misleading to present as "your last detected location".
+    if (!isDefaultLocation && currentLocation?.name) {
       setCurrentAddress((prev) => ({
         ...prev,
         name: registeredName || prev.name,
@@ -921,6 +949,12 @@ const CheckoutPage = () => {
         `Minimum order value is ₹${minimumOrderValue}. Add items worth ₹${Math.ceil(minimumOrderShortfall)} more.`,
         "error",
       );
+      return;
+    }
+
+    if (!savedRecipient && !currentAddress?.address) {
+      showToast("Please add a delivery address before placing your order", "error");
+      setIsAddressModalOpen(true);
       return;
     }
 

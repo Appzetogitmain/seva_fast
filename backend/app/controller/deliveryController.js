@@ -13,6 +13,8 @@ import { distanceMeters } from "../utils/geoUtils.js";
 import { applyDeliveredSettlement } from "../services/orderSettlement.js";
 import { roundCurrency } from "../utils/money.js";
 import { sanitizeOrdersForDeliveryView } from "../utils/deliveryOrderView.js";
+import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
+import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 
 const LOC_MIN_INTERVAL_MS = () =>
   parseInt(process.env.LOCATION_MIN_INTERVAL_MS || "3000", 10);
@@ -1047,6 +1049,16 @@ export const validateDeliveryOtp = async (req, res) => {
             },
             { new: true }
         );
+
+        // Notify the customer (push + WhatsApp) as soon as delivery is confirmed —
+        // independent of finance settlement below, which can fail/retry separately.
+        emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_DELIVERED, {
+            orderId: order.orderId,
+            customerId: order.customer,
+            userId: order.customer,
+            sellerId: order.seller,
+            deliveryId: deliveryBoyId,
+        });
 
         if (updatedOrder) {
             try {
