@@ -135,7 +135,7 @@ const autoCancelExpiredOrders = async () => {
             sellerTimeoutAlert: true,
             sellerTimeoutAlertAt: now,
             attentionRequired: true,
-            attentionReason: "Seller acceptance timeout (> 1 min)",
+            attentionReason: "Seller acceptance delayed (> 10 min)",
           },
           $unset: { expiresAt: 1 },
         },
@@ -148,11 +148,11 @@ const autoCancelExpiredOrders = async () => {
         customerId: updated.customer,
         userId: updated.customer,
         sellerId: updated.seller,
-        customerMessage: "Your order is being processed by the seller.",
+        customerMessage: "Your order is taking longer than usual to be accepted. We've notified the seller.",
         sellerMessage:
-          `ACTION REQUIRED: Order #${updated.orderId} is pending acceptance over 1 min. Please Accept or Cancel.`,
+          `ACTION REQUIRED: Order #${updated.orderId} is pending acceptance over 10 min. Please Accept or Reject.`,
         adminMessage:
-          `ACTION REQUIRED: Order #${updated.orderId} pending seller acceptance over 1 min.`,
+          `ACTION REQUIRED: Order #${updated.orderId} pending seller acceptance over 10 min.`,
       });
     }
 
