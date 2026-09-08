@@ -2,19 +2,16 @@ import crypto from "crypto";
 import Order from "../models/order.js";
 import CheckoutGroup from "../models/checkoutGroup.js";
 
+// Crockford Base32 excludes ambiguous letters (I, L, O, U) to avoid customer/rider confusion.
 const CROCKFORD_BASE32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const TIMESTAMP_PART_LENGTH = 10;
-const RANDOM_PART_LENGTH = 16;
+const RANDOM_SUFFIX_LENGTH = 6;
 
-function encodeTimePart(timestampMs) {
-  let value = BigInt(timestampMs);
-  let encoded = "";
-  for (let i = 0; i < TIMESTAMP_PART_LENGTH; i += 1) {
-    const index = Number(value & 31n);
-    encoded = CROCKFORD_BASE32[index] + encoded;
-    value >>= 5n;
-  }
-  return encoded;
+function formatCompactDate(date = new Date()) {
+  const d = new Date(date);
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yy}${mm}${dd}`;
 }
 
 function randomBase32(length) {
@@ -26,16 +23,12 @@ function randomBase32(length) {
   return out;
 }
 
-function buildSortableToken(nowMs = Date.now()) {
-  return `${encodeTimePart(nowMs)}${randomBase32(RANDOM_PART_LENGTH)}`;
+export function buildPublicOrderId(now = new Date()) {
+  return `ORD-${formatCompactDate(now)}-${randomBase32(RANDOM_SUFFIX_LENGTH)}`;
 }
 
-export function buildPublicOrderId() {
-  return `ORD-${buildSortableToken()}`;
-}
-
-export function buildCheckoutGroupId() {
-  return `CHK-${buildSortableToken()}`;
+export function buildCheckoutGroupId(now = new Date()) {
+  return `CHK-${formatCompactDate(now)}-${randomBase32(RANDOM_SUFFIX_LENGTH)}`;
 }
 
 export async function generateUniquePublicOrderId({ session = null, maxAttempts = 8 } = {}) {

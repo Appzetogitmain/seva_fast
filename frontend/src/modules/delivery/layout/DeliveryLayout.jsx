@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { createPortal } from "react-dom";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
+import DeliveryChatbotWidget from "../components/DeliveryChatbotWidget";
 import { Toaster, toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { BellRing, MapPin, Navigation } from "lucide-react";
@@ -249,6 +250,11 @@ const DeliveryLayout = () => {
   const shouldShowBottomNav = !hideBottomNavRoutes.some((route) =>
     location.pathname.includes(route),
   );
+
+  const hideChatbotRoutes = ["/delivery/login", "/delivery/auth", "/delivery/splash"];
+  const shouldShowChatbot =
+    Boolean(user) &&
+    !hideChatbotRoutes.some((route) => location.pathname.includes(route));
 
   const fetchAvailableOrders = useCallback(async () => {
     if (availableOrdersRequestRef.current.inFlight) return null;
@@ -796,6 +802,7 @@ const DeliveryLayout = () => {
       </main>
 
       {shouldShowBottomNav && <BottomNav />}
+      {shouldShowChatbot && <DeliveryChatbotWidget />}
       <Toaster
         position="top-center"
         offset={72}

@@ -39,6 +39,8 @@ import {
   Check,
   Contact2,
   Wallet,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
@@ -198,6 +200,10 @@ const CheckoutPage = () => {
   const [useWallet, setUseWallet] = useState(false);
   const [walletAmountToUse, setWalletAmountToUse] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [paymentFailureModal, setPaymentFailureModal] = useState({
+    isOpen: false,
+    reason: "",
+  });
   const [orderId, setOrderId] = useState(null);
   const [pricingPreview, setPricingPreview] = useState(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
@@ -1113,18 +1119,29 @@ const CheckoutPage = () => {
 
             if (checkoutResult?.cancelled) {
               setIsPlacingOrder(false);
+              setPaymentFailureModal({
+                isOpen: true,
+                reason: "Online payment was cancelled before completion. Your cart items are preserved — you can retry or switch payment method below.",
+              });
               showToast(
-                "Razorpay payment cancelled. You can complete payment from order details.",
+                "Payment was not completed. You can retry or switch payment method.",
                 "warning",
               );
             }
             return;
           } catch (payError) {
             setIsPlacingOrder(false);
+            setPaymentFailureModal({
+              isOpen: true,
+              reason:
+                payError.response?.data?.message ||
+                payError.message ||
+                "We could not complete your online transaction. Please try again or switch to another payment method.",
+            });
             showToast(
               payError.response?.data?.message ||
               payError.message ||
-              "Could not open Razorpay checkout. Please try again.",
+              "Could not complete payment. Please try again or choose another payment method.",
               "error",
             );
             return;
@@ -1642,6 +1659,65 @@ const CheckoutPage = () => {
               </Button>
             </DialogFooter>
           </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Failure / Cancelled Modal */}
+      <Dialog
+        open={paymentFailureModal.isOpen}
+        onOpenChange={(open) => setPaymentFailureModal((prev) => ({ ...prev, isOpen: open }))}
+      >
+        <DialogContent className="sm:max-w-[420px] p-6 rounded-3xl">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-red-50 border border-red-200 rounded-full flex items-center justify-center text-red-600 mb-4 shadow-sm">
+              <AlertCircle size={32} />
+            </div>
+
+            <DialogTitle className="text-xl font-black text-slate-900 mb-1">
+              Payment Incomplete
+            </DialogTitle>
+
+            <DialogDescription className="text-xs text-slate-500 mb-5 leading-relaxed">
+              {paymentFailureModal.reason || "We could not complete your online transaction. Your items are safe in your cart."}
+            </DialogDescription>
+
+            <div className="w-full space-y-2.5">
+              {settings?.codEnabled !== false && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPayment("cash");
+                    setPaymentFailureModal({ isOpen: false, reason: "" });
+                    showToast("Payment switched to Cash on Delivery (COD). Slide to place order!", "info");
+                  }}
+                  className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/20 text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <Banknote size={18} />
+                  Switch to Cash on Delivery (COD)
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentFailureModal({ isOpen: false, reason: "" });
+                  handlePlaceOrder();
+                }}
+                className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                <RefreshCw size={16} />
+                Retry Online Payment
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentFailureModal({ isOpen: false, reason: "" })}
+                className="w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                Change Payment Method on Checkout
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

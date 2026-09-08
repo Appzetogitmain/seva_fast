@@ -106,6 +106,18 @@ const deliverySchema = new mongoose.Schema(
             default: false,
         },
 
+        rating: {
+            type: Number,
+            default: 5.0,
+            min: 1,
+            max: 5,
+        },
+
+        totalRatings: {
+            type: Number,
+            default: 0,
+        },
+
 
 
         isOnline: {

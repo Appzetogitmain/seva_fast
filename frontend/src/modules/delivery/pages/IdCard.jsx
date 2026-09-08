@@ -50,19 +50,18 @@ const IdCard = () => {
     }
   };
 
-  // Delivery Partner Details (Dynamic from Auth & Admin Settings)
   const cardData = {
-    name: user?.name || "Rahul Sharma",
-    riderId: user?._id ? `SF-DRV-${user._id.slice(-6).toUpperCase()}` : "SF-DRV-8942",
-    phone: user?.phone || "+91 98765 43210",
-    vehicleNumber: user?.vehicleNumber || "KA 01 EV 2024",
+    name: user?.name || "Delivery Partner",
+    riderId: user?._id ? `SF-DRV-${user._id.slice(-6).toUpperCase()}` : "N/A",
+    phone: user?.phone || "—",
+    vehicleNumber: user?.vehicleNumber || "—",
     profileImage: user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'Felix'}`,
     // Rider Personal Address & City
-    city: user?.city || user?.hubLocation || "Bengaluru",
-    riderAddress: user?.address || "HSR Layout, Sector 1, Bengaluru",
+    city: user?.city || user?.currentArea || user?.preferredArea || "—",
+    riderAddress: user?.address || "Address not provided",
     // Admin Managed Address & Support Helpline from System Settings
-    address: settings?.address || "SEVAFAST Technologies Pvt. Ltd., Tech Hub Tower B, 4th Floor, HSR Layout, Bengaluru, KA - 560102",
-    supportNumber: settings?.supportPhone || "1800-SEVA-FAST (+91 80 4900 7000)",
+    address: settings?.address || `${settings?.appName || 'SEVAFAST'} Support Center`,
+    supportNumber: settings?.supportPhone || "1800-SEVA-FAST",
     // Issue Date = Platform Joining Date
     issueDate: getJoiningDate(user?.createdAt),
   };

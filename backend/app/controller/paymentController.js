@@ -11,6 +11,10 @@ import {
 } from "../validation/paymentValidation.js";
 
 function resolvePaymentErrorMessage(error) {
+  if (error?.statusCode === 401 || error?.status === 401 || error?.error?.description?.includes?.("Authentication failed")) {
+    return "Razorpay Authentication Failed: RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET in .env is invalid or expired.";
+  }
+
   const directMessage = String(error?.message || "").trim();
   if (directMessage) return directMessage;
 

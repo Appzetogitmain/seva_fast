@@ -82,4 +82,5 @@ export const deliveryApi = {
     axiosInstance.post(`/orders/workflow/${orderId}/return-drop-otp/request`, body),
   verifyReturnDropOtp: (orderId, body) =>
     axiosInstance.post(`/orders/workflow/${orderId}/return-drop-otp/verify`, body),
+  aiChat: (data) => axiosInstance.post("/delivery/ai/chat", data),
 };

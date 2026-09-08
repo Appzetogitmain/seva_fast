@@ -75,14 +75,12 @@ export default function AdminChatbotWidget() {
   const [isBubbleVisible, setIsBubbleVisible] = useState(true);
   const [attachedImage, setAttachedImage] = useState(null);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const streamIntervalRef = useRef(null);
+  const activeUtteranceRef = useRef(null);
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
-  // recognition.onend fires asynchronously and calls handleSend from a
-  // closure captured when startVoiceInput() ran — at that point
-  // setVoiceMode(true) hasn't been committed yet, so a plain `voiceMode`
-  // read there is permanently stale (always false) for every mic-triggered
-  // message. Mirror it into a ref so the async callback always sees the
-  // latest value instead of the one frozen at closure-creation time.
+
   const voiceModeRef = useRef(voiceMode);
   useEffect(() => {
     voiceModeRef.current = voiceMode;
@@ -102,7 +100,48 @@ export default function AdminChatbotWidget() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading]);
+  }, [messages, isLoading, isSpeaking]);
+
+  // Stop all active speech synthesis and text streaming
+  const stopSpeaking = () => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {
+        console.warn("Speech synthesis cancel error:", e);
+      }
+    }
+    if (streamIntervalRef.current) {
+      clearInterval(streamIntervalRef.current);
+      streamIntervalRef.current = null;
+    }
+    setIsSpeaking(false);
+  };
+
+  // Automatically halt speech and speech recognition whenever chat modal is closed or unmounted
+  useEffect(() => {
+    if (!isOpen) {
+      stopSpeaking();
+      if (isListening && recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (_) {}
+        setIsListening(false);
+      }
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      stopSpeaking();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      stopSpeaking();
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort?.(); } catch (_) {}
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -125,27 +164,147 @@ export default function AdminChatbotWidget() {
       .replace(/\$([0-9.,]+)\$/g, "$1");
   };
 
+  const getBestVoiceForText = (text) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return { voice: null, lang: "en-IN" };
+    const voices = window.speechSynthesis.getVoices() || [];
+    if (voices.length === 0) return { voice: null, lang: "en-IN" };
+
+    const isHindiOrMarathi = /[\u0900-\u097F]/.test(text);
+    const isGujarati = /[\u0A80-\u0AFF]/.test(text);
+    const isBengali = /[\u0980-\u09FF]/.test(text);
+    const isTamil = /[\u0B80-\u0BFF]/.test(text);
+    const isTelugu = /[\u0C00-\u0C7F]/.test(text);
+    const isKannada = /[\u0C80-\u0CFF]/.test(text);
+
+    if (isGujarati) {
+      const v = voices.find(v => v.lang && (v.lang.startsWith("gu") || v.lang.includes("GU")));
+      if (v) return { voice: v, lang: "gu-IN" };
+    }
+    if (isBengali) {
+      const v = voices.find(v => v.lang && (v.lang.startsWith("bn") || v.lang.includes("BN")));
+      if (v) return { voice: v, lang: "bn-IN" };
+    }
+    if (isTamil) {
+      const v = voices.find(v => v.lang && (v.lang.startsWith("ta") || v.lang.includes("TA")));
+      if (v) return { voice: v, lang: "ta-IN" };
+    }
+    if (isTelugu) {
+      const v = voices.find(v => v.lang && (v.lang.startsWith("te") || v.lang.includes("TE")));
+      if (v) return { voice: v, lang: "te-IN" };
+    }
+    if (isKannada) {
+      const v = voices.find(v => v.lang && (v.lang.startsWith("kn") || v.lang.includes("KN")));
+      if (v) return { voice: v, lang: "kn-IN" };
+    }
+    if (isHindiOrMarathi) {
+      const v = voices.find(v => v.lang && (v.lang.startsWith("hi") || v.lang.includes("HI") || v.lang.startsWith("mr")));
+      if (v) return { voice: v, lang: "hi-IN" };
+    }
+
+    const indianEnglish = voices.find(v => v.lang && (v.lang === "en-IN" || v.lang.includes("en-IN") || v.lang.includes("en_IN")));
+    const englishVoice = indianEnglish || voices.find(v => v.lang && v.lang.startsWith("en")) || voices[0];
+    return { voice: englishVoice, lang: englishVoice?.lang || "en-IN" };
+  };
+
+  // Synchronized Gemini-like Voice + Progressive Word Streaming
+  const streamAndSpeakResponse = (fullReplyText, shouldSpeak = false) => {
+    stopSpeaking();
+
+    const formattedText = formatAiText(fullReplyText);
+    const cleanSpeech = formattedText.replace(/[*#_~`>•-]/g, "").trim();
+
+    const modelMessageId = Date.now();
+    setMessages((prev) => [
+      ...prev,
+      { id: modelMessageId, role: "model", content: "", isStreaming: true }
+    ]);
+
+    if (shouldSpeak && typeof window !== "undefined" && "speechSynthesis" in window && cleanSpeech) {
+      try {
+        const utterance = new SpeechSynthesisUtterance(cleanSpeech);
+        const { voice: chosenVoice, lang: chosenLang } = getBestVoiceForText(cleanSpeech);
+
+        if (chosenVoice) utterance.voice = chosenVoice;
+        utterance.lang = chosenLang || "en-IN";
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => {
+          setIsSpeaking(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === modelMessageId
+                ? { ...msg, content: formattedText, isStreaming: false }
+                : msg
+            )
+          );
+        };
+        utterance.onerror = () => {
+          setIsSpeaking(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === modelMessageId
+                ? { ...msg, content: formattedText, isStreaming: false }
+                : msg
+            )
+          );
+        };
+
+        activeUtteranceRef.current = utterance;
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.error("Speech synthesis error:", err);
+      }
+    }
+
+    const words = formattedText.split(" ");
+    let currentWordIdx = 0;
+    const streamSpeed = shouldSpeak ? 65 : 25;
+
+    streamIntervalRef.current = setInterval(() => {
+      currentWordIdx += 1;
+      const currentStreamText = words.slice(0, currentWordIdx).join(" ");
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === modelMessageId
+            ? { ...msg, content: currentStreamText, isStreaming: currentWordIdx < words.length }
+            : msg
+        )
+      );
+
+      if (currentWordIdx >= words.length) {
+        clearInterval(streamIntervalRef.current);
+        streamIntervalRef.current = null;
+        if (!shouldSpeak) {
+          setIsSpeaking(false);
+        }
+      }
+    }, streamSpeed);
+  };
+
   const speakText = (text) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.resume();
+    stopSpeaking();
 
-      const cleanText = formatAiText(text).replace(/[*#_~`>]/g, "").trim();
+    try {
+      const cleanText = formatAiText(text).replace(/[*#_~`>•-]/g, "").trim();
       if (!cleanText) return;
 
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      const voices = window.speechSynthesis.getVoices();
+      const { voice: chosenVoice, lang: chosenLang } = getBestVoiceForText(cleanText);
 
-      const hindiVoice = voices.find((v) => v.lang && (v.lang.includes("hi") || v.lang.includes("HI")));
-      const indianVoice = voices.find((v) => v.lang && (v.lang.includes("IN") || v.lang.includes("in")));
-      const defaultVoice = hindiVoice || indianVoice || voices.find((v) => v.lang && v.lang.startsWith("en")) || voices[0];
-
-      if (defaultVoice) utterance.voice = defaultVoice;
-      utterance.lang = defaultVoice?.lang || "hi-IN";
-      utterance.rate = 0.95;
-      utterance.pitch = 1.05;
+      if (chosenVoice) utterance.voice = chosenVoice;
+      utterance.lang = chosenLang || "en-IN";
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
       utterance.volume = 1.0;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
 
       window.speechSynthesis.speak(utterance);
     } catch (err) {
@@ -188,6 +347,8 @@ export default function AdminChatbotWidget() {
   };
 
   const startVoiceInput = () => {
+    stopSpeaking();
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert("Voice input is supported in Google Chrome & Edge. Please allow microphone permissions.");
@@ -229,7 +390,7 @@ export default function AdminChatbotWidget() {
       recognition.onend = () => {
         setIsListening(false);
         if (finalTranscript.trim()) {
-          handleSend(null, finalTranscript);
+          handleSend(null, finalTranscript, true);
         }
       };
 
@@ -243,7 +404,7 @@ export default function AdminChatbotWidget() {
 
   const handleImageSelect = async (e) => {
     const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file later
+    e.target.value = "";
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
@@ -263,11 +424,13 @@ export default function AdminChatbotWidget() {
     }
   };
 
-  const handleSend = async (e, textOverride = null) => {
+  const handleSend = async (e, textOverride = null, isFromVoice = false) => {
     e?.preventDefault();
     const finalInput = textOverride || input;
     const imageToSend = attachedImage;
     if (!finalInput.trim() && !imageToSend && !isLoading) return;
+
+    stopSpeaking();
 
     if (isListening) {
       recognitionRef.current?.stop();
@@ -286,6 +449,8 @@ export default function AdminChatbotWidget() {
     setAttachedImage(null);
     setIsLoading(true);
 
+    const shouldSpeakReply = isFromVoice || voiceModeRef.current;
+
     try {
       const res = await adminApi.aiChat({
         message: userMessage.content,
@@ -295,19 +460,18 @@ export default function AdminChatbotWidget() {
       });
       const reply = res.data.result?.reply || res.data.data?.reply || "";
 
-      setMessages([...newMessages, { role: "model", content: reply }]);
+      setIsLoading(false);
 
-      if (voiceModeRef.current && reply) {
-        speakText(reply);
+      if (reply) {
+        streamAndSpeakResponse(reply, shouldSpeakReply);
+      } else {
+        const fallbackMsg = "Your request was processed. Let me know if you need help with anything else in the admin portal.";
+        streamAndSpeakResponse(fallbackMsg, shouldSpeakReply);
       }
     } catch (error) {
-      const errMsg = error?.response?.data?.message || "Sorry, I am having trouble connecting right now. Please try again.";
-      setMessages([...newMessages, { role: "model", content: errMsg }]);
-      if (voiceModeRef.current) {
-        speakText(errMsg);
-      }
-    } finally {
       setIsLoading(false);
+      const errMsg = error?.response?.data?.message || "Sorry, I am having trouble connecting right now. Please try again.";
+      streamAndSpeakResponse(errMsg, shouldSpeakReply);
     }
   };
 
@@ -349,7 +513,7 @@ export default function AdminChatbotWidget() {
   }
 
   return (
-    <div className="fixed bottom-6 right-3 sm:right-6 w-[94vw] sm:w-[410px] bg-white rounded-2xl shadow-2xl border border-slate-200/90 flex flex-col overflow-hidden z-[999] transition-all" style={{ height: "550px", maxHeight: "78vh" }}>
+    <div className="fixed bottom-6 right-3 sm:right-6 w-[94vw] sm:w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200/90 flex flex-col overflow-hidden z-[999] transition-all" style={{ height: "550px", maxHeight: "78vh" }}>
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white px-4 py-3 flex justify-between items-center shadow-md">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-full overflow-hidden border border-primary/50 shrink-0 bg-slate-800">
@@ -368,16 +532,17 @@ export default function AdminChatbotWidget() {
 
         <div className="flex items-center gap-1.5">
           <button
+            type="button"
             onClick={() => {
               const newMode = !voiceMode;
               setVoiceMode(newMode);
               if (newMode) {
-                speakText("Voice talk mode activated.");
+                speakText("Voice talk mode on.");
               } else {
-                window.speechSynthesis?.cancel();
+                stopSpeaking();
               }
             }}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
               voiceMode
                 ? "bg-primary text-white shadow-sm ring-1 ring-white/30"
                 : "bg-white/10 text-slate-300 hover:bg-white/20 hover:text-white"
@@ -388,7 +553,15 @@ export default function AdminChatbotWidget() {
             <span className="text-[10px]">{voiceMode ? "Voice ON" : "Voice"}</span>
           </button>
 
-          <button onClick={() => { setIsOpen(false); window.speechSynthesis?.cancel(); }} className="hover:bg-white/10 p-1.5 rounded-full transition-colors text-slate-300 hover:text-white">
+          <button 
+            type="button"
+            onClick={() => { 
+              setIsOpen(false); 
+              stopSpeaking(); 
+            }} 
+            className="hover:bg-white/10 p-1.5 rounded-full transition-colors text-slate-300 hover:text-white cursor-pointer"
+            title="Close Assistant"
+          >
             <FiX size={18} />
           </button>
         </div>
@@ -429,11 +602,11 @@ export default function AdminChatbotWidget() {
 
         {messages.map((msg, idx) => {
           const text = msg.content || "";
-          if (!text && !msg.image) return null;
+          if (!text && !msg.image && !msg.isStreaming) return null;
           const displayText = msg.role === "model" ? formatAiText(text) : text;
 
           return (
-            <div key={idx} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+            <div key={msg.id || idx} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
               <div className={`max-w-[88%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed shadow-xs ${
                 msg.role === "user"
                   ? "bg-primary text-white font-medium rounded-tr-xs"
@@ -468,15 +641,22 @@ export default function AdminChatbotWidget() {
                       {displayText}
                     </ReactMarkdown>
 
-                    <div className="flex justify-end pt-1">
-                      <button
-                        onClick={() => speakText(displayText)}
-                        className="text-slate-400 hover:text-primary p-1 rounded-md transition-colors cursor-pointer"
-                        title="Read Aloud"
-                      >
-                        <FiVolume2 size={13} />
-                      </button>
-                    </div>
+                    {msg.isStreaming && (
+                      <span className="inline-block w-1.5 h-3.5 bg-primary animate-pulse ml-1 align-middle rounded-xs" />
+                    )}
+
+                    {!msg.isStreaming && displayText && (
+                      <div className="flex justify-end pt-1">
+                        <button
+                          type="button"
+                          onClick={() => speakText(displayText)}
+                          className="text-slate-400 hover:text-primary p-1 rounded-md transition-colors cursor-pointer"
+                          title="Read Aloud"
+                        >
+                          <FiVolume2 size={13} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -487,23 +667,48 @@ export default function AdminChatbotWidget() {
           <div className="flex items-start">
             <div className="bg-white text-slate-800 shadow-xs border border-slate-200/80 rounded-2xl rounded-tl-xs px-4 py-2.5 flex gap-2.5 items-center">
               <Sparkles className="animate-spin text-primary" size={16} />
-              <span className="text-xs font-medium text-slate-500">Admin AI is typing...</span>
+              <span className="text-xs font-medium text-slate-500">Admin AI is thinking...</span>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Active AI Speech Waveform Banner with STOP Button */}
+      {isSpeaking && (
+        <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border-t border-b border-primary/20 px-3.5 py-2 flex items-center justify-between animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="flex items-center gap-2.5 text-primary font-semibold text-xs">
+            <div className="flex items-end gap-1 h-3.5 pb-0.5">
+              <span className="w-1 bg-primary rounded-full animate-[pulse_0.6s_ease-in-out_infinite] h-2"></span>
+              <span className="w-1 bg-primary rounded-full animate-[pulse_0.8s_ease-in-out_infinite_150ms] h-3.5"></span>
+              <span className="w-1 bg-primary rounded-full animate-[pulse_0.5s_ease-in-out_infinite_300ms] h-2.5"></span>
+              <span className="w-1 bg-primary rounded-full animate-[pulse_0.7s_ease-in-out_infinite_75ms] h-3"></span>
+            </div>
+            <span className="text-slate-700">Admin AI is speaking...</span>
+          </div>
+          <button
+            type="button"
+            onClick={stopSpeaking}
+            className="flex items-center gap-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 px-3 py-1 rounded-full shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            title="Stop AI speech"
+          >
+            <span className="w-2 h-2 bg-white rounded-xs"></span>
+            <span>Stop</span>
+          </button>
+        </div>
+      )}
+
+      {/* Voice Listening Active Wave Banner */}
       {isListening && (
-        <div className="bg-rose-50 border-t border-rose-100 px-3 py-1.5 flex items-center justify-between animate-pulse">
+        <div className="bg-rose-50 border-t border-b border-rose-200 px-3.5 py-2 flex items-center justify-between animate-pulse">
           <div className="flex items-center gap-2 text-rose-600 font-semibold text-xs">
-            <FiMic size={14} className="animate-pulse text-rose-500" />
-            <span>Listening... Speak now, in any language</span>
+            <FiMic size={15} className="animate-spin text-rose-500" />
+            <span>Listening... Speak now (in any language)</span>
           </div>
           <button
             type="button"
             onClick={() => { recognitionRef.current?.stop(); setIsListening(false); }}
-            className="text-[10px] font-bold text-rose-700 bg-rose-200/60 px-2 py-0.5 rounded-full hover:bg-rose-200"
+            className="text-xs font-bold text-rose-700 bg-rose-200/80 hover:bg-rose-300 px-2.5 py-1 rounded-full transition-colors cursor-pointer"
           >
             Done
           </button>
@@ -521,7 +726,7 @@ export default function AdminChatbotWidget() {
             <button
               type="button"
               onClick={() => setAttachedImage(null)}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-800 text-white flex items-center justify-center shadow-md hover:bg-rose-500"
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-800 text-white flex items-center justify-center shadow-md hover:bg-rose-500 cursor-pointer"
               title="Remove image"
             >
               <FiX size={12} />
@@ -543,16 +748,17 @@ export default function AdminChatbotWidget() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isProcessingImage}
-          className="p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center bg-slate-100 text-slate-600 hover:text-primary hover:bg-primary/10 disabled:opacity-50"
+          className="p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center bg-slate-100 text-slate-600 hover:text-primary hover:bg-primary/10 disabled:opacity-50 cursor-pointer"
           title="Attach a screenshot or photo to ask about"
         >
           {isProcessingImage ? <Sparkles size={17} className="animate-spin" /> : <FiImage size={17} />}
         </button>
 
+        {/* Voice Input (Microphone) Button with Barge-in */}
         <button
           type="button"
           onClick={startVoiceInput}
-          className={`p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center ${
+          className={`p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center cursor-pointer ${
             isListening
               ? "bg-rose-500 text-white shadow-md scale-105 animate-pulse"
               : "bg-slate-100 text-slate-600 hover:text-primary hover:bg-primary/10"
@@ -565,7 +771,10 @@ export default function AdminChatbotWidget() {
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            if (isSpeaking) stopSpeaking();
+          }}
           placeholder={isListening ? "Listening to your voice..." : attachedImage ? "Ask about this image (optional)..." : "Ask anything in any language..."}
           className="flex-1 bg-slate-100/80 border-none outline-none rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1.5 focus:ring-primary/40 transition-all font-medium min-w-0"
           disabled={isLoading}
@@ -574,7 +783,7 @@ export default function AdminChatbotWidget() {
         <button
           type="submit"
           disabled={isLoading || (!input.trim() && !attachedImage)}
-          className="p-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 transition-all shadow-xs"
+          className="p-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 transition-all shadow-xs cursor-pointer"
         >
           <FiSend size={16} />
         </button>

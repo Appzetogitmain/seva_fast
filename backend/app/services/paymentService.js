@@ -21,12 +21,12 @@ import { releaseReservedStockForOrder } from "./stockService.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 
+let cachedKeyId = null;
+let cachedKeySecret = null;
 let razorpayClient = null;
 const MAX_RECEIPT_LENGTH = 40;
 
 function getRazorpayClient() {
-  if (razorpayClient) return razorpayClient;
-
   const keyId = String(process.env.RAZORPAY_KEY_ID || "").trim();
   const keySecret = String(process.env.RAZORPAY_KEY_SECRET || "").trim();
 
@@ -34,6 +34,12 @@ function getRazorpayClient() {
     throw new Error("Razorpay credentials not configured");
   }
 
+  if (razorpayClient && cachedKeyId === keyId && cachedKeySecret === keySecret) {
+    return razorpayClient;
+  }
+
+  cachedKeyId = keyId;
+  cachedKeySecret = keySecret;
   razorpayClient = new Razorpay({
     key_id: keyId,
     key_secret: keySecret,

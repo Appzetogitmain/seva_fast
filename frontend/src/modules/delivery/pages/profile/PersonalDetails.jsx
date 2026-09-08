@@ -16,12 +16,12 @@ const PersonalDetails = () => {
     phone: "",
     email: "",
     address: "",
-    dob: "15/08/1995",
-    bloodGroup: "O+",
+    dob: "",
+    bloodGroup: "",
   });
 
   const formatDate = (dateString) => {
-    if (!dateString) return "15/08/1995";
+    if (!dateString) return "";
     if (dateString.includes("-")) {
       const parts = dateString.split("-");
       if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
@@ -36,8 +36,8 @@ const PersonalDetails = () => {
         phone: user.phone || "",
         email: user.email || "",
         address: user.address || "",
-        dob: formatDate(user.dob),
-        bloodGroup: user.bloodGroup || "O+",
+        dob: formatDate(user.dob) || "",
+        bloodGroup: user.bloodGroup || "",
       });
     }
   }, [user]);
@@ -48,6 +48,8 @@ const PersonalDetails = () => {
         name: formData.fullName,
         email: formData.email,
         address: formData.address,
+        dob: formData.dob,
+        bloodGroup: formData.bloodGroup,
       });
       await refreshUser();
       setIsEditing(false);
@@ -161,9 +163,11 @@ const PersonalDetails = () => {
             <Input
               label="Date of Birth"
               value={formData.dob}
-              readOnly={true}
+              readOnly={!isEditing}
+              placeholder="DD/MM/YYYY"
+              onChange={(e) => setFormData({...formData, dob: e.target.value})}
               icon={Calendar}
-              className="bg-gray-50 border-transparent"
+              className={!isEditing ? "bg-gray-50 border-transparent" : ""}
             />
             <Input
               label="Blood Group"

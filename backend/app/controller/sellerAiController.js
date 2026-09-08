@@ -3,12 +3,19 @@ import { generateChatResponse, AiServiceError } from "../services/ai/geminiServi
 import Product from "../models/product.js";
 import Order from "../models/order.js";
 import Wallet from "../models/wallet.js";
-import SellerPlan from "../models/sellerPlan.js";
-import Review from "../models/review.js";
+import Seller from "../models/seller.js";
 import mongoose from "mongoose";
 
 const SELLER_SYSTEM_INSTRUCTION = `
 You are "Seva Seller AI", the official smart onboarding and operations assistant for the "Seva Fast" Seller Portal. Your goal is to guide local shop owners, merchants, and sellers through platform features, troubleshoot issues, and answer their business queries in a friendly, highly concise manner.
+
+### 🌐 STRICT LANGUAGE & SCRIPT MIRRORING RULE (CRITICAL / HIGHEST PRIORITY):
+- **ALWAYS REPLY IN THE EXACT SAME LANGUAGE AND SCRIPT USED BY THE USER IN THEIR LATEST MESSAGE**:
+  - If the user writes/speaks in **English** (e.g. "What are my sales today?", "Show me my pending orders", "How to add products?"), you MUST respond in **fluent, pure English**. Do NOT use Hindi or Hinglish when the user communicates in English.
+  - If the user writes/speaks in **Hindi (Devanagari script)** (e.g. "आज की बिक्री बताओ", "कम स्टॉक वाले आइटम दिखाओ"), you MUST respond in **Hindi (Devanagari)**.
+  - If the user writes/speaks in **Hinglish (Roman script Hindi)** (e.g. "Mera aaj ka sales batao", "Stock kaise add karein?"), reply in friendly **Hinglish**.
+  - If the user writes/speaks in **Marathi (मराठी), Gujarati (ગુજરાતી), Bengali (বাংলা), Tamil (தமிழ்), Telugu (తెలుగు), Kannada (ಕನ್ನಡ)**, etc., reply in that **EXACT language and script**.
+  - **Never default to Hindi when the user writes or speaks in English.**
 
 ### App Ecosystem & Seller Domain Knowledge:
 
@@ -31,7 +38,7 @@ You are "Seva Seller AI", the official smart onboarding and operations assistant
 
 5. **Finances & Earnings**:
    - **Seva Wallet (/seller/earnings)**: All digital sales earnings go here. Sellers can request Withdrawal to their bank account (/seller/withdrawals).
-   - **COD Cash (/seller/cod)**: If seller collects COD cash or delivery boys give COD cash to admin, the cash reconciliation happens here.
+   - **COD Cash (/seller/cod-cash)**: If seller collects COD cash or delivery boys give COD cash to admin, the cash reconciliation happens here.
 
 6. **Promotions & Ads (/seller/promotions)**:
    - Sellers can purchase in-app Carousel Banners and highlighted store positioning using their Wallet balance or UPI to boost sales.
@@ -105,153 +112,196 @@ export const handleSellerChat = async (req, res) => {
       return handleResponse(res, 400, "Message is required");
     }
 
-    const formattedHistory = history.map((msg) => ({
-      role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.content }],
-    }));
+    const sellerObjId = mongoose.Types.ObjectId.isValid(sellerId)
+      ? new mongoose.Types.ObjectId(String(sellerId))
+      : sellerId;
 
-    const fullMessages = [
+    const formattedHistory = (Array.isArray(history) ? history : [])
+      .slice(-10)
+      .map((msg) => ({
+        role: msg.role === "user" ? "user" : "model",
+        parts: [{ text: String(msg.content || "") }],
+      }))
+      .filter((msg) => Boolean(msg.parts[0].text));
+
+    const messages = [
       ...formattedHistory,
       { role: "user", parts: [{ text: message }] }
     ];
 
-    // Start single turn execution loop
-    const result = await generateChatResponse({
-      messages: fullMessages,
+    const executeTool = async ({ name, args }) => {
+      switch (name) {
+        case "get_seller_overview": {
+          const startOfDay = new Date();
+          startOfDay.setHours(0, 0, 0, 0);
+
+          const [todayOrders, allSellerOrders, sellerDoc] = await Promise.all([
+            Order.find({
+              seller: sellerObjId,
+              createdAt: { $gte: startOfDay },
+            }).select("pricing paymentBreakdown status orderStatus").lean(),
+            Order.find({
+              seller: sellerObjId,
+              status: { $in: ["placed", "confirmed", "packed", "ready_for_pickup", "out_for_delivery", "pending", "processing"] },
+            }).select("orderId status createdAt").lean(),
+            Seller.findById(sellerObjId).select("name shopName walletBalance subscription").lean(),
+          ]);
+
+          const todayDelivered = todayOrders.filter(
+            (o) => o.status === "delivered" || o.orderStatus === "delivered"
+          );
+
+          const todaySales = todayDelivered.reduce(
+            (sum, o) => sum + Number(o.paymentBreakdown?.sellerPayoutTotal || o.pricing?.total || 0),
+            0
+          );
+
+          const lowStockCount = await Product.countDocuments({
+            sellerId: sellerObjId,
+            stock: { $lte: 5 },
+          });
+
+          return {
+            storeName: sellerDoc?.shopName || "Aapka Store",
+            todaySalesRupees: Math.round(todaySales * 100) / 100,
+            todayDeliveredOrders: todayDelivered.length,
+            todayTotalOrdersReceived: todayOrders.length,
+            pendingOrdersCount: allSellerOrders.length,
+            lowStockItemsCount: lowStockCount,
+            walletBalanceRupees: Number(sellerDoc?.walletBalance || 0),
+          };
+        }
+
+        case "get_low_stock_products": {
+          const lowStockProducts = await Product.find({
+            sellerId: sellerObjId,
+            stock: { $lte: 5 }
+          })
+            .select("name stock price sku")
+            .limit(10)
+            .lean();
+
+          return {
+            totalLowStock: lowStockProducts.length,
+            products: lowStockProducts.map((p) => ({
+              name: p.name,
+              stockRemaining: p.stock,
+              price: p.price,
+            })),
+          };
+        }
+
+        case "get_pending_returns": {
+          const pendingReturns = await Order.find({
+            seller: sellerObjId,
+            $or: [
+              { returnStatus: { $in: ["requested", "in_transit", "qc_pending"] } },
+              { "returnRequest.status": { $in: ["requested", "approved", "in_transit", "qc_pending"] } },
+            ],
+          })
+            .select("orderId returnReason returnStatus returnRequest")
+            .limit(5)
+            .lean();
+
+          return {
+            count: pendingReturns.length,
+            returns: pendingReturns.map((r) => ({
+              orderId: r.orderId,
+              reason: r.returnReason || r.returnRequest?.reason || "Customer requested return",
+              status: r.returnStatus || r.returnRequest?.status || "pending",
+            })),
+          };
+        }
+
+        case "get_seller_active_plan": {
+          const sellerDoc = await Seller.findById(sellerObjId)
+            .select("subscription commissionModel")
+            .lean();
+
+          if (
+            sellerDoc?.subscription?.expiresAt &&
+            new Date(sellerDoc.subscription.expiresAt) > new Date()
+          ) {
+            return {
+              planName: sellerDoc.subscription.planName || "Active 0% Commission Pass",
+              validUntil: new Date(sellerDoc.subscription.expiresAt).toLocaleDateString(),
+              commissionModel: sellerDoc.commissionModel || "PLAN_BASED",
+              status: "ACTIVE",
+            };
+          }
+
+          return {
+            commissionModel: "Category Commission",
+            status: "FREE_TIER",
+            message: "Seller is currently on standard category commission. 0% plans available in Subscription tab.",
+          };
+        }
+
+        default:
+          return { error: `Unknown tool: ${name}` };
+      }
+    };
+
+    // Multi-turn tool loop
+    let response = await generateChatResponse({
+      messages,
       systemInstruction: SELLER_SYSTEM_INSTRUCTION,
-      tools: tools,
+      tools,
     });
 
-    let finalResponseText = result.text;
-    
-    // If the model called a tool, execute it and feed the result back
-    if (result.toolCall) {
-      const functionName = result.toolCall.name;
-      const functionArgs = result.toolCall.args;
-      let functionResponse = {};
+    let iterations = 0;
+    const MAX_ITERATIONS = 4;
+
+    while (iterations < MAX_ITERATIONS) {
+      const functionCalls = response.functionCalls || [];
+      if (functionCalls.length === 0) break;
+
+      iterations++;
+      const toolCall = functionCalls[0];
+      let toolResult = {};
 
       try {
-        switch (functionName) {
-          case "get_seller_overview": {
-            const startOfDay = new Date();
-            startOfDay.setHours(0, 0, 0, 0);
-
-            const [orders, wallet] = await Promise.all([
-              Order.find({
-                sellerId,
-                createdAt: { $gte: startOfDay },
-              }).select("totalAmount orderStatus").lean(),
-              Wallet.findOne({ userId: sellerId, userType: "seller" }).lean(),
-            ]);
-
-            const todaySales = orders
-              .filter(o => o.orderStatus === "delivered")
-              .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-              
-            const pendingOrders = orders.filter(o => ["pending", "processing", "ready_for_pickup"].includes(o.orderStatus)).length;
-
-            functionResponse = {
-              todaySales: todaySales,
-              pendingOrders: pendingOrders,
-              walletBalance: wallet ? wallet.balance : 0,
-            };
-            break;
-          }
-
-          case "get_low_stock_products": {
-            const lowStockProducts = await Product.find({
-              sellerId,
-              stock: { $lte: 5 }
-            }).select("name stock price").limit(10).lean();
-            
-            functionResponse = {
-              products: lowStockProducts.map(p => ({
-                name: p.name,
-                stock: p.stock,
-                price: p.price
-              }))
-            };
-            break;
-          }
-
-          case "get_pending_returns": {
-            const pendingReturns = await Order.find({
-              sellerId,
-              returnStatus: { $in: ["requested", "in_transit", "qc_pending"] }
-            }).select("orderId returnReason returnStatus").limit(5).lean();
-            
-            functionResponse = {
-              returns: pendingReturns.map(r => ({
-                orderId: r._id,
-                reason: r.returnReason,
-                status: r.returnStatus
-              }))
-            };
-            break;
-          }
-
-          case "get_seller_active_plan": {
-            const plan = await SellerPlan.findOne({ sellerId, status: "active" })
-              .populate("planId", "name type price")
-              .lean();
-            
-            if (plan) {
-              functionResponse = {
-                planName: plan.planId?.name || "Premium Plan",
-                validUntil: plan.endDate,
-                status: plan.status
-              };
-            } else {
-              functionResponse = {
-                message: "No active premium plan found. Seller is on default Category Commission plan."
-              };
-            }
-            break;
-          }
-
-          default:
-            functionResponse = { error: "Unknown tool call" };
-        }
-      } catch (err) {
-        console.error(`Seller Tool Error [${functionName}]:`, err);
-        functionResponse = { error: "Failed to execute tool" };
+        toolResult = await executeTool(toolCall);
+      } catch (toolErr) {
+        console.error(`[SellerAI] Tool execution error for ${toolCall.name}:`, toolErr);
+        toolResult = { error: "Failed to fetch live database records" };
       }
 
-      // Feed tool result back for final conversational response
-      const followUpMessages = [
-        ...formattedHistory,
-        { role: "user", parts: [{ text: message }] },
-        {
-          role: "model",
-          parts: [
-            {
-              functionCall: {
-                name: functionName,
-                args: functionArgs,
-              },
-            },
-          ],
-        },
-        {
-          role: "user",
-          parts: [
-            {
-              functionResponse: {
-                name: functionName,
-                response: functionResponse,
-              },
-            },
-          ],
-        }
-      ];
+      if (response.candidates?.[0]?.content) {
+        messages.push(response.candidates[0].content);
+      } else {
+        messages.push({ role: "model", parts: [{ functionCall: toolCall }] });
+      }
 
-      const followUpResult = await generateChatResponse({
-        messages: followUpMessages,
-        systemInstruction: SELLER_SYSTEM_INSTRUCTION,
-        tools: tools,
+      messages.push({
+        role: "user",
+        parts: [{ functionResponse: { name: toolCall.name, response: toolResult } }],
       });
 
-      finalResponseText = followUpResult.text;
+      try {
+        response = await generateChatResponse({
+          messages,
+          systemInstruction: SELLER_SYSTEM_INSTRUCTION,
+          tools,
+        });
+      } catch (loopErr) {
+        console.warn("[SellerAI] Loop LLM call failed:", loopErr.message);
+        break;
+      }
+    }
+
+    let finalResponseText = response.text;
+    if (!finalResponseText && response.candidates?.[0]?.content?.parts) {
+      const textParts = response.candidates[0].content.parts
+        .filter((p) => typeof p.text === "string" && p.text.trim())
+        .map((p) => p.text.trim());
+      if (textParts.length > 0) {
+        finalResponseText = textParts.join("\n\n");
+      }
+    }
+
+    if (!finalResponseText) {
+      finalResponseText = "Aapka request process ho gaya hai. Kya aapko kisi aur feature ya orders ke baare me janna hai?";
     }
 
     return handleResponse(res, 200, "Success", { reply: finalResponseText });
@@ -259,12 +309,24 @@ export const handleSellerChat = async (req, res) => {
     console.error("[SellerAI] Chat error:", error);
     if (error instanceof AiServiceError) {
       if (error.code === "RATE_LIMITED") {
-        return handleResponse(res, 429, "Seva AI is experiencing high demand right now. Please try again in a few moments.");
+        return handleResponse(
+          res,
+          429,
+          "Seva AI is experiencing high demand right now. Please try again in a few moments."
+        );
       }
       if (error.code === "UPSTREAM_ERROR") {
-        return handleResponse(res, 503, "Seva AI is currently experiencing high demand. Please try again in a moment.");
+        return handleResponse(
+          res,
+          503,
+          "Seva AI is currently experiencing high demand. Please try again in a moment."
+        );
       }
     }
-    return handleResponse(res, 500, "Couldn't generate response. Please try again in a moment.");
+    return handleResponse(
+      res,
+      500,
+      "Couldn't generate response. Please try again in a moment."
+    );
   }
 };

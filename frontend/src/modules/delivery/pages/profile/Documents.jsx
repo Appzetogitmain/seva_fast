@@ -1,52 +1,50 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, FileCheck, UploadCloud, XCircle, Clock } from "lucide-react";
 import Button from "@/shared/components/ui/Button";
 import Card from "@/shared/components/ui/Card";
 import { toast } from "sonner";
+import { useAuth } from "@core/context/AuthContext";
+import { formatDate } from "@shared/utils/formatDate";
 
 const Documents = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const fileInputRef = useRef(null);
   const [activeDocId, setActiveDocId] = useState(null);
 
-  const [docs, setDocs] = useState([
-    {
-      id: 1,
-      title: "Aadhar Card",
-      status: "Verified",
-      uploadedOn: "12 Jan 2024",
-      fileName: "aadhar_front_back.pdf",
-    },
-    {
-      id: 2,
-      title: "PAN Card",
-      status: "Verified",
-      uploadedOn: "12 Jan 2024",
-      fileName: "pan_card.jpg",
-    },
-    {
-      id: 3,
-      title: "Driving License",
-      status: "Verified",
-      uploadedOn: "15 Jan 2024",
-      fileName: "dl_front.jpg",
-    },
-    {
-      id: 4,
-      title: "Police Clearance",
-      status: "Pending",
-      uploadedOn: "20 Feb 2024",
-      fileName: "pcc_receipt.pdf",
-    },
-    {
-      id: 5,
-      title: "Bank Passbook",
-      status: "Rejected",
-      reason: "Image blurry, please re-upload",
-      fileName: null,
-    },
-  ]);
+  const [docs, setDocs] = useState([]);
+
+  useEffect(() => {
+    if (user) {
+      setDocs([
+        {
+          id: "aadhar",
+          title: "Aadhar Card",
+          status: user?.documents?.aadhar ? (user?.isVerified ? "Verified" : "Pending") : (user?.aadharNumber ? "Verified" : "Pending"),
+          uploadedOn: user?.createdAt ? formatDate(user.createdAt, "—") : "—",
+          fileName: user?.documents?.aadhar ? (user.documents.aadhar.split("/").pop() || "Aadhar Card") : (user?.aadharNumber ? `Aadhar (XXXX-${user.aadharNumber.slice(-4)})` : null),
+          url: user?.documents?.aadhar || null,
+        },
+        {
+          id: "pan",
+          title: "PAN Card",
+          status: user?.documents?.pan ? (user?.isVerified ? "Verified" : "Pending") : (user?.panNumber ? "Verified" : "Pending"),
+          uploadedOn: user?.createdAt ? formatDate(user.createdAt, "—") : "—",
+          fileName: user?.documents?.pan ? (user.documents.pan.split("/").pop() || "PAN Card") : (user?.panNumber ? `PAN (${user.panNumber})` : null),
+          url: user?.documents?.pan || null,
+        },
+        {
+          id: "dl",
+          title: "Driving License",
+          status: user?.documents?.drivingLicense ? (user?.isVerified ? "Verified" : "Pending") : (user?.drivingLicenseNumber ? "Verified" : "Pending"),
+          uploadedOn: user?.createdAt ? formatDate(user.createdAt, "—") : "—",
+          fileName: user?.documents?.drivingLicense ? (user.documents.drivingLicense.split("/").pop() || "Driving License") : (user?.drivingLicenseNumber ? `DL (${user.drivingLicenseNumber})` : null),
+          url: user?.documents?.drivingLicense || null,
+        },
+      ]);
+    }
+  }, [user]);
 
   const handleUpload = (id) => {
     setActiveDocId(id);
@@ -141,16 +139,25 @@ const Documents = () => {
                   {doc.status === "Rejected" ? "Re-upload" : "Update"}
                 </Button>
               )}
-              {doc.fileName && (
+              {doc.url ? (
                 <Button
                   variant="outline"
                   size="sm"
                   className="w-full text-xs h-8"
-                  onClick={() => toast.success("Downloading document...")}
+                  onClick={() => window.open(doc.url, "_blank")}
                 >
                   View File
                 </Button>
-              )}
+              ) : doc.fileName ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs h-8"
+                  onClick={() => toast.info(`${doc.title} is verified and recorded.`)}
+                >
+                  View Details
+                </Button>
+              ) : null}
             </div>
           </Card>
         ))}

@@ -17,6 +17,7 @@ import {
   ChevronUp,
   BadgeCheck,
   Wallet,
+  Edit3,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Button from "@/shared/components/ui/Button";
@@ -25,6 +26,7 @@ import { useAuth } from "@core/context/AuthContext";
 import { useSettings } from "@core/context/SettingsContext";
 import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 import axiosInstance from '@core/api/axios';
+import { deliveryApi } from "../services/deliveryApi";
 import { formatDate } from '@shared/utils/formatDate';
 
 const Profile = () => {
@@ -38,7 +40,8 @@ const Profile = () => {
   const { settings } = useSettings();
   const appName = settings?.appName || "App";
   const [faqs, setFaqs] = useState([]);
-  const [stats, setStats] = useState({ deliveries: 0, today: 0 });
+  const [stats, setStats] = useState({ deliveries: 0, today: 0, rating: "5.0", joinedDate: null });
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const fetchFaqs = async () => {
@@ -51,14 +54,30 @@ const Profile = () => {
     };
     const fetchStats = async () => {
       try {
-        const response = await axiosInstance.get('/delivery/stats');
-        setStats(response.data.result || { deliveries: 0, today: 0 });
+        const response = await deliveryApi.getStats();
+        if (response.data.success) {
+          setStats(response.data.result || { deliveries: 0, today: 0, rating: "5.0", joinedDate: null });
+        }
       } catch (error) {
         console.error("Error fetching stats:", error);
       }
     };
+    const fetchNotifications = async () => {
+      try {
+        const response = await deliveryApi.getNotifications();
+        if (response.data.success && response.data.result) {
+          setUnreadCount(response.data.result.unreadCount || 0);
+        } else if (response.data.unreadCount !== undefined) {
+          setUnreadCount(response.data.unreadCount);
+        }
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+      }
+    };
+
     fetchFaqs();
     fetchStats();
+    fetchNotifications();
   }, []);
 
   const getJoinedDate = (dateString) => formatDate(dateString, "N/A");
@@ -164,40 +183,61 @@ const Profile = () => {
       <div className="bg-primary pt-12 pb-24 px-6 rounded-b-[2.5rem] relative shadow-lg">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-white text-2xl font-bold">My Profile</h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/20"
-            onClick={() => toast.info("No new notifications")}>
+          <button
+            type="button"
+            onClick={() => navigate("/delivery/notifications")}
+            className="relative p-2.5 rounded-full text-white hover:bg-white/20 active:scale-95 transition-all focus:outline-none"
+            title="Notifications"
+            aria-label="Notifications">
             <Bell size={24} />
-          </Button>
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 border-2 border-primary rounded-full animate-pulse"></span>
+            )}
+          </button>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <div className="w-20 h-20 bg-white rounded-full p-1 shadow-lg">
-              <img
-                src={user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'Felix'}`}
-                alt="Profile"
-                className="w-full h-full rounded-full object-cover bg-gray-100"
-              />
+        <div className="flex items-center justify-between">
+          <div
+            onClick={() => navigate("/delivery/profile/personal-details")}
+            className="flex items-center space-x-4 cursor-pointer group"
+          >
+            <div className="relative">
+              <div className="w-20 h-20 bg-white rounded-full p-1 shadow-lg group-hover:scale-105 transition-transform">
+                <img
+                  src={user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'Felix'}`}
+                  alt="Profile"
+                  className="w-full h-full rounded-full object-cover bg-gray-100"
+                />
+              </div>
+              <div className={`absolute bottom-0 right-0 w-6 h-6 border-2 border-white rounded-full ${user?.isOnline ? "bg-emerald-500" : "bg-gray-400"}`}></div>
             </div>
-            <div className={`absolute bottom-0 right-0 w-6 h-6 border-2 border-white rounded-full ${user?.isOnline ? "bg-emerald-500" : "bg-gray-400"}`}></div>
-          </div>
-          <div className="text-white">
-            <h2 className="font-bold text-xl">{user?.name || "Delivery Partner"}</h2>
-            <p className="text-white/80 text-sm flex items-center mb-1">
-              <Phone size={14} className="mr-1" /> {user?.phone || ""}
-            </p>
-            <div className="flex items-center space-x-2">
-              <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium backdrop-blur-sm">
-                ID: {user?._id ? user._id.slice(-6).toUpperCase() : "N/A"}
-              </span>
-              <span className={`px-2 py-0.5 rounded text-xs font-bold shadow-sm ${user?.isVerified ? "bg-brand-500 text-primary-foreground" : "bg-yellow-500 text-yellow-950"}`}>
-                {user?.isVerified ? "VERIFIED" : "PENDING"}
-              </span>
+            <div className="text-white">
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-xl">{user?.name || "Delivery Partner"}</h2>
+              </div>
+              <p className="text-white/80 text-sm flex items-center mb-1">
+                <Phone size={14} className="mr-1" /> {user?.phone || ""}
+              </p>
+              <div className="flex items-center space-x-2">
+                <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-medium backdrop-blur-sm">
+                  ID: {user?._id ? user._id.slice(-6).toUpperCase() : "N/A"}
+                </span>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold shadow-sm ${user?.isVerified ? "bg-brand-500 text-primary-foreground" : "bg-yellow-500 text-yellow-950"}`}>
+                  {user?.isVerified ? "VERIFIED" : "PENDING"}
+                </span>
+              </div>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => navigate("/delivery/profile/personal-details")}
+            className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-2 rounded-xl backdrop-blur-sm transition-all active:scale-95 shadow-sm border border-white/20"
+            title="Edit Profile"
+          >
+            <Edit3 size={14} />
+            <span>Edit</span>
+          </button>
         </div>
       </div>
 
@@ -211,14 +251,22 @@ const Profile = () => {
           <p className="text-gray-400 text-[10px] uppercase font-bold tracking-wider">
             Joined
           </p>
-          <p className="font-bold text-gray-900 text-lg">{getJoinedDate(user?.createdAt)}</p>
+          <p className="font-bold text-gray-900 text-lg">
+            {user?.createdAt
+              ? formatDate(user.createdAt, "—")
+              : (stats?.joinedDate ? formatDate(stats.joinedDate, "—") : "—")}
+          </p>
         </div>
         <div className="w-px bg-gray-100"></div>
         <div className="flex-1">
           <p className="text-gray-400 text-[10px] uppercase font-bold tracking-wider">
             Trips
           </p>
-          <p className="font-bold text-gray-900 text-lg">{stats?.deliveries !== undefined ? stats.deliveries.toLocaleString() : "0"}</p>
+          <p className="font-bold text-gray-900 text-lg">
+            {stats?.deliveries !== undefined
+              ? stats.deliveries.toLocaleString()
+              : (stats?.trips !== undefined ? stats.trips.toLocaleString() : "0")}
+          </p>
         </div>
         <div className="w-px bg-gray-100"></div>
         <div className="flex-1">
@@ -226,7 +274,12 @@ const Profile = () => {
             Rating
           </p>
           <p className="font-bold text-gray-900 text-lg flex justify-center items-center">
-            {user?.rating || "4.8"} <span className="text-yellow-400 text-sm ml-1">★</span>
+            {user?.rating !== undefined && user?.rating !== null
+              ? Number(user.rating).toFixed(1)
+              : (stats?.rating !== undefined && stats?.rating !== null
+                  ? Number(stats.rating).toFixed(1)
+                  : "5.0")}{" "}
+            <span className="text-yellow-400 text-sm ml-1">★</span>
           </p>
         </div>
       </motion.div>

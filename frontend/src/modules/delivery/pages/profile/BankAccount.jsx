@@ -23,7 +23,6 @@ const BankAccount = () => {
       : "Not Configured",
     ifsc: user?.ifsc || "N/A",
     bankName: user?.ifsc ? `${user.ifsc.slice(0, 4).toUpperCase()} Bank` : "N/A",
-    branch: "MG Road, Bangalore",
     status: user?.accountNumber ? "Verified" : "Not Set",
   };
 

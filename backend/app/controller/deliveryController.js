@@ -89,18 +89,23 @@ export const getDeliveryStats = async (req, res) => {
             .filter(t => t.status === 'Settled' && (t.type === 'Incentive' || t.type === 'Bonus'))
             .reduce((acc, t) => acc + t.amount, 0);
 
-        const wallet = await Wallet.findOne({
-            ownerType: "DELIVERY_PARTNER",
-            ownerId: deliveryBoyId,
-        })
-            .select("cashInHand")
-            .lean();
+        const [wallet, deliveryDoc] = await Promise.all([
+            Wallet.findOne({
+                ownerType: "DELIVERY_PARTNER",
+                ownerId: deliveryBoyId,
+            }).select("cashInHand").lean(),
+            Delivery.findById(deliveryBoyId).select("rating totalRatings createdAt").lean(),
+        ]);
         const cashCollected = roundCurrency(wallet?.cashInHand || 0);
 
         return handleResponse(res, 200, "Stats fetched", {
             today: todayEarnings,
             totalEarnings,
             deliveries: totalDeliveries,
+            trips: totalDeliveries,
+            rating: typeof deliveryDoc?.rating === "number" ? Number(deliveryDoc.rating).toFixed(1) : "5.0",
+            totalRatings: deliveryDoc?.totalRatings || 0,
+            joinedDate: deliveryDoc?.createdAt || null,
             incentives,
             cashCollected,
             confirmedCount,

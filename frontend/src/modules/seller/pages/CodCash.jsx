@@ -172,11 +172,13 @@ const CodCash = () => {
           {data.heldByRider.slice(0, 50).map((row) => (
             <div
               key={row.orderId}
-              className="rounded-xl border border-blue-100 bg-blue-50/40 p-3"
+              className="rounded-xl border border-blue-100 bg-blue-50/40 p-3.5"
             >
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-bold text-slate-900">Order #{row.orderId}</p>
-                <p className="text-xs font-bold text-blue-700">{row.riderName}</p>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-xs sm:text-sm font-bold text-slate-900 break-all">Order #{row.orderId}</p>
+                <span className="shrink-0 px-2 py-0.5 rounded-md bg-blue-100/80 text-[11px] font-bold text-blue-700 whitespace-nowrap">
+                  {row.riderName}
+                </span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
@@ -281,9 +283,9 @@ const CodCash = () => {
           {data.pendingOrders.slice(0, 50).map((row) => (
             <div
               key={row.orderId}
-              className="rounded-xl border border-slate-100 bg-slate-50/60 p-3"
+              className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5"
             >
-              <p className="text-sm font-bold text-slate-900 mb-2">Order #{row.orderId}</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-900 mb-2 break-all">Order #{row.orderId}</p>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
                   <p className="text-[9px] font-bold text-slate-500 uppercase">Total COD</p>
@@ -323,17 +325,21 @@ const CodCash = () => {
           {data.owedByAdmin.slice(0, 50).map((row) => (
             <div
               key={row.orderId}
-              className="flex items-center justify-between rounded-xl border border-purple-100 bg-purple-50/40 p-3"
+              className="flex items-center justify-between gap-3 rounded-xl border border-purple-100 bg-purple-50/40 p-3.5"
             >
-              <div>
-                <p className="text-sm font-bold text-slate-900">Order #{row.orderId}</p>
-                <p className="text-xs text-slate-500">
-                  {row.createdAt ? formatDate(row.createdAt) : ""} · Pending
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm font-bold text-slate-900 break-all leading-snug">
+                  Order #{row.orderId}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {row.createdAt ? formatDate(row.createdAt) : ""} · <span className="font-semibold text-purple-700">Pending</span>
                 </p>
               </div>
-              <p className="text-sm font-extrabold text-purple-700">
-                {RUPEE}{safeMoney(row.amount).toLocaleString()}
-              </p>
+              <div className="shrink-0 text-right">
+                <p className="text-sm sm:text-base font-extrabold text-purple-700 whitespace-nowrap">
+                  {RUPEE}{safeMoney(row.amount).toLocaleString()}
+                </p>
+              </div>
             </div>
           ))}
           {data.owedByAdmin.length === 0 && (

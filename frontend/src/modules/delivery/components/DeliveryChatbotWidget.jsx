@@ -1,13 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { aiApi } from "../services/aiApi";
-import { FiMessageSquare, FiX, FiSend, FiCamera, FiLoader, FiMic, FiMicOff, FiVolume2, FiVolumeX } from "react-icons/fi";
-import { Sparkles, Bot, User, Volume2, Mic, Radio } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { deliveryApi } from "../services/deliveryApi";
+import { FiX, FiSend, FiMic, FiMicOff, FiVolume2, FiVolumeX } from "react-icons/fi";
+import { Sparkles, Radio } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import { useCart } from "../context/CartContext";
-import { useLocation as useAppLocation } from '../context/LocationContext';
 
-export default function ChatbotWidget() {
+export default function DeliveryChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -24,12 +21,9 @@ export default function ChatbotWidget() {
   const activeUtteranceRef = useRef(null);
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
-  const navigate = useNavigate();
-  const { addToCart, removeFromCart } = useCart();
-  const { currentLocation } = useAppLocation();
 
-  // recognition.onend (below) fires asynchronously and calls handleSend from
-  // a closure captured at the moment startVoiceInput() ran — at that point
+  // recognition.onend fires asynchronously and calls handleSend from a
+  // closure captured when startVoiceInput() ran — at that point
   // setVoiceMode(true) hasn't been committed yet, so a plain `voiceMode`
   // read there is permanently stale (always false) for every mic-triggered
   // message. Mirror it into a ref so the async callback always sees the
@@ -40,10 +34,10 @@ export default function ChatbotWidget() {
   }, [voiceMode]);
 
   const prompts = [
-    "Kya dhoondh rahe hain? 🔍",
-    "Offers & coupons chahiye? 🏷️",
-    "Order status track karein 📦",
-    "Boliye, Seva AI sun rahi hai! 🎙️"
+    "Koi sawal? Seva Rider AI se poochein ✨",
+    "Order kaise accept-deliver karein? 📦",
+    "COD cash kaise jama karein? 💵",
+    "Earnings & wallet ke baare me janein 💰"
   ];
 
   const scrollToBottom = () => {
@@ -122,12 +116,12 @@ export default function ChatbotWidget() {
     const voices = window.speechSynthesis.getVoices() || [];
     if (voices.length === 0) return { voice: null, lang: "en-IN" };
 
-    const isHindiOrMarathi = /[\u0900-\u097F]/.test(text);
-    const isGujarati = /[\u0A80-\u0AFF]/.test(text);
-    const isBengali = /[\u0980-\u09FF]/.test(text);
-    const isTamil = /[\u0B80-\u0BFF]/.test(text);
-    const isTelugu = /[\u0C00-\u0C7F]/.test(text);
-    const isKannada = /[\u0C80-\u0CFF]/.test(text);
+    const isHindiOrMarathi = /[ऀ-ॿ]/.test(text);
+    const isGujarati = /[઀-૿]/.test(text);
+    const isBengali = /[ঀ-৿]/.test(text);
+    const isTamil = /[஀-௿]/.test(text);
+    const isTelugu = /[ఀ-౿]/.test(text);
+    const isKannada = /[ಀ-೿]/.test(text);
 
     if (isGujarati) {
       const v = voices.find(v => v.lang && (v.lang.startsWith("gu") || v.lang.includes("GU")));
@@ -160,52 +154,56 @@ export default function ChatbotWidget() {
   };
 
   // Synchronized Gemini-like Voice + Progressive Word Streaming
-  const streamAndSpeakResponse = (fullReplyText, shouldSpeak = false, products = undefined) => {
+  const streamAndSpeakResponse = (fullReplyText, shouldSpeak = false) => {
     stopSpeaking();
 
     const formattedText = formatAiText(fullReplyText);
     const cleanSpeech = formattedText.replace(/[*#_~`>•-]/g, '').trim();
 
+    // Start with empty placeholder for model reply
     const modelMessageId = Date.now();
     setMessages((prev) => [
       ...prev,
-      {
-        id: modelMessageId,
-        role: "model",
-        parts: [{ text: "" }],
-        isStreaming: true,
-        products: products && products.length > 0 ? products : undefined
-      }
+      { id: modelMessageId, role: "model", content: "", isStreaming: true }
     ]);
 
+    // If speech is requested and browser supports SpeechSynthesis
     if (shouldSpeak && typeof window !== 'undefined' && 'speechSynthesis' in window && cleanSpeech) {
       try {
         const utterance = new SpeechSynthesisUtterance(cleanSpeech);
         const { voice: chosenVoice, lang: chosenLang } = getBestVoiceForText(cleanSpeech);
 
-        if (chosenVoice) utterance.voice = chosenVoice;
+        if (chosenVoice) {
+          utterance.voice = chosenVoice;
+        }
+
         utterance.lang = chosenLang || 'en-IN';
         utterance.rate = 1.0;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
 
-        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onstart = () => {
+          setIsSpeaking(true);
+        };
+
         utterance.onend = () => {
           setIsSpeaking(false);
+          // Ensure full text is committed on end
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === modelMessageId
-                ? { ...msg, parts: [{ text: formattedText }], isStreaming: false }
+                ? { ...msg, content: formattedText, isStreaming: false }
                 : msg
             )
           );
         };
+
         utterance.onerror = () => {
           setIsSpeaking(false);
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === modelMessageId
-                ? { ...msg, parts: [{ text: formattedText }], isStreaming: false }
+                ? { ...msg, content: formattedText, isStreaming: false }
                 : msg
             )
           );
@@ -218,9 +216,10 @@ export default function ChatbotWidget() {
       }
     }
 
+    // Progressive real-time typewriter word stream
     const words = formattedText.split(" ");
     let currentWordIdx = 0;
-    const streamSpeed = shouldSpeak ? 65 : 25;
+    const streamSpeed = shouldSpeak ? 65 : 25; // Synced with speech rate if speaking
 
     streamIntervalRef.current = setInterval(() => {
       currentWordIdx += 1;
@@ -229,7 +228,7 @@ export default function ChatbotWidget() {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === modelMessageId
-            ? { ...msg, parts: [{ text: currentStreamText }], isStreaming: currentWordIdx < words.length }
+            ? { ...msg, content: currentStreamText, isStreaming: currentWordIdx < words.length }
             : msg
         )
       );
@@ -244,7 +243,7 @@ export default function ChatbotWidget() {
     }, streamSpeed);
   };
 
-  // Voice speech synthesis helper for manual clicks
+  // Voice speech synthesis helper for individual manual clicks
   const speakText = (text) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     stopSpeaking();
@@ -256,7 +255,10 @@ export default function ChatbotWidget() {
       const utterance = new SpeechSynthesisUtterance(cleanText);
       const { voice: chosenVoice, lang: chosenLang } = getBestVoiceForText(cleanText);
 
-      if (chosenVoice) utterance.voice = chosenVoice;
+      if (chosenVoice) {
+        utterance.voice = chosenVoice;
+      }
+
       utterance.lang = chosenLang || 'en-IN';
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
@@ -272,7 +274,7 @@ export default function ChatbotWidget() {
     }
   };
 
-  // Typewriter effect on bottom bubble
+  // Typewriter effect on bottom bubble: Type char by char -> hold 2s -> hide 3s -> next text
   useEffect(() => {
     if (isOpen) return;
 
@@ -285,12 +287,14 @@ export default function ChatbotWidget() {
           setDisplayedText(fullText.slice(0, displayedText.length + 1));
         }, 45);
       } else {
+        // Fully typed: wait 2 seconds, then fade out
         timer = setTimeout(() => {
           setIsBubbleVisible(false);
           setIsTyping(false);
         }, 2000);
       }
     } else {
+      // Hidden: wait 3 seconds, switch prompt, then start typing next
       timer = setTimeout(() => {
         setDisplayedText("");
         setCurrentPromptIdx((prev) => (prev + 1) % prompts.length);
@@ -306,11 +310,12 @@ export default function ChatbotWidget() {
   const handleAvatarClick = () => {
     setIsOpen(true);
     setIsBubbleVisible(false);
-    speakText("Kuch mil nahi raha hai Seva Fast me? Mujhe batao!");
+    speakText("Order ya earnings me kuch poochna hai? Mujhe batao!");
   };
 
   // Web Speech Recognition setup (Voice to Text) with Barge-in
   const startVoiceInput = () => {
+    // Barge-in: interrupt any ongoing AI speech immediately
     stopSpeaking();
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -334,12 +339,12 @@ export default function ChatbotWidget() {
       recognition.continuous = false;
 
       recognition.onstart = () => setIsListening(true);
-      
+
       recognition.onresult = (event) => {
         const transcript = Array.from(event.results)
           .map(result => result[0].transcript)
           .join('');
-        
+
         if (transcript) {
           finalTranscript = transcript;
           setInput(transcript);
@@ -371,6 +376,7 @@ export default function ChatbotWidget() {
     const finalInput = textOverride || input;
     if (!finalInput.trim() && !isLoading) return;
 
+    // Barge-in: stop any active speech immediately
     stopSpeaking();
 
     if (isListening) {
@@ -378,37 +384,26 @@ export default function ChatbotWidget() {
       setIsListening(false);
     }
 
-    const userMessage = { role: "user", parts: [{ text: finalInput }] };
-    const newMessages = [...messages, userMessage];
-    
-    setMessages(newMessages);
+    const userMessage = { role: "user", content: finalInput };
+    const historyPayload = messages.map(m => ({ role: m.role, content: m.content }));
+
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
 
     const shouldSpeakReply = isFromVoice || voiceModeRef.current;
 
     try {
-      const params = {
-        messages: newMessages.map(m => ({ role: m.role, parts: m.parts })),
-        lat: currentLocation?.latitude,
-        lng: currentLocation?.longitude,
-      };
-      const res = await aiApi.chat(params);
-      const { reply, products, action, actionPayload } = res.data.result || {};
-      
+      const res = await deliveryApi.aiChat({ message: finalInput, history: historyPayload });
+      const reply = res.data.result?.reply || res.data.data?.reply || res.data.reply || "";
+
       setIsLoading(false);
 
-      if (action === "ADD_TO_CART" && actionPayload) {
-        await addToCart(actionPayload, { skipConfirm: true });
-      } else if (action === "REMOVE_FROM_CART" && actionPayload) {
-        removeFromCart(actionPayload.productId, actionPayload.variantSku);
-      }
-      
       if (reply) {
-        streamAndSpeakResponse(reply, shouldSpeakReply, products);
+        streamAndSpeakResponse(reply, shouldSpeakReply);
       } else {
-        const fallbackMsg = "Aapka message mil gaya hai. Kya aapko kisi aur item ya order ke baare me poochna hai?";
-        streamAndSpeakResponse(fallbackMsg, shouldSpeakReply, products);
+        const fallbackMsg = "Aapka message mil gaya hai. Kya aapko kisi aur order ya feature ke baare me janna hai?";
+        streamAndSpeakResponse(fallbackMsg, shouldSpeakReply);
       }
     } catch (error) {
       setIsLoading(false);
@@ -416,47 +411,13 @@ export default function ChatbotWidget() {
       streamAndSpeakResponse(errMsg, shouldSpeakReply);
     }
   };
-  const handleImageUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64String = reader.result.replace(/^data:(.*,)?/, '');
-      const mimeType = file.type;
-
-      stopSpeaking();
-      setMessages(prev => [...prev, { role: "user", parts: [{ text: `[Uploaded Image: ${file.name}]` }] }]);
-      setIsLoading(true);
-
-      try {
-        const res = await aiApi.visualSearch({
-          imageBase64: base64String,
-          mimeType,
-        });
-        
-        const { keywords, products } = res.data.result;
-        let botReply = `Maine aapki photo check ki aur matching items search kiye hain:`;
-        setIsLoading(false);
-        if (products && products.length > 0) {
-          streamAndSpeakResponse(botReply, voiceModeRef.current, products);
-        } else {
-          streamAndSpeakResponse(`Photo me **${keywords}** recognize hua, par abhi store me matching stock available nahi hai.`, voiceModeRef.current);
-        }
-      } catch (error) {
-        setIsLoading(false);
-        streamAndSpeakResponse("Failed to process the image. Please try again.", voiceModeRef.current);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
 
   if (!isOpen) {
     return (
       <div className="fixed bottom-20 md:bottom-6 right-5 z-[999] flex flex-col items-end gap-2 select-none">
         {/* Sleek Typewriter Speech Capsule */}
         {isBubbleVisible && displayedText && (
-          <div 
+          <div
             onClick={handleAvatarClick}
             className="cursor-pointer bg-white/95 backdrop-blur-xs text-slate-800 text-[11px] sm:text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg border border-slate-200/90 flex items-center gap-1.5 hover:border-primary hover:shadow-primary/20 transition-all duration-300 transform hover:-translate-y-0.5 animate-in fade-in"
           >
@@ -470,13 +431,13 @@ export default function ChatbotWidget() {
         <button
           onClick={handleAvatarClick}
           className="relative group p-0.5 rounded-full bg-gradient-to-tr from-primary via-orange-400 to-amber-300 shadow-2xl hover:scale-108 hover:shadow-primary/40 transition-all duration-300 flex items-center justify-center cursor-pointer"
-          title="Seva AI Assistant"
+          title="Seva Rider AI Assistant"
         >
           {/* Avatar Image in Circle */}
           <div className="w-13 h-13 sm:w-15 sm:h-15 rounded-full overflow-hidden border-2 border-white bg-slate-900 flex items-center justify-center shadow-inner">
-            <img 
-              src="/ai-assistant-avatar.png" 
-              alt="Seva AI" 
+            <img
+              src="/ai-assistant-avatar.png"
+              alt="Seva AI"
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
             />
           </div>
@@ -506,13 +467,13 @@ export default function ChatbotWidget() {
               <h3 className="font-bold text-sm tracking-tight text-white">Seva Assistant</h3>
               <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-primary/20 text-primary border border-primary/30">AI</span>
             </div>
-            <p className="text-[11px] text-slate-300">Live products, orders & help</p>
+            <p className="text-[11px] text-slate-300">Orders, earnings & help</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-1.5">
           {/* Two-way Voice Talk Toggle Button */}
-          <button 
+          <button
             type="button"
             onClick={() => {
               const newMode = !voiceMode;
@@ -522,10 +483,10 @@ export default function ChatbotWidget() {
               } else {
                 stopSpeaking();
               }
-            }} 
+            }}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              voiceMode 
-                ? "bg-primary text-white shadow-sm ring-1 ring-white/30" 
+              voiceMode
+                ? "bg-primary text-white shadow-sm ring-1 ring-white/30"
                 : "bg-white/10 text-slate-300 hover:bg-white/20 hover:text-white"
             }`}
             title={voiceMode ? "Voice Talk ON (AI will speak replies)" : "Turn ON Voice Talk"}
@@ -534,12 +495,12 @@ export default function ChatbotWidget() {
             <span className="text-[10px]">{voiceMode ? "Voice ON" : "Voice"}</span>
           </button>
 
-          <button 
+          <button
             type="button"
-            onClick={() => { 
-              setIsOpen(false); 
-              stopSpeaking(); 
-            }} 
+            onClick={() => {
+              setIsOpen(false);
+              stopSpeaking();
+            }}
             className="hover:bg-white/10 p-1.5 rounded-full transition-colors text-slate-300 hover:text-white cursor-pointer"
             title="Close Assistant"
           >
@@ -550,15 +511,50 @@ export default function ChatbotWidget() {
 
       {/* Messages Feed */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-        {messages.filter(m => (m.parts && m.parts[0] && m.parts[0].text) || m.isStreaming).map((msg, idx) => {
-          const rawText = msg.parts?.[0]?.text || "";
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full py-6 text-center px-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-3 shadow-xs">
+              <Sparkles size={24} />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800">Namaste! Main hoon Seva Rider AI</h4>
+            <p className="text-xs text-slate-500 mt-1 max-w-[280px]">
+              Order accept-deliver karna, COD cash, earnings ya app ke kisi bhi feature ke baare me poochiye.
+            </p>
+
+            <div className="w-full mt-4 space-y-1.5">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-left pl-1">Aap pooch sakte hain:</p>
+              {[
+                "Mera aaj ka earnings batao 💰",
+                "Pickup OTP kaha milega? 🔑",
+                "COD cash seller ko kaise du? 💵",
+                "Withdrawal request kaise karein? 🏦"
+              ].map((suggestion, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setInput(suggestion.replace(/[^\w\s?&/]/g, '').trim());
+                  }}
+                  className="w-full text-left text-xs bg-white hover:bg-primary/5 hover:border-primary/40 border border-slate-200/80 rounded-xl px-3 py-2 text-slate-700 font-medium transition-all shadow-xs flex items-center justify-between group cursor-pointer"
+                >
+                  <span className="truncate">{suggestion}</span>
+                  <span className="text-[10px] text-primary font-bold opacity-0 group-hover:opacity-100 transition-opacity">Ask →</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg, idx) => {
+          const rawText = msg.content || (msg.parts && msg.parts[0]?.text) || "";
           const text = msg.role === "model" ? formatAiText(rawText) : rawText;
+          if (!text && !msg.isStreaming) return null;
 
           return (
             <div key={msg.id || idx} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
               <div className={`max-w-[88%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed shadow-xs ${
-                msg.role === "user" 
-                  ? "bg-primary text-white font-medium rounded-tr-xs" 
+                msg.role === "user"
+                  ? "bg-primary text-white font-medium rounded-tr-xs"
                   : "bg-white text-slate-800 border border-slate-200/80 rounded-tl-xs"
               }`}>
                 {msg.role === "user" ? (
@@ -584,13 +580,13 @@ export default function ChatbotWidget() {
                     {msg.isStreaming && (
                       <span className="inline-block w-1.5 h-3.5 bg-primary animate-pulse ml-1 align-middle rounded-xs" />
                     )}
-                    
+
                     {/* Read Aloud button (when not actively streaming) */}
                     {!msg.isStreaming && text && (
                       <div className="flex justify-end pt-1">
-                        <button 
+                        <button
                           type="button"
-                          onClick={() => speakText(text)} 
+                          onClick={() => speakText(text)}
                           className="text-slate-400 hover:text-primary p-1 rounded-md transition-colors cursor-pointer"
                           title="Read Aloud"
                         >
@@ -601,55 +597,6 @@ export default function ChatbotWidget() {
                   </div>
                 )}
               </div>
-              
-              {/* Display clickable product cards */}
-              {msg.products && msg.products.length > 0 && (
-                  <div className="mt-2.5 w-full max-w-[92%] grid grid-cols-1 gap-2">
-                      {msg.products.map(p => {
-                          const prodId = p.id || p._id;
-                          return (
-                            <div 
-                              key={prodId} 
-                              onClick={() => {
-                                if (prodId) {
-                                  setIsOpen(false);
-                                  stopSpeaking();
-                                  navigate(`/product/${prodId}`);
-                                }
-                              }} 
-                              className="cursor-pointer bg-white p-2.5 rounded-xl shadow-xs border border-slate-200/90 flex gap-3 items-center hover:border-primary hover:shadow-md hover:scale-[1.01] transition-all group"
-                            >
-                                {p.thumbnail ? (
-                                  <img src={p.thumbnail} alt={p.name} className="w-12 h-12 object-cover rounded-lg bg-slate-50 shrink-0 border border-slate-100" />
-                                ) : (
-                                  <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-xs shrink-0">
-                                    Item
-                                  </div>
-                                )}
-                                
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-semibold text-slate-900 truncate group-hover:text-primary transition-colors">{p.name}</p>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className="text-xs font-bold text-primary">₹{p.price ?? 0}</span>
-                                      {p.mrp && Number(p.mrp) > Number(p.price) && (
-                                        <span className="text-[10px] text-slate-400 line-through">₹{p.mrp}</span>
-                                      )}
-                                      {p.rating && typeof p.rating === 'number' && (
-                                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                          ★ {p.rating}
-                                        </span>
-                                      )}
-                                    </div>
-                                </div>
-
-                                <div className="text-[11px] font-semibold text-primary px-2.5 py-1 bg-primary/10 rounded-lg group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
-                                  View
-                                </div>
-                            </div>
-                          );
-                      })}
-                  </div>
-              )}
             </div>
           );
         })}
@@ -657,7 +604,7 @@ export default function ChatbotWidget() {
           <div className="flex items-start">
             <div className="bg-white text-slate-800 shadow-xs border border-slate-200/80 rounded-2xl rounded-tl-xs px-4 py-2.5 flex gap-2.5 items-center">
               <Sparkles className="animate-spin text-primary" size={16} />
-              <span className="text-xs font-medium text-slate-500">Searching Seva Fast...</span>
+              <span className="text-xs font-medium text-slate-500">Seva Rider AI soch raha hai...</span>
             </div>
           </div>
         )}
@@ -695,8 +642,8 @@ export default function ChatbotWidget() {
             <Radio size={15} className="animate-spin text-rose-500" />
             <span>Sun raha hoon... Boliye (Speak now)</span>
           </div>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => { recognitionRef.current?.stop(); setIsListening(false); }}
             className="text-xs font-bold text-rose-700 bg-rose-200/80 hover:bg-rose-300 px-2.5 py-1 rounded-full transition-colors cursor-pointer"
           >
@@ -707,26 +654,21 @@ export default function ChatbotWidget() {
 
       {/* Input Form */}
       <form onSubmit={handleSend} className="p-2.5 bg-white border-t border-slate-200 flex items-center gap-1.5">
-        {/* Photo Upload */}
-        <label className="cursor-pointer p-2 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-xl transition-colors shrink-0" title="Visual Search">
-          <FiCamera size={18} />
-          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-        </label>
 
         {/* Voice Input (Microphone) Button with Barge-in */}
         <button
           type="button"
           onClick={startVoiceInput}
           className={`p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center cursor-pointer ${
-            isListening 
-              ? "bg-rose-500 text-white shadow-md scale-105 animate-pulse" 
+            isListening
+              ? "bg-rose-500 text-white shadow-md scale-105 animate-pulse"
               : "bg-slate-100 text-slate-600 hover:text-primary hover:bg-primary/10"
           }`}
           title={isListening ? "Listening... Click to stop" : "Click to Speak via Voice"}
         >
           {isListening ? <FiMicOff size={17} /> : <FiMic size={17} />}
         </button>
-        
+
         {/* Text Input */}
         <input
           type="text"
@@ -739,7 +681,7 @@ export default function ChatbotWidget() {
           className="flex-1 bg-slate-100/80 border-none outline-none rounded-xl px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-1.5 focus:ring-primary/40 transition-all font-medium min-w-0"
           disabled={isLoading}
         />
-        
+
         {/* Send Button */}
         <button
           type="submit"
