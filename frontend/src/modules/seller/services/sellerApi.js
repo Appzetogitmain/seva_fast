@@ -39,6 +39,8 @@ export const sellerApi = {
     acceptCertificate: () => axiosInstance.post('/seller/accept-certificate'),
     getCodCashSummary: () => axiosInstance.get('/seller/cod/summary'),
     payCodCashToAdmin: (data) => axiosInstance.post('/seller/cod/pay', data),
+    confirmCashReceivedFromRider: (orderId) =>
+        axiosInstance.post(`/seller/cod/confirm-received/${encodeURIComponent(String(orderId))}`),
 
     // Stock
     adjustStock: (data) => axiosInstance.post('/products/adjust-stock', data),

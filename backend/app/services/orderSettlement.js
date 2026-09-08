@@ -38,7 +38,6 @@ export async function applyDeliveredSettlement(order, orderIdString) {
           $set: {
             amount: sellerEarning,
             status: "Pending",
-            type: "Order Payment",
           },
           $setOnInsert: {
             user: settled.seller,
@@ -237,7 +236,6 @@ export async function finalizeCodAfterAdminCredit(orderOrId, orderIdString) {
         $set: {
           amount: sellerEarning,
           status: sellerTxnStatus,
-          type: "Order Payment",
         },
         $setOnInsert: {
           user: refreshed.seller,

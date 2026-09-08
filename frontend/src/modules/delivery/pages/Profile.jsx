@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   BadgeCheck,
+  Wallet,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Button from "@/shared/components/ui/Button";
@@ -97,6 +98,13 @@ const Profile = () => {
       sub: "Withdraw your earnings",
       color: "text-brand-600 bg-brand-50",
       path: "/delivery/profile/withdrawals",
+    },
+    {
+      icon: Wallet,
+      label: "COD Cash Management",
+      sub: "Cash in hand, collected & seller handovers",
+      color: "text-amber-600 bg-amber-50 font-bold",
+      path: "/delivery/cod-cash",
     },
     {
       icon: FileText,

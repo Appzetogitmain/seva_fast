@@ -1472,15 +1472,17 @@ export async function markCodOnlinePaid(orderOrId, { actorId = null } = {}) {
       { session },
     );
 
-    order.paymentBreakdown = {
-      ...(order.paymentBreakdown || {}),
-      codCollectedAmount: net,
-      codRemittedAmount: net,
-      codPendingAmount: 0,
-    };
+    if (!order.paymentBreakdown) {
+      order.paymentBreakdown = {};
+    }
+    order.paymentBreakdown.codCollectedAmount = net;
+    order.paymentBreakdown.codRemittedAmount = net;
+    order.paymentBreakdown.codPendingAmount = 0;
+    ensurePaymentBreakdownSnapshots(order);
+
     order.paymentStatus = ORDER_PAYMENT_STATUS.COD_RECONCILED;
     order.payment = {
-      ...(order.payment || {}),
+      ...(order.payment?.toObject?.() || order.payment || {}),
       method: "upi",
       status: "completed",
     };

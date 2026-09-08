@@ -144,31 +144,45 @@ export const getDeliveryEarnings = async (req, res) => {
             .select("cashInHand")
             .lean();
 
-        const totalEarnings = transactions
-            .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
-            .reduce((acc, t) => acc + t.amount, 0);
+        const totalEarnings = roundCurrency(
+            transactions
+                .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
+                .reduce((acc, t) => acc + Number(t.amount || 0), 0),
+        );
 
-        const tipsReceived = transactions
-            .filter(t => t.type === 'Delivery Earning' && t.status === 'Settled')
-            .reduce(
-                (acc, t) =>
-                    acc +
-                    Number(
-                        t?.meta?.tipAmount ??
-                        t?.order?.paymentBreakdown?.riderTipAmount ??
-                        t?.order?.pricing?.tip ??
-                        0,
-                    ),
-                0,
-            );
+        const cashEarned = roundCurrency(
+            transactions
+                .filter(t => t.status === 'Settled' && t.type === 'Delivery Earning' && t.meta?.settledViaCash)
+                .reduce((acc, t) => acc + Number(t.amount || 0), 0),
+        );
 
-        const onlinePay = transactions
-            .filter(t => t.type === 'Delivery Earning' && t.status === 'Settled')
-            .reduce((acc, t) => acc + t.amount, 0);
+        const onlineEarnings = roundCurrency(
+            transactions
+                .filter(t => t.status === 'Settled' && t.type === 'Delivery Earning' && !t.meta?.settledViaCash)
+                .reduce((acc, t) => acc + Number(t.amount || 0), 0),
+        );
 
-        const incentives = transactions
-            .filter(t => (t.type === 'Incentive' || t.type === 'Bonus') && t.status === 'Settled')
-            .reduce((acc, t) => acc + t.amount, 0);
+        const tipsReceived = roundCurrency(
+            transactions
+                .filter(t => t.type === 'Delivery Earning' && t.status === 'Settled')
+                .reduce(
+                    (acc, t) =>
+                        acc +
+                        Number(
+                            t?.meta?.tipAmount ??
+                            t?.order?.paymentBreakdown?.riderTipAmount ??
+                            t?.order?.pricing?.tip ??
+                            0,
+                        ),
+                    0,
+                ),
+        );
+
+        const incentives = roundCurrency(
+            transactions
+                .filter(t => (t.type === 'Incentive' || t.type === 'Bonus') && t.status === 'Settled')
+                .reduce((acc, t) => acc + Number(t.amount || 0), 0),
+        );
 
         const cashCollected = roundCurrency(wallet?.cashInHand || 0);
 
@@ -205,16 +219,45 @@ export const getDeliveryEarnings = async (req, res) => {
             chartData.push({
                 name: dayNames[d.getDay()],
                 earnings: foundAt ? foundAt.amount : 0,
-                incentives: 0 // Could be further aggregated if needed
+                incentives: 0
             });
         }
 
+        // All lifetime transactions for wallet balance calculation
+        const allTransactions = await Transaction.find({
+            user: deliveryBoyId,
+            userModel: "Delivery",
+        }).lean();
+
+        const settledOnlineEarnings = allTransactions
+            .filter((t) => t.status === "Settled" && !t.meta?.settledViaCash)
+            .reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
+        const cashKeptInHand = allTransactions
+            .filter((t) => t.status === "Settled" && t.meta?.settledViaCash)
+            .reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
+        const pendingWithdrawals = allTransactions
+            .filter(
+                (t) =>
+                    (t.status === "Pending" || t.status === "Processing") &&
+                    t.type === "Withdrawal",
+            )
+            .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
+
+        const availableBalance = roundCurrency(Math.max(settledOnlineEarnings - pendingWithdrawals, 0));
+
         return handleResponse(res, 200, "Earnings fetched", {
             totalEarnings,
-            onlinePay,
+            cashEarned,
+            onlineEarnings,
+            onlinePay: onlineEarnings,
             incentives,
             tipsReceived,
             cashCollected,
+            cashKeptInHand: roundCurrency(cashKeptInHand),
+            availableBalance,
+            pendingWithdrawals: roundCurrency(pendingWithdrawals),
             chartData,
             transactions: transactions.slice(0, 20)
         });
@@ -252,8 +295,9 @@ export const getDeliveryCodCashSummary = async (req, res) => {
             orderStatus: { $ne: "cancelled" },
         })
             .select(
-                "orderId status orderStatus deliveredAt createdAt financeFlags paymentBreakdown pricing",
+                "orderId status orderStatus deliveredAt createdAt financeFlags paymentBreakdown pricing seller",
             )
+            .populate("seller", "name shopName phone")
             .sort({ createdAt: -1 })
             .limit(200)
             .lean();
@@ -271,13 +315,13 @@ export const getDeliveryCodCashSummary = async (req, res) => {
             const estimatedNet = roundCurrency(Math.max(gross - riderCommission, 0));
             const pendingNet = roundCurrency(order.paymentBreakdown?.codPendingAmount ?? 0);
             const remittedNet = roundCurrency(order.paymentBreakdown?.codRemittedAmount ?? 0);
-            const contribution =
-                codCashWithRider && pendingNet > 0
-                    ? pendingNet
-                    : !codMarkedCollected && !codOnlinePaid && collectMethod !== "online_qr"
-                      ? estimatedNet
-                      : 0;
+            
+            // Only cash actually collected and in rider's hand contributes to float to settle
+            const contribution = (codCashWithRider && pendingNet > 0) ? pendingNet : 0;
             const isCollected = codMarkedCollected || codOnlinePaid;
+
+            const sellerShop = order.seller?.shopName || order.seller?.name || "Store / Seller";
+            const sellerPhone = order.seller?.phone || "";
 
             return {
                 orderId: order.orderId,
@@ -297,50 +341,67 @@ export const getDeliveryCodCashSummary = async (req, res) => {
                 amountNetRemitted: remittedNet,
                 systemFloatContribution: contribution,
                 isCollected,
+                sellerName: sellerShop,
+                sellerPhone: sellerPhone,
+                remitTo: "seller",
             };
         });
 
+        // Float is strictly the cash currently collected and held in rider's pocket
         const systemFloatCOD = roundCurrency(
-            normalized.reduce((sum, row) => sum + Number(row.systemFloatContribution || 0), 0),
+            normalized
+                .filter((row) => row.codCashWithRider && Number(row.amountNetPending || 0) > 0)
+                .reduce((sum, row) => sum + Number(row.amountNetPending || 0), 0),
         );
-        // Rider's own commission across every COD order they've delivered —
-        // this is money they kept in hand, not a wallet/bank payout.
+        // Rider's own commission across delivered COD orders kept in hand
         const totalCodEarnings = roundCurrency(
-            normalized.reduce((sum, row) => sum + Number(row.riderCommission || 0), 0),
+            normalized
+                .filter((row) => row.isCollected || row.status === "delivered" || row.orderStatus === "delivered")
+                .reduce((sum, row) => sum + Number(row.riderCommission || 0), 0),
         );
-        // Total COD cash actually collected from customers so far (gross).
+        // Total COD cash actually collected from customers so far (gross)
         const totalCollected = roundCurrency(
             normalized
                 .filter((row) => row.isCollected)
                 .reduce((sum, row) => sum + Number(row.amountGross || 0), 0),
         );
-        // Net amount already handed over/remitted onward (to seller or admin).
+        // Net amount already handed over/settled so far
         const totalSettled = roundCurrency(
             normalized.reduce((sum, row) => sum + Number(row.amountNetRemitted || 0), 0),
         );
 
+        // 1. Ready to hand over to seller right now
         const toHandoff = normalized
             .filter((row) => row.codCashWithRider && Number(row.amountNetPending || 0) > 0)
             .slice(0, 50);
 
+        // 2. Active ongoing orders to collect from customer (not yet delivered/collected)
         const toCollect = normalized
             .filter(
                 (row) =>
                     !row.codMarkedCollected &&
                     !row.codOnlinePaid &&
+                    row.status !== "delivered" &&
+                    row.orderStatus !== "delivered" &&
                     Number(row.amountNetExpected || 0) > 0,
             )
             .slice(0, 50);
 
+        // 3. Past settled history (handed over to seller or paid online)
+        const settledHistory = normalized
+            .filter((row) => row.codCashWithSeller || (Number(row.amountNetRemitted || 0) > 0 && !row.codCashWithRider))
+            .slice(0, 50);
+
         return handleResponse(res, 200, "COD cash summary fetched", {
             systemFloatCOD,
-            cashInHand: roundCurrency(wallet?.cashInHand || 0),
+            cashInHand: roundCurrency(wallet?.cashInHand || systemFloatCOD || 0),
             totalCodEarnings,
             totalCollected,
             totalSettled,
             toHandoff,
             toRemit: toHandoff,
             toCollect,
+            settledHistory,
         });
     } catch (error) {
         return handleResponse(res, 500, error.message);

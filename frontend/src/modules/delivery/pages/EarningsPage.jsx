@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -7,7 +8,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { TrendingUp, ArrowUpRight, Download } from "lucide-react";
+import { TrendingUp, ArrowUpRight, Download, Wallet, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import Button from "@/shared/components/ui/Button";
@@ -26,13 +27,17 @@ const resolveTipAmount = (txn) =>
   );
 
 const EarningsPage = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("weekly");
   const [loading, setLoading] = useState(true);
   const [earningsData, setEarningsData] = useState({
     totalEarnings: 0,
+    cashEarned: 0,
+    onlineEarnings: 0,
     incentives: 0,
     bonuses: 0,
     tipsReceived: 0,
+    cashCollected: 0,
     chartData: [],
     recentTransactions: [],
   });
@@ -45,9 +50,12 @@ const EarningsPage = () => {
         const result = response.data.result;
         setEarningsData({
           totalEarnings: result.totalEarnings || 0,
+          cashEarned: result.cashEarned || 0,
+          onlineEarnings: result.onlineEarnings || 0,
           incentives: result.incentives || 0,
           bonuses: result.bonuses || 0,
           tipsReceived: result.tipsReceived || 0,
+          cashCollected: result.cashCollected || 0,
           chartData: result.chartData || [],
           recentTransactions: result.transactions || result.recentTransactions || [],
         });
@@ -123,30 +131,70 @@ const EarningsPage = () => {
             <p className="text-brand-100 font-medium text-sm uppercase tracking-wide mb-1 relative z-10">
               Total Earnings
             </p>
-            <div className="flex items-baseline mb-6 relative z-10">
+            <div className="flex items-baseline mb-4 relative z-10">
               <span className="text-3xl font-bold mr-1">{RUPEE}</span>
               <span className="text-5xl font-extrabold tracking-tight">
                 {Number(earningsData.totalEarnings || 0).toLocaleString()}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/20 relative z-10">
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/20 relative z-10">
+              <div className="bg-white/10 p-2.5 rounded-xl">
+                <p className="text-brand-100 text-[10px] uppercase font-bold mb-0.5">In Your Pocket (COD)</p>
+                <p className="font-extrabold text-base">
+                  {RUPEE}
+                  {Number(earningsData.cashEarned || 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white/10 p-2.5 rounded-xl">
+                <p className="text-brand-100 text-[10px] uppercase font-bold mb-0.5">Online / Bank Payout</p>
+                <p className="font-extrabold text-base">
+                  {RUPEE}
+                  {Number(earningsData.onlineEarnings || 0).toLocaleString()}
+                </p>
+              </div>
               <div>
-                <p className="text-brand-100 text-xs mb-1">Incentives</p>
-                <p className="font-bold text-lg">
+                <p className="text-brand-100 text-xs mb-0.5">Incentives</p>
+                <p className="font-bold text-sm">
                   +{RUPEE}
                   {Number(earningsData.incentives || 0).toLocaleString()}
                 </p>
               </div>
               <div>
-                <p className="text-brand-100 text-xs mb-1">Tips</p>
-                <p className="font-bold text-lg">
+                <p className="text-brand-100 text-xs mb-0.5">Tips</p>
+                <p className="font-bold text-sm">
                   +{RUPEE}
                   {Number(earningsData.tipsReceived || 0).toLocaleString()}
                 </p>
               </div>
             </div>
           </div>
+        </motion.div>
+
+        {/* COD Cash Management Direct Access Card */}
+        <motion.div variants={itemVariants}>
+          <Card
+            onClick={() => navigate("/delivery/cod-cash")}
+            className="p-4 rounded-2xl border border-orange-200 bg-orange-50/60 hover:bg-orange-50 transition-all cursor-pointer shadow-sm group flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-orange-100 text-orange-700 rounded-xl group-hover:scale-105 transition-transform">
+                <Wallet size={22} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-orange-800 uppercase tracking-wide">
+                  COD Cash Management
+                </p>
+                <p className="text-lg font-black text-gray-900">
+                  {RUPEE}{Number(earningsData.cashCollected || 0).toLocaleString()}
+                  <span className="text-xs font-normal text-gray-500 ml-1.5">(Float to Hand Over)</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center text-xs font-bold text-orange-700 group-hover:translate-x-1 transition-transform">
+              Manage <ChevronRight size={16} />
+            </div>
+          </Card>
         </motion.div>
 
         <motion.div variants={itemVariants}>

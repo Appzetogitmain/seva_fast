@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { IndianRupee, RotateCw } from "lucide-react";
+import { IndianRupee, RotateCw, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import Card from "@/shared/components/ui/Card";
 import Button from "@/shared/components/ui/Button";
@@ -17,6 +17,7 @@ function safeMoney(value) {
 const CodCash = () => {
   const [loading, setLoading] = React.useState(true);
   const [paying, setPaying] = React.useState(false);
+  const [confirmingOrderId, setConfirmingOrderId] = React.useState(null);
   const [payAmount, setPayAmount] = React.useState("");
   const [data, setData] = React.useState({
     cashInHand: 0,
@@ -58,6 +59,21 @@ const CodCash = () => {
     fetchSummary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleConfirmCashReceived = async (orderId, amount, riderName) => {
+    try {
+      setConfirmingOrderId(orderId);
+      await sellerApi.confirmCashReceivedFromRider(orderId);
+      toast.success(
+        `Confirmed receipt of ${RUPEE}${safeMoney(amount).toLocaleString()} from ${riderName || "Rider"}!`,
+      );
+      await fetchSummary();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to confirm cash receipt");
+    } finally {
+      setConfirmingOrderId(null);
+    }
+  };
 
   const enteredPayAmount = safeMoney(payAmount);
 
@@ -181,6 +197,35 @@ const CodCash = () => {
                     {RUPEE}{safeMoney(row.amountOwedBySeller).toLocaleString()}
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-3 pt-2.5 border-t border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <p className="text-xs text-blue-900 font-medium">
+                  Rider handed over this cash at your store?
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    handleConfirmCashReceived(
+                      row.orderId,
+                      row.amountOwedBySeller,
+                      row.riderName,
+                    )
+                  }
+                  disabled={confirmingOrderId === row.orderId}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  {confirmingOrderId === row.orderId ? (
+                    <>
+                      <RotateCw size={13} className="animate-spin" /> Confirming...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={14} /> Mark Cash Received ({RUPEE}
+                      {safeMoney(row.amountOwedBySeller).toLocaleString()})
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           ))}

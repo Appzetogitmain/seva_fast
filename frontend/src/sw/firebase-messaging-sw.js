@@ -102,8 +102,11 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId || firebaseConfig.apiKey
       options: {
         body,
         tag,
+        icon: "/favicon.png",
+        badge: "/favicon.png",
         requireInteraction: true,
         renotify: true,
+        vibrate: [200, 100, 200],
         ...(image ? { image } : {}),
         data: {
           link,
@@ -128,3 +131,57 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId || firebaseConfig.apiKey
     self.registration.showNotification(title, options);
   });
 }
+
+// Fallback listener for raw Web Push events
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  try {
+    const payload = event.data.json();
+    // If payload has already been rendered by Firebase onBackgroundMessage or native handler, skip
+    if (payload && (payload.notification || payload.data)) {
+      const notification = payload.notification || {};
+      const data = payload.data || {};
+      const title = notification.title || data.title || "SevaFast Update";
+      const body = notification.body || data.body || "";
+      const link = data.link || "/";
+      const tag = notification.tag || data.tag || data.orderId || "quick-commerce";
+      const image = String(notification.image || data.image || data.imageUrl || "").trim();
+
+      event.waitUntil(
+        self.registration.getNotifications({ tag }).then((existingNotifications) => {
+          // Prevent duplicate if already shown by Firebase SDK
+          if (existingNotifications && existingNotifications.length > 0) {
+            return undefined;
+          }
+          return self.registration.showNotification(title, {
+            body,
+            tag,
+            icon: "/favicon.png",
+            badge: "/favicon.png",
+            requireInteraction: true,
+            renotify: true,
+            vibrate: [200, 100, 200],
+            ...(image ? { image } : {}),
+            data: {
+              link,
+              orderId: data.orderId || "",
+              eventType: data.eventType || "",
+            },
+          });
+        }),
+      );
+    }
+  } catch (_e) {
+    // If data is plain text
+    const text = event.data.text();
+    if (text) {
+      event.waitUntil(
+        self.registration.showNotification("SevaFast", {
+          body: text,
+          icon: "/favicon.png",
+          badge: "/favicon.png",
+        }),
+      );
+    }
+  }
+});

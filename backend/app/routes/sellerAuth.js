@@ -9,7 +9,15 @@ import {
     verifySellerPasswordResetOtpController,
     resetSellerPassword,
 } from "../controller/sellerAuthController.js";
-import { getSellerProfile, updateSellerProfile, requestWithdrawal, getNearbySellers, getSellerCodCashSummary, submitSellerCodCashToAdmin } from "../controller/sellerController.js";
+import {
+    getSellerProfile,
+    updateSellerProfile,
+    requestWithdrawal,
+    getNearbySellers,
+    getSellerCodCashSummary,
+    submitSellerCodCashToAdmin,
+    confirmSellerReceivedCodCash,
+} from "../controller/sellerController.js";
 import { getSellerStats, getSellerEarnings, getSellerProfitSummary } from "../controller/sellerStatsController.js";
 import { getSellerWalletSummaryController } from "../controller/adminFinanceController.js";
 import {
@@ -120,6 +128,13 @@ router.post(
   allowRoles("seller"),
   requireApprovedSeller,
   submitSellerCodCashToAdmin,
+);
+router.post(
+  "/cod/confirm-received/:orderId",
+  verifyToken,
+  allowRoles("seller"),
+  requireApprovedSeller,
+  confirmSellerReceivedCodCash,
 );
 
 // Seller Subscription Plan routes

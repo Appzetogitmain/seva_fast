@@ -125,18 +125,19 @@ export const AuthProvider = ({ children }) => {
                     await startForegroundPushListener();
                     if (hasRegisteredFcmToken(currentRole)) return;
 
+                    const isFlutter = Boolean(window.Flutter);
                     const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
-                    if (permission === 'granted') {
+                    if (permission === 'granted' || isFlutter) {
                         await ensureFcmTokenRegistered({
                             role: currentRole,
-                            platform: 'web'
+                            platform: isFlutter ? 'app' : 'web'
                         });
                         return;
                     }
 
                     cleanupDeferredRegistration = scheduleFcmRegistrationOnUserGesture({
                         role: currentRole,
-                        platform: 'web',
+                        platform: isFlutter ? 'app' : 'web',
                         onError: (error) => {
                             console.warn('[push] Deferred registration failed:', error?.message || error);
                         },
@@ -219,6 +220,18 @@ export const AuthProvider = ({ children }) => {
                     console.warn('[auth] Failed to persist token to Flutter bridge:', error);
                 }
             }
+
+            // Immediately register push token for this role
+            import('@core/firebase/pushClient')
+                .then(({ ensureFcmTokenRegistered }) => {
+                    ensureFcmTokenRegistered({
+                        role,
+                        platform: window.Flutter ? 'app' : 'web'
+                    }).catch((err) => {
+                        console.warn('[auth] Post-login FCM registration skipped:', err?.message || err);
+                    });
+                })
+                .catch(() => {});
         } else {
             console.error('Invalid role or missing token for login:', role);
         }

@@ -1308,35 +1308,52 @@ const OrderDetails = () => {
         {/* COD dual collect: Online QR or Cash */}
         {codNeedsAction && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="p-6 rounded-3xl shadow-sm border border-orange-100 bg-orange-50/30">
-              <h3 className="font-bold text-lg text-gray-900 mb-1">Collect COD Payment</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Choose how the customer will pay. Wallets settle only after admin receives money.
+            <Card className="p-6 rounded-3xl shadow-sm border border-orange-200 bg-orange-50/40">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold text-lg text-gray-900">Collect COD Payment</h3>
+                <span className="text-xs font-black uppercase px-2.5 py-1 rounded-full bg-orange-100 text-orange-800">
+                  Cash on Delivery
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mb-4">
+                Follow the 3-step calculation below: Keep your earning in your pocket and hand over only the remaining amount.
               </p>
 
-              <div className="grid grid-cols-3 gap-2 mb-4 bg-white rounded-2xl border border-orange-100 p-3">
-                <div className="text-center">
-                  <p className="text-[9px] font-bold text-gray-500 uppercase">Total COD</p>
-                  <p className="text-base font-extrabold text-gray-900">
+              {/* Explicit 3-step calculation card */}
+              <div className="bg-white rounded-2xl border border-orange-100 p-4 shadow-sm space-y-3 mb-4">
+                <div className="flex justify-between items-center text-sm py-1 border-b border-gray-100">
+                  <span className="text-gray-600 font-medium">1. Collect from Customer (Gross Total):</span>
+                  <span className="text-base font-extrabold text-gray-900">
                     ₹{codBreakdown.gross.toLocaleString()}
-                  </p>
+                  </span>
                 </div>
-                <div className="text-center border-x border-orange-100">
-                  <p className="text-[9px] font-bold text-emerald-600 uppercase">Your Earning</p>
-                  <p className="text-base font-extrabold text-emerald-600">
-                    ₹{codBreakdown.earning.toLocaleString()}
-                  </p>
+                <div className="flex justify-between items-center text-sm py-1 border-b border-gray-100 bg-emerald-50/60 -mx-4 px-4">
+                  <span className="text-emerald-700 font-bold">2. Your Delivery Earning (Keep in Pocket):</span>
+                  <span className="text-base font-black text-emerald-600">
+                    - ₹{codBreakdown.earning.toLocaleString()}
+                  </span>
                 </div>
-                <div className="text-center">
-                  <p className="text-[9px] font-bold text-orange-600 uppercase">To Settle</p>
-                  <p className="text-base font-extrabold text-orange-700">
+                <div className="flex justify-between items-center text-base pt-1">
+                  <span className="text-orange-950 font-black">3. Net Amount to Hand Over:</span>
+                  <span className="text-xl font-black text-orange-700">
                     ₹{codBreakdown.toSettle.toLocaleString()}
-                  </p>
+                  </span>
                 </div>
               </div>
-              <p className="text-[11px] text-gray-500 mb-4 -mt-2">
-                Keep your ₹{codBreakdown.earning.toLocaleString()} earning — hand over only the remaining ₹{codBreakdown.toSettle.toLocaleString()}.
-              </p>
+
+              {/* Clear Recipient Notice Banner */}
+              <div className="rounded-xl p-3 bg-amber-100/70 border border-amber-200 mb-4">
+                <p className="text-xs font-bold text-amber-900">
+                  📍 Handover Destination:
+                </p>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  Hand over <span className="font-extrabold text-gray-900">₹{codBreakdown.toSettle.toLocaleString()}</span> directly to{" "}
+                  <span className="font-extrabold text-amber-950 underline">
+                    {order.seller?.shopName || order.seller?.name || "the Store / Seller"}
+                  </span>{" "}
+                  (or have customer pay full amount to Admin via QR).
+                </p>
+              </div>
 
               {(!codFlags.codCollectMethod || codFlags.codCollectMethod === "none") && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1353,7 +1370,7 @@ const OrderDetails = () => {
                     onClick={() => handleChooseCodMethod("cash")}
                     className="w-full"
                   >
-                    Collect Cash
+                    Collect Cash (₹{codBreakdown.gross.toLocaleString()})
                   </Button>
                 </div>
               )}
@@ -1367,6 +1384,9 @@ const OrderDetails = () => {
                   )}
                   {codQr && (
                     <div className="rounded-2xl bg-white border border-orange-100 p-4 text-center space-y-3">
+                      <div className="inline-block px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-1">
+                        Recipient: Admin Account
+                      </div>
                       {codQr.qrUrl ? (
                         <img
                           src={codQr.qrUrl}
@@ -1386,32 +1406,41 @@ const OrderDetails = () => {
                     </div>
                   )}
                   <Button disabled={codBusy} onClick={handleMarkOnlinePaid} className="w-full">
-                    {codBusy ? "Saving..." : "Mark as Paid"}
+                    {codBusy ? "Saving..." : "Mark as Paid to Admin"}
                   </Button>
                 </div>
               )}
 
               {codFlags.codCollectMethod === "cash" && !codFlags.codCashWithRider && !codFlags.codCashWithSeller && (
                 <Button disabled={codBusy} onClick={handleMarkCashCollected} className="w-full">
-                  {codBusy ? "Saving..." : "Mark Cash Collected"}
+                  {codBusy ? "Saving..." : `Mark Cash Collected (Keep ₹${codBreakdown.earning})`}
                 </Button>
               )}
 
               {codFlags.codCashWithRider && !codFlags.codCashWithSeller && (
                 <div className="space-y-3">
-                  <p className="text-sm text-orange-800 font-medium">
-                    Cash is with you. Hand it over to the seller when you return.
-                  </p>
+                  <div className="p-3 bg-white rounded-xl border border-orange-200">
+                    <p className="text-xs font-bold text-gray-500 uppercase">Cash with you to hand over</p>
+                    <p className="text-lg font-black text-orange-700">₹{codBreakdown.toSettle.toLocaleString()}</p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Give to Seller: <span className="font-bold text-gray-900">{order.seller?.shopName || order.seller?.name || "Store / Seller"}</span>
+                    </p>
+                  </div>
                   <Button disabled={codBusy} onClick={handleHandoffToSeller} className="w-full">
-                    {codBusy ? "Saving..." : "Hand Over to Seller"}
+                    {codBusy ? "Saving..." : `Hand Over ₹${codBreakdown.toSettle.toLocaleString()} to Seller`}
                   </Button>
                 </div>
               )}
 
               {codFlags.codCashWithSeller && (
-                <p className="text-sm text-green-700 font-medium">
-                  Cash handed to seller. Seller will remit to admin.
-                </p>
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                  <p className="text-sm text-emerald-800 font-bold">
+                    ✓ Handed Over to {order.seller?.shopName || order.seller?.name || "Seller"}
+                  </p>
+                  <p className="text-xs text-emerald-600 mt-0.5">
+                    Your ₹{codBreakdown.earning.toLocaleString()} earning is settled and in your pocket.
+                  </p>
+                </div>
               )}
             </Card>
           </motion.div>

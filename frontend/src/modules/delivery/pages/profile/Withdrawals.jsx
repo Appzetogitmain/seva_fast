@@ -25,6 +25,7 @@ const Withdrawals = () => {
     const [fetching, setFetching] = useState(true);
     const [stats, setStats] = useState({
         availableBalance: 0,
+        cashKeptInHand: 0,
         pendingWithdrawals: 0,
         history: []
     });
@@ -33,26 +34,27 @@ const Withdrawals = () => {
         try {
             setFetching(true);
             const res = await deliveryApi.getEarnings();
-            if (res.data.success) {
+            if (res.data?.success && res.data?.result) {
+                const result = res.data.result;
+                const txns = result.transactions || result.recentTransactions || [];
                 setStats({
-                    availableBalance: res.data.result.totalEarnings || 0,
-                    pendingWithdrawals: (res.data.result.recentTransactions || [])
-                        .filter(t => t.type.includes('Withdrawal') && (t.status === 'Pending' || t.status === 'Processing'))
-                        .reduce((acc, t) => acc + Math.abs(t.amount), 0),
-                    history: (res.data.result.recentTransactions || [])
-                        .filter(t => t.type.includes('Withdrawal'))
+                    availableBalance: Number(result.availableBalance ?? 0),
+                    cashKeptInHand: Number(result.cashKeptInHand ?? 0),
+                    pendingWithdrawals: Number(result.pendingWithdrawals ?? 
+                        txns
+                            .filter(t => t.type?.includes('Withdrawal') && (t.status === 'Pending' || t.status === 'Processing'))
+                            .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0)
+                    ),
+                    history: txns.filter(t => t.type?.includes('Withdrawal'))
                 });
             }
         } catch (error) {
             console.error("Fetch Error:", error);
-            // Fallback with mock data for frontend demo if API fails
             setStats({
-                availableBalance: 1250,
+                availableBalance: 0,
+                cashKeptInHand: 0,
                 pendingWithdrawals: 0,
-                history: [
-                    { id: 'WDR123', amount: 500, status: 'Settled', date: '2024-03-20', type: 'Withdrawal' },
-                    { id: 'WDR124', amount: 300, status: 'Pending', date: '2024-03-21', type: 'Withdrawal' }
-                ]
+                history: []
             });
         } finally {
             setFetching(false);
@@ -68,7 +70,7 @@ const Withdrawals = () => {
             return toast.error("Please enter a valid amount");
         }
         if (Number(amount) > stats.availableBalance) {
-            return toast.error("Insufficient balance");
+            return toast.error("Insufficient balance. You cannot withdraw cash you already kept in pocket.");
         }
 
         setLoading(true);
@@ -114,15 +116,27 @@ const Withdrawals = () => {
                             {stats.availableBalance.toLocaleString()}
                         </h2>
 
-                        <div className="mt-6 flex items-center justify-between text-white bg-white/10 p-3 rounded-xl backdrop-blur-md border border-white/10">
-                            <div className="flex items-center">
-                                <Clock size={16} className="mr-2 opacity-80" />
-                                <span className="text-[11px] font-bold">Pending: ₹{stats.pendingWithdrawals.toLocaleString()}</span>
+                        <div className="mt-4 grid grid-cols-2 gap-2 text-white">
+                            <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-md border border-white/10">
+                                <span className="text-[10px] text-brand-100 uppercase font-bold block">Pending</span>
+                                <span className="text-xs font-bold">₹{stats.pendingWithdrawals.toLocaleString()}</span>
                             </div>
-                            <ArrowUpRight size={16} className="opacity-80" />
+                            <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-md border border-white/10">
+                                <span className="text-[10px] text-brand-100 uppercase font-bold block">In Your Pocket (COD)</span>
+                                <span className="text-xs font-bold">₹{stats.cashKeptInHand.toLocaleString()}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                {stats.cashKeptInHand > 0 && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                        <p>
+                            You already have <strong>₹{stats.cashKeptInHand.toLocaleString()}</strong> in physical cash in your pocket from COD deliveries. Only online/incentive earnings are withdrawable from Admin.
+                        </p>
+                    </div>
+                )}
 
                 {/* Withdrawal Form */}
                 <Card className="p-6">

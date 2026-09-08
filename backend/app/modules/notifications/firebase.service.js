@@ -88,6 +88,10 @@ export async function sendFCM(tokens = [], payload = {}) {
   const body = payload.body || payload.message || "";
   const tag = data.orderId || data.eventType || "quick-commerce";
   const image = resolveImageUrl(payload, data);
+  if (!data.title && title) data.title = title;
+  if (!data.body && body) data.body = body;
+  if (!data.tag && tag) data.tag = tag;
+
   const chunks = chunkArray(tokens, MAX_FCM_MULTICAST_TOKENS);
 
   const merged = {
@@ -109,6 +113,12 @@ export async function sendFCM(tokens = [], payload = {}) {
         priority: "high",
         notification: {
           channelId: "high_importance_channel",
+          sound: "default",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          priority: "high",
+          visibility: "public",
+          ...(image ? { imageUrl: image } : {}),
         },
       },
       apns: {
@@ -128,9 +138,16 @@ export async function sendFCM(tokens = [], payload = {}) {
           title,
           body,
           tag,
+          icon: "/favicon.png",
+          badge: "/favicon.png",
           requireInteraction: true,
+          renotify: true,
           ...(image ? { image } : {}),
-          data: { link: link || absoluteLink || "/" },
+          data: {
+            link: link || absoluteLink || "/",
+            orderId: data.orderId || "",
+            eventType: data.eventType || "",
+          },
         },
         // Only set absolute fcmOptions when FRONTEND_URL is configured (avoid localhost).
         fcmOptions: absoluteLink ? { link: absoluteLink } : undefined,

@@ -571,3 +571,55 @@ export const submitSellerCodCashToAdmin = async (req, res) => {
     return handleResponse(res, error.statusCode || 500, error.message);
   }
 };
+
+/* ===============================
+   SELLER CONFIRM COD CASH RECEIVED FROM RIDER
+================================ */
+export const confirmSellerReceivedCodCash = async (req, res) => {
+  try {
+    const sellerId = req.user?.id ?? req.user?._id;
+    if (!sellerId) {
+      return handleResponse(res, 401, "Unauthorized");
+    }
+    const { orderId } = req.params;
+    if (!orderId) {
+      return handleResponse(res, 400, "Order ID is required");
+    }
+
+    const Order = (await import("../models/order.js")).default;
+    const { handoffCodCashToSeller } = await import(
+      "../services/finance/orderFinanceService.js"
+    );
+
+    const isObjectId = mongoose.Types.ObjectId.isValid(String(orderId));
+    const query = {
+      $or: [
+        { orderId: String(orderId) },
+        ...(isObjectId ? [{ _id: new mongoose.Types.ObjectId(String(orderId)) }] : []),
+      ],
+      seller: new mongoose.Types.ObjectId(String(sellerId)),
+    };
+
+    const order = await Order.findOne(query);
+    if (!order) {
+      return handleResponse(res, 404, "Order not found or does not belong to your store");
+    }
+
+    if (order.financeFlags?.codCashWithSeller) {
+      return handleResponse(res, 200, "Cash is already marked received by store", order);
+    }
+
+    if (!order.financeFlags?.codCashWithRider) {
+      return handleResponse(res, 400, "Rider has not marked this cash collected yet");
+    }
+
+    const updated = await handoffCodCashToSeller(order._id, {
+      actorId: sellerId,
+    });
+
+    return handleResponse(res, 200, "COD cash marked as received from rider successfully", updated);
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
+  }
+};
+
