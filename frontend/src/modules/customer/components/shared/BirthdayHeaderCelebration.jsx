@@ -50,11 +50,18 @@ const BirthdayHeaderCelebration = ({ variant = "global" }) => {
   const firstName = getBirthdayFirstName(user?.name);
 
   useEffect(() => {
-    if (!isBirthday || variant !== "global") return undefined;
+    if (!isBirthday || variant !== "global") {
+      document.body.classList.remove("has-birthday-banner");
+      return undefined;
+    }
 
+    document.body.classList.add("has-birthday-banner");
     fireHeaderConfetti();
     const intervalId = setInterval(fireHeaderConfetti, 14000);
-    return () => clearInterval(intervalId);
+    return () => {
+      document.body.classList.remove("has-birthday-banner");
+      clearInterval(intervalId);
+    };
   }, [isBirthday, variant]);
 
   if (!isBirthday) return null;

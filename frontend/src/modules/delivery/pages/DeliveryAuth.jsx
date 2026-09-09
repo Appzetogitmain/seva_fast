@@ -48,6 +48,107 @@ const isValidIndianMobile = (phone) => /^[6-9]\d{9}$/.test(String(phone || ""));
 // Bug 275/277: persist in-progress signup (step + fields) across a T&C/Privacy
 // tab visit or a hard page refresh, so the rider doesn't lose their work.
 const SIGNUP_DRAFT_KEY = "delivery_signup_draft";
+const FILES_DRAFT_KEY = "delivery_signup_files";
+
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+  });
+
+const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 0.75) => {
+  if (!file || !file.type || !file.type.startsWith("image/")) return file;
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            const compressedFile = new File(
+              [blob],
+              file.name.replace(/\.[^/.]+$/, ".jpg"),
+              {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              }
+            );
+            resolve(compressedFile);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
+};
+
+const base64ToFile = (dataUrl, fileName, mimeType) => {
+  try {
+    const arr = dataUrl.split(",");
+    const mime = mimeType || arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], fileName || "document.jpg", { type: mime });
+  } catch {
+    return null;
+  }
+};
+
+const getStoredFilesDraft = () => {
+  try {
+    const raw = sessionStorage.getItem(FILES_DRAFT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const setStoredFileItem = (key, fileMeta) => {
+  try {
+    const current = getStoredFilesDraft();
+    if (fileMeta) {
+      current[key] = fileMeta;
+    } else {
+      delete current[key];
+    }
+    sessionStorage.setItem(FILES_DRAFT_KEY, JSON.stringify(current));
+  } catch (e) {
+    console.warn("Could not save file to sessionStorage", e);
+  }
+};
 
 const loadSignupDraft = () => {
   try {
@@ -102,9 +203,32 @@ const DeliveryAuth = () => {
   const [panFile, setPanFile] = useState(null);
   const [dlFile, setDlFile] = useState(null);
 
+  // Rehydrate files from sessionStorage draft on mount
+  useEffect(() => {
+    const storedFiles = getStoredFilesDraft();
+    if (storedFiles.profile?.dataUrl) {
+      const file = base64ToFile(storedFiles.profile.dataUrl, storedFiles.profile.name, storedFiles.profile.type);
+      if (file) {
+        setProfileImageFile(file);
+        setProfileImagePreview(storedFiles.profile.dataUrl);
+      }
+    }
+    if (storedFiles.aadhar?.dataUrl) {
+      const file = base64ToFile(storedFiles.aadhar.dataUrl, storedFiles.aadhar.name, storedFiles.aadhar.type);
+      if (file) setAadharFile(file);
+    }
+    if (storedFiles.pan?.dataUrl) {
+      const file = base64ToFile(storedFiles.pan.dataUrl, storedFiles.pan.name, storedFiles.pan.type);
+      if (file) setPanFile(file);
+    }
+    if (storedFiles.dl?.dataUrl) {
+      const file = base64ToFile(storedFiles.dl.dataUrl, storedFiles.dl.name, storedFiles.dl.type);
+      if (file) setDlFile(file);
+    }
+  }, []);
+
   // OTP state
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(30);
   const [validationErrors, setValidationErrors] = useState({});
@@ -191,16 +315,80 @@ const DeliveryAuth = () => {
     e.target.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  const handleDLUpload = (file) => {
-    setDlFile(file || null);
+  const handleProfilePhotoChange = async (file) => {
+    if (!file) {
+      setProfileImageFile(null);
+      setProfileImagePreview("");
+      setStoredFileItem("profile", null);
+      return;
+    }
+    const processedFile = await compressImage(file, 800, 800, 0.8);
+    setProfileImageFile(processedFile);
+    try {
+      const base64 = await fileToBase64(processedFile);
+      setProfileImagePreview(base64);
+      setStoredFileItem("profile", {
+        dataUrl: base64,
+        name: processedFile.name,
+        type: processedFile.type,
+      });
+    } catch {
+      setProfileImagePreview(URL.createObjectURL(processedFile));
+    }
   };
 
-  const handlePanUpload = (file) => {
-    setPanFile(file || null);
+  const handleDLUpload = async (file) => {
+    if (!file) {
+      setDlFile(null);
+      setStoredFileItem("dl", null);
+      return;
+    }
+    const processedFile = await compressImage(file, 1280, 1280, 0.75);
+    setDlFile(processedFile);
+    try {
+      const base64 = await fileToBase64(processedFile);
+      setStoredFileItem("dl", {
+        dataUrl: base64,
+        name: processedFile.name,
+        type: processedFile.type,
+      });
+    } catch {}
   };
 
-  const handleAadharUpload = (file) => {
-    setAadharFile(file || null);
+  const handlePanUpload = async (file) => {
+    if (!file) {
+      setPanFile(null);
+      setStoredFileItem("pan", null);
+      return;
+    }
+    const processedFile = await compressImage(file, 1280, 1280, 0.75);
+    setPanFile(processedFile);
+    try {
+      const base64 = await fileToBase64(processedFile);
+      setStoredFileItem("pan", {
+        dataUrl: base64,
+        name: processedFile.name,
+        type: processedFile.type,
+      });
+    } catch {}
+  };
+
+  const handleAadharUpload = async (file) => {
+    if (!file) {
+      setAadharFile(null);
+      setStoredFileItem("aadhar", null);
+      return;
+    }
+    const processedFile = await compressImage(file, 1280, 1280, 0.75);
+    setAadharFile(processedFile);
+    try {
+      const base64 = await fileToBase64(processedFile);
+      setStoredFileItem("aadhar", {
+        dataUrl: base64,
+        name: processedFile.name,
+        type: processedFile.type,
+      });
+    } catch {}
   };
 
   const handleSendOtp = async () => {
@@ -236,10 +424,22 @@ const DeliveryAuth = () => {
         if (signupExperience) formData.append("experienceYears", signupExperience);
         if (signupPreferredArea) formData.append("preferredArea", signupPreferredArea);
 
-        if (profileImageFile) formData.append("profileImage", profileImageFile);
-        if (aadharFile) formData.append("aadhar", aadharFile);
-        if (panFile) formData.append("pan", panFile);
-        if (dlFile) formData.append("dl", dlFile);
+        if (profileImageFile) {
+          const comp = await compressImage(profileImageFile, 800, 800, 0.8);
+          formData.append("profileImage", comp);
+        }
+        if (aadharFile) {
+          const comp = await compressImage(aadharFile, 1280, 1280, 0.75);
+          formData.append("aadhar", comp);
+        }
+        if (panFile) {
+          const comp = await compressImage(panFile, 1280, 1280, 0.75);
+          formData.append("pan", comp);
+        }
+        if (dlFile) {
+          const comp = await compressImage(dlFile, 1280, 1280, 0.75);
+          formData.append("dl", comp);
+        }
 
         const res = await deliveryApi.sendSignupOtp(formData);
         toast.success(res.data?.message || "OTP sent!");
@@ -268,7 +468,7 @@ const DeliveryAuth = () => {
   };
 
   const handleVerifyOtp = async () => {
-    if (otp.some((d) => d === "") || !agreed) return;
+    if (otp.some((d) => d === "")) return;
     setLoading(true);
     try {
       const phone = mode === "login" ? loginPhone : signupPhone;
@@ -280,6 +480,7 @@ const DeliveryAuth = () => {
         // Signup submitted successfully (approved or pending) — clear the draft.
         try {
           sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+          sessionStorage.removeItem(FILES_DRAFT_KEY);
         } catch {
           /* ignore */
         }
@@ -371,21 +572,7 @@ const DeliveryAuth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F4FF] flex flex-col items-center justify-center p-5 pt-20 font-['Outfit',_sans-serif]">
-      {/* Fixed Logo Bar - stays pinned even on long, scrolling forms */}
-      <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-4">
-        <div className="w-14 h-14 rounded-2xl bg-white/85 backdrop-blur-sm border border-brand-100 shadow-sm flex items-center justify-center overflow-hidden">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt={`${appName} logo`}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <ShieldCheck className="w-5 h-5 text-brand-600" />
-          )}
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F0F4FF] flex flex-col items-center justify-center p-4 py-8 sm:py-10 font-['Outfit',_sans-serif]">
       {/* Background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-32 -left-32 w-80 h-80 bg-brand-200/40 rounded-full blur-3xl" />
@@ -396,14 +583,25 @@ const DeliveryAuth = () => {
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-[420px] relative z-10"
+        className="w-full max-w-[420px] relative z-10 my-auto"
       >
         {/* Card */}
         <div className="bg-white rounded-[2.5rem] shadow-[0_24px_60px_rgba(99,102,241,0.1)] border border-brand-50 overflow-hidden">
 
-          {/* Header with Lottie */}
-          <div className="bg-gradient-to-br from-brand-50 to-purple-50 p-8 pt-10 flex flex-col items-center relative">
-            <div className="w-40 h-40">
+          {/* Header with Logo & Lottie */}
+          <div className="bg-gradient-to-br from-brand-50 to-purple-50 p-6 pt-8 flex flex-col items-center relative">
+            <div className="w-14 h-14 rounded-2xl bg-white shadow-sm border border-brand-100 flex items-center justify-center overflow-hidden mb-3 shrink-0">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={`${appName} logo`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <ShieldCheck className="w-6 h-6 text-brand-600" />
+              )}
+            </div>
+            <div className="w-36 h-36">
               <Lottie animationData={deliveryRiding} loop />
             </div>
             <AnimatePresence mode="wait">
@@ -412,7 +610,7 @@ const DeliveryAuth = () => {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                className="text-center mt-3"
+                className="text-center mt-2"
               >
                 <h1 className="text-2xl font-black text-gray-900">
                   {step === "otp"
@@ -490,11 +688,8 @@ const DeliveryAuth = () => {
                                 id="profile-upload"
                                 className="hidden"
                                 onChange={(e) => {
-                                  const file = e.target.files[0];
-                                  if (file) {
-                                    setProfileImageFile(file);
-                                    setProfileImagePreview(URL.createObjectURL(file));
-                                  }
+                                  const file = e.target.files?.[0];
+                                  if (file) handleProfilePhotoChange(file);
                                 }}
                               />
                               <label
@@ -944,12 +1139,12 @@ const DeliveryAuth = () => {
                         >
                           <div className="space-y-3">
                             {[
-                              { label: "Aadhar Card (Front/Back)", state: aadharFile, setter: setAadharFile, id: "aadhar" },
-                              { label: "PAN Card", state: panFile, setter: setPanFile, id: "pan" },
+                              { label: "Aadhar Card (Front/Back)", state: aadharFile, handler: handleAadharUpload, id: "aadhar" },
+                              { label: "PAN Card", state: panFile, handler: handlePanUpload, id: "pan" },
                               {
                                 label: isCycleVehicle ? "Government ID (Optional for Cycle)" : "Driving License",
                                 state: dlFile,
-                                setter: setDlFile,
+                                handler: handleDLUpload,
                                 id: "dl",
                               },
                             ].map((doc) => (
@@ -960,11 +1155,8 @@ const DeliveryAuth = () => {
                                   className="hidden"
                                   accept="image/*"
                                   onChange={(e) => {
-                                    const file = e.target.files[0];
-                                    if (doc.id === "dl") handleDLUpload(file);
-                                    else if (doc.id === "pan") handlePanUpload(file);
-                                    else if (doc.id === "aadhar") handleAadharUpload(file);
-                                    else doc.setter(file);
+                                    const file = e.target.files?.[0];
+                                    if (file) doc.handler(file);
                                   }}
                                 />
                                 <label
@@ -992,7 +1184,7 @@ const DeliveryAuth = () => {
                                       type="button"
                                       onClick={(e) => {
                                         e.preventDefault();
-                                        doc.setter(null);
+                                        doc.handler(null);
                                       }}
                                       className="p-1.5 hover:bg-brand-100 rounded-lg text-brand-600 transition-colors"
                                     >
@@ -1000,8 +1192,6 @@ const DeliveryAuth = () => {
                                     </button>
                                   )}
                                 </label>
-
-
                               </div>
                             ))}
                             <p className="text-[10px] text-gray-400 italic px-1 flex items-center gap-1.5">
@@ -1137,26 +1327,10 @@ const DeliveryAuth = () => {
                     )}
                   </div>
 
-                  {/* Terms checkbox */}
-                  <div className="flex items-start gap-3 bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                    <input
-                      id="terms"
-                      type="checkbox"
-                      checked={agreed}
-                      onChange={(e) => setAgreed(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-brand-600 cursor-pointer"
-                    />
-                    <label htmlFor="terms" className="text-xs text-gray-500 leading-relaxed cursor-pointer">
-                      I confirm my phone number is correct and I agree to the{" "}
-                      <Link to="/terms?for=delivery" target="_blank" className="text-brand-600 font-bold hover:underline">Terms of Service</Link> &amp;{" "}
-                      <Link to="/privacy?for=delivery" target="_blank" className="text-brand-600 font-bold hover:underline">Privacy Policy</Link>.
-                    </label>
-                  </div>
-
                   {/* Verify Button */}
                   <button
                     onClick={handleVerifyOtp}
-                    disabled={!agreed || otp.some((d) => !d) || loading}
+                    disabled={otp.some((d) => !d) || loading}
                     className="w-full py-4 bg-black  text-primary-foreground rounded-2xl text-sm font-black tracking-widest uppercase shadow-lg shadow-brand-200 hover:bg-brand-700 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {loading ? (

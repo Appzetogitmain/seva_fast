@@ -49,6 +49,27 @@
 
   /* Cart pill fill — overridden on Home by MainLocationHeader */
   --customer-mini-cart-color: var(--primary);
+  --birthday-banner-height: 0px;
+}
+
+body.has-birthday-banner {
+  --birthday-banner-height: 36px;
+}
+
+/* Automatically offset sticky headers and absolute top bars under the birthday banner */
+body.has-birthday-banner main .sticky.top-0,
+body.has-birthday-banner main [class*="sticky"][class*="top-0"],
+body.has-birthday-banner [class*="min-h-screen"] > .sticky.top-0,
+body.has-birthday-banner [class*="min-h-screen"] > [class*="sticky"][class*="top-0"] {
+  top: var(--birthday-banner-height) !important;
+}
+
+body.has-birthday-banner header.absolute.top-4 {
+  top: calc(1rem + var(--birthday-banner-height)) !important;
+}
+
+body.has-birthday-banner header.absolute.top-8 {
+  top: calc(2rem + var(--birthday-banner-height)) !important;
 }
 
 body {

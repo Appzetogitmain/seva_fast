@@ -35,10 +35,21 @@ const PlansPage = () => {
     const [processingPlanId, setProcessingPlanId] = useState(null);
     const [referralModalOpen, setReferralModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
-    const [referralCode, setReferralCode] = useState('');
+    const { user, refreshUser } = useAuth();
+    
+    const referrerReferralCode = user?.referredBy?.referralCode || '';
+    const [referralCode, setReferralCode] = useState(() => {
+        return (referrerReferralCode || (typeof window !== 'undefined' ? sessionStorage.getItem('seva_referral_code') : '') || '').trim().toUpperCase();
+    });
+
+    useEffect(() => {
+        const activeRef = referrerReferralCode || sessionStorage.getItem('seva_referral_code') || '';
+        if (activeRef) {
+            setReferralCode(activeRef.trim().toUpperCase());
+        }
+    }, [referrerReferralCode]);
     
     const navigate = useNavigate();
-    const { user, refreshUser } = useAuth();
 
     useEffect(() => {
         fetchPlans();
@@ -99,7 +110,7 @@ const PlansPage = () => {
     };
 
     const resolveReferralForPurchase = () => {
-        const entered = referralCode.trim().toUpperCase();
+        const entered = (referralCode || referrerReferralCode || sessionStorage.getItem('seva_referral_code') || '').trim().toUpperCase();
         if (!entered) return DEFAULT_REFERRAL_CODE;
         if (user?.referralCode && entered === String(user.referralCode).trim().toUpperCase()) {
             return DEFAULT_REFERRAL_CODE;
@@ -352,32 +363,46 @@ const PlansPage = () => {
                             </button>
                             
                             <div className="mb-6">
-                                <h3 className="text-xl font-black text-slate-900 tracking-tight">Enter Referral Code</h3>
+                                <h3 className="text-xl font-black text-slate-900 tracking-tight">Referral & Sponsor Details</h3>
                                 <p className="text-sm font-medium text-slate-500 mt-1 mb-3">
-                                    <strong>{selectedPlan?.name}</strong> plan ke liye referral code daalein. Har plan purchase par code zaroori hai.
+                                    <strong>{selectedPlan?.name}</strong> plan activation.
                                 </p>
-                                <div className="bg-amber-50/80 border border-amber-100 rounded-xl p-3 flex items-start gap-3">
-                                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-amber-600 text-xs font-black">!</span>
+                                {referralCode ? (
+                                    <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-3 flex items-start gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <span className="text-emerald-700 text-xs font-black">✓</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-emerald-900/70 uppercase tracking-widest mb-0.5">Referral Code Applied</p>
+                                            <p className="text-xs font-black text-emerald-900 leading-tight">
+                                                Code: <span className="font-mono tracking-wider">{referralCode}</span>
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-amber-900/60 uppercase tracking-widest mb-0.5">No Referral Code?</p>
-                                        <p className="text-xs font-bold text-amber-900 leading-tight">
-                                            No worries! Click{' '}
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setReferralCode(DEFAULT_REFERRAL_CODE);
-                                                    toast.success('SEVAFAST code applied!');
-                                                }}
-                                                className="font-black text-amber-700 tracking-wider hover:underline"
-                                            >
-                                                SEVAFAST
-                                            </button>{' '}
-                                            to enjoy platform support benefits.
-                                        </p>
+                                ) : (
+                                    <div className="bg-amber-50/80 border border-amber-100 rounded-xl p-3 flex items-start gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <span className="text-amber-600 text-xs font-black">!</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-amber-900/60 uppercase tracking-widest mb-0.5">No Referral Code?</p>
+                                            <p className="text-xs font-bold text-amber-900 leading-tight">
+                                                No worries! Click{' '}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setReferralCode(DEFAULT_REFERRAL_CODE);
+                                                        toast.success('SEVAFAST code applied!');
+                                                    }}
+                                                    className="font-black text-amber-700 tracking-wider hover:underline"
+                                                >
+                                                    SEVAFAST
+                                                </button>{' '}
+                                                to enjoy platform support benefits.
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             <input 

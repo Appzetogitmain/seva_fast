@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Phone, Mail, Camera, Save, Cake, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Camera, Save, Cake, Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@core/context/AuthContext';
@@ -33,6 +33,8 @@ const EditProfilePage = () => {
         dateOfBirth: formatDobForInput(user?.dateOfBirth),
         profileImage: user?.profileImage || '',
     });
+
+    const isDobLocked = Boolean(user?.dateOfBirth);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -199,21 +201,37 @@ const EditProfilePage = () => {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Date of Birth</label>
-                            <div className="flex items-center gap-3 bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10 transition-all">
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">Date of Birth</label>
+                                {isDobLocked && (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                                        <Lock size={10} /> Locked
+                                    </span>
+                                )}
+                            </div>
+                            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+                                isDobLocked
+                                    ? 'bg-slate-100/80 border-slate-200 cursor-not-allowed'
+                                    : 'bg-slate-50 border-slate-200 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10'
+                            }`}>
                                 <Cake size={20} className="text-slate-400 shrink-0" />
                                 <input
                                     type="date"
                                     name="dateOfBirth"
                                     value={formData.dateOfBirth}
                                     onChange={handleChange}
-                                    required
+                                    disabled={isDobLocked}
                                     max={new Date().toISOString().split('T')[0]}
-                                    className="bg-transparent w-full text-slate-800 font-bold outline-none"
+                                    className={`bg-transparent w-full font-bold outline-none ${
+                                        isDobLocked ? 'text-slate-500 cursor-not-allowed' : 'text-slate-800'
+                                    }`}
                                 />
+                                {isDobLocked && <Lock size={16} className="text-slate-400 shrink-0" />}
                             </div>
                             <p className="mt-2 text-[11px] font-medium text-slate-400">
-                                We use this to send you a birthday wish once every year.
+                                {isDobLocked
+                                    ? 'Date of birth cannot be modified once set. Please contact support if you need to update it.'
+                                    : 'We use this to send you a birthday wish once every year. Note: Once saved, DOB cannot be changed.'}
                             </p>
                         </div>
 

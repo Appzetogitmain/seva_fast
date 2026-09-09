@@ -19,7 +19,9 @@ import {
 } from "../validation/customerAuthValidation.js";
 import { recordAuthActivity } from "../services/authActivityService.js";
 import { ensurePlanSubscriptionsSynced } from "../services/planSubscriptionService.js";
-import { applyDateOfBirthToCustomer } from "../utils/customerDob.js";
+import { applyDateOfBirthToCustomer, parseDateOfBirthInput } from "../utils/customerDob.js";
+
+import { resolveReferrerIdByCode, isSelfReferral } from "../services/referralService.js";
 
 const CUSTOMER_REFERRED_BY_FIELDS = "name phone referralCode role";
 
@@ -50,6 +52,7 @@ export const signupCustomer = async (req, res) => {
             rawPhone: payload.phone,
             flow: "signup",
             ipAddress: req.ip,
+            referralCode: payload.referralCode,
         });
 
         return handleResponse(res, 200, "OTP sent successfully");
@@ -98,6 +101,14 @@ export const verifyCustomerOTP = async (req, res) => {
             otp: payload.otp,
             ipAddress: req.ip,
         });
+
+        if (payload.referralCode && !customer.referredBy) {
+            const referrerId = await resolveReferrerIdByCode(payload.referralCode);
+            if (referrerId && !isSelfReferral(customer._id, referrerId)) {
+                customer.referredBy = referrerId;
+                await customer.save();
+            }
+        }
 
         if (payload.dateOfBirth !== undefined) {
             applyDateOfBirthToCustomer(customer, payload.dateOfBirth);
@@ -307,7 +318,21 @@ export const updateCustomerProfile = async (req, res) => {
         if (payload.phone) customer.phone = payload.phone;
         if (payload.addresses) customer.addresses = payload.addresses;
         if (payload.dateOfBirth !== undefined) {
-            applyDateOfBirthToCustomer(customer, payload.dateOfBirth);
+            if (customer.dateOfBirth) {
+                const existingIso = new Date(customer.dateOfBirth).toISOString().split("T")[0];
+                let incomingIso = null;
+                if (payload.dateOfBirth) {
+                    const parsed = parseDateOfBirthInput(payload.dateOfBirth);
+                    if (parsed?.dateOfBirth) {
+                        incomingIso = parsed.dateOfBirth.toISOString().split("T")[0];
+                    }
+                }
+                if (!incomingIso || incomingIso !== existingIso) {
+                    return handleResponse(res, 400, "Date of birth cannot be changed once set. Please contact support if you need assistance.");
+                }
+            } else {
+                applyDateOfBirthToCustomer(customer, payload.dateOfBirth);
+            }
         }
 
         await customer.save();

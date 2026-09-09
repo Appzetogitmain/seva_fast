@@ -198,6 +198,30 @@ export async function issueCustomerOtp({
     customer = await Customer.findById(customer._id).select(
       "+otpHash +otpExpiresAt +otpFailedAttempts +otpLockedUntil +otpLastSentAt +otpSessionVersion +otp +otpExpiry",
     );
+  } else if (!customer.isVerified) {
+    if (name && (!customer.name || customer.name === "Customer")) {
+      customer.name = name;
+    }
+    if (referralCode && !customer.referredBy) {
+      if (referralCode.toUpperCase() === "SEVAFAST") {
+        let adminUser = await Customer.findOne({ referralCode: "SEVAFAST", role: "admin" });
+        if (!adminUser) {
+          adminUser = await Customer.create({
+            name: "SEVAFAST Admin",
+            phone: "+910000000000",
+            role: "admin",
+            referralCode: "SEVAFAST",
+            isVerified: true,
+          });
+        }
+        customer.referredBy = adminUser._id;
+      } else {
+        const referrer = await Customer.findOne({ referralCode: referralCode.toUpperCase() });
+        if (referrer && String(referrer._id) !== String(customer._id)) {
+          customer.referredBy = referrer._id;
+        }
+      }
+    }
   }
 
   if (customer.otpLockedUntil && customer.otpLockedUntil > now) {

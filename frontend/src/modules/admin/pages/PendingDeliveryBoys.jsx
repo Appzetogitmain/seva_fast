@@ -66,30 +66,33 @@ const PendingDeliveryBoys = () => {
             const list = Array.isArray(payload.items) ? payload.items : (response.data.results || []);
 
             // Map backend data to frontend format
-            const mappedRiders = list.map(r => ({
-                id: r._id,
-                name: r.name,
-                phone: r.phone,
-                email: r.email,
-                address: r.address,
-                dob: r.dob,
-                bloodGroup: r.bloodGroup,
-                avatar: r.profileImage,
-                appliedDate: formatDate(r.createdAt),
-                location: r.currentArea || 'Not Specified',
-                vehicle: r.vehicleType ? r.vehicleType.charAt(0).toUpperCase() + r.vehicleType.slice(1) : 'Bike',
-                vehicleNumber: r.vehicleNumber,
-                drivingLicenseNumber: r.drivingLicenseNumber,
-                aadharNumber: r.aadharNumber,
-                panNumber: r.panNumber,
-                accountHolder: r.accountHolder,
-                accountNumber: r.accountNumber,
-                ifsc: r.ifsc,
-                documents: Object.keys(r.documents || {}).filter(key => r.documents[key]),
-                documentUrls: r.documents || {},
-                status: r.isVerified ? 'approved' : 'pending_review',
-                preferredArea: r.currentArea || 'Not Specified'
-            }));
+            const mappedRiders = list.map(r => {
+                const loc = String(r.preferredArea || r.currentArea || r.address || '').trim() || 'Not Specified';
+                return {
+                    id: r._id,
+                    name: r.name,
+                    phone: r.phone,
+                    email: r.email,
+                    address: r.address,
+                    dob: r.dob,
+                    bloodGroup: r.bloodGroup,
+                    avatar: r.profileImage,
+                    appliedDate: formatDate(r.createdAt),
+                    location: loc,
+                    vehicle: r.vehicleType ? r.vehicleType.charAt(0).toUpperCase() + r.vehicleType.slice(1) : 'Bike',
+                    vehicleNumber: r.vehicleNumber,
+                    drivingLicenseNumber: r.drivingLicenseNumber,
+                    aadharNumber: r.aadharNumber,
+                    panNumber: r.panNumber,
+                    accountHolder: r.accountHolder,
+                    accountNumber: r.accountNumber,
+                    ifsc: r.ifsc,
+                    documents: Object.keys(r.documents || {}).filter(key => r.documents[key]),
+                    documentUrls: r.documents || {},
+                    status: r.isVerified ? 'approved' : 'pending_review',
+                    preferredArea: loc
+                };
+            });
 
             setPendingRiders(mappedRiders);
         } catch (error) {
@@ -427,6 +430,7 @@ const PendingDeliveryBoys = () => {
                                                 className="h-24 w-24 rounded-2xl bg-white shadow-xl object-cover ring-4 ring-white mx-auto"
                                             />
                                             <h3 className="ds-h2 mt-3">{viewingRider.name}</h3>
+                                            <p className="text-[10px] font-mono font-bold text-slate-400 mt-0.5">ID: RD-{String(viewingRider.id || '').slice(-6).toUpperCase()}</p>
                                             <p className="text-[11px] font-bold text-slate-500 mt-0.5">Applied: {viewingRider.appliedDate}</p>
                                         </div>
 

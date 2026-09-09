@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@core/context/AuthContext';
 import { useSettings } from '@core/context/SettingsContext';
 import {
@@ -19,6 +19,7 @@ import {
     X,
     Eye,
     Cake,
+    Gift,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { customerApi } from '../services/customerApi';
@@ -84,7 +85,21 @@ const CustomerAuth = () => {
     const logoUrl = settings?.logoUrl || '';
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchParams] = useSearchParams();
     const isSignupRoute = location.pathname === '/signup';
+
+    const urlReferral = searchParams.get('ref') || searchParams.get('referralCode') || searchParams.get('refId') || '';
+    const [referralCode, setReferralCode] = useState(() => {
+        return (urlReferral || sessionStorage.getItem('seva_referral_code') || '').trim().toUpperCase();
+    });
+
+    useEffect(() => {
+        if (urlReferral) {
+            const clean = urlReferral.trim().toUpperCase();
+            sessionStorage.setItem('seva_referral_code', clean);
+            setReferralCode(clean);
+        }
+    }, [urlReferral]);
 
     const [formData, setFormData] = useState({
         phone: location.state?.phone || '',
@@ -158,6 +173,7 @@ const CustomerAuth = () => {
                 const res = await customerApi.sendSignupOtp({
                     name: formData.name.trim(),
                     phone: formData.phone,
+                    referralCode: referralCode.trim() || undefined,
                 });
                 toast.success(res.data?.message || 'OTP sent successfully!');
             }
@@ -217,6 +233,7 @@ const CustomerAuth = () => {
                 phone: formData.phone,
                 otp: formData.otp,
                 ...(!isLogin && formData.dateOfBirth ? { dateOfBirth: formData.dateOfBirth } : {}),
+                ...(!isLogin && referralCode.trim() ? { referralCode: referralCode.trim() } : {}),
             });
 
             const responseData = response.data.result || response.data;
@@ -480,6 +497,26 @@ const CustomerAuth = () => {
                                                     value={formData.dateOfBirth}
                                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
                                                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                                                    onFocus={(e) => { e.target.style.borderColor = activeCategory.theme; }}
+                                                    onBlur={(e) => { e.target.style.borderColor = '#F3F4F6'; }}
+                                                />
+                                            </div>
+                                        )}
+                                        {!isLogin && (
+                                            <div className="relative group">
+                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors">
+                                                    <Gift size={18} />
+                                                </div>
+                                                <input
+                                                    name="referralCode"
+                                                    value={referralCode}
+                                                    placeholder="Referral Code (Optional)"
+                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 uppercase tracking-wider outline-none focus:bg-white transition-all"
+                                                    onChange={(e) => {
+                                                        const val = e.target.value.toUpperCase().trim();
+                                                        setReferralCode(val);
+                                                        sessionStorage.setItem('seva_referral_code', val);
+                                                    }}
                                                     onFocus={(e) => { e.target.style.borderColor = activeCategory.theme; }}
                                                     onBlur={(e) => { e.target.style.borderColor = '#F3F4F6'; }}
                                                 />

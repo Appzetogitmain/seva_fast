@@ -9,7 +9,6 @@ import { useAuth } from '@core/context/AuthContext';
 import { useSettings } from '@core/context/SettingsContext';
 import { useSignOutConfirmation } from '@shared/hooks/useSignOutConfirmation';
 import { customerApi } from '../services/customerApi';
-import axiosInstance from '@core/api/axios';
 import { toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import {
@@ -68,7 +67,7 @@ function getPurchasedPlanNames(user) {
 
 const ProfilePage = () => {
     const navigate = useNavigate();
-    const { user, role } = useAuth();
+    const { user, updateUser, role } = useAuth();
     const { requestSignOut, signOutDialog } = useSignOutConfirmation();
     const { settings } = useSettings();
     const appName = settings?.appName || 'App';
@@ -239,13 +238,17 @@ const ProfilePage = () => {
     const siteReferUrl = referralCode
         ? `${window.location.origin}/signup?ref=${referralCode}`
         : window.location.origin;
-    const appReferUrl = settings?.playStoreLink || siteReferUrl;
+    const defaultPlayStoreLink = 'https://play.google.com/store/apps/details?id=com.sevafast.user';
+    const appReferUrl = settings?.playStoreLink || defaultPlayStoreLink;
     const cardReferUrl = siteReferUrl;
     const referrerName = getReferrerDisplayName(user?.referredBy);
     const logoUrl = settings?.logoUrl || '/seva-fast-logo.png';
     const supportEmail = settings?.supportEmail || 'sevafast2@gmail.com';
-    const siteHost = (typeof window !== 'undefined' ? window.location.host : 'www.sevafast.in') || 'www.sevafast.in';
-    const profilePhotoUrl = user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user?.name || user?.phone || 'customer')}`;
+    const rawHost = typeof window !== 'undefined' ? window.location.hostname : 'sevafast.in';
+    const displaySiteHost = (!rawHost || rawHost.includes('localhost') || rawHost.includes('127.0.0.1'))
+        ? 'www.sevafast.in'
+        : (rawHost.startsWith('www.') ? rawHost : `www.${rawHost}`);
+    const profilePhotoUrl = user?.profileImage || '';
     const qrSrc = (data, size = 120) =>
         `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
     const goldText = 'text-[#967117] font-bold';
@@ -335,7 +338,6 @@ const ProfilePage = () => {
             </div>
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-4">
-
                 {/* User Identity Card — SEVAFAST membership layout */}
                 <div
                     ref={membershipCardRef}
@@ -349,7 +351,7 @@ const ProfilePage = () => {
                     <div className="pointer-events-none absolute -right-[6%] top-[6%] h-[88%] w-[44%] rounded-full border border-black/25 sm:w-[40%]" />
                     <div className="pointer-events-none absolute right-[2%] top-[14%] h-[72%] w-[36%] rounded-full border border-black/15 sm:w-[32%]" />
 
-                    <div className="relative z-10 grid grid-cols-[1.22fr_0.78fr] gap-2 p-3 sm:gap-2.5 sm:p-4 min-h-[238px] sm:min-h-[276px]">
+                    <div className="relative z-10 grid grid-cols-[1.28fr_0.72fr] gap-2 p-3 sm:gap-2.5 sm:p-4 min-h-[238px] sm:min-h-[276px]">
                         {/* Left rounded content panel */}
                         <div className="relative flex min-w-0 flex-col rounded-[1.35rem] bg-white/42 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-[1px] sm:rounded-[1.75rem] sm:px-4 sm:py-3.5">
                             <div className="flex items-start justify-between gap-2">
@@ -430,12 +432,12 @@ const ProfilePage = () => {
                                 <p className="truncate">user ref id: {referralCode || 'N/A'}</p>
                             </div>
 
-                            <div className="mt-auto flex items-end justify-between gap-2.5 pt-3">
-                                <div className="flex min-w-0 items-end gap-1.5">
-                                    <span className="text-xl leading-none sm:text-2xl" aria-hidden>🛍️</span>
+                            <div className="mt-auto flex items-end justify-between gap-1.5 pt-2.5">
+                                <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+                                    <span className="text-base leading-none sm:text-xl shrink-0" aria-hidden>🛍️</span>
                                     <div className="min-w-0 text-[8px] font-semibold leading-tight text-slate-700 sm:text-[9px]">
-                                        <p className="truncate">www.{siteHost.replace(/^www\./, '')}</p>
-                                        <p className="truncate">{supportEmail}</p>
+                                        <p className="truncate font-sans font-medium">{displaySiteHost}</p>
+                                        <p className="truncate font-sans text-slate-600">{supportEmail}</p>
                                     </div>
                                 </div>
                                 {referralCode ? (
@@ -446,14 +448,14 @@ const ProfilePage = () => {
                                             navigator.clipboard.writeText(referralCode);
                                             toast.success('Referral code copied to clipboard!');
                                         }}
-                                        className="inline-flex max-w-[50%] items-center gap-1 rounded-md bg-[#2f6fed]/10 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-[#2f6fed] ring-1 ring-[#2f6fed]/25"
+                                        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-[#2f6fed]/10 px-1.5 py-1 text-[8px] font-black uppercase tracking-wider text-[#2f6fed] ring-1 ring-[#2f6fed]/25"
                                         title="Copy referral code"
                                     >
-                                        <Share2 size={10} className="shrink-0" />
-                                        <span className="truncate font-mono tracking-wider text-slate-800 normal-case">
+                                        <Share2 size={9} className="shrink-0" />
+                                        <span className="font-mono tracking-wider text-slate-800 normal-case font-bold">
                                             {referralCode}
                                         </span>
-                                        <Copy size={10} className="shrink-0 text-slate-500" />
+                                        <Copy size={9} className="shrink-0 text-slate-500" />
                                     </button>
                                 ) : null}
                             </div>
@@ -521,16 +523,24 @@ const ProfilePage = () => {
                                         {user?.currentPlan && user?.planExpiry ? formatDate(user.planExpiry) : 'N / A'}
                                     </div>
                                 </div>
-                                <div className="h-[4.25rem] w-[4.25rem] overflow-hidden rounded-full border-[3px] border-white bg-slate-200 shadow-md sm:h-[5.25rem] sm:w-[5.25rem]">
-                                    <img
-                                        src={profilePhotoUrl}
-                                        alt={user?.name || 'Profile'}
-                                        className="h-full w-full object-cover"
-                                        crossOrigin="anonymous"
-                                    />
+                                <div className="relative h-[4.25rem] w-[4.25rem] rounded-full border-[3px] border-white bg-slate-200 shadow-md sm:h-[5.25rem] sm:w-[5.25rem]">
+                                    <div className="h-full w-full overflow-hidden rounded-full flex items-center justify-center">
+                                        {profilePhotoUrl ? (
+                                            <img
+                                                src={profilePhotoUrl}
+                                                alt={user?.name || 'Profile'}
+                                                className="h-full w-full object-cover"
+                                                crossOrigin="anonymous"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-500">
+                                                <User className="w-8 h-8 sm:w-10 sm:h-10 text-slate-500" />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <span className="mt-1 text-[8px] font-semibold text-white/95 sm:text-[9px]">
-                                    profile photo
+                                    photo
                                 </span>
                             </div>
 

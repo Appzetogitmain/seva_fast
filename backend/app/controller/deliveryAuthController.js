@@ -79,6 +79,10 @@ export const signupDelivery = async (req, res) => {
             return handleResponse(res, 400, "Delivery partner already exists");
         }
 
+        if (delivery && delivery.isPhoneVerified && !delivery.isVerified) {
+            return handleResponse(res, 400, "Your application is already submitted and pending admin approval");
+        }
+
         let otp = generateOTP();
         if (isDeliveryTestPhone(phone)) {
             otp = DELIVERY_TEST_OTP;
@@ -89,19 +93,21 @@ export const signupDelivery = async (req, res) => {
         let dlUrl = delivery?.documents?.drivingLicense || "";
         let profileImageUrl = delivery?.profileImage || "";
 
-        // Handle File Uploads via Multer
-        if (req.files && Array.isArray(req.files)) {
-            for (const file of req.files) {
-                if (file.fieldname === "profileImage") {
-                    profileImageUrl = await uploadToCloudinary(file.buffer, "delivery/profiles");
-                } else if (file.fieldname === "aadhar") {
-                    aadharUrl = await uploadToCloudinary(file.buffer, "delivery/documents");
-                } else if (file.fieldname === "pan") {
-                    panUrl = await uploadToCloudinary(file.buffer, "delivery/documents");
-                } else if (file.fieldname === "dl") {
-                    dlUrl = await uploadToCloudinary(file.buffer, "delivery/documents");
-                }
-            }
+        // Handle File Uploads via Multer concurrently
+        if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+            await Promise.all(
+                req.files.map(async (file) => {
+                    if (file.fieldname === "profileImage") {
+                        profileImageUrl = await uploadToCloudinary(file.buffer, "delivery/profiles");
+                    } else if (file.fieldname === "aadhar") {
+                        aadharUrl = await uploadToCloudinary(file.buffer, "delivery/documents");
+                    } else if (file.fieldname === "pan") {
+                        panUrl = await uploadToCloudinary(file.buffer, "delivery/documents");
+                    } else if (file.fieldname === "dl") {
+                        dlUrl = await uploadToCloudinary(file.buffer, "delivery/documents");
+                    }
+                })
+            );
         }
 
         const normalizedAadhar = String(req.body?.aadharUrl || req.body?.aadhar || "").trim();
@@ -142,6 +148,7 @@ export const signupDelivery = async (req, res) => {
                 pan: panUrl,
                 drivingLicense: dlUrl,
             },
+            isPhoneVerified: false,
             otp,
             otpExpiry: Date.now() + 5 * 60 * 1000,
         };
@@ -185,6 +192,13 @@ export const loginDelivery = async (req, res) => {
 
         if (!delivery) {
             return handleResponse(res, 404, "Delivery partner not found");
+        }
+
+        if (!delivery.isPhoneVerified) {
+            return handleResponse(res, 400, "Please complete your registration and mobile verification first.", {
+                isVerified: false,
+                isPhoneVerified: false,
+            });
         }
 
         if (!delivery.isVerified) {
@@ -244,7 +258,8 @@ export const verifyDeliveryOTP = async (req, res) => {
 
         delivery.otp = undefined;
         delivery.otpExpiry = undefined;
-        const isNewSignup = !delivery.isVerified && !delivery.lastLogin; // rudimentary check if it's a new unverified signup
+        const isNewSignup = !delivery.isPhoneVerified && !delivery.isVerified;
+        delivery.isPhoneVerified = true;
         await delivery.save();
 
         if (isNewSignup) {
@@ -269,6 +284,7 @@ export const verifyDeliveryOTP = async (req, res) => {
         if (!delivery.isVerified) {
             return handleResponse(res, 403, "Your delivery partner account is pending admin approval.", {
                 isVerified: false,
+                isPhoneVerified: true,
                 applicationStatus: "pending",
                 requiresApproval: true,
             });

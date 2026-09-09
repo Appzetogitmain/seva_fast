@@ -106,6 +106,11 @@ const deliverySchema = new mongoose.Schema(
             default: false,
         },
 
+        isPhoneVerified: {
+            type: Boolean,
+            default: false,
+        },
+
         rating: {
             type: Number,
             default: 5.0,

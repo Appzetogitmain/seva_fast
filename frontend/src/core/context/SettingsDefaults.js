@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS = {
   instagram: "",
   linkedin: "",
   youtube: "",
-  playStoreLink: "",
+  playStoreLink: "https://play.google.com/store/apps/details?id=com.sevafast.user",
   appStoreLink: "",
   metaTitle: "",
   metaDescription: "",

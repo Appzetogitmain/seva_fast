@@ -1,16 +1,19 @@
 import Delivery from "../../models/delivery.js";
 import Order from "../../models/order.js";
+import Wallet from "../../models/wallet.js";
+import Transaction from "../../models/transaction.js";
 import handleResponse from "../../utils/helper.js";
 import getPagination from "../../utils/pagination.js";
+import { roundCurrency } from "../../utils/money.js";
 import { notify } from "../../modules/notifications/notification.service.js";
 import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
 
 export const getDeliveryPartners = async (req, res) => {
   try {
-    const { status, verified } = req.query;
+    const { status, verified, search } = req.query;
     const query = {};
 
-    if (status === "online") {
+    if (status === "online" || status === "available") {
       query.isOnline = true;
     } else if (status === "offline") {
       query.isOnline = false;
@@ -20,6 +23,18 @@ export const getDeliveryPartners = async (req, res) => {
       query.isVerified = true;
     } else if (verified === "false") {
       query.isVerified = false;
+      query.isPhoneVerified = { $ne: false };
+    }
+
+    if (search && String(search).trim()) {
+      const searchRegex = new RegExp(String(search).trim(), "i");
+      query.$or = [
+        { name: searchRegex },
+        { phone: searchRegex },
+        { email: searchRegex },
+        { currentArea: searchRegex },
+        { preferredArea: searchRegex },
+      ];
     }
 
     const { page, limit, skip } = getPagination(req, {
@@ -36,8 +51,85 @@ export const getDeliveryPartners = async (req, res) => {
       Delivery.countDocuments(query),
     ]);
 
+    const partnerIds = deliveryPartners.map((dp) => dp._id);
+
+    // Fetch live wallet balances, completed deliveries, and earnings
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [wallets, orderCounts, earningsAgg] = await Promise.all([
+      Wallet.find({
+        ownerType: "DELIVERY_PARTNER",
+        ownerId: { $in: partnerIds },
+      }).lean(),
+      Order.aggregate([
+        {
+          $match: {
+            deliveryBoy: { $in: partnerIds },
+            status: "delivered",
+          },
+        },
+        {
+          $group: {
+            _id: "$deliveryBoy",
+            totalDeliveries: { $sum: 1 },
+          },
+        },
+      ]),
+      Transaction.aggregate([
+        {
+          $match: {
+            user: { $in: partnerIds },
+            userModel: "Delivery",
+            status: "Settled",
+            type: { $in: ["Delivery Earning", "Incentive", "Bonus"] },
+          },
+        },
+        {
+          $group: {
+            _id: "$user",
+            totalEarnings: { $sum: "$amount" },
+            todayEarnings: {
+              $sum: {
+                $cond: [{ $gte: ["$createdAt", startOfToday] }, "$amount", 0],
+              },
+            },
+          },
+        },
+      ]),
+    ]);
+
+    const walletMap = new Map(wallets.map((w) => [String(w.ownerId), w]));
+    const orderCountMap = new Map(
+      orderCounts.map((o) => [String(o._id), o.totalDeliveries]),
+    );
+    const earningsMap = new Map(earningsAgg.map((e) => [String(e._id), e]));
+
+    const enrichedItems = deliveryPartners.map((dp) => {
+      const w = walletMap.get(String(dp._id));
+      const totalDeliveries = orderCountMap.get(String(dp._id)) || 0;
+      const earn = earningsMap.get(String(dp._id));
+      const totalEarnings = roundCurrency(earn?.totalEarnings || 0);
+      const todayEarnings = roundCurrency(earn?.todayEarnings || 0);
+      const walletBalance = roundCurrency(w?.availableBalance || 0);
+      const cashInHand = roundCurrency(w?.cashInHand || 0);
+      const rating =
+        typeof dp.rating === "number" ? Number(dp.rating.toFixed(1)) : 5.0;
+
+      return {
+        ...dp,
+        totalDeliveries,
+        totalOrders: totalDeliveries,
+        todayEarnings,
+        totalEarnings,
+        walletBalance,
+        cashInHand,
+        rating,
+      };
+    });
+
     return handleResponse(res, 200, "Delivery partners fetched successfully", {
-      items: deliveryPartners,
+      items: enrichedItems,
       page,
       limit,
       total,
@@ -53,7 +145,7 @@ export const approveDeliveryPartner = async (req, res) => {
     const { id } = req.params;
     const rider = await Delivery.findOneAndUpdate(
       { _id: id },
-      { isVerified: true, isOnline: true },
+      { isVerified: true, isPhoneVerified: true, isOnline: true },
       { new: true },
     );
 

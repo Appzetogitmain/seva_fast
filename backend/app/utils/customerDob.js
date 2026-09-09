@@ -6,8 +6,12 @@ export function parseDateOfBirthInput(input) {
     return null;
   }
 
-  const raw = String(input).trim();
+  let raw = String(input).trim();
   if (!raw) return null;
+
+  if (raw.includes("T")) {
+    raw = raw.split("T")[0];
+  }
 
   const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
   if (!isoMatch) {

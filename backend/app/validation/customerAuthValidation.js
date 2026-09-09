@@ -3,6 +3,7 @@ import Joi from "joi";
 export const sendSignupOtpSchema = Joi.object({
   name: Joi.string().trim().min(2).max(80).required(),
   phone: Joi.string().trim().min(7).max(24).required(),
+  referralCode: Joi.string().trim().max(50).optional().allow("", null),
 });
 
 export const sendLoginOtpSchema = Joi.object({
@@ -12,7 +13,15 @@ export const sendLoginOtpSchema = Joi.object({
 export const verifyOtpSchema = Joi.object({
   phone: Joi.string().trim().min(7).max(24).required(),
   otp: Joi.string().trim().pattern(/^\d{4,8}$/).required(),
-  dateOfBirth: Joi.string().trim().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
+  dateOfBirth: Joi.alternatives()
+    .try(
+      Joi.string().trim().pattern(/^\d{4}-\d{2}-\d{2}$/),
+      Joi.string().isoDate(),
+      Joi.date()
+    )
+    .optional()
+    .allow("", null),
+  referralCode: Joi.string().trim().max(50).optional().allow("", null),
 });
 
 export const updateCustomerProfileSchema = Joi.object({
@@ -23,7 +32,14 @@ export const updateCustomerProfileSchema = Joi.object({
   // normalizePhoneNumber() on the Customer model reduces it to E.164 on save.
   phone: Joi.string().trim().pattern(/^(\+?91)?[6-9]\d{9}$/).optional(),
   addresses: Joi.array().optional(),
-  dateOfBirth: Joi.string().trim().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow("", null),
+  dateOfBirth: Joi.alternatives()
+    .try(
+      Joi.string().trim().pattern(/^\d{4}-\d{2}-\d{2}$/),
+      Joi.string().isoDate(),
+      Joi.date()
+    )
+    .optional()
+    .allow("", null),
   profileImage: Joi.string().trim().max(500).optional().allow("", null),
 });
 
