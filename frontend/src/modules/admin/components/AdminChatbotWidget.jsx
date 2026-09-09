@@ -531,6 +531,19 @@ export default function AdminChatbotWidget() {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* Quick Stop AI Voice Button if currently speaking */}
+          {isSpeaking && (
+            <button
+              type="button"
+              onClick={stopSpeaking}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition-all animate-pulse cursor-pointer hover:scale-105 active:scale-95"
+              title="Stop AI Voice Speech"
+            >
+              <span className="w-2 h-2 bg-white rounded-xs"></span>
+              <span className="text-[10px]">Stop Audio</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => {

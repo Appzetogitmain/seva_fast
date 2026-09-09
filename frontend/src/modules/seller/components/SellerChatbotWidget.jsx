@@ -63,7 +63,11 @@ export default function SellerChatbotWidget() {
       clearInterval(streamIntervalRef.current);
       streamIntervalRef.current = null;
     }
+    activeUtteranceRef.current = null;
     setIsSpeaking(false);
+    setMessages((prev) =>
+      prev.map((msg) => (msg.isStreaming ? { ...msg, isStreaming: false } : msg))
+    );
   };
 
   // Automatically halt speech and speech recognition whenever chat modal is closed or unmounted
@@ -212,9 +216,11 @@ export default function SellerChatbotWidget() {
         };
 
         activeUtteranceRef.current = utterance;
+        setIsSpeaking(true);
         window.speechSynthesis.speak(utterance);
       } catch (err) {
         console.error("Speech synthesis error:", err);
+        setIsSpeaking(false);
       }
     }
 
@@ -248,6 +254,12 @@ export default function SellerChatbotWidget() {
   // Voice speech synthesis helper for individual manual clicks
   const speakText = (text) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    
+    if (isSpeaking) {
+      stopSpeaking();
+      return;
+    }
+
     stopSpeaking();
 
     try {
@@ -270,9 +282,12 @@ export default function SellerChatbotWidget() {
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
 
+      activeUtteranceRef.current = utterance;
+      setIsSpeaking(true);
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.error("Speech synthesis error:", err);
+      setIsSpeaking(false);
     }
   };
 
@@ -474,6 +489,19 @@ export default function SellerChatbotWidget() {
         </div>
         
         <div className="flex items-center gap-1.5">
+          {/* Quick Stop AI Voice Button if currently speaking */}
+          {isSpeaking && (
+            <button
+              type="button"
+              onClick={stopSpeaking}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-sm transition-all animate-pulse cursor-pointer hover:scale-105 active:scale-95"
+              title="Stop AI Voice Speech"
+            >
+              <span className="w-2 h-2 bg-white rounded-xs"></span>
+              <span className="text-[10px]">Stop Audio</span>
+            </button>
+          )}
+
           {/* Two-way Voice Talk Toggle Button */}
           <button 
             type="button"
@@ -583,16 +611,20 @@ export default function SellerChatbotWidget() {
                       <span className="inline-block w-1.5 h-3.5 bg-primary animate-pulse ml-1 align-middle rounded-xs" />
                     )}
                     
-                    {/* Read Aloud button (when not actively streaming) */}
+                    {/* Read Aloud / Stop button (when not actively streaming) */}
                     {!msg.isStreaming && text && (
                       <div className="flex justify-end pt-1">
                         <button 
                           type="button"
-                          onClick={() => speakText(text)} 
-                          className="text-slate-400 hover:text-primary p-1 rounded-md transition-colors cursor-pointer"
-                          title="Read Aloud"
+                          onClick={() => isSpeaking ? stopSpeaking() : speakText(text)} 
+                          className={`p-1 rounded-md transition-colors cursor-pointer ${
+                            isSpeaking 
+                              ? "text-rose-500 hover:text-rose-700 bg-rose-50" 
+                              : "text-slate-400 hover:text-primary"
+                          }`}
+                          title={isSpeaking ? "Stop Voice" : "Read Aloud"}
                         >
-                          <FiVolume2 size={13} />
+                          {isSpeaking ? <FiVolumeX size={13} /> : <FiVolume2 size={13} />}
                         </button>
                       </div>
                     )}
