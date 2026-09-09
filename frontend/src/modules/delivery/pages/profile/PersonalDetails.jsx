@@ -95,12 +95,18 @@ const PersonalDetails = () => {
         {/* Profile Photo */}
         <div className="flex flex-col items-center justify-center py-6">
           <div className="relative">
-            <div className="w-24 h-24 rounded-full p-1 bg-white shadow-md">
-              <img
-                src={user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'Felix'}`}
-                alt="Profile"
-                className="w-full h-full rounded-full object-cover bg-gray-100"
-              />
+            <div className="w-24 h-24 rounded-full p-1 bg-white shadow-md flex items-center justify-center overflow-hidden">
+              {user?.profileImage && !user.profileImage.includes('dicebear.com') ? (
+                <img
+                  src={user.profileImage}
+                  alt="Profile"
+                  className="w-full h-full rounded-full object-cover bg-gray-100"
+                />
+              ) : (
+                <div className="w-full h-full rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                  <User size={44} className="text-slate-600" />
+                </div>
+              )}
             </div>
             {isEditing && (
               <button className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full shadow-lg hover:bg-primary/90 transition-colors">

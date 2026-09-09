@@ -202,12 +202,18 @@ const Profile = () => {
             className="flex items-center space-x-4 cursor-pointer group"
           >
             <div className="relative">
-              <div className="w-20 h-20 bg-white rounded-full p-1 shadow-lg group-hover:scale-105 transition-transform">
-                <img
-                  src={user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'Felix'}`}
-                  alt="Profile"
-                  className="w-full h-full rounded-full object-cover bg-gray-100"
-                />
+              <div className="w-20 h-20 bg-white rounded-full p-1 shadow-lg group-hover:scale-105 transition-transform flex items-center justify-center overflow-hidden">
+                {user?.profileImage && !user.profileImage.includes('dicebear.com') ? (
+                  <img
+                    src={user.profileImage}
+                    alt="Profile"
+                    className="w-full h-full rounded-full object-cover bg-gray-100"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                    <User size={38} className="text-slate-600" />
+                  </div>
+                )}
               </div>
               <div className={`absolute bottom-0 right-0 w-6 h-6 border-2 border-white rounded-full ${user?.isOnline ? "bg-emerald-500" : "bg-gray-400"}`}></div>
             </div>

@@ -17,8 +17,9 @@ import ScrollToTop from '../../modules/customer/components/shared/ScrollToTop';
 import Auth from '../../modules/seller/pages/Auth';
 import ApplicationPending from '../../modules/seller/pages/ApplicationPending';
 import AdminAuth from '../../modules/admin/pages/AdminAuth';
-import DeliveryAuth from '../../modules/delivery/pages/DeliveryAuth';
 import DeliveryApplicationPending from '../../modules/delivery/pages/ApplicationPending';
+import DeliveryAuth from '../../modules/delivery/pages/DeliveryAuth';
+import VerifyPartner from '../../modules/delivery/pages/VerifyPartner';
 import CustomerAuth from '../../modules/customer/pages/CustomerAuth';
 
 // Customer Pages (lazy-loaded)
@@ -179,6 +180,18 @@ const router = createBrowserRouter([
                 {
                     path: 'delivery/pending-approval',
                     element: <DeliveryApplicationPending />,
+                },
+                {
+                    path: 'verify/delivery/:riderId',
+                    element: <VerifyPartner />,
+                },
+                {
+                    path: 'verify/delivery',
+                    element: <VerifyPartner />,
+                },
+                {
+                    path: 'verify',
+                    element: <VerifyPartner />,
                 },
                 {
                     path: 'seller/*',

@@ -1,51 +1,110 @@
-import React from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Clock3, ShieldAlert, Store } from "lucide-react";
+import { CheckCircle2, Clock3, ShieldAlert, Store, RotateCw, Sparkles } from "lucide-react";
 import { useAuth } from "@core/context/AuthContext";
 import { useSettings } from "@core/context/SettingsContext";
+import { onSellerApprovalStatus } from "@core/services/orderSocket";
+import { toast } from "sonner";
 
 const ApplicationPending = () => {
   const location = useLocation();
-  const { isAuthenticated, role, user, isLoading, refreshUser } = useAuth();
+  const navigate = useNavigate();
+  const { isAuthenticated, role, user, isLoading, refreshUser, token } = useAuth();
   const { settings } = useSettings();
+  const [isChecking, setIsChecking] = useState(false);
 
   const appName = settings?.appName || "App";
   const logoUrl = settings?.logoUrl || "";
 
-  const applicationStatus =
-    location.state?.applicationStatus ||
-    user?.applicationStatus ||
-    null;
-  const rejectionReason = location.state?.rejectionReason || user?.rejectionReason || "";
+  // Prioritize live user object status over stale location.state
+  const currentStatus = user?.applicationStatus || (user?.isVerified ? "approved" : location.state?.applicationStatus || "pending");
+  const isApproved =
+    Boolean(user) &&
+    user.isVerified === true &&
+    user.isActive === true &&
+    currentStatus === "approved";
 
-  if (!isLoading && isAuthenticated && role === "seller") {
-    const isApproved =
-      user?.isVerified === true &&
-      user?.isActive === true &&
-      applicationStatus === "approved";
+  const handleApprovedTransition = () => {
+    toast.success("🎉 Congratulations! Your store application has been approved by admin!", {
+      duration: 5000,
+    });
+    navigate("/seller", { replace: true });
+  };
 
-    if (isApproved) {
-      return <Navigate to="/seller" replace />;
-    }
+  // If already approved on mount or state change, immediately redirect to seller dashboard
+  if (!isLoading && isAuthenticated && role === "seller" && isApproved) {
+    return <Navigate to="/seller" replace />;
   }
 
-  React.useEffect(() => {
-    let interval;
-    if (isAuthenticated && role === "seller" && applicationStatus === "pending") {
-      interval = setInterval(() => {
-        if (refreshUser) {
-          refreshUser();
-        }
-      }, 30000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isAuthenticated, role, applicationStatus, refreshUser]);
+  // 1. Real-time WebSocket listener for immediate approval without reload
+  useEffect(() => {
+    if (!token || !isAuthenticated || role !== "seller") return;
 
-  const isRejected = applicationStatus === "rejected";
-  const isStatusUnknown = !applicationStatus;
+    const cleanup = onSellerApprovalStatus(token, async (data) => {
+      console.log("[SellerApplicationPending] Received approval status update:", data);
+      if (data?.status === "approved" || data?.applicationStatus === "approved") {
+        if (refreshUser) {
+          await refreshUser();
+        }
+        handleApprovedTransition();
+      } else if (data?.status === "rejected") {
+        if (refreshUser) {
+          await refreshUser();
+        }
+        toast.error(`Store application rejected: ${data?.reason || "Please review and re-submit."}`);
+      }
+    });
+
+    return () => {
+      if (typeof cleanup === "function") cleanup();
+    };
+  }, [token, isAuthenticated, role, refreshUser]);
+
+  // 2. Active 3-second heartbeat polling fallback (in case socket reconnects)
+  useEffect(() => {
+    if (!isAuthenticated || role !== "seller" || isApproved) return;
+
+    const interval = setInterval(async () => {
+      try {
+        if (refreshUser) {
+          const freshUser = await refreshUser();
+          const freshStatus = freshUser?.applicationStatus || (freshUser?.isVerified ? "approved" : "pending");
+          if (freshUser?.isVerified === true && freshUser?.isActive === true && freshStatus === "approved") {
+            clearInterval(interval);
+            handleApprovedTransition();
+          }
+        }
+      } catch (err) {
+        console.warn("[SellerApplicationPending] Poll check error:", err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, role, isApproved, refreshUser]);
+
+  const handleManualCheck = async () => {
+    setIsChecking(true);
+    try {
+      if (refreshUser) {
+        const freshUser = await refreshUser();
+        const freshStatus = freshUser?.applicationStatus || (freshUser?.isVerified ? "approved" : "pending");
+        if (freshUser?.isVerified === true && freshUser?.isActive === true && freshStatus === "approved") {
+          handleApprovedTransition();
+          return;
+        }
+      }
+      toast.info("Application is still under review by admin.");
+    } catch {
+      toast.error("Failed to check status. Please try again.");
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const isRejected = currentStatus === "rejected";
+  const isStatusUnknown = !currentStatus;
+  const rejectionReason = location.state?.rejectionReason || user?.rejectionReason || "";
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden font-['Outfit']">
@@ -71,10 +130,11 @@ const ApplicationPending = () => {
               <span className="text-sm font-bold text-white/90">{appName} Seller</span>
             </div>
             <div
-              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest ${isRejected
-                ? "bg-rose-500/20 text-rose-200"
-                : "bg-amber-400/20 text-amber-100"
-                }`}
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest ${
+                isRejected
+                  ? "bg-rose-500/20 text-rose-200"
+                  : "bg-amber-400/20 text-amber-100 animate-pulse"
+              }`}
             >
               {isRejected ? <ShieldAlert className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
               {isRejected ? "Application Rejected" : isStatusUnknown ? "Status Unavailable" : "Application Pending"}
@@ -93,7 +153,7 @@ const ApplicationPending = () => {
               ? "You cannot access the seller dashboard yet. Please contact admin support and re-submit with the required details."
               : isStatusUnknown
                 ? "This can happen during a temporary network issue. Please reconnect and try signing in again."
-                : "Dashboard access unlocks automatically once admin approves your account."}
+                : "Dashboard access unlocks automatically in real-time once admin approves your store — no need to log out!"}
           </p>
 
           {rejectionReason ? (
@@ -104,18 +164,34 @@ const ApplicationPending = () => {
           ) : null}
 
           {!isRejected && !isStatusUnknown ? (
-            <div className="mt-6 rounded-2xl border border-brand-400/30 bg-brand-500/10 px-4 py-3 text-sm text-slate-100 flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0 text-brand-400" />
-              <p className="font-semibold">
-                Approval usually takes less than 24 hours. You can return to login and try again later.
-              </p>
+            <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3.5 text-sm text-slate-100 flex items-start gap-3">
+              <Sparkles className="h-5 w-5 mt-0.5 shrink-0 text-emerald-400 animate-spin" style={{ animationDuration: '4s' }} />
+              <div>
+                <p className="font-bold text-white">
+                  Live Sync Active
+                </p>
+                <p className="text-xs font-medium text-emerald-200/90 mt-0.5">
+                  As soon as admin clicks "Approve", this page will instantly unlock your seller dashboard automatically.
+                </p>
+              </div>
             </div>
           ) : null}
 
-          <div className="mt-8 flex flex-col sm:flex-row gap-3">
+          <div className="mt-8 flex flex-col sm:flex-row items-center gap-3">
+            {!isRejected && (
+              <button
+                type="button"
+                onClick={handleManualCheck}
+                disabled={isChecking}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 text-sm font-black tracking-wide hover:opacity-95 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+              >
+                <RotateCw className={`h-4 w-4 ${isChecking ? "animate-spin" : ""}`} />
+                {isChecking ? "Checking Status..." : "Check Status Now"}
+              </button>
+            )}
             <Link
               to="/seller/auth"
-              className="inline-flex items-center justify-center rounded-xl bg-white text-slate-900 px-5 py-3 text-sm font-black tracking-wide hover:bg-slate-100 transition-colors"
+              className="w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white px-5 py-3 text-sm font-black tracking-wide transition-colors border border-white/10"
             >
               Back To Seller Login
             </Link>

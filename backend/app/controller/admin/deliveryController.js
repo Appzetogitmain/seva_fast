@@ -7,6 +7,7 @@ import getPagination from "../../utils/pagination.js";
 import { roundCurrency } from "../../utils/money.js";
 import { notify } from "../../modules/notifications/notification.service.js";
 import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
+import { getIO } from "../../socket/socketManager.js";
 
 export const getDeliveryPartners = async (req, res) => {
   try {
@@ -161,6 +162,20 @@ export const approveDeliveryPartner = async (req, res) => {
       console.error("Failed to notify delivery partner of approval", err);
     }
 
+    // Real-time socket push to immediately unlock rider dashboard without re-login
+    try {
+      const io = getIO();
+      if (io) {
+        io.to(`delivery:${rider._id}`).emit("delivery:approval_status", {
+          status: "approved",
+          isVerified: true,
+          isOnline: true,
+        });
+      }
+    } catch (socketErr) {
+      console.error("Failed to emit delivery approval socket event:", socketErr);
+    }
+
     return handleResponse(res, 200, "Rider approved successfully", rider);
   } catch (error) {
     return handleResponse(res, 500, error.message);
@@ -182,6 +197,19 @@ export const rejectDeliveryPartner = async (req, res) => {
       });
     } catch (err) {
       console.error("Failed to notify delivery partner of rejection", err);
+    }
+
+    // Real-time socket push to notify rejected rider immediately
+    try {
+      const io = getIO();
+      if (io) {
+        io.to(`delivery:${rider._id}`).emit("delivery:approval_status", {
+          status: "rejected",
+          isVerified: false,
+        });
+      }
+    } catch (socketErr) {
+      console.error("Failed to emit delivery rejection socket event:", socketErr);
     }
 
     return handleResponse(

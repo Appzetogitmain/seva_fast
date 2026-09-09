@@ -295,3 +295,17 @@ export function onPhotoChatStatusUpdate(getToken, handler) {
   s.on("photo_chat_status_update", handler);
   return () => s.off("photo_chat_status_update", handler);
 }
+
+export function onDeliveryApprovalStatus(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("delivery:approval_status", handler);
+  return () => s.off("delivery:approval_status", handler);
+}
+
+export function onSellerApprovalStatus(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("seller:approval_status", handler);
+  return () => s.off("seller:approval_status", handler);
+}

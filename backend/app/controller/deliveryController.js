@@ -66,9 +66,12 @@ export const getDeliveryStats = async (req, res) => {
             Order.countDocuments({ deliveryBoy: deliveryBoyId, status: 'out_for_delivery' }),
         ]);
 
-        // Today's earnings - Using a more robust date check
+        // Today's and yesterday's earnings calculation for dynamic growth percentage
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
+
+        const startOfYesterday = new Date(startOfToday);
+        startOfYesterday.setDate(startOfYesterday.getDate() - 1);
 
         const allTransactions = await Transaction.find({
             user: deliveryBoyId,
@@ -76,18 +79,43 @@ export const getDeliveryStats = async (req, res) => {
         }).lean();
 
         const todayTransactions = allTransactions.filter(t => new Date(t.createdAt) >= startOfToday);
+        const yesterdayTransactions = allTransactions.filter(t => {
+            const txDate = new Date(t.createdAt);
+            return txDate >= startOfYesterday && txDate < startOfToday;
+        });
 
-        const todayEarnings = todayTransactions
-            .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
-            .reduce((acc, t) => acc + t.amount, 0);
+        const todayEarnings = roundCurrency(
+            todayTransactions
+                .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
+                .reduce((acc, t) => acc + t.amount, 0)
+        );
 
-        const totalEarnings = allTransactions
-            .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
-            .reduce((acc, t) => acc + t.amount, 0);
+        const yesterdayEarnings = roundCurrency(
+            yesterdayTransactions
+                .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
+                .reduce((acc, t) => acc + t.amount, 0)
+        );
 
-        const incentives = allTransactions
-            .filter(t => t.status === 'Settled' && (t.type === 'Incentive' || t.type === 'Bonus'))
-            .reduce((acc, t) => acc + t.amount, 0);
+        let growthPercentage = 0;
+        if (yesterdayEarnings > 0) {
+            growthPercentage = Math.round(((todayEarnings - yesterdayEarnings) / yesterdayEarnings) * 100);
+        } else if (todayEarnings > 0) {
+            growthPercentage = 100;
+        } else {
+            growthPercentage = 0;
+        }
+
+        const totalEarnings = roundCurrency(
+            allTransactions
+                .filter(t => t.status === 'Settled' && (t.type === 'Delivery Earning' || t.type === 'Incentive' || t.type === 'Bonus'))
+                .reduce((acc, t) => acc + t.amount, 0)
+        );
+
+        const incentives = roundCurrency(
+            allTransactions
+                .filter(t => t.status === 'Settled' && (t.type === 'Incentive' || t.type === 'Bonus'))
+                .reduce((acc, t) => acc + t.amount, 0)
+        );
 
         const [wallet, deliveryDoc] = await Promise.all([
             Wallet.findOne({
@@ -100,6 +128,8 @@ export const getDeliveryStats = async (req, res) => {
 
         return handleResponse(res, 200, "Stats fetched", {
             today: todayEarnings,
+            yesterdayEarnings,
+            growthPercentage,
             totalEarnings,
             deliveries: totalDeliveries,
             trips: totalDeliveries,

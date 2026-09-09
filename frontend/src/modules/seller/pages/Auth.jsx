@@ -146,6 +146,45 @@ const Auth = () => {
     return missing;
   };
 
+  const handleToggleAuth = (targetModeIsLogin) => {
+    const nextIsLogin = typeof targetModeIsLogin === "boolean" ? targetModeIsLogin : !isLogin;
+    setIsLogin(nextIsLogin);
+    setSignupStep(1);
+    setVerifications({
+      email: createInitialVerificationState(),
+      phone: createInitialVerificationState(),
+    });
+
+    setFormData((prev) => {
+      const raw = (prev.email || "").trim();
+      const isDigitsOnlyPhone = /^[0-9+() -]{7,15}$/.test(raw) && !raw.includes("@");
+
+      if (!nextIsLogin) {
+        // Switching from Login -> Signup
+        if (isDigitsOnlyPhone) {
+          const cleanPhone = raw.replace(/\D/g, "").slice(-10);
+          return {
+            ...prev,
+            email: "",
+            phone: cleanPhone,
+          };
+        } else {
+          return {
+            ...prev,
+            email: raw,
+            phone: prev.phone || "",
+          };
+        }
+      } else {
+        // Switching from Signup -> Login
+        return {
+          ...prev,
+          email: prev.email || prev.phone || "",
+        };
+      }
+    });
+  };
+
   const updateVerificationState = (field, updates) => {
     setVerifications((prev) => ({
       ...prev,
@@ -231,7 +270,7 @@ const Auth = () => {
       const alphanumeric = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 15);
       setFormData({ ...formData, [name]: alphanumeric });
     } else if (name === "udyamNumber") {
-      const cleaned = value.replace(/[^a-zA-Z0-9-]/g, "").toUpperCase().slice(0, 19);
+      const cleaned = value.replace(/[^a-zA-Z0-9\/-]/g, "").toUpperCase().slice(0, 25);
       setFormData({ ...formData, [name]: cleaned });
     } else if (name === "ifscCode") {
       const cleaned = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 11);
@@ -506,10 +545,16 @@ const Auth = () => {
             isProcessing.current = false;
             return;
           }
-          if (formData.udyamNumber && !/^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/.test(formData.udyamNumber)) {
-            toast.error("Please enter a valid Udyam Number (e.g. UDYAM-MH-12-1234567).");
-            isProcessing.current = false;
-            return;
+          if (formData.udyamNumber) {
+            const rawVal = String(formData.udyamNumber).trim();
+            // Validates official Udyam formats (with/without UDYAM prefix, flexible digits) and Shop Act registration numbers
+            const isUdyam = /^UDYAM-[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(rawVal) || /^UDYAM[A-Z]{2}\d{5,10}$/i.test(rawVal) || /^[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(rawVal);
+            const isShopActOrReg = /^[A-Z0-9\/-]{3,25}$/i.test(rawVal);
+            if (!isUdyam && !isShopActOrReg) {
+              toast.error("Please enter a valid Udyam or Shop Act Registration number.");
+              isProcessing.current = false;
+              return;
+            }
           }
         }
       }
@@ -655,6 +700,15 @@ const Auth = () => {
             rejectionReason,
           },
         });
+      }
+      if (isLogin && error.response?.status === 404) {
+        toast.error(error.response?.data?.message || "This store isn't registered. Please sign up.", {
+          action: {
+            label: "Sign Up Now",
+            onClick: () => handleToggleAuth(false),
+          },
+        });
+        return;
       }
       toast.error(error.response?.data?.message || "Authentication failed");
     } finally {
@@ -881,25 +935,25 @@ const Auth = () => {
                       )}
                     </div>
                     {!isLogin && verifications.email.isOtpVisible && verifications.email.status !== "verified" && (
-                      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <div className="w-full flex items-center justify-between gap-2 rounded-xl border-2 border-brand-200/80 bg-brand-50/40 p-2 sm:px-3 sm:py-2.5 transition-all">
                         <input
                           type="text"
                           inputMode="numeric"
                           maxLength={6}
-                          placeholder="Enter email OTP"
+                          placeholder="Enter 6-digit email OTP"
                           value={verifications.email.otp}
                           onChange={(e) =>
                             updateVerificationState("email", {
                               otp: e.target.value.replace(/\D/g, "").slice(0, 6),
                             })
                           }
-                          className="flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none placeholder:text-slate-400"
+                          className="min-w-0 flex-1 bg-transparent text-sm font-bold text-slate-800 tracking-widest outline-none placeholder:text-slate-400 placeholder:tracking-normal placeholder:font-medium"
                         />
                         <button
                           type="button"
                           onClick={() => handleVerifyOtp("email")}
                           disabled={verifications.email.isVerifying || verifications.email.otp.length !== 6}
-                          className="rounded-md bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-50"
+                          className="shrink-0 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white shadow-sm hover:bg-black transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {verifications.email.isVerifying ? "Checking..." : "Confirm OTP"}
                         </button>
@@ -952,25 +1006,25 @@ const Auth = () => {
                           </button>
                         </div>
                         {verifications.phone.isOtpVisible && verifications.phone.status !== "verified" && (
-                          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                          <div className="w-full flex items-center justify-between gap-2 rounded-xl border-2 border-brand-200/80 bg-brand-50/40 p-2 sm:px-3 sm:py-2.5 transition-all">
                             <input
                               type="text"
                               inputMode="numeric"
                               maxLength={6}
-                              placeholder="Enter phone OTP"
+                              placeholder="Enter 6-digit phone OTP"
                               value={verifications.phone.otp}
                               onChange={(e) =>
                                 updateVerificationState("phone", {
                                   otp: e.target.value.replace(/\D/g, "").slice(0, 6),
                                 })
                               }
-                              className="flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none placeholder:text-slate-400"
+                              className="min-w-0 flex-1 bg-transparent text-sm font-bold text-slate-800 tracking-widest outline-none placeholder:text-slate-400 placeholder:tracking-normal placeholder:font-medium"
                             />
                             <button
                               type="button"
                               onClick={() => handleVerifyOtp("phone")}
                               disabled={verifications.phone.isVerifying || verifications.phone.otp.length !== 6}
-                              className="rounded-md bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-50"
+                              className="shrink-0 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white shadow-sm hover:bg-black transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               {verifications.phone.isVerifying ? "Checking..." : "Confirm OTP"}
                             </button>
@@ -1515,14 +1569,7 @@ const Auth = () => {
                   {isLogin ? "New to the platform?" : "Already part of us?"}{" "}
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsLogin(!isLogin);
-                      setSignupStep(1);
-                      setVerifications({
-                        email: createInitialVerificationState(),
-                        phone: createInitialVerificationState(),
-                      });
-                    }}
+                    onClick={() => handleToggleAuth(!isLogin)}
                     className="text-slate-900 hover:text-black transition-colors underline underline-offset-4 font-black">
                     {isLogin ? "Register Store" : "Sign In"}
                   </button>

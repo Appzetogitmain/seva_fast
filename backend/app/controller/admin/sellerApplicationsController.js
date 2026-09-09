@@ -7,6 +7,7 @@ import {
 } from "../../services/admin/sellerApplicationService.js";
 import { notify } from "../../modules/notifications/notification.service.js";
 import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
+import { getIO } from "../../socket/socketManager.js";
 
 export const getPendingSellers = async (req, res) => {
   try {
@@ -57,6 +58,22 @@ export const approveSellerApplication = async (req, res) => {
       console.error("Error sending seller approval notification:", notifyErr);
     }
 
+    // Real-time socket push to immediately unlock seller dashboard without re-login
+    try {
+      const io = getIO();
+      if (io) {
+        const targetId = String(seller._id || seller.id || id);
+        io.to(`seller:${targetId}`).emit("seller:approval_status", {
+          status: "approved",
+          applicationStatus: "approved",
+          isVerified: true,
+          isActive: true,
+        });
+      }
+    } catch (socketErr) {
+      console.error("Failed to emit seller approval socket event:", socketErr);
+    }
+
     return handleResponse(res, 200, "Seller approved successfully", seller);
   } catch (error) {
     return handleResponse(res, 500, error.message);
@@ -86,6 +103,21 @@ export const rejectSellerApplication = async (req, res) => {
       });
     } catch (notifyErr) {
       console.error("Error sending seller rejection notification:", notifyErr);
+    }
+
+    // Real-time socket push to notify rejected seller immediately
+    try {
+      const io = getIO();
+      if (io) {
+        const targetId = String(seller._id || seller.id || id);
+        io.to(`seller:${targetId}`).emit("seller:approval_status", {
+          status: "rejected",
+          applicationStatus: "rejected",
+          reason,
+        });
+      }
+    } catch (socketErr) {
+      console.error("Failed to emit seller rejection socket event:", socketErr);
     }
 
     return handleResponse(res, 200, "Seller application rejected", seller);

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -30,6 +30,8 @@ const IdCard = () => {
   // Active View Mode: 'both' | 'front' | 'back'
   const [activeTab, setActiveTab] = useState("both");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [base64Avatar, setBase64Avatar] = useState(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
   // References for DOM elements to export to PNG
   const frontCardRef = useRef(null);
@@ -55,7 +57,7 @@ const IdCard = () => {
     riderId: user?._id ? `SF-DRV-${user._id.slice(-6).toUpperCase()}` : "N/A",
     phone: user?.phone || "—",
     vehicleNumber: user?.vehicleNumber || "—",
-    profileImage: user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'Felix'}`,
+    profileImage: base64Avatar || user?.profileImage || "",
     // Rider Personal Address & City
     city: user?.city || user?.currentArea || user?.preferredArea || "—",
     riderAddress: user?.address || "Address not provided",
@@ -66,45 +68,132 @@ const IdCard = () => {
     issueDate: getJoiningDate(user?.createdAt),
   };
 
-  // Handle Download Front/Back/Both Card as High-Res PNG
+  // Generate Real Scannable 2D QR Code Matrix
+  useEffect(() => {
+    let isMounted = true;
+    const generateQr = async () => {
+      try {
+        const QRCodeModule = await import("qrcode");
+        const QRCode = QRCodeModule.default || QRCodeModule;
+        const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://sevafast.com";
+        const verifyUrl = `${baseUrl}/verify/delivery/${encodeURIComponent(cardData.riderId)}?name=${encodeURIComponent(cardData.name)}`;
+        const dataUrl = await QRCode.toDataURL(verifyUrl, {
+          width: 256,
+          margin: 1,
+          color: {
+            dark: "#0f172a", // slate-900
+            light: "#ffffff",
+          },
+          errorCorrectionLevel: "M",
+        });
+        if (isMounted) setQrCodeDataUrl(dataUrl);
+      } catch (err) {
+        console.error("Failed to generate QR Code:", err);
+      }
+    };
+    generateQr();
+    return () => {
+      isMounted = false;
+    };
+  }, [cardData.riderId, cardData.name]);
+
+  // Convert profile avatar to base64 Data URL to guarantee 100% CORS-safe canvas/PNG generation
+  useEffect(() => {
+    let isMounted = true;
+    const loadAvatar = async () => {
+      const initial = (user?.name || "D").charAt(0).toUpperCase();
+      const fallbackSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="%23f97316"/><stop offset="100%" stop-color="%23dc2626"/></linearGradient></defs><rect width="100" height="100" fill="url(%23g)"/><text x="50%" y="56%" font-size="44" font-weight="bold" font-family="system-ui, sans-serif" fill="%23ffffff" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
+
+      const rawUrl = user?.profileImage && !user.profileImage.includes('dicebear.com')
+        ? user.profileImage
+        : null;
+
+      if (!rawUrl) {
+        if (isMounted) setBase64Avatar(fallbackSvg);
+        return;
+      }
+
+      if (rawUrl.startsWith("data:")) {
+        setBase64Avatar(rawUrl);
+        return;
+      }
+
+      try {
+        const response = await fetch(rawUrl, { mode: "cors" });
+        if (!response.ok) throw new Error("Network response was not ok");
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (isMounted && reader.result) {
+            setBase64Avatar(reader.result);
+          }
+        };
+        reader.readAsDataURL(blob);
+      } catch {
+        if (isMounted) setBase64Avatar(fallbackSvg);
+      }
+    };
+
+    loadAvatar();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.profileImage, user?.name]);
+
+  // Handle Download Front or Back Card as High-Res PNG
   const handleDownload = async (side = "front") => {
     try {
       setIsDownloading(true);
-      toast.info(`Preparing ${side.toUpperCase()} ID Card for download...`);
-
-      // Dynamically import html2canvas
-      const html2canvasModule = await import("html2canvas");
-      const html2canvas = html2canvasModule.default || html2canvasModule;
 
       const targetElement = side === "front" ? frontCardRef.current : backCardRef.current;
 
       if (!targetElement) {
-        toast.error("Card element not ready for download");
+        toast.error(`Please select "${side.toUpperCase()}" tab to download.`);
         setIsDownloading(false);
         return;
       }
 
-      const canvas = await html2canvas(targetElement, {
-        scale: 3, // Ultra crisp high-definition render
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-        logging: false
-      });
+      let dataUrl = null;
 
-      const image = canvas.toDataURL("image/png");
+      try {
+        const html2canvasModule = await import("html2canvas");
+        const html2canvas = html2canvasModule.default || html2canvasModule;
+        const canvas = await html2canvas(targetElement, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+        });
+        dataUrl = canvas.toDataURL("image/png");
+      } catch (errCanvas) {
+        console.warn("html2canvas error, trying html-to-image with skipFonts:", errCanvas);
+        const { toPng } = await import("html-to-image");
+        dataUrl = await toPng(targetElement, {
+          quality: 1,
+          pixelRatio: 3,
+          backgroundColor: "#ffffff",
+          skipFonts: true,
+          embedFonts: false,
+          cacheBust: true,
+        });
+      }
+
+      if (!dataUrl) {
+        throw new Error("Failed to render card image.");
+      }
+
       const link = document.createElement("a");
-      link.href = image;
+      link.href = dataUrl;
       link.download = `SEVAFAST_ID_Card_${side.toUpperCase()}_${cardData.riderId}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
-      toast.success(`${side.toUpperCase()} ID Card downloaded successfully!`);
+      toast.success(`${side === "front" ? "Front" : "Back"} ID Card downloaded successfully!`);
     } catch (err) {
       console.error("ID Card download failed:", err);
-      toast.error("Failed to download image. Opening print view instead.");
-      window.print();
+      toast.error("Download failed. Please try again or use Print / PDF.");
     } finally {
       setIsDownloading(false);
     }
@@ -114,11 +203,15 @@ const IdCard = () => {
     await handleDownload("front");
     setTimeout(async () => {
       await handleDownload("back");
-    }, 800);
+    }, 1000);
   };
 
   const handlePrint = () => {
-    window.print();
+    // Dismiss any active toast notifications so they don't appear in print
+    toast.dismiss();
+    setTimeout(() => {
+      window.print();
+    }, 150);
   };
 
   return (
@@ -141,15 +234,37 @@ const IdCard = () => {
 
         {/* Action Buttons: Download & Print */}
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() => handleDownload("front")}
-            disabled={isDownloading}
-            size="sm"
-            className="bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow flex items-center gap-1.5"
-          >
-            {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            Download PNG
-          </Button>
+          {activeTab === "back" ? (
+            <Button
+              onClick={() => handleDownload("back")}
+              disabled={isDownloading}
+              size="sm"
+              className="bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow flex items-center gap-1.5"
+            >
+              {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Download Back PNG
+            </Button>
+          ) : activeTab === "front" ? (
+            <Button
+              onClick={() => handleDownload("front")}
+              disabled={isDownloading}
+              size="sm"
+              className="bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow flex items-center gap-1.5"
+            >
+              {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Download Front PNG
+            </Button>
+          ) : (
+            <Button
+              onClick={() => handleDownload("front")}
+              disabled={isDownloading}
+              size="sm"
+              className="bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow flex items-center gap-1.5"
+            >
+              {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Download Front PNG
+            </Button>
+          )}
 
           <Button
             onClick={handlePrint}
@@ -197,7 +312,7 @@ const IdCard = () => {
       </div>
 
       {/* Main Cards Layout Container */}
-      <div className="max-w-4xl mx-auto flex flex-wrap justify-center items-center gap-6 py-1">
+      <div id="printable-id-card-area" className="print-container max-w-4xl mx-auto flex flex-wrap justify-center items-center gap-6 py-1">
         
         {/* ========================================================================= */}
         {/* FRONT CARD DESIGN */}
@@ -219,7 +334,7 @@ const IdCard = () => {
 
             <div
               ref={frontCardRef}
-              className="w-[330px] h-[480px] rounded-2xl bg-white text-slate-900 shadow-xl border border-gray-200 overflow-hidden flex flex-col justify-between relative"
+              className="id-card-element w-[330px] h-[480px] rounded-2xl bg-white text-slate-900 shadow-xl border border-gray-200 overflow-hidden flex flex-col justify-between relative"
             >
               {/* Lanyard Slot Notch */}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-2 bg-slate-900/10 rounded-full border border-slate-400/20 z-20 flex items-center justify-center">
@@ -259,6 +374,7 @@ const IdCard = () => {
                     <img
                       src={cardData.profileImage}
                       alt={cardData.name}
+                      crossOrigin="anonymous"
                       className="w-full h-full rounded-full object-cover bg-gray-100 border-2 border-white"
                     />
                     <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-white">
@@ -368,7 +484,7 @@ const IdCard = () => {
 
             <div
               ref={backCardRef}
-              className="w-[330px] h-[480px] rounded-2xl bg-white text-slate-900 shadow-xl border border-gray-200 overflow-hidden flex flex-col justify-between relative"
+              className="id-card-element w-[330px] h-[480px] rounded-2xl bg-white text-slate-900 shadow-xl border border-gray-200 overflow-hidden flex flex-col justify-between relative"
             >
               {/* Lanyard Slot Notch */}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-2 bg-slate-900/10 rounded-full border border-slate-400/20 z-20 flex items-center justify-center">
@@ -393,14 +509,22 @@ const IdCard = () => {
                 
                 {/* QR Code & Barcode Block */}
                 <div className="bg-gray-50 rounded-xl p-2 border border-gray-200 flex items-center justify-between gap-2.5">
-                  <div className="w-14 h-14 bg-white p-1 rounded-lg border border-gray-300 shadow-sm flex items-center justify-center shrink-0">
-                    <QrCode size={44} className="text-slate-900" />
+                  <div className="w-14 h-14 bg-white p-0.5 rounded-lg border border-gray-300 shadow-sm flex items-center justify-center shrink-0 overflow-hidden">
+                    {qrCodeDataUrl ? (
+                      <img
+                        src={qrCodeDataUrl}
+                        alt={`Verify ${cardData.riderId}`}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <QrCode size={40} className="text-slate-900 animate-pulse" />
+                    )}
                   </div>
 
                   <div className="flex-1 text-left">
                     <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Digital Verification</p>
                     <p className="text-[10px] font-mono font-bold text-slate-800 truncate">
-                      verify.sevafast.com
+                      {typeof window !== "undefined" && window.location.host ? `${window.location.host}/verify` : "sevafast.com/verify"}
                     </p>
                     
                     {/* Simulated Barcode */}
@@ -477,7 +601,7 @@ const IdCard = () => {
         <button
           onClick={handleDownloadBoth}
           disabled={isDownloading}
-          className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 px-4 py-2 rounded-xl transition-all inline-flex items-center gap-1.5 shadow-sm"
+          className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 px-4 py-2 rounded-xl transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
         >
           <Download size={14} /> Download Both Front & Back Cards (PNG)
         </button>
@@ -486,19 +610,50 @@ const IdCard = () => {
       {/* Print Specific CSS Override to ensure clean printing */}
       <style>{`
         @media print {
-          .no-print, header, nav, button {
-            display: none !important;
+          @page {
+            size: auto;
+            margin: 8mm;
           }
-          body {
-            background: white !important;
+          *, *::before, *::after {
+            box-shadow: none !important;
+            text-shadow: none !important;
+          }
+          body, html {
+            background: #ffffff !important;
             margin: 0 !important;
             padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          .max-w-4xl {
-            max-width: 100% !important;
-            width: 100% !important;
+          .no-print,
+          nav,
+          footer,
+          header,
+          button,
+          [data-sonner-toaster],
+          [data-sonner-toast],
+          .sonner-toaster,
+          .sonner-toast,
+          .fixed {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+          }
+          .print-container {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+            align-items: center !important;
+            gap: 20px !important;
             margin: 0 auto !important;
-            padding: 0 !important;
+            padding: 10px 0 !important;
+            background: transparent !important;
+          }
+          .id-card-element {
+            box-shadow: 0 0 0 1px #e2e8f0 !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
           }
         }
       `}</style>
@@ -507,3 +662,4 @@ const IdCard = () => {
 };
 
 export default IdCard;
+

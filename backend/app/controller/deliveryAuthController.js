@@ -194,14 +194,18 @@ export const loginDelivery = async (req, res) => {
             return handleResponse(res, 404, "Delivery partner not found");
         }
 
-        if (!delivery.isPhoneVerified) {
+        // If rider is already verified/approved by admin, ensure isPhoneVerified is active
+        if (delivery.isVerified) {
+            if (!delivery.isPhoneVerified) {
+                delivery.isPhoneVerified = true;
+                await delivery.save();
+            }
+        } else if (delivery.isPhoneVerified === false && !delivery.isVerified && !delivery.isPhoneVerified) {
             return handleResponse(res, 400, "Please complete your registration and mobile verification first.", {
                 isVerified: false,
                 isPhoneVerified: false,
             });
-        }
-
-        if (!delivery.isVerified) {
+        } else if (!delivery.isVerified) {
             return handleResponse(res, 403, "Your delivery partner account is pending admin approval.", {
                 isVerified: false,
                 applicationStatus: "pending",
@@ -381,6 +385,59 @@ export const updateDeliveryProfile = async (req, res) => {
         await delivery.save();
 
         return handleResponse(res, 200, "Profile updated successfully", delivery);
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
+/* ===============================
+   PUBLIC DELIVERY PARTNER VERIFICATION
+================================ */
+export const getPublicDeliveryVerification = async (req, res) => {
+    try {
+        const { idOrRiderId } = req.params;
+        if (!idOrRiderId) {
+            return handleResponse(res, 400, "Rider ID or Identifier is required");
+        }
+
+        let query = {};
+        if (mongoose.Types.ObjectId.isValid(idOrRiderId)) {
+            query = { _id: idOrRiderId };
+        } else {
+            const cleaned = idOrRiderId.replace(/^SF-DRV-/i, "").toLowerCase();
+            query = {
+                $or: [
+                    { phone: idOrRiderId },
+                    mongoose.Types.ObjectId.isValid(cleaned) ? { _id: cleaned } : null,
+                    { $expr: { $regexMatch: { input: { $toString: "$_id" }, regex: `${cleaned}$`, options: "i" } } }
+                ].filter(Boolean)
+            };
+        }
+
+        const delivery = await Delivery.findOne(query).select(
+            "name phone vehicleType vehicleNumber isVerified createdAt profileImage city currentArea preferredArea"
+        );
+
+        if (!delivery) {
+            return handleResponse(res, 404, "Delivery Partner Not Found");
+        }
+
+        const riderId = `SF-DRV-${delivery._id.toString().slice(-6).toUpperCase()}`;
+
+        return handleResponse(res, 200, "Verification data fetched successfully", {
+            id: delivery._id,
+            riderId,
+            name: delivery.name,
+            phone: delivery.phone ? `${delivery.phone.slice(0, 2)}******${delivery.phone.slice(-2)}` : "—",
+            vehicleType: delivery.vehicleType || "Bike",
+            vehicleNumber: delivery.vehicleNumber || "Verified Commercial Partner",
+            isVerified: delivery.isVerified,
+            status: delivery.isVerified ? "AUTHORIZED_DELIVERY_PARTNER" : "PENDING_VERIFICATION",
+            joinedDate: delivery.createdAt,
+            city: delivery.city || delivery.currentArea || delivery.preferredArea || "Indore",
+            organization: "SEVAFAST Logistics Pvt. Ltd.",
+            verifiedAt: new Date().toISOString(),
+        });
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }

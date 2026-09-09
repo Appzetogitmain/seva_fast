@@ -3,12 +3,14 @@ import {
   Bell,
   Star,
   TrendingUp,
+  TrendingDown,
   Package,
   MapPin,
   CheckCircle,
   XCircle,
   IndianRupee,
   AlertCircle,
+  User,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -159,13 +161,19 @@ const Dashboard = () => {
       >
         <div className="flex items-center space-x-3">
           <div
-            className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary ring-2 ring-primary/20 shadow-sm cursor-pointer"
+            className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary ring-2 ring-primary/20 shadow-sm cursor-pointer flex items-center justify-center bg-white"
             onClick={() => navigate("/delivery/profile")}>
-            <img
-              src={user?.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'Felix'}`}
-              alt="Profile"
-              className="w-full h-full object-cover"
-            />
+            {user?.profileImage && !user.profileImage.includes('dicebear.com') ? (
+              <img
+                src={user.profileImage}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary">
+                <User size={22} className="text-primary" />
+              </div>
+            )}
           </div>
           <div
             onClick={() => navigate("/delivery/profile")}
@@ -176,7 +184,7 @@ const Dashboard = () => {
             <div className="flex items-center text-sm font-medium">
               <span className="flex items-center bg-yellow-50 text-yellow-600 px-1.5 py-0.5 rounded border border-yellow-100">
                 <Star size={12} fill="currentColor" className="mr-1" />
-                4.8
+                {earnings.rating || (typeof user?.rating === "number" ? Number(user.rating).toFixed(1) : "5.0")}
               </span>
               <span className="text-gray-300 mx-2">•</span>
               <span className="ds-caption text-gray-500">ID: {user?._id ? user._id.slice(-6).toUpperCase() : "N/A"}</span>
@@ -322,18 +330,38 @@ const Dashboard = () => {
           <div className="flex items-baseline mb-2 relative z-10">
             <span className="text-2xl font-bold text-gray-400 mr-1">₹</span>
             <span className="text-4xl font-extrabold text-gray-900 tracking-tight">
-              {earnings.today}
+              {Number(earnings.today || 0).toLocaleString("en-IN")}
             </span>
-            <span className="ml-3 text-brand-600 text-xs font-bold flex items-center bg-brand-50 border border-brand-100 px-2 py-1 rounded-full">
-              <TrendingUp size={12} className="mr-1" /> +12%
-            </span>
+            {(() => {
+              const growth = earnings.growthPercentage;
+              if (growth === undefined || growth === null) return null;
+              if (growth > 0) {
+                return (
+                  <span className="ml-3 text-emerald-600 text-xs font-black flex items-center bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                    <TrendingUp size={12} className="mr-1" /> +{growth}%
+                  </span>
+                );
+              }
+              if (growth < 0) {
+                return (
+                  <span className="ml-3 text-rose-600 text-xs font-black flex items-center bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-full">
+                    <TrendingDown size={12} className="mr-1" /> {growth}%
+                  </span>
+                );
+              }
+              return (
+                <span className="ml-3 text-slate-500 text-[11px] font-bold flex items-center bg-slate-100 border border-slate-200 px-2.5 py-0.5 rounded-full">
+                  Today
+                </span>
+              );
+            })()}
           </div>
-          {earnings.today === 0 && earnings.totalEarnings > 0 && (
+          {Number(earnings.today || 0) === 0 && Number(earnings.totalEarnings || 0) > 0 && (
             <p className="text-xs text-gray-400 font-medium mb-4 relative z-10">
-              Total Earned: <span className="text-gray-700 font-bold">₹{earnings.totalEarnings}</span>
+              Total Earned: <span className="text-gray-700 font-bold">₹{Number(earnings.totalEarnings || 0).toLocaleString("en-IN")}</span>
             </p>
           )}
-          {earnings.today > 0 && <div className="mb-6" />}
+          {Number(earnings.today || 0) > 0 && <div className="mb-6" />}
 
           <div className="grid grid-cols-3 gap-4 border-t border-gray-50 pt-4 relative z-10">
             <div className="text-center group cursor-pointer">
