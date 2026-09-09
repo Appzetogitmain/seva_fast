@@ -13,6 +13,14 @@ import {
 } from "../../constants/finance.js";
 import { addMoney, clampMoney, roundCurrency } from "../../utils/money.js";
 
+function normalizeOwnerType(ownerType) {
+  if (!ownerType) return null;
+  const upper = String(ownerType).toUpperCase().trim();
+  if (upper === "RIDER" || upper === "DELIVERY") return OWNER_TYPE.DELIVERY_PARTNER;
+  if (upper === "SUB-ADMIN") return OWNER_TYPE.SUB_ADMIN;
+  return upper;
+}
+
 function normalizeOwnerId(ownerType, ownerId) {
   // Platform admin wallet is a single shared wallet (ownerId null).
   // Sub-admin wallets are per Admin document.
@@ -29,9 +37,13 @@ function assertPositiveAmount(amount) {
 }
 
 export async function getOrCreateWallet(ownerType, ownerId, { session } = {}) {
-  const normalizedOwnerId = normalizeOwnerId(ownerType, ownerId);
+  const normalizedOwnerType = normalizeOwnerType(ownerType);
+  if (!normalizedOwnerType) {
+    throw new Error("getOrCreateWallet: valid ownerType is required");
+  }
+  const normalizedOwnerId = normalizeOwnerId(normalizedOwnerType, ownerId);
   const query = {
-    ownerType,
+    ownerType: normalizedOwnerType,
     ownerId: normalizedOwnerId,
   };
   const options = {};
@@ -42,7 +54,7 @@ export async function getOrCreateWallet(ownerType, ownerId, { session } = {}) {
     wallet = await Wallet.create(
       [
         {
-          ownerType,
+          ownerType: normalizedOwnerType,
           ownerId: normalizedOwnerId,
           availableBalance: 0,
           pendingBalance: 0,

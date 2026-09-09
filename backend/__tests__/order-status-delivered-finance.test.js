@@ -45,6 +45,7 @@ jest.unstable_mockModule("../app/constants/orderWorkflow.js", () => ({
   WORKFLOW_STATUS: {},
   DEFAULT_SELLER_TIMEOUT_MS: () => 0,
   workflowFromLegacyStatus: (status) => status,
+  legacyStatusFromWorkflow: (status) => status,
 }));
 
 jest.unstable_mockModule("../app/services/orderWorkflowService.js", () => ({
@@ -59,6 +60,8 @@ jest.unstable_mockModule("../app/services/orderWorkflowService.js", () => ({
 jest.unstable_mockModule("../app/services/finance/orderFinanceService.js", () => ({
   freezeFinancialSnapshot: jest.fn((order) => order),
   reverseOrderFinanceOnCancellation: jest.fn(),
+  markSelfDeliveryCodCashWithSeller: jest.fn(),
+  handleOnlineOrderFinance: jest.fn(),
 }));
 
 jest.unstable_mockModule("../app/utils/geoUtils.js", () => ({
