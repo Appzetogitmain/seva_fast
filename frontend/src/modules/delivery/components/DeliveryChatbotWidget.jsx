@@ -33,6 +33,17 @@ export default function DeliveryChatbotWidget() {
     voiceModeRef.current = voiceMode;
   }, [voiceMode]);
 
+  useEffect(() => {
+    const handleOpenChatbot = () => {
+      setIsOpen(true);
+      setIsBubbleVisible(false);
+    };
+    window.addEventListener("open-delivery-chatbot", handleOpenChatbot);
+    return () => {
+      window.removeEventListener("open-delivery-chatbot", handleOpenChatbot);
+    };
+  }, []);
+
   const prompts = [
     "Koi sawal? Seva Rider AI se poochein ✨",
     "Order kaise accept-deliver karein? 📦",

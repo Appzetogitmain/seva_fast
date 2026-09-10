@@ -125,6 +125,18 @@ export const AuthProvider = ({ children }) => {
                     await startForegroundPushListener();
                     if (hasRegisteredFcmToken(currentRole)) return;
 
+                    // Skip auto-registration if push notifications are disabled in delivery settings
+                    if (currentRole === 'delivery') {
+                        try {
+                            const rawSettings = localStorage.getItem('app_settings');
+                            if (rawSettings && JSON.parse(rawSettings).pushNotifications === false) {
+                                return;
+                            }
+                        } catch {
+                            // ignore
+                        }
+                    }
+
                     const isFlutter = Boolean(window.Flutter);
                     const permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
                     if (permission === 'granted' || isFlutter) {
@@ -291,11 +303,15 @@ export const AuthProvider = ({ children }) => {
             }
         }
 
+        if (currentRole === 'seller') {
+            localStorage.removeItem('pending_seller_id');
+        }
+
         // Final fallback: redirect based on current path if needed
         // (ProtectedRoute usually handles this, but explicit navigation is safer for some UI edge cases)
         const path = window.location.pathname;
         if (path.startsWith('/admin')) window.location.href = '/admin/auth';
-        else if (path.startsWith('/seller')) window.location.href = '/seller/auth';
+        else if (path.startsWith('/seller')) window.location.href = '/seller/auth?switch=true';
         else if (path.startsWith('/delivery')) window.location.href = '/delivery/auth';
         else window.location.href = '/login';
     };

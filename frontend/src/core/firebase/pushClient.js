@@ -98,6 +98,19 @@ async function ensureServiceWorkerRegistration() {
 }
 
 async function showSystemNotification({ title, body, data } = {}) {
+  // Respect user push notification preference if disabled in app settings
+  try {
+    const rawSettings = typeof localStorage !== "undefined" ? localStorage.getItem("app_settings") : null;
+    if (rawSettings) {
+      const parsed = JSON.parse(rawSettings);
+      if (parsed.pushNotifications === false) {
+        return;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
   const safeTitle = String(title || "Notification");
   const safeBody = String(body || "");
   const link = data?.link || "/";

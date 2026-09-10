@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
 import DeliveryChatbotWidget from "../components/DeliveryChatbotWidget";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { BellRing, MapPin, Navigation } from "lucide-react";
 import { deliveryApi } from "../services/deliveryApi";
@@ -23,6 +23,11 @@ import {
   isIncomingDeliveryNotification,
 } from "../utils/deliveryOrderNavigation";
 import { saveDeliveryPartnerLocation } from "../utils/deliveryLastLocation";
+import {
+  getDeliverySettings,
+  startDeliveryVibration,
+  stopDeliveryVibration,
+} from "../utils/deliverySettings";
 import orderAlertSound from "@/assets/sounds/order_alert.mp3";
 
 /** Match server `deliverySearchExpiresAt` — progress bar + countdown stay aligned when modal opens late. */
@@ -65,6 +70,18 @@ const DeliveryLayout = () => {
   };
 
   const startOrderRingtone = () => {
+    const settings = getDeliverySettings();
+
+    // Trigger vibration if enabled
+    if (settings.vibration) {
+      startDeliveryVibration();
+    }
+
+    // Only play audio ringtone if sound is enabled
+    if (!settings.sound) {
+      return;
+    }
+
     const audio = getOrderRingtone();
     audio.loop = true;
     audio.preload = "auto";
@@ -75,6 +92,8 @@ const DeliveryLayout = () => {
     if (!ringtoneRetryTimerRef.current) {
       ringtoneRetryTimerRef.current = setInterval(() => {
         if (!activeOrderRef.current) return;
+        const currentSettings = getDeliverySettings();
+        if (!currentSettings.sound) return;
         const currentAudio = getOrderRingtone();
         if (!currentAudio.paused) return;
         currentAudio.play().catch(() => { });
@@ -88,6 +107,8 @@ const DeliveryLayout = () => {
     ) {
       const unlockPlayback = () => {
         if (!activeOrderRef.current) return;
+        const currentSettings = getDeliverySettings();
+        if (!currentSettings.sound) return;
         const currentAudio = getOrderRingtone();
         if (!currentAudio.paused) return;
         currentAudio.play().catch(() => { });
@@ -102,6 +123,7 @@ const DeliveryLayout = () => {
   };
 
   const stopOrderRingtone = () => {
+    stopDeliveryVibration();
     const audio = orderRingtoneRef.current;
     if (ringtoneRetryTimerRef.current) {
       clearInterval(ringtoneRetryTimerRef.current);
@@ -803,11 +825,6 @@ const DeliveryLayout = () => {
 
       {shouldShowBottomNav && <BottomNav />}
       {shouldShowChatbot && <DeliveryChatbotWidget />}
-      <Toaster
-        position="top-center"
-        offset={72}
-        mobileOffset={72}
-      />
     </div>
   );
 };

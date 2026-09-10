@@ -1112,12 +1112,20 @@ const DeliveryAuth = () => {
                                   toast.error("Please fill all bank and identification fields");
                                   return;
                                 }
-                                if (signupAadharNumber.length !== 12) {
-                                  toast.error("Aadhar number must be 12 digits");
+                                if (!/^\d{12}$/.test(signupAadharNumber)) {
+                                  toast.error("Aadhaar number must be exactly 12 digits");
                                   return;
                                 }
-                                if (signupPanNumber.length !== 10) {
-                                  toast.error("PAN number must be 10 characters");
+                                if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(signupPanNumber)) {
+                                  toast.error("Please enter a valid 10-character PAN number (e.g. ABCDE1234F)");
+                                  return;
+                                }
+                                if (!/^\d{9,18}$/.test(signupAccountNumber)) {
+                                  toast.error("Account number must be 9 to 18 digits");
+                                  return;
+                                }
+                                if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(signupIfsc)) {
+                                  toast.error("Please enter a valid 11-character IFSC code (e.g. SBIN0001234, 5th character must be 0)");
                                   return;
                                 }
                                 setSignupStep(4);

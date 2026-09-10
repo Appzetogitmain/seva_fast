@@ -1,5 +1,6 @@
 import Notification from "./notification.model.js";
 import PushToken from "./token.model.js";
+import NotificationPreference from "./preference.model.js";
 import {
   notificationQueue,
   notificationDeadQueue,
@@ -93,6 +94,35 @@ export async function deliverNotificationById(notificationId) {
     return;
   }
 
+  const preference = await NotificationPreference.findOne({
+    userId: notification.userId,
+    role: notification.role,
+  }).lean();
+
+  if (preference && preference.pushNotifications === false) {
+    await Notification.updateOne(
+      { _id: notification._id },
+      {
+        $set: {
+          status: "sent",
+          failureReason: "Push notifications disabled by user preference",
+          deliveryStats: {
+            attempted: 0,
+            sent: 0,
+            failed: 0,
+            invalidTokens: 0,
+          },
+        },
+      },
+    );
+    incrementCounter("notifications_total", {
+      status: "sent",
+      eventType: notification.type,
+      role: notification.role,
+    });
+    return;
+  }
+
   const tokens = await PushToken.find({
     userId: notification.userId,
     role: notification.role,
@@ -135,6 +165,10 @@ export async function deliverNotificationById(notificationId) {
           body: notification.body || notification.message,
           message: notification.message,
           data: notification.data || {},
+        },
+        {
+          sound: preference?.sound !== false,
+          vibration: preference?.vibration !== false,
         },
       ),
       new Promise((_, reject) =>

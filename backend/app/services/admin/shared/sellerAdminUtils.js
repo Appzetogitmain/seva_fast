@@ -35,23 +35,43 @@ export function formatSellerDocumentFiles(documents) {
     return [];
   }
 
+  // Use dynamic import or require if getMediaURL is needed. Let's assume frontend prepends backend URL if it's relative, 
+  // or we can construct a Cloudinary URL if we know the cloud name.
+  // Actually, we can use process.env.BACKEND_URL or just let the frontend handle relative URLs by making it viewable.
+
   return Object.entries(documents)
     .filter(([, value]) => Boolean(value))
     .map(([key, value]) => {
       const normalizedValue = String(value).trim();
       const label = getSellerDocumentLabel(key);
-      const isUrl = isViewableDocumentUrl(normalizedValue);
+      const isHttp = isViewableDocumentUrl(normalizedValue);
+      const isRelativeOrPublicId = normalizedValue.startsWith('/') || normalizedValue.includes('/');
+      
+      const isViewable = isHttp || isRelativeOrPublicId;
+      
+      // If it's a cloudinary publicId (not http and doesn't start with /), we could guess the URL or rely on frontend.
+      // But let's just use the value as the URL, the frontend can handle it if it's relative, 
+      // or if it's a publicId, we can format it.
+      let url = normalizedValue;
+      if (!isHttp && !normalizedValue.startsWith('/') && normalizedValue.includes('/')) {
+         // rough guess for cloudinary if process.env.CLOUDINARY_CLOUD_NAME is available
+         const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'demo';
+         url = `https://res.cloudinary.com/${cloudName}/image/upload/${normalizedValue}`;
+      } else if (!isHttp && !normalizedValue.startsWith('/')) {
+         url = `/uploads/${normalizedValue}`; // Fallback local path
+      }
+
       const lowerValue = normalizedValue.toLowerCase();
 
       return {
         key,
         label,
         value: normalizedValue,
-        url: isUrl ? normalizedValue : "",
-        fileName: isUrl
+        url: url,
+        fileName: isHttp
           ? normalizedValue.split("/").pop()?.split("?")[0] || label
-          : normalizedValue,
-        isViewable: isUrl,
+          : normalizedValue.split("/").pop() || label,
+        isViewable: isViewable,
         fileType: lowerValue.includes(".pdf") ? "pdf" : "image",
       };
     });

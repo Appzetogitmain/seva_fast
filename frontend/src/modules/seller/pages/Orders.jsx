@@ -1666,7 +1666,7 @@ const Orders = () => {
                                                         <div key={idx} className="flex items-center justify-between p-3 bg-white ring-1 ring-slate-100 rounded-2xl group hover:shadow-md transition-all">
                                                             <div className="flex items-center gap-4">
                                                                 <div className="h-12 w-12 rounded-xl overflow-hidden bg-slate-50 ring-1 ring-slate-200 flex-shrink-0">
-                                                                    <img src={item.image} alt={item.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                                    <img src={item.image || '/default-product.png'} alt={item.name} onError={(e) => { e.target.onerror = null; e.target.src = '/default-product.png'; }} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-xs font-bold text-slate-900">{item.name}</p>

@@ -51,7 +51,14 @@ export function getSellerEarningBreakdown(order) {
   const deliveryFee = Number(
     order?.pricing?.deliveryFee ?? order?.paymentBreakdown?.deliveryFeeCharged ?? 0,
   );
-  const deliveryShare = roundMoney(deliveryFee * DELIVERY_FEE_SELLER_SHARE);
+  // Match backend splitDeliveryFee: rider is paid first, seller only gets
+  // 80% of whatever remains after the rider's cut.
+  const riderPayoutTotal = Number(order?.paymentBreakdown?.riderPayoutTotal ?? 0);
+  const remainingDeliveryFee = Math.max(
+    roundMoney(deliveryFee) - roundMoney(riderPayoutTotal),
+    0,
+  );
+  const deliveryShare = roundMoney(remainingDeliveryFee * DELIVERY_FEE_SELLER_SHARE);
   const productEarning = roundMoney(Math.max(total - deliveryShare, 0));
 
   const items = Array.isArray(order?.items) ? order.items : (order?.paymentBreakdown?.lineItems || []);

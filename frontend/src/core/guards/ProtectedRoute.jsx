@@ -19,6 +19,13 @@ const ProtectedRoute = ({ children }) => {
             return <Navigate to="/admin/auth" state={{ from: location }} replace />;
         }
         if (location.pathname.startsWith('/seller')) {
+            const hasPendingSeller = typeof localStorage !== 'undefined' && (
+                localStorage.getItem('pending_seller_id') ||
+                localStorage.getItem('auth_seller')
+            );
+            if (hasPendingSeller) {
+                return <Navigate to="/seller/pending-approval" state={{ from: location, approvalRequired: true }} replace />;
+            }
             return <Navigate to="/seller/auth" state={{ from: location }} replace />;
         }
         if (location.pathname.startsWith('/delivery')) {

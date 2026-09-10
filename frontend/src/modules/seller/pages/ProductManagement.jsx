@@ -229,6 +229,9 @@ const ProductManagement = () => {
     packageHeight: "",
     deliveryType: "instant",
     brand: "",
+    shelfLife: "",
+    fssaiCode: "",
+    countryOfOrigin: "India",
     mainImage: null,
     galleryImages: [],
     variants: [
@@ -370,6 +373,15 @@ const ProductManagement = () => {
         }
       }
 
+      const selectedCategoryName = categories
+        .find((h) => (h._id || h.id) === formData.header)
+        ?.children?.find((c) => (c._id || c.id) === formData.category)?.name;
+
+      if (selectedCategoryName && selectedCategoryName.toLowerCase().includes("grocery") && !formData.shelfLife?.trim()) {
+        toast.error("Shelf Life is strictly mandatory for Grocery products.");
+        return;
+      }
+
       const data = new FormData();
       data.append("name", formData.name);
       data.append("slug", formData.slug);
@@ -397,6 +409,9 @@ const ProductManagement = () => {
         data.append("returnWindowDays", formData.returnWindowDays);
       }
       data.append("tags", formData.tags);
+      data.append("shelfLife", formData.shelfLife || "");
+      data.append("fssaiCode", formData.fssaiCode || "");
+      data.append("countryOfOrigin", formData.countryOfOrigin || "India");
       data.append("variants", JSON.stringify(formData.variants));
 
       if (formData.mainImageFile) {
@@ -502,6 +517,9 @@ const ProductManagement = () => {
         packageHeight: item.packageHeight != null && item.packageHeight !== "" ? String(item.packageHeight) : "",
         deliveryType: item.deliveryType || "instant",
         brand: item.brand || "",
+        shelfLife: item.shelfLife || "",
+        fssaiCode: item.fssaiCode || "",
+        countryOfOrigin: item.countryOfOrigin || "India",
         isReturnable: item.isReturnable ?? true,
         returnWindowDays: item.returnWindowDays ?? 1,
         mainImage: item.mainImage || null,
@@ -674,11 +692,11 @@ const ProductManagement = () => {
               className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 border-none rounded-xl text-xs font-semibold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/5 transition-all outline-none"
             />
           </div>
-          <div className="relative flex gap-2 shrink-0 w-full lg:w-auto">
+          <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 w-full lg:w-auto">
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="flex-1 lg:flex-none px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary/5 outline-none appearance-none cursor-pointer"
+              className="col-span-2 sm:col-span-1 sm:flex-1 lg:flex-none px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary/5 outline-none appearance-none cursor-pointer"
             >
               <option value="all">All Categories</option>
               {categories.map((h) => (
@@ -693,10 +711,10 @@ const ProductManagement = () => {
               ))}
             </select>
 
-            <div ref={filterDropdownRef}>
+            <div ref={filterDropdownRef} className="col-span-1 relative">
               <button
                 onClick={() => setIsFilterOpen((prev) => !prev)}
-                className="flex items-center space-x-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
+                className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all"
               >
                 <HiOutlineFunnel className="h-4 w-4" />
                 <span>Filters</span>
@@ -774,7 +792,7 @@ const ProductManagement = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="flex-1 lg:flex-none px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary/5 outline-none appearance-none cursor-pointer"
+              className="col-span-1 sm:flex-1 lg:flex-none px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary/5 outline-none appearance-none cursor-pointer"
             >
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
@@ -844,15 +862,16 @@ const ProductManagement = () => {
                   key={p._id || p.id}
                   className="hover:bg-gray-50/50 transition-colors group border-b border-gray-100 last:border-b-0">
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-4">
-                      <div className="h-14 w-14 rounded-lg overflow-hidden bg-slate-100 ring-1 ring-slate-200">
-                        <img
+                      <div className="flex items-center gap-4">
+                        <div className="h-14 w-14 shrink-0 rounded-lg overflow-hidden bg-slate-100 ring-1 ring-slate-200">
+                          <img
                           src={
                             p.mainImage ||
                             p.image ||
-                            "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&q=80&w=400&h=400"
+                            "/default-product.png"
                           }
                           alt={p.name}
+                          onError={(e) => { e.target.onerror = null; e.target.src = '/default-product.png'; }}
                           className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                       </div>
@@ -1308,6 +1327,56 @@ const ProductManagement = () => {
                           </div>
                         </div>
                       )}
+
+                      {/* Compliance & Details */}
+                      <div className="pt-6 mt-6 border-t border-slate-100 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-1.5 flex flex-col">
+                            <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                              Shelf Life {selectedCategoryName?.toLowerCase().includes("grocery") && <span className="text-rose-500">*</span>}
+                            </label>
+                            <input
+                              value={formData.shelfLife || ""}
+                              onChange={(e) =>
+                                setFormData({ ...formData, shelfLife: e.target.value })
+                              }
+                              className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
+                              placeholder="e.g. 6 Months, 3 Days"
+                            />
+                            {selectedCategoryName?.toLowerCase().includes("grocery") && (
+                              <p className="text-[10px] text-rose-500 font-medium ml-1">Mandatory for Grocery items.</p>
+                            )}
+                          </div>
+                          <div className="space-y-1.5 flex flex-col">
+                            <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                              FSSAI License / Code
+                            </label>
+                            <input
+                              value={formData.fssaiCode || ""}
+                              onChange={(e) =>
+                                setFormData({ ...formData, fssaiCode: e.target.value })
+                              }
+                              className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
+                              placeholder="e.g. 10012011000001"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-1.5 flex flex-col">
+                            <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                              Country of Origin
+                            </label>
+                            <input
+                              value={formData.countryOfOrigin || ""}
+                              onChange={(e) =>
+                                setFormData({ ...formData, countryOfOrigin: e.target.value })
+                              }
+                              className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
+                              placeholder="e.g. India"
+                            />
+                          </div>
+                        </div>
+                      </div>
 
                       {/* Returns & Warranties */}
                       <div className="pt-6 mt-6 border-t border-slate-100 space-y-6">

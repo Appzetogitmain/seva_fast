@@ -15,12 +15,17 @@ export function sellerDeliveredOrderMatch(sellerId) {
 }
 
 export function sellerOrderRevenueAmount() {
+  // Revenue = productSubtotal (seller's actual product value before any
+  // customer-facing discounts like coupons, wallet, or membership).
+  // Discounts are subsidised by admin, not seller — so the seller's gross
+  // revenue must reflect the full product value, not the discounted
+  // grandTotal the customer paid.
   return {
     $ifNull: [
-      "$pricing.total",
+      "$paymentBreakdown.productSubtotal",
       {
         $ifNull: [
-          "$paymentBreakdown.grandTotal",
+          "$pricing.subtotal",
           {
             $sum: {
               $map: {

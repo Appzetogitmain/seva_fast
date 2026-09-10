@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, LayoutGrid, User, Sparkles, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,51 @@ const navItems = [
 
 const BottomNav = () => {
     const location = useLocation();
+    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const handleFocusIn = (e) => {
+            const tag = e.target?.tagName?.toUpperCase();
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) {
+                setIsKeyboardOpen(true);
+            }
+        };
+
+        const handleFocusOut = (e) => {
+            const tag = e.target?.tagName?.toUpperCase();
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) {
+                setIsKeyboardOpen(false);
+            }
+        };
+
+        const handleViewportResize = () => {
+            if (window.visualViewport) {
+                // If the visual viewport height shrinks significantly, mobile keyboard is open
+                const isShrunk = window.visualViewport.height < window.innerHeight * 0.75;
+                setIsKeyboardOpen(isShrunk);
+            }
+        };
+
+        document.addEventListener('focusin', handleFocusIn);
+        document.addEventListener('focusout', handleFocusOut);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', handleViewportResize);
+        }
+
+        return () => {
+            document.removeEventListener('focusin', handleFocusIn);
+            document.removeEventListener('focusout', handleFocusOut);
+            if (window.visualViewport) {
+                window.visualViewport.removeEventListener('resize', handleViewportResize);
+            }
+        };
+    }, []);
+
+    if (isKeyboardOpen) {
+        return null;
+    }
 
     return (
         <div className="fixed bottom-0 left-0 right-0 z-[500] bg-white border-t border-gray-100 flex items-center justify-around h-[70px] md:hidden shadow-[0_-8px_30px_rgba(0,0,0,0.06)] px-4 pb-[env(safe-area-inset-bottom)]">

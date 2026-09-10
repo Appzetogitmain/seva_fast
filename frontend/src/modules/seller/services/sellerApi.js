@@ -3,6 +3,7 @@ import axiosInstance from '@core/api/axios';
 export const sellerApi = {
     login: (data) => axiosInstance.post('/seller/login', data),
     signup: (data) => axiosInstance.post('/seller/signup', data),
+    checkApprovalStatus: (params) => axiosInstance.get('/seller/approval-status', { params: { ...params, _t: Date.now() } }),
     sendVerificationOtp: (data) => axiosInstance.post('/seller/verification/send-otp', data),
     verifyVerificationOtp: (data) => axiosInstance.post('/seller/verification/verify-otp', data),
     sendPasswordResetOtp: (data) => axiosInstance.post('/seller/forgot-password/send-otp', data),

@@ -202,7 +202,7 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
     const path = location.pathname.replace(/\/$/, '') || '/';
 
     const hideHeaderRoutes = ['/', '/categories', '/orders', '/transactions', '/profile', '/profile/edit', '/wishlist', '/addresses', '/wallet', '/support', '/privacy', '/about', '/terms', '/checkout', '/search', '/chat', '/plans', '/professionals', '/professionals/panel'];
-    const hideBottomNavRoutes = ['/checkout', '/search', '/chat'];
+    const hideBottomNavRoutes = ['/checkout', '/search', '/chat', '/profile/edit'];
     const hideCartRoutes = ['/checkout', '/chat'];
 
     // /terms and /privacy are shared pages: the delivery and seller apps link

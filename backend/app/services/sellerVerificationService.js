@@ -10,6 +10,10 @@ import {
   sendSellerPasswordResetOtpEmail,
   useRealEmailOTP,
 } from "./emailService.js";
+import {
+  normalizeIndian10DigitPhone,
+  getPhoneLookupCandidates,
+} from "../utils/phone.js";
 
 const SELLER_SIGNUP_PURPOSE = "seller_signup";
 const SELLER_PASSWORD_RESET_PURPOSE = "seller_password_reset";
@@ -145,8 +149,8 @@ function normalizeEmail(value) {
 }
 
 function normalizePhone(value) {
-  const phone = String(value || "").replace(/\D/g, "").slice(0, 10);
-  if (!/^\d{10}$/.test(phone)) {
+  const phone = normalizeIndian10DigitPhone(value);
+  if (!/^[6-9]\d{9}$/.test(phone)) {
     const error = new Error("Please enter a valid 10-digit phone number");
     error.statusCode = 400;
     throw error;
@@ -169,7 +173,10 @@ function normalizeTarget(channel, rawValue) {
 }
 
 async function ensureTargetAvailable(channel, target) {
-  const query = channel === "email" ? { email: target } : { phone: target };
+  const query =
+    channel === "email"
+      ? { email: target }
+      : { phone: { $in: getPhoneLookupCandidates(target) } };
   const existingSeller = await Seller.findOne(query).select("_id").lean();
   if (existingSeller) {
     const error = new Error(

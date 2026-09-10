@@ -210,6 +210,16 @@ const OrderDetail = () => {
         { label: "Advertise", value: commissionBreakdown.advertiseChargeAmount },
     ].filter((row) => Number(row.value) > 0);
 
+    // Discount & subsidy details
+    const discountTotal = Number(paymentBreakdown.discountTotal ?? order.pricing?.discount ?? 0);
+    const walletAmount = Number(paymentBreakdown.walletAmount ?? order.pricing?.walletAmount ?? 0);
+    const membershipDiscountAmount = Number(paymentBreakdown.membershipDiscountAmount ?? 0);
+    const firstOrderDiscountAmount = Number(paymentBreakdown.firstOrderDiscountAmount ?? 0);
+    const couponDiscount = Math.max(discountTotal - membershipDiscountAmount - firstOrderDiscountAmount, 0);
+    const membershipTier = commissionBreakdown.membershipTier || null;
+    const couponCode = order.couponCode || paymentBreakdown.couponCode || null;
+    const hasDiscountOrWallet = discountTotal > 0 || walletAmount > 0;
+
     return (
         <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
             {/* Control Bar */}
@@ -290,11 +300,12 @@ const OrderDetail = () => {
                                             <td className="px-6 py-5">
                                                 <div className="flex items-center gap-4">
                                                     <div className="h-14 w-14 bg-slate-50 rounded-2xl flex items-center justify-center ds-h1 shadow-inner border border-slate-100 group-hover:scale-110 transition-transform overflow-hidden">
-                                                        {item.image ? (
-                                                            <img src={item.image} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <Package className="h-6 w-6 text-slate-200" />
-                                                        )}
+                                                        <img
+                                                            src={item.image || '/default-product.png'}
+                                                            alt=""
+                                                            onError={(e) => { e.target.onerror = null; e.target.src = '/default-product.png'; }}
+                                                            className="w-full h-full object-cover"
+                                                        />
                                                     </div>
                                                     <div>
                                                         <h4 className="text-sm font-black text-slate-900">{item.name}</h4>
@@ -606,6 +617,50 @@ const OrderDetail = () => {
                                                         <span>₹{platformFee.toLocaleString("en-IN")}</span>
                                                     </div>
                                                 )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Discount & Subsidy — Admin bears these costs */}
+                                    {hasDiscountOrWallet && (
+                                        <div>
+                                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 px-1">
+                                                Discount & Subsidy (Admin bears this cost)
+                                            </p>
+                                            <div className="space-y-1.5 pl-2 border-l-2 border-rose-200">
+                                                {couponDiscount > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Coupon Discount{couponCode ? ` (${couponCode})` : ''}</span>
+                                                        <span className="text-rose-500">-₹{couponDiscount.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {membershipDiscountAmount > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Membership Discount{membershipTier ? ` (${membershipTier})` : ''}</span>
+                                                        <span className="text-rose-500">-₹{membershipDiscountAmount.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {firstOrderDiscountAmount > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>First Order Discount</span>
+                                                        <span className="text-rose-500">-₹{firstOrderDiscountAmount.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {walletAmount > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Wallet Used</span>
+                                                        <span className="text-amber-600">₹{walletAmount.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {discountTotal > 0 && (
+                                                    <div className="flex justify-between text-xs font-black text-rose-600 px-2 py-1.5 bg-rose-50 rounded-lg mt-1">
+                                                        <span>Total Admin Subsidy</span>
+                                                        <span>-₹{discountTotal.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                <p className="text-[9px] font-bold text-slate-400 px-2 py-1 italic">
+                                                    Seller gets full product value (₹{productSubtotal.toLocaleString("en-IN")}). Discount is borne by admin, not seller.
+                                                </p>
                                             </div>
                                         </div>
                                     )}

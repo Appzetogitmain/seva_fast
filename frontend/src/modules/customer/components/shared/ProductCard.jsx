@@ -89,7 +89,7 @@ const ProductCard = React.memo(
       : 0;
 
     const finalPrice = (isFirstOrder && firstOrderDiscount > 0)
-      ? Math.round(displayPrice * (1 - firstOrderDiscount / 100))
+      ? Number((displayPrice * (1 - firstOrderDiscount / 100)).toFixed(2))
       : displayPrice;
 
     const strikePrice = displayOriginalPrice > displayPrice
@@ -309,9 +309,13 @@ const ProductCard = React.memo(
             )}>
             <img
               ref={imageRef}
-              src={applyCloudinaryTransform(product.image)}
+              src={applyCloudinaryTransform(product.image) || '/default-product.png'}
               alt={product.name}
               loading="lazy"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/default-product.png';
+              }}
               className={cn("w-full h-full object-cover mix-blend-multiply", isOutOfStock && "grayscale opacity-60")}
             />
           </div>

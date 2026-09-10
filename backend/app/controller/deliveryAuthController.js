@@ -305,7 +305,6 @@ export const verifyDeliveryOTP = async (req, res) => {
             user: delivery,
             req,
         });
-
         const token = generateToken(delivery);
 
         return handleResponse(res, 200, "Login successful", {
@@ -382,11 +381,31 @@ export const updateDeliveryProfile = async (req, res) => {
         if (experienceYears !== undefined && experienceYears !== "") delivery.experienceYears = Number(experienceYears);
         if (preferredArea !== undefined) delivery.preferredArea = preferredArea;
 
+        // Handle profile photo upload via multer or base64 / url
+        if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+            for (const file of req.files) {
+                if (file.fieldname === "profileImage" || file.fieldname === "image" || file.fieldname === "avatar") {
+                    const result = await uploadToCloudinary(file.buffer, "delivery/profiles", {
+                        mimeType: file.mimetype,
+                    });
+                    delivery.profileImage = typeof result === "string" ? result : (result?.secure_url || result?.url || "");
+                }
+            }
+        } else if (req.file) {
+            const result = await uploadToCloudinary(req.file.buffer, "delivery/profiles", {
+                mimeType: req.file.mimetype,
+            });
+            delivery.profileImage = typeof result === "string" ? result : (result?.secure_url || result?.url || "");
+        } else if (req.body.profileImage !== undefined) {
+            delivery.profileImage = req.body.profileImage;
+        }
+
         await delivery.save();
 
         return handleResponse(res, 200, "Profile updated successfully", delivery);
     } catch (error) {
-        return handleResponse(res, 500, error.message);
+        console.error("Error updating delivery profile:", error);
+        return handleResponse(res, error.statusCode || 500, error.message || "Failed to update delivery profile");
     }
 };
 

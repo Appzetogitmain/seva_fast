@@ -4,7 +4,14 @@ const mockNotificationFindById = jest.fn();
 const mockNotificationUpdateOne = jest.fn();
 const mockPushTokenFind = jest.fn();
 const mockPushTokenUpdateMany = jest.fn();
+const mockPreferenceFindOne = jest.fn();
 const mockSendFCM = jest.fn();
+
+jest.unstable_mockModule("../app/modules/notifications/preference.model.js", () => ({
+  default: {
+    findOne: mockPreferenceFindOne,
+  },
+}));
 
 jest.unstable_mockModule("../app/modules/notifications/notification.model.js", () => ({
   default: {
@@ -100,6 +107,14 @@ describe("notification worker invalid token cleanup", () => {
       ],
     });
 
+    mockPreferenceFindOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({
+        pushNotifications: true,
+        sound: true,
+        vibration: true,
+      }),
+    });
+
     mockNotificationUpdateOne.mockResolvedValue({ modifiedCount: 1 });
     mockPushTokenUpdateMany.mockResolvedValue({ modifiedCount: 1 });
   });
@@ -126,6 +141,33 @@ describe("notification worker invalid token cleanup", () => {
       expect.objectContaining({
         $set: expect.objectContaining({
           status: "sent",
+        }),
+      }),
+    );
+  });
+
+  test("skips FCM delivery when user has pushNotifications turned off in preferences", async () => {
+    mockPreferenceFindOne.mockReturnValue({
+      lean: jest.fn().mockResolvedValue({
+        pushNotifications: false,
+        sound: false,
+        vibration: false,
+      }),
+    });
+
+    await processNotificationJob({
+      data: {
+        notificationId: "notif-1",
+      },
+    });
+
+    expect(mockSendFCM).not.toHaveBeenCalled();
+    expect(mockNotificationUpdateOne).toHaveBeenCalledWith(
+      { _id: "notif-1" },
+      expect.objectContaining({
+        $set: expect.objectContaining({
+          status: "sent",
+          failureReason: "Push notifications disabled by user preference",
         }),
       }),
     );

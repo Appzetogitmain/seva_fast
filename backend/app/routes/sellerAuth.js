@@ -8,6 +8,7 @@ import {
     sendSellerPasswordResetOtp,
     verifySellerPasswordResetOtpController,
     resetSellerPassword,
+    checkSellerApprovalStatus,
 } from "../controller/sellerAuthController.js";
 import {
     getSellerProfile,
@@ -84,6 +85,8 @@ router.post(
     signupSeller
 );
 router.post("/login", loginSeller);
+router.get("/approval-status", checkSellerApprovalStatus);
+router.post("/check-approval-status", checkSellerApprovalStatus);
 router.get("/nearby", getNearbySellers);
 
 // Profile routes

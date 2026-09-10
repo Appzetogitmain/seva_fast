@@ -141,45 +141,47 @@ const Dashboard = () => {
   }, [statsData?.salesTrend, statsData?.chartData]);
   const revenueMax = Math.max(1, ...revenueChartData.map((d) => d.sales));
 
+  const pendingOrdersCount = safeOrders.filter(o => ['pending', 'processing'].includes((o.status || '').toLowerCase())).length;
+
   const stats = [
     {
       label: "Total Revenue",
       value: statsData?.overview?.totalSales || "₹0",
-      change: "+12.5%",
-      changeType: "increase",
+      change: statsData?.overview?.salesTrend ? `${statsData.overview.salesTrend}` : "0%",
+      changeType: (statsData?.overview?.salesTrend || "").startsWith("-") ? "decrease" : "increase",
       icon: DollarSign,
       iconBg: "bg-brand-50",
       iconColor: "text-brand-600",
-      description: "vs last month",
+      description: "vs last week",
       path: "/seller/transactions",
     },
     {
-      label: "Actual Net Profit",
-      value: statsData?.overview?.totalNetProfit || "₹0",
-      change: statsData?.overview?.netProfitMargin ? `${statsData.overview.netProfitMargin} margin` : "0% margin",
-      changeType: "increase",
-      icon: TrendingUp,
-      iconBg: "bg-emerald-50",
-      iconColor: "text-emerald-600",
-      description: "after product cost",
-      path: "/seller/earnings",
+      label: "Pending Orders",
+      value: pendingOrdersCount.toString(),
+      change: pendingOrdersCount > 0 ? `${pendingOrdersCount} need attention` : "Caught up",
+      changeType: pendingOrdersCount > 0 ? "decrease" : "neutral",
+      icon: Clock,
+      iconBg: "bg-amber-50",
+      iconColor: "text-amber-600",
+      description: "awaiting processing",
+      path: "/seller/orders",
     },
     {
       label: "Total Orders",
       value: statsData?.overview?.totalOrders || "0",
-      change: "+8.2%",
-      changeType: "increase",
+      change: statsData?.overview?.ordersTrend ? `${statsData.overview.ordersTrend}` : "0%",
+      changeType: (statsData?.overview?.ordersTrend || "").startsWith("-") ? "decrease" : "increase",
       icon: ShoppingBag,
       iconBg: "bg-brand-50",
       iconColor: "text-brand-600",
-      description: "vs last month",
+      description: "vs last week",
       path: "/seller/orders",
     },
     {
       label: "Avg Order Value",
       value: statsData?.overview?.avgOrderValue || "₹0",
-      change: "+2",
-      changeType: "increase",
+      change: "",
+      changeType: "neutral",
       icon: Package,
       iconBg: "bg-purple-50",
       iconColor: "text-purple-600",
@@ -457,15 +459,19 @@ const Dashboard = () => {
                 <p className="text-base font-medium text-slate-600">{stat.label}</p>
                 <p className="text-2xl font-bold text-slate-900 mt-2">{stat.value}</p>
                 <div className="flex items-center gap-2 mt-2">
-                  <span
-                    className={cn(
-                      "text-xs font-semibold flex items-center gap-1",
-                      stat.changeType === "increase" ? "text-brand-600" : "text-red-600"
-                    )}
-                  >
-                    <TrendingUp className={cn("h-3 w-3", stat.changeType === "decrease" && "rotate-180")} />
-                    {stat.change}
-                  </span>
+                  {stat.change && (
+                    <span
+                      className={cn(
+                        "text-xs font-semibold flex items-center gap-1",
+                        stat.changeType === "increase" ? "text-brand-600" : stat.changeType === "decrease" ? "text-red-600" : "text-slate-500"
+                      )}
+                    >
+                      {stat.changeType !== "neutral" && (
+                        <TrendingUp className={cn("h-3 w-3", stat.changeType === "decrease" && "rotate-180")} />
+                      )}
+                      {stat.change}
+                    </span>
+                  )}
                   <span className="text-sm text-slate-600">{stat.description}</span>
                 </div>
               </div>

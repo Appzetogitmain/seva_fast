@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
+import { normalizeIndian10DigitPhone } from "../utils/phone.js";
 
 const sellerSchema = new mongoose.Schema(
   {
@@ -263,6 +264,23 @@ const sellerSchema = new mongoose.Schema(
 
 sellerSchema.index({ location: "2dsphere" });
 sellerSchema.index({ isActive: 1, isVerified: 1 });
+
+// Normalize phone and whatsappNumber before validation
+sellerSchema.pre("validate", function (next) {
+  if (this.phone) {
+    const normalized = normalizeIndian10DigitPhone(this.phone);
+    if (normalized && normalized.length === 10) {
+      this.phone = normalized;
+    }
+  }
+  if (this.whatsappNumber) {
+    const normalized = normalizeIndian10DigitPhone(this.whatsappNumber);
+    if (normalized && normalized.length === 10) {
+      this.whatsappNumber = normalized;
+    }
+  }
+  next();
+});
 
 // Generate sellerCode and Hash password before saving
 sellerSchema.pre("save", async function (next) {

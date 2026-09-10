@@ -37,7 +37,7 @@ router.get("/public-verify/:idOrRiderId", getPublicDeliveryVerification);
 
 // Profile routes
 router.get("/profile", verifyToken, getDeliveryProfile);
-router.put("/profile", verifyToken, updateDeliveryProfile);
+router.put("/profile", verifyToken, upload.any(), updateDeliveryProfile);
 router.get("/stats", verifyToken, requireApprovedDelivery, getDeliveryStats);
 router.get("/earnings", verifyToken, requireApprovedDelivery, getDeliveryEarnings);
 router.get("/cod/summary", verifyToken, allowRoles("delivery"), requireApprovedDelivery, getDeliveryCodCashSummary);

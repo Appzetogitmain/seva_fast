@@ -117,6 +117,9 @@ const AddProduct = () => {
     packageHeight: "",
     deliveryType: "instant",
     brand: "",
+    shelfLife: "",
+    fssaiCode: "",
+    countryOfOrigin: "India",
     isReturnable: true,
     returnWindowDays: 1,
     mainImage: null,
@@ -137,52 +140,25 @@ const AddProduct = () => {
   }), []);
 
   const [formData, setFormData] = useState(() => {
+    const blankData = getBlankFormData();
     const saved = localStorage.getItem("seller_add_product_draft");
     if (saved) {
       try {
-        return JSON.parse(saved);
-      } catch (e) {}
+        const parsed = JSON.parse(saved);
+        return {
+          ...blankData,
+          ...parsed,
+          // Ensure arrays/objects exist even if they were deleted before saving to localStorage
+          galleryImages: parsed.galleryImages || blankData.galleryImages || [],
+          galleryFiles: parsed.galleryFiles || blankData.galleryFiles,
+          mainImage: parsed.mainImage || blankData.mainImage,
+          mainImageFile: parsed.mainImageFile || blankData.mainImageFile,
+        };
+      } catch (e) {
+        console.warn("Could not parse draft data:", e);
+      }
     }
-    return {
-      name: "",
-      slug: "",
-      sku: "",
-      description: "",
-      price: "",
-      salePrice: "",
-      costPrice: "",
-      stock: "",
-      lowStockAlert: 5,
-      category: "",
-      subcategory: "",
-      header: "",
-      status: "active",
-      tags: "",
-      aiGenerated: false,
-      weight: "",
-      weightVal: "",
-      weightUnit: "kg",
-      packageLength: "",
-      packageBreadth: "",
-      packageHeight: "",
-      deliveryType: "instant",
-      brand: "",
-      isReturnable: true,
-      returnWindowDays: 1,
-      mainImage: null,
-      galleryImages: [],
-      variants: [
-        {
-          id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-          name: "",
-          price: "",
-          salePrice: "",
-          costPrice: "",
-          stock: "",
-          sku: "",
-        },
-      ],
-    };
+    return blankData;
   });
 
   const [dbCategories, setDbCategories] = useState([]);
@@ -256,7 +232,18 @@ const AddProduct = () => {
   };
 
   useEffect(() => {
-    localStorage.setItem("seller_add_product_draft", JSON.stringify(formData));
+    try {
+      const draftData = { ...formData };
+      // Exclude large base64 images and File objects to prevent localStorage quota exceeded errors
+      delete draftData.mainImage;
+      delete draftData.mainImageFile;
+      delete draftData.galleryImages;
+      delete draftData.galleryFiles;
+      
+      localStorage.setItem("seller_add_product_draft", JSON.stringify(draftData));
+    } catch (error) {
+      console.warn("Could not save product draft to localStorage:", error);
+    }
   }, [formData]);
 
   useEffect(() => {
@@ -348,6 +335,11 @@ const AddProduct = () => {
     // Validate required category levels are selected
     if (!formData.header || !formData.category) {
       toast.error("Please select Main Group and Specific Category");
+      return;
+    }
+
+    if (selectedCategoryName && selectedCategoryName.toLowerCase().includes("grocery") && !formData.shelfLife?.trim()) {
+      toast.error("Shelf Life is strictly mandatory for Grocery products.");
       return;
     }
 
@@ -489,7 +481,7 @@ const AddProduct = () => {
         } else {
           setFormData({
             ...formData,
-            galleryImages: [...formData.galleryImages, reader.result],
+            galleryImages: [...(formData.galleryImages || []), reader.result],
             galleryFiles: [...(formData.galleryFiles || []), file]
           });
         }
@@ -873,6 +865,60 @@ const AddProduct = () => {
             </div>
           </Card>
 
+          {/* Compliance & Details */}
+          <Card
+            title={CardTitle(HiOutlineScale, "Compliance & Details")}
+            subtitle="Additional product information for customers">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5 flex flex-col">
+                  <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                    Shelf Life {selectedCategoryName?.toLowerCase().includes("grocery") && <span className="text-rose-500">*</span>}
+                  </label>
+                  <input
+                    value={formData.shelfLife}
+                    onChange={(e) =>
+                      setFormData({ ...formData, shelfLife: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
+                    placeholder="e.g. 6 Months, 3 Days"
+                  />
+                  {selectedCategoryName?.toLowerCase().includes("grocery") && (
+                    <p className="text-[10px] text-rose-500 font-medium ml-1">Mandatory for Grocery items.</p>
+                  )}
+                </div>
+                <div className="space-y-1.5 flex flex-col">
+                  <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                    FSSAI License / Code
+                  </label>
+                  <input
+                    value={formData.fssaiCode}
+                    onChange={(e) =>
+                      setFormData({ ...formData, fssaiCode: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
+                    placeholder="e.g. 10012011000001"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5 flex flex-col">
+                  <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                    Country of Origin
+                  </label>
+                  <input
+                    value={formData.countryOfOrigin}
+                    onChange={(e) =>
+                      setFormData({ ...formData, countryOfOrigin: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-md text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
+                    placeholder="e.g. India"
+                  />
+                </div>
+              </div>
+            </div>
+          </Card>
+
           {/* Returns & Warranties */}
           <Card
             title={CardTitle(HiOutlineScale, "Returns & Warranties")}
@@ -948,8 +994,8 @@ const AddProduct = () => {
               {(formData.variants || []).map((variant, index) => (
                 <div
                   key={variant.id}
-                  className="p-4 bg-slate-50 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end group relative">
-                  <div className="col-span-12 md:col-span-3 space-y-1">
+                  className="p-4 bg-slate-50 rounded-2xl border border-slate-100 grid grid-cols-12 gap-4 items-end group relative">
+                  <div className="col-span-12 md:col-span-2 space-y-1">
                     <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
                       Variant Name
                     </label>
@@ -1023,7 +1069,7 @@ const AddProduct = () => {
                       className="w-full px-3 py-2 bg-emerald-50/50 ring-1 ring-emerald-100 border-none rounded-xl text-xs font-bold text-emerald-800 outline-none focus:ring-2 focus:ring-emerald-200"
                     />
                   </div>
-                  <div className="col-span-6 md:col-span-2 space-y-1">
+                  <div className="col-span-6 md:col-span-1 space-y-1">
                     <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
                       Stock
                     </label>
@@ -1053,7 +1099,7 @@ const AddProduct = () => {
                       className="w-full px-3 py-2 bg-white ring-1 ring-slate-200 border-none rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/10"
                     />
                   </div>
-                  <div className="col-span-5 md:col-span-2 space-y-1">
+                  <div className="col-span-12 md:col-span-2 space-y-1">
                     <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
                       Product Code
                     </label>
@@ -1084,30 +1130,29 @@ const AddProduct = () => {
                     }
                     return null;
                   })()}
-                  <div className="col-span-1 flex justify-end pb-1">
-                    <button
-                      onClick={() => {
-                        if (formData.variants.length > 1) {
-                          setFormData((prev) => {
-                            const remaining = prev.variants
-                              .map((variant, idx) => ({ variant, oldIndex: idx + 1 }))
-                              .filter((item) => item.oldIndex !== index + 1)
-                              .map((item, newIdx) => {
-                                const shouldAuto =
-                                  !item.variant.sku ||
-                                  isAutoSku(item.variant.sku, prev.name, item.oldIndex);
-                                return shouldAuto
-                                  ? { ...item.variant, sku: makeSku(prev.name, newIdx + 1) }
-                                  : item.variant;
-                              });
-                            return { ...prev, variants: remaining };
-                          });
-                        }
-                      }}
-                      className="p-2 text-slate-300 hover:text-rose-500 transition-colors">
-                      <HiOutlineTrash className="h-4 w-4" />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.variants.length > 1) {
+                        setFormData((prev) => {
+                          const remaining = prev.variants
+                            .map((variant, idx) => ({ variant, oldIndex: idx + 1 }))
+                            .filter((item) => item.oldIndex !== index + 1)
+                            .map((item, newIdx) => {
+                              const shouldAuto =
+                                !item.variant.sku ||
+                                isAutoSku(item.variant.sku, prev.name, item.oldIndex);
+                              return shouldAuto
+                                ? { ...item.variant, sku: makeSku(prev.name, newIdx + 1) }
+                                : item.variant;
+                            });
+                          return { ...prev, variants: remaining };
+                        });
+                      }
+                    }}
+                    className="absolute -top-3 -right-3 p-1.5 bg-white text-rose-500 rounded-full shadow-md border border-slate-100 hover:bg-rose-50 transition-colors z-10">
+                    <HiOutlineTrash className="h-4 w-4" />
+                  </button>
                 </div>
               ))}
             </div>
@@ -1240,19 +1285,7 @@ const AddProduct = () => {
                       We show this image on the search page and the main
                       store listing. Make sure it is clear and bright.
                     </p>
-                    {formData.mainImage && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleAutoFillFromPhoto(formData.mainImageFile)}
-                        disabled={isAnalyzingImage}
-                        className="mt-2 text-primary border-primary/30 bg-primary/5 hover:bg-primary/10 text-xs font-bold"
-                      >
-                        <Sparkles className="mr-1.5 h-3.5 w-3.5 animate-pulse" />
-                        Auto-Fill Details from this Photo
-                      </Button>
-                    )}
+
                   </div>
                 </div>
               </div>
@@ -1267,10 +1300,10 @@ const AddProduct = () => {
                     <div
                       key={i}
                       className="aspect-square rounded-md border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center group hover:border-primary hover:bg-primary/5 transition-all cursor-pointer relative overflow-hidden">
-                      {formData.galleryImages[i - 1] ? (
+                      {(formData.galleryImages || [])[i - 1] ? (
                         <>
                           <img
-                            src={formData.galleryImages[i - 1]}
+                            src={(formData.galleryImages || [])[i - 1]}
                             className="w-full h-full object-cover"
                           />
                           <button
@@ -1278,7 +1311,7 @@ const AddProduct = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              const newImages = [...formData.galleryImages];
+                              const newImages = [...(formData.galleryImages || [])];
                               newImages.splice(i - 1, 1);
                               const newFiles = [...(formData.galleryFiles || [])];
                               if (newFiles.length > i - 1) {

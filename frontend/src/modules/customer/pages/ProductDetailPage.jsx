@@ -74,7 +74,7 @@ const ProductDetailPage = () => {
         return images.length > 0
           ? images
           : [
-              "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&q=80&w=400&h=400",
+              "/default-product.png",
             ];
     }, [selectedProduct]);
 
@@ -215,7 +215,7 @@ const ProductDetailPage = () => {
       : 0;
 
     const finalUnitPrice = (isFirstOrder && firstOrderDiscount > 0)
-      ? Math.round(baseUnitPrice * (1 - firstOrderDiscount / 100))
+      ? Number((baseUnitPrice * (1 - firstOrderDiscount / 100)).toFixed(2))
       : baseUnitPrice;
 
     const strikeThroughPrice = originalPrice > finalUnitPrice ? originalPrice : 0;
@@ -488,7 +488,7 @@ const ProductDetailPage = () => {
                                                                 : 'border-gray-200/60 opacity-50 hover:opacity-90 bg-white/60'
                                                         )}
                                                     >
-                                                        <img src={applyCloudinaryTransform(img, "f_auto,q_auto:best,w_160,dpr_auto")} alt="" loading="lazy" className="w-full h-full object-contain p-1.5" />
+                                                        <img src={applyCloudinaryTransform(img, "f_auto,q_auto:best,w_160,dpr_auto") || '/default-product.png'} alt="" loading="lazy" onError={(e) => { e.target.onerror = null; e.target.src = '/default-product.png'; }} className="w-full h-full object-contain p-1.5" />
                                                     </motion.button>
                                                 ))}
                                             </div>
@@ -503,8 +503,12 @@ const ProductDetailPage = () => {
                                                     animate={{ scale: 1, opacity: 1 }}
                                                     exit={{ scale: 0.93, opacity: 0 }}
                                                     transition={{ duration: 0.15 }}
-                                                    src={applyCloudinaryTransform(allImages[activeImageIndex], "f_auto,q_auto:best,w_1200,dpr_auto")}
+                                                    src={applyCloudinaryTransform(allImages[activeImageIndex], "f_auto,q_auto:best,w_1200,dpr_auto") || '/default-product.png'}
                                                     alt={`${selectedProduct.name} ${activeImageIndex + 1}`}
+                                                    onError={(e) => {
+                                                        e.target.onerror = null;
+                                                        e.target.src = '/default-product.png';
+                                                    }}
                                                     className={cn("w-full h-full object-contain mix-blend-multiply drop-shadow-2xl hover:scale-[1.03] transition-transform duration-500 absolute inset-0 m-auto p-0", isOutOfStock && "grayscale opacity-60")}
                                                 />
                                             </AnimatePresence>
@@ -581,6 +585,7 @@ const ProductDetailPage = () => {
                                                     💰 Save ₹{activePricing.originalPrice - activePricing.unitPrice}
                                                 </motion.div>
                                             )}
+                                            {reviews.length > 0 && (
                                             <motion.div
                                                 initial={{ opacity: 0, x: -10 }}
                                                 animate={{ opacity: 1, x: 0 }}
@@ -588,9 +593,10 @@ const ProductDetailPage = () => {
                                                 className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-[10px] font-[700] border border-orange-100/50"
                                             >
                                                 <Star size={10} fill="currentColor" />
-                                                {reviews.length > 0 ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1) : '4.8'}
-                                                <span className="text-orange-400 font-medium">({reviews.length > 0 ? reviews.length : '120+'})</span>
+                                                {(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)}
+                                                <span className="text-orange-400 font-medium">({reviews.length})</span>
                                             </motion.div>
+                                            )}
                                         </div>
 
                                         {/* Product Name */}
@@ -679,29 +685,6 @@ const ProductDetailPage = () => {
                                             </div>
                                         </motion.div>
 
-                                        {/* View Cart */}
-                                        {cartCount > 0 && (
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.98 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                className="flex justify-center -mt-1"
-                                            >
-                                                <Link
-                                                    to="/checkout"
-                                                    className="w-[80%] bg-gradient-to-r from-primary to-[var(--brand-500)] text-white h-[38px] rounded-xl flex items-center justify-between px-4 shadow-md shadow-brand-200/40 hover:shadow-lg hover:-translate-y-0.5 transition-all active:scale-[0.98]"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <ShoppingBag size={14} strokeWidth={2.0} />
-                                                        <span className="text-[11px] font-[700] uppercase tracking-wider">View Cart</span>
-                                                    </div>
-                                                    <div className="flex items-center justify-center gap-1.5 bg-white/10 px-2 py-1 rounded-lg">
-                                                        <span className="text-[12px] font-[800] tracking-tight">₹{cart.reduce((total, item) => total + (effectiveUnitPrice(item.price, item.salePrice) * Number(item.quantity || 0)), 0)}</span>
-                                                        <ChevronRight size={14} strokeWidth={2.5} />
-                                                    </div>
-                                                </Link>
-                                            </motion.div>
-                                        )}
-
 
 
                                         {/* Variants Selection (Desktop) */}
@@ -753,9 +736,9 @@ const ProductDetailPage = () => {
                                             >
                                                 <div className="grid grid-cols-2 gap-3 mt-1">
                                                     {[
-                                                        { label: 'Shelf Life', value: '3 Days', emoji: '📅' },
-                                                        { label: 'Country of Origin', value: 'India', emoji: '🇮🇳' },
-                                                        { label: 'FSSAI License', value: '1001234567890', emoji: '🛡️' },
+                                                        ...(selectedProduct.shelfLife ? [{ label: 'Shelf Life', value: selectedProduct.shelfLife, emoji: '📅' }] : []),
+                                                        ...(selectedProduct.countryOfOrigin ? [{ label: 'Country of Origin', value: selectedProduct.countryOfOrigin, emoji: '🇮🇳' }] : []),
+                                                        ...(selectedProduct.fssaiCode ? [{ label: 'FSSAI License', value: selectedProduct.fssaiCode, emoji: '🛡️' }] : []),
                                                         { label: 'Customer Care', value: supportEmail, emoji: '📧' }
                                                     ].map((d) => (
                                                         <div key={d.label} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 group hover:bg-white hover:shadow-sm transition-all">
@@ -771,14 +754,18 @@ const ProductDetailPage = () => {
                                                 title="Return Policy"
                                                 icon={<RotateCcw size={16} />}
                                             >
-                                                {settings?.returnPolicy ? (
+                                                {!selectedProduct.isReturnable ? (
+                                                    <p className="text-[13px] text-rose-500 font-bold leading-relaxed">
+                                                        This item is non-returnable.
+                                                    </p>
+                                                ) : settings?.returnPolicy ? (
                                                     <div 
                                                         className="text-[13px] text-slate-500 font-medium leading-relaxed quill-content"
                                                         dangerouslySetInnerHTML={{ __html: settings.returnPolicy }}
                                                     />
                                                 ) : (
                                                     <p className="text-[13px] text-slate-500 font-medium leading-relaxed">
-                                                        Request a return from your order details page within the return window after delivery.
+                                                        Request a return from your order details page within {selectedProduct.returnWindowDays || 1} {selectedProduct.returnWindowDays === 1 ? 'day' : 'days'} after delivery.
                                                         Items should be unused and in original condition with accessories.
                                                     </p>
                                                 )}
@@ -787,16 +774,18 @@ const ProductDetailPage = () => {
                                             {/* Customer Reviews */}
                                             <AccordionItem 
                                                 id="reviews" 
-                                                title={`Customer Reviews (${reviews.length > 0 ? reviews.length : '120+'})`}
+                                                title={reviews.length > 0 ? `Customer Reviews (${reviews.length})` : 'Customer Reviews'}
                                                 icon={<Star size={16} />}
                                             >
                                                 <div className="space-y-6 mt-2">
+                                                    {reviews.length > 0 && (
                                                     <div className="flex items-center justify-between mb-4">
                                                         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 text-primary rounded-xl text-xs font-black border border-brand-100">
                                                             <Star size={14} fill="currentColor" />
-                                                            {reviews.length > 0 ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1) : '4.8'}
+                                                            {(reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)}
                                                         </div>
                                                     </div>
+                                                    )}
 
                                                     {/* Review Form - only if customer has purchased & delivered */}
                                                     {canReview === true ? (

@@ -39,7 +39,7 @@ export async function getAdminOrderEarnings({
       .limit(safeLimit)
       .populate("seller", "shopName name phone")
       .select(
-        "orderId deliveredAt paymentMode paymentStatus paymentBreakdown settlementStatus financeFlags pricing createdAt seller",
+        "orderId deliveredAt paymentMode paymentStatus paymentBreakdown settlementStatus financeFlags pricing createdAt seller couponCode",
       )
       .lean(),
     Order.countDocuments(query),
@@ -52,6 +52,9 @@ export async function getAdminOrderEarnings({
           totalCustomerPaid: {
             $sum: { $ifNull: ["$paymentBreakdown.grandTotal", "$pricing.total"] },
           },
+          totalProductSubtotal: {
+            $sum: { $ifNull: ["$paymentBreakdown.productSubtotal", "$pricing.subtotal"] },
+          },
           totalPlatformEarning: {
             $sum: { $ifNull: ["$paymentBreakdown.platformTotalEarning", 0] },
           },
@@ -63,6 +66,12 @@ export async function getAdminOrderEarnings({
           },
           totalRiderPayout: {
             $sum: { $ifNull: ["$paymentBreakdown.riderPayoutTotal", 0] },
+          },
+          totalDiscountGiven: {
+            $sum: { $ifNull: ["$paymentBreakdown.discountTotal", "$pricing.discount"] },
+          },
+          totalWalletUsed: {
+            $sum: { $ifNull: ["$paymentBreakdown.walletAmount", "$pricing.walletAmount"] },
           },
         },
       },
@@ -87,6 +96,8 @@ export async function getAdminOrderEarnings({
             name: order.seller.name,
           }
         : null,
+      // Core amounts
+      productSubtotal: roundCurrency(pb.productSubtotal ?? order.pricing?.subtotal ?? 0),
       customerPaid: roundCurrency(pb.grandTotal ?? order.pricing?.total ?? 0),
       platformEarning: roundCurrency(pb.platformTotalEarning ?? 0),
       adminCommission: roundCurrency(pb.adminProductCommissionTotal ?? 0),
@@ -95,6 +106,25 @@ export async function getAdminOrderEarnings({
       tip: roundCurrency(pb.tipTotal ?? pb.riderTipAmount ?? 0),
       sellerPayout: roundCurrency(pb.sellerPayoutTotal ?? 0),
       riderPayout: roundCurrency(pb.riderPayoutTotal ?? 0),
+
+      // Discount & wallet
+      discountTotal: roundCurrency(pb.discountTotal ?? order.pricing?.discount ?? 0),
+      walletAmount: roundCurrency(pb.walletAmount ?? order.pricing?.walletAmount ?? 0),
+
+      // Discount source attribution
+      discountSources: {
+        coupon: roundCurrency(
+          (pb.discountTotal ?? 0) - (pb.membershipDiscountAmount ?? 0) - (pb.firstOrderDiscountAmount ?? 0),
+        ),
+        couponCode: order.couponCode || null,
+        membership: roundCurrency(pb.membershipDiscountAmount ?? 0),
+        membershipTier: comm.membershipTier || null,
+        firstOrder: roundCurrency(pb.firstOrderDiscountAmount ?? 0),
+      },
+
+      // Admin subsidy — total discount admin bears (seller is NOT charged for this)
+      adminDiscountSubsidy: roundCurrency(pb.discountTotal ?? order.pricing?.discount ?? 0),
+
       adminEarningCredited: Boolean(
         settlement.adminEarningCredited ?? order.financeFlags?.adminEarningCredited,
       ),
@@ -126,10 +156,13 @@ export async function getAdminOrderEarnings({
     summary: {
       orderCount: Number(summaryRow.orderCount || 0),
       totalCustomerPaid: roundCurrency(summaryRow.totalCustomerPaid || 0),
+      totalProductSubtotal: roundCurrency(summaryRow.totalProductSubtotal || 0),
       totalPlatformEarning: roundCurrency(summaryRow.totalPlatformEarning || 0),
       totalAdminCommission: roundCurrency(summaryRow.totalAdminCommission || 0),
       totalSellerPayout: roundCurrency(summaryRow.totalSellerPayout || 0),
       totalRiderPayout: roundCurrency(summaryRow.totalRiderPayout || 0),
+      totalDiscountGiven: roundCurrency(summaryRow.totalDiscountGiven || 0),
+      totalWalletUsed: roundCurrency(summaryRow.totalWalletUsed || 0),
     },
   };
 }

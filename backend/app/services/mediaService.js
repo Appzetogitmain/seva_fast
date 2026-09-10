@@ -67,7 +67,7 @@ const ENTITY_FOLDER_MAP = {
 
 const RESOURCE_TYPE_MAP = {
   image: "image",
-  document: "raw",
+  document: "image",
   raw: "raw",
 };
 
@@ -500,7 +500,7 @@ async function uploadToCloudinary(fileBuffer, folder = "categories", options = {
     options.optimize !== false &&
     (resourceType === "image" || isImageMimeType(mimeType));
 
-  const cloudResourceType = isPdf ? "raw" : (shouldOptimizeImage ? "image" : "auto");
+  const cloudResourceType = isPdf ? "image" : (shouldOptimizeImage ? "image" : "auto");
   const publicId = options.public_id || (isPdf ? `${Date.now()}_seller_kyc.pdf` : undefined);
 
   const uploadOptions = {

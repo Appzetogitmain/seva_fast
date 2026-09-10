@@ -6,6 +6,7 @@ import { invalidateSellerName } from "../services/entityNameCache.js";
 import { registerOrUpdateSellerPickupLocation } from "../services/shiprocket/shiprocketOrderService.js";
 import { invalidate } from "../services/cacheService.js";
 import { geocodeAddress } from "../services/mapsGeocodeService.js";
+import { normalizeIndian10DigitPhone } from "../utils/phone.js";
 
 /* ===============================
    GET NEARBY SELLERS
@@ -197,7 +198,13 @@ export const updateSellerProfile = async (req, res) => {
     // Update fields if provided
     if (name) seller.name = name;
     if (shopName) seller.shopName = shopName;
-    if (phone) seller.phone = phone;
+    if (phone) {
+      const normalizedPhone = normalizeIndian10DigitPhone(phone);
+      if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
+        return handleResponse(res, 400, "Please enter a valid 10-digit phone number starting with 6-9.");
+      }
+      seller.phone = normalizedPhone;
+    }
     if (address !== undefined) seller.address = address;
     if (locality !== undefined) seller.locality = locality;
     if (pincode !== undefined) seller.pincode = pincode;

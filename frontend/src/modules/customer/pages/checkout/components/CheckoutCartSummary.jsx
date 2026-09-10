@@ -29,9 +29,10 @@ const CheckoutCartSummary = React.memo(function CheckoutCartSummary({
           className="flex items-start gap-3 pb-4 border-b border-slate-100 last:border-0 last:pb-0">
           <div className="h-20 w-20 rounded-xl overflow-hidden bg-slate-50 flex-shrink-0">
             <img
-              src={applyCloudinaryTransform(item.image)}
+              src={applyCloudinaryTransform(item.image) || '/default-product.png'}
               alt={item.name}
               loading="lazy"
+              onError={(e) => { e.target.onerror = null; e.target.src = '/default-product.png'; }}
               className={cn("h-full w-full object-cover", item.stock != null && item.stock <= 0 && "grayscale opacity-60")}
             />
           </div>
@@ -75,8 +76,8 @@ const CheckoutCartSummary = React.memo(function CheckoutCartSummary({
               const isOutOfStock = item.stock != null && item.stock <= 0;
               const unit = effectiveUnitPrice(mrp, sale);
               const hasDiscount = sale > 0 && sale < mrp;
-              const total = Math.round(unit * qty);
-              const totalMrp = Math.round(mrp * qty);
+              const total = Number((unit * qty).toFixed(2));
+              const totalMrp = Number((mrp * qty).toFixed(2));
               return (
                 <div className="text-right leading-tight flex flex-col items-end">
                   {isOutOfStock ? (

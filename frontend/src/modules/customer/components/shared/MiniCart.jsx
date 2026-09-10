@@ -57,9 +57,10 @@ const MiniCart = () => {
                             <div className="h-7 w-7 rounded-full bg-white flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
                                 {cart.length > 0 && (
                                     <img
-                                        src={applyCloudinaryTransform(cart[0].image)}
+                                        src={applyCloudinaryTransform(cart[0].image) || '/default-product.png'}
                                         alt={cart[0].name}
                                         loading="lazy"
+                                        onError={(e) => { e.target.onerror = null; e.target.src = '/default-product.png'; }}
                                         className="w-full h-full object-contain p-0.5"
                                     />
                                 )}

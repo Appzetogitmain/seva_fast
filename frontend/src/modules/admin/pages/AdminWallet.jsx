@@ -696,10 +696,12 @@ const AdminWallet = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mt-5">
                         {[
                             { label: 'Delivered Orders', value: orderEarnings.summary?.orderCount || 0, suffix: '' },
+                            { label: 'Product Value', value: orderEarnings.summary?.totalProductSubtotal || 0, prefix: '₹' },
                             { label: 'Customer Paid', value: orderEarnings.summary?.totalCustomerPaid || 0, prefix: '₹' },
+                            { label: 'Discount Subsidized', value: orderEarnings.summary?.totalDiscountGiven || 0, prefix: '₹', highlightDanger: true },
                             { label: 'Platform Earning', value: orderEarnings.summary?.totalPlatformEarning || 0, prefix: '₹', highlight: true },
                             { label: 'Seller Payouts', value: orderEarnings.summary?.totalSellerPayout || 0, prefix: '₹' },
                         ].map((item) => (
@@ -707,11 +709,16 @@ const AdminWallet = () => {
                                 key={item.label}
                                 className={cn(
                                     "rounded-2xl px-4 py-3 ring-1",
-                                    item.highlight ? "bg-fuchsia-50 ring-fuchsia-100" : "bg-slate-50 ring-slate-100"
+                                    item.highlight ? "bg-fuchsia-50 ring-fuchsia-100" :
+                                    item.highlightDanger ? "bg-rose-50 ring-rose-100" : "bg-slate-50 ring-slate-100"
                                 )}
                             >
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.label}</p>
-                                <p className={cn("text-lg font-black mt-1", item.highlight ? "text-fuchsia-700" : "text-slate-900")}>
+                                <p className={cn(
+                                    "text-lg font-black mt-1",
+                                    item.highlight ? "text-fuchsia-700" :
+                                    item.highlightDanger ? "text-rose-600" : "text-slate-900"
+                                )}>
                                     {item.prefix || ''}{Number(item.value || 0).toLocaleString('en-IN')}{item.suffix || ''}
                                 </p>
                             </div>
@@ -722,7 +729,7 @@ const AdminWallet = () => {
                 <div className="px-6 pb-3">
                     <p className="text-[11px] font-bold text-slate-500">
                         Split rule: <span className="text-slate-800">Seller Payout + Platform Earning = Customer Paid</span>
-                        <span className="text-slate-400 font-semibold"> · Commission is inside Platform Earning (detail on row click)</span>
+                        <span className="text-slate-400 font-semibold"> · Discounts are absorbed by platform · Detail on row click</span>
                     </p>
                 </div>
 
@@ -732,7 +739,9 @@ const AdminWallet = () => {
                             <tr className="bg-slate-50/80 border-b border-slate-100">
                                 <th className="ds-table-header-cell pl-6">Order</th>
                                 <th className="ds-table-header-cell">Seller</th>
+                                <th className="ds-table-header-cell text-center">Product Value</th>
                                 <th className="ds-table-header-cell text-center">Customer Paid</th>
+                                <th className="ds-table-header-cell text-center">Discount Subsidy</th>
                                 <th className="ds-table-header-cell text-center">Seller Payout</th>
                                 <th className="ds-table-header-cell text-center">Platform Earning</th>
                                 <th className="ds-table-header-cell text-center">Mode</th>
@@ -742,13 +751,13 @@ const AdminWallet = () => {
                         <tbody className="divide-y divide-slate-50">
                             {orderEarningsLoading ? (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-16 text-center text-sm font-bold text-slate-400">
+                                    <td colSpan="9" className="px-6 py-16 text-center text-sm font-bold text-slate-400">
                                         Loading order earnings...
                                     </td>
                                 </tr>
                             ) : orderEarnings.items.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" className="px-6 py-16 text-center">
+                                    <td colSpan="9" className="px-6 py-16 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <ShoppingBag className="h-10 w-10 text-slate-200" />
                                             <p className="text-sm font-bold text-slate-400">No delivered orders found</p>
@@ -773,7 +782,19 @@ const AdminWallet = () => {
                                             <p className="text-[10px] text-slate-400">{row.seller?.name || ''}</p>
                                         </td>
                                         <td className="px-4 py-4 text-center">
-                                            <span className="text-sm font-black text-slate-800">₹{Number(row.customerPaid || 0).toLocaleString('en-IN')}</span>
+                                            <span className="text-sm font-black text-slate-800">₹{Number(row.productSubtotal || 0).toLocaleString('en-IN')}</span>
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            <span className="text-sm font-bold text-slate-700">₹{Number(row.customerPaid || 0).toLocaleString('en-IN')}</span>
+                                        </td>
+                                        <td className="px-4 py-4 text-center">
+                                            {Number(row.discountTotal || 0) > 0 ? (
+                                                <span className="text-xs font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
+                                                    -₹{Number(row.discountTotal).toLocaleString('en-IN')}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-400">₹0</span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-4 text-center">
                                             <span className="text-sm font-bold text-slate-700">₹{Number(row.sellerPayout || 0).toLocaleString('en-IN')}</span>
@@ -1217,6 +1238,53 @@ const AdminWallet = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Discount & Subsidy Info */}
+                        {(Number(selectedOrderEarning.discountTotal || 0) > 0 || Number(selectedOrderEarning.walletAmount || 0) > 0) && (
+                            <div className="bg-rose-50/70 ring-1 ring-rose-200/80 rounded-xl p-3.5 space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">
+                                        Discount & Subsidy (Admin Bears This Cost)
+                                    </p>
+                                    <span className="text-xs font-black text-rose-600">
+                                        -₹{Number(selectedOrderEarning.discountTotal || 0).toLocaleString('en-IN')}
+                                    </span>
+                                </div>
+                                <div className="space-y-1 text-xs text-slate-600">
+                                    <div className="flex justify-between">
+                                        <span>Product Value (Listed Price):</span>
+                                        <span className="font-bold text-slate-900">₹{Number(selectedOrderEarning.productSubtotal || 0).toLocaleString('en-IN')}</span>
+                                    </div>
+                                    {Number(selectedOrderEarning.discountSources?.coupon || 0) > 0 && (
+                                        <div className="flex justify-between text-rose-600">
+                                            <span>Coupon Discount {selectedOrderEarning.discountSources?.couponCode ? `(${selectedOrderEarning.discountSources.couponCode})` : ''}:</span>
+                                            <span className="font-bold">-₹{Number(selectedOrderEarning.discountSources.coupon).toLocaleString('en-IN')}</span>
+                                        </div>
+                                    )}
+                                    {Number(selectedOrderEarning.discountSources?.membership || 0) > 0 && (
+                                        <div className="flex justify-between text-rose-600">
+                                            <span>Membership Discount {selectedOrderEarning.discountSources?.membershipTier ? `(${selectedOrderEarning.discountSources.membershipTier})` : ''}:</span>
+                                            <span className="font-bold">-₹{Number(selectedOrderEarning.discountSources.membership).toLocaleString('en-IN')}</span>
+                                        </div>
+                                    )}
+                                    {Number(selectedOrderEarning.discountSources?.firstOrder || 0) > 0 && (
+                                        <div className="flex justify-between text-rose-600">
+                                            <span>First Order Discount:</span>
+                                            <span className="font-bold">-₹{Number(selectedOrderEarning.discountSources.firstOrder).toLocaleString('en-IN')}</span>
+                                        </div>
+                                    )}
+                                    {Number(selectedOrderEarning.walletAmount || 0) > 0 && (
+                                        <div className="flex justify-between text-amber-700 font-bold">
+                                            <span>Wallet Used by Customer:</span>
+                                            <span>₹{Number(selectedOrderEarning.walletAmount).toLocaleString('en-IN')}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <p className="text-[9px] text-slate-500 italic pt-1 border-t border-rose-200/60">
+                                    Seller gets full product value (₹{Number(selectedOrderEarning.productSubtotal || 0).toLocaleString('en-IN')} minus commission). Discounts are subsidized by admin, not seller.
+                                </p>
+                            </div>
+                        )}
 
                         <div>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">

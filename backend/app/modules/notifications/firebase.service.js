@@ -69,7 +69,7 @@ function resolveImageUrl(payload = {}, data = {}) {
   return isWebLink(fromData) ? fromData : "";
 }
 
-export async function sendFCM(tokens = [], payload = {}) {
+export async function sendFCM(tokens = [], payload = {}, options = {}) {
   if (!Array.isArray(tokens) || tokens.length === 0) {
     return {
       successCount: 0,
@@ -77,6 +77,9 @@ export async function sendFCM(tokens = [], payload = {}) {
       responses: [],
     };
   }
+
+  const soundEnabled = options.sound !== false;
+  const vibrationEnabled = options.vibration !== false;
 
   const messaging = getMessagingClient();
   const data = toStringMap(payload.data || {});
@@ -113,9 +116,9 @@ export async function sendFCM(tokens = [], payload = {}) {
         priority: "high",
         notification: {
           channelId: "high_importance_channel",
-          sound: "default",
-          defaultSound: true,
-          defaultVibrateTimings: true,
+          sound: soundEnabled ? "default" : undefined,
+          defaultSound: soundEnabled,
+          defaultVibrateTimings: vibrationEnabled,
           priority: "high",
           visibility: "public",
           ...(image ? { imageUrl: image } : {}),
@@ -125,7 +128,7 @@ export async function sendFCM(tokens = [], payload = {}) {
         payload: {
           aps: {
             "content-available": 1,
-            sound: "default",
+            sound: soundEnabled ? "default" : undefined,
           },
         },
       },
@@ -142,6 +145,8 @@ export async function sendFCM(tokens = [], payload = {}) {
           badge: "/favicon.png",
           requireInteraction: true,
           renotify: true,
+          silent: !soundEnabled,
+          vibrate: vibrationEnabled ? [200, 100, 200] : [0],
           ...(image ? { image } : {}),
           data: {
             link: link || absoluteLink || "/",

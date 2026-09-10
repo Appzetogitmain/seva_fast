@@ -14,13 +14,17 @@ import { recordAuthActivity } from "../services/authActivityService.js";
 import { getAdminIds } from "../utils/adminIds.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
+import {
+    normalizeIndian10DigitPhone,
+    getPhoneLookupCandidates,
+} from "../utils/phone.js";
 
 /* ===============================
    Utils
 ================================ */
 
 const generateToken = (seller) =>
-    jwt.sign({ id: seller._id, role: "seller" }, process.env.JWT_SECRET, {
+    jwt.sign({ id: seller._id, role: "seller" }, process.env.JWT_SECRET || "default_jwt_secret", {
         expiresIn: "7d",
     });
 
@@ -171,9 +175,88 @@ export const signupSeller = async (req, res) => {
             return handleResponse(res, 400, "Please enter a valid email address.");
         }
 
-        if (!panNumber && !aadhaarNumber) {
+        // 1. Bank Details Format Validation (Step 2)
+        let parsedBankDetails = {};
+        let parsedBusinessInfo = {};
+        try {
+            parsedBankDetails = typeof bankDetails === "string" ? JSON.parse(bankDetails) : (bankDetails || {});
+            parsedBusinessInfo = typeof businessInfo === "string" ? JSON.parse(businessInfo) : (businessInfo || {});
+        } catch(e) {
+            return handleResponse(res, 400, "Invalid bank details format.");
+        }
+
+        const accountHolderName = String(parsedBankDetails.accountHolderName || "").trim();
+        const bankName = String(parsedBankDetails.bankName || "").trim();
+        const branch = String(parsedBankDetails.branch || "").trim();
+        const accountNumber = String(parsedBankDetails.accountNumber || "").trim();
+        const ifscCode = String(parsedBankDetails.ifscCode || "").trim().toUpperCase();
+
+        if (!accountHolderName) {
+            return handleResponse(res, 400, "Please enter Account Holder Name.");
+        }
+        if (!bankName) {
+            return handleResponse(res, 400, "Please enter Bank Name.");
+        }
+        if (!branch) {
+            return handleResponse(res, 400, "Please enter Branch Name.");
+        }
+        if (!accountNumber || !/^\d{9,18}$/.test(accountNumber)) {
+            return handleResponse(res, 400, "Please enter a valid Bank Account Number (9 to 18 digits).");
+        }
+        if (!ifscCode || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode)) {
+            return handleResponse(res, 400, "Please enter a valid 11-character IFSC Code (e.g. SBIN0001234, 5th character must be '0').");
+        }
+
+        parsedBankDetails = {
+            accountHolderName,
+            bankName,
+            branch,
+            accountNumber,
+            ifscCode,
+        };
+
+        // 2. KYC Details Format Validation (Step 4)
+        const cleanPan = panNumber ? String(panNumber).trim().toUpperCase() : "";
+        const cleanAadhaar = aadhaarNumber ? String(aadhaarNumber).trim() : "";
+        const cleanGstin = gstinNumber ? String(gstinNumber).trim().toUpperCase() : "";
+        const cleanUdyam = udyamNumber ? String(udyamNumber).trim().toUpperCase() : "";
+
+        if (!cleanPan && !cleanAadhaar) {
             return handleResponse(res, 400, "Either PAN Number or Aadhaar Number is compulsory.");
         }
+
+        if (cleanPan) {
+            if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+                return handleResponse(res, 400, "Please enter a valid 10-character PAN Number (e.g. ABCDE1234F).");
+            }
+        }
+
+        if (cleanAadhaar) {
+            if (!/^\d{12}$/.test(cleanAadhaar)) {
+                return handleResponse(res, 400, "Aadhaar Number must be exactly 12 digits.");
+            }
+        }
+
+        if (cleanGstin) {
+            if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(cleanGstin) && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{3}$/.test(cleanGstin)) {
+                return handleResponse(res, 400, "Please enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5).");
+            }
+        }
+
+        if (cleanUdyam) {
+            const isUdyam = /^UDYAM-[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(cleanUdyam) || /^UDYAM[A-Z]{2}\d{5,10}$/i.test(cleanUdyam) || /^[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(cleanUdyam);
+            const isShopAct = /^[A-Z0-9\/-]{3,25}$/i.test(cleanUdyam);
+            if (!isUdyam && !isShopAct) {
+                return handleResponse(res, 400, "Please enter a valid Udyam (e.g. UDYAM-XX-00-0000000) or Shop Act Registration number.");
+            }
+        }
+
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const normalizedPhone = normalizeIndian10DigitPhone(phone);
+        if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
+            return handleResponse(res, 400, "Please enter a valid 10-digit phone number starting with 6-9.");
+        }
+        const normalizedWhatsapp = whatsappNumber ? normalizeIndian10DigitPhone(whatsappNumber) : undefined;
 
         verifySellerVerificationToken({
             channel: "email",
@@ -197,7 +280,10 @@ export const signupSeller = async (req, res) => {
             return handleResponse(res, 400, "Radius must be between 1 and 100 km");
         }
 
-        let seller = await Seller.findOne({ $or: [{ email }, { phone }] });
+        const phoneCandidates = getPhoneLookupCandidates(phone);
+        let seller = await Seller.findOne({
+            $or: [{ email: normalizedEmail }, { phone: { $in: phoneCandidates } }]
+        });
 
         if (seller) {
             return handleResponse(res, 400, "Seller with this email or phone already exists");
@@ -220,28 +306,21 @@ export const signupSeller = async (req, res) => {
             );
         }
 
-        let parsedBankDetails = {};
-        let parsedBusinessInfo = {};
-        try {
-            parsedBankDetails = typeof bankDetails === "string" ? JSON.parse(bankDetails) : (bankDetails || {});
-            parsedBusinessInfo = typeof businessInfo === "string" ? JSON.parse(businessInfo) : (businessInfo || {});
-        } catch(e) {}
-
         const sellerData = {
             name,
-            email,
-            phone,
-            whatsappNumber,
+            email: normalizedEmail,
+            phone: normalizedPhone,
+            whatsappNumber: normalizedWhatsapp,
             password,
             shopName,
             businessType,
             sellerType,
             category,
             description,
-            panNumber,
-            aadhaarNumber,
-            gstinNumber,
-            udyamNumber,
+            panNumber: cleanPan,
+            aadhaarNumber: cleanAadhaar,
+            gstinNumber: cleanGstin,
+            udyamNumber: cleanUdyam,
             bankDetails: parsedBankDetails,
             businessInfo: parsedBusinessInfo,
             address,
@@ -334,8 +413,21 @@ export const signupSeller = async (req, res) => {
             });
         }
 
+        const token = generateToken(seller);
+
         return handleResponse(res, 201, "Seller registered successfully", {
-            seller,
+            token,
+            seller: {
+                _id: seller._id,
+                name: seller.name,
+                email: seller.email,
+                phone: seller.phone,
+                shopName: seller.shopName,
+                role: "seller",
+                applicationStatus: seller.applicationStatus || "pending",
+                isVerified: seller.isVerified === true,
+                isActive: seller.isActive === true,
+            },
             applicationStatus: "pending",
             requiresApproval: true,
         });
@@ -400,8 +492,15 @@ export const loginSeller = async (req, res) => {
             return handleResponse(res, 400, "Email/Phone and password are required");
         }
 
-        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-        const query = isEmail ? { email } : { phone: email };
+        const identifier = String(email || "").trim();
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+        let query;
+        if (isEmail) {
+            query = { email: identifier.toLowerCase() };
+        } else {
+            const phoneCandidates = getPhoneLookupCandidates(identifier);
+            query = { phone: { $in: phoneCandidates } };
+        }
         const seller = await Seller.findOne(query).select("+password");
 
         if (!seller) {
@@ -431,7 +530,22 @@ export const loginSeller = async (req, res) => {
                     ? "Your seller application was rejected. Please contact support."
                     : "Your seller account is pending admin approval.";
 
+            const token = generateToken(seller);
+
             return handleResponse(res, 403, approvalMessage, {
+                token,
+                seller: {
+                    _id: seller._id,
+                    name: seller.name,
+                    email: seller.email,
+                    phone: seller.phone,
+                    shopName: seller.shopName,
+                    role: "seller",
+                    applicationStatus,
+                    isVerified: seller.isVerified === true,
+                    isActive: seller.isActive === true,
+                    rejectionReason: seller.rejectionReason || "",
+                },
                 applicationStatus,
                 isVerified: seller.isVerified === true,
                 isActive: seller.isActive === true,
@@ -545,3 +659,46 @@ export const acceptSellerCertificate = async (req, res) => {
         return handleResponse(res, 500, error.message);
     }
 };
+
+/* ===============================
+   CHECK SELLER APPROVAL STATUS
+================================ */
+export const checkSellerApprovalStatus = async (req, res) => {
+    try {
+        const sellerId = req.user?.id || req.query.sellerId || req.body?.sellerId;
+        const email = req.query.email || req.body?.email;
+        const phone = req.query.phone || req.body?.phone;
+
+        let query = null;
+        if (sellerId) query = { _id: sellerId };
+        else if (email) query = { email: String(email).trim().toLowerCase() };
+        else if (phone) {
+            const candidates = getPhoneLookupCandidates(phone);
+            query = { phone: { $in: candidates } };
+        }
+
+        if (!query) {
+            return handleResponse(res, 400, "Seller ID, email or phone is required");
+        }
+
+        const seller = await Seller.findOne(query).select("name shopName email phone applicationStatus isVerified isActive rejectionReason");
+        if (!seller) {
+            return handleResponse(res, 404, "Seller not found");
+        }
+
+        const applicationStatus = seller.applicationStatus || (seller.isVerified ? "approved" : "pending");
+        const isApproved = seller.isVerified === true && seller.isActive === true && applicationStatus === "approved";
+
+        return handleResponse(res, 200, "Status fetched successfully", {
+            sellerId: seller._id,
+            isApproved,
+            applicationStatus,
+            isVerified: seller.isVerified === true,
+            isActive: seller.isActive === true,
+            rejectionReason: seller.rejectionReason || "",
+        });
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+

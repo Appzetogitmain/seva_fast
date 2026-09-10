@@ -82,6 +82,9 @@ const MapPicker = ({
   const mapRef = useRef(null);
   const autocompleteRef = useRef(null);
   const circleRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const hasUserSelectedLocationRef = useRef(false);
+  const locationRequestIdRef = useRef(0);
 
   useEffect(() => {
     // Google calls this global when the Maps JS API key is invalid, unauthorized
@@ -119,65 +122,147 @@ const MapPicker = ({
   }, [initialLocation]);
 
   useEffect(() => {
-    if (!isOpen) return;
-
-    setRadius(initialRadius);
-
-    if (preferCurrentLocationOnOpen) {
-      getCurrentLocation({ silent: true, fallbackToInitial: true });
+    if (!isOpen) {
+      hasUserSelectedLocationRef.current = false;
       return;
     }
 
-    if (initialLocation) {
+    setRadius(initialRadius);
+    locationRequestIdRef.current += 1;
+    const reqId = locationRequestIdRef.current;
+
+    // Prioritize previously selected or passed location
+    if (initialLocation?.lat && initialLocation?.lng) {
+      hasUserSelectedLocationRef.current = true;
       setCenter(initialLocation);
       setMarker(initialLocation);
-    } else {
-      setCenter(defaultCenter);
-      setMarker(null);
+      if (mapRef.current) {
+        mapRef.current.panTo(initialLocation);
+        mapRef.current.setZoom(15);
+      }
+      return;
     }
+
+    if (preferCurrentLocationOnOpen) {
+      getCurrentLocation({ silent: true, requestId: reqId });
+      return;
+    }
+
+    setCenter(defaultCenter);
+    setMarker(null);
   }, [isOpen, initialLocation, initialRadius, preferCurrentLocationOnOpen]);
 
   const onMapClick = useCallback((e) => {
+    hasUserSelectedLocationRef.current = true;
     clearCircleOverlay();
     const newPos = {
       lat: e.latLng.lat(),
       lng: e.latLng.lng(),
     };
     setMarker(newPos);
+    setCenter(newPos);
+    if (mapRef.current) {
+      mapRef.current.panTo(newPos);
+    }
   }, [clearCircleOverlay]);
 
   const onMarkerDragEnd = useCallback((e) => {
+    hasUserSelectedLocationRef.current = true;
     clearCircleOverlay();
     const newPos = {
       lat: e.latLng.lat(),
       lng: e.latLng.lng(),
     };
     setMarker(newPos);
+    setCenter(newPos);
+    if (mapRef.current) {
+      mapRef.current.panTo(newPos);
+    }
   }, [clearCircleOverlay]);
 
   const handlePlaceChanged = () => {
-    if (autocompleteRef.current) {
-      const place = autocompleteRef.current.getPlace();
-      if (place.geometry) {
-        clearCircleOverlay();
-        const newPos = {
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-        };
-        setCenter(newPos);
-        setMarker(newPos);
-        setAddress(place.formatted_address || "");
+    if (!autocompleteRef.current) return;
+    const place = autocompleteRef.current.getPlace();
+
+    if (place?.geometry?.location) {
+      hasUserSelectedLocationRef.current = true;
+      clearCircleOverlay();
+      const newPos = {
+        lat:
+          typeof place.geometry.location.lat === "function"
+            ? place.geometry.location.lat()
+            : place.geometry.location.lat,
+        lng:
+          typeof place.geometry.location.lng === "function"
+            ? place.geometry.location.lng
+            : place.geometry.location.lng,
+      };
+      setCenter(newPos);
+      setMarker(newPos);
+      setAddress(place.formatted_address || place.name || "");
+
+      if (mapRef.current) {
+        if (place.geometry.viewport) {
+          mapRef.current.fitBounds(place.geometry.viewport);
+        } else {
+          mapRef.current.panTo(newPos);
+          mapRef.current.setZoom(16);
+        }
+      }
+    } else {
+      // Fallback: If user typed text and pressed Enter or place geometry wasn't populated directly
+      const inputEl = searchInputRef.current;
+      const query = inputEl?.value || address;
+      if (query && window.google?.maps?.Geocoder) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode(
+          { address: query, componentRestrictions: { country: "IN" } },
+          (results, status) => {
+            if (status === "OK" && results?.[0]?.geometry?.location) {
+              hasUserSelectedLocationRef.current = true;
+              clearCircleOverlay();
+              const loc = results[0].geometry.location;
+              const newPos = {
+                lat: loc.lat(),
+                lng: loc.lng(),
+              };
+              setCenter(newPos);
+              setMarker(newPos);
+              setAddress(results[0].formatted_address || query);
+
+              if (mapRef.current) {
+                if (results[0].geometry.viewport) {
+                  mapRef.current.fitBounds(results[0].geometry.viewport);
+                } else {
+                  mapRef.current.panTo(newPos);
+                  mapRef.current.setZoom(16);
+                }
+              }
+            }
+          },
+        );
       }
     }
   };
 
   const getCurrentLocation = ({
     silent = false,
-    fallbackToInitial = false,
+    requestId = null,
+    force = false,
   } = {}) => {
+    if (force) {
+      hasUserSelectedLocationRef.current = false;
+      locationRequestIdRef.current += 1;
+    }
+    const currentReqId = requestId ?? locationRequestIdRef.current;
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          // If the user already searched or pinned a location, do not overwrite!
+          if (!force && hasUserSelectedLocationRef.current) return;
+          if (currentReqId !== locationRequestIdRef.current) return;
+
           clearCircleOverlay();
           const newPos = {
             lat: position.coords.latitude,
@@ -185,11 +270,19 @@ const MapPicker = ({
           };
           setCenter(newPos);
           setMarker(newPos);
+          if (mapRef.current) {
+            mapRef.current.panTo(newPos);
+            mapRef.current.setZoom(15);
+          }
         },
         () => {
-          if (fallbackToInitial && initialLocation) {
+          if (currentReqId !== locationRequestIdRef.current) return;
+          if (initialLocation) {
             setCenter(initialLocation);
             setMarker(initialLocation);
+            if (mapRef.current) {
+              mapRef.current.panTo(initialLocation);
+            }
             return;
           }
 
@@ -197,13 +290,17 @@ const MapPicker = ({
             alert("Unable to retrieve your location. Please select manually.");
           }
         },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
       );
       return;
     }
 
-    if (fallbackToInitial && initialLocation) {
+    if (initialLocation) {
       setCenter(initialLocation);
       setMarker(initialLocation);
+      if (mapRef.current) {
+        mapRef.current.panTo(initialLocation);
+      }
       return;
     }
 
@@ -341,17 +438,34 @@ const MapPicker = ({
           <div className="relative flex-1">
             {isLoaded && (
               <Autocomplete
-                onLoad={(ref) => (autocompleteRef.current = ref)}
+                onLoad={(ref) => {
+                  autocompleteRef.current = ref;
+                }}
                 onPlaceChanged={handlePlaceChanged}
                 options={{
                   componentRestrictions: { country: "IN" },
-                  fields: ["geometry", "formatted_address"],
+                  fields: [
+                    "geometry",
+                    "formatted_address",
+                    "name",
+                    "address_components",
+                  ],
                 }}>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+                  <input
+                    ref={searchInputRef}
+                    data-map-search="true"
+                    type="text"
                     placeholder="Search for your shop area..."
-                    className="pl-10"
+                    defaultValue={address}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handlePlaceChanged();
+                      }
+                    }}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-800 placeholder:text-gray-400 focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 transition-all shadow-xs"
                   />
                 </div>
               </Autocomplete>
@@ -360,7 +474,7 @@ const MapPicker = ({
           <Button
             variant="outline"
             size="icon"
-            onClick={getCurrentLocation}
+            onClick={() => getCurrentLocation({ silent: false, force: true })}
             title="Use current location">
             <Navigation className="w-4 h-4" />
           </Button>

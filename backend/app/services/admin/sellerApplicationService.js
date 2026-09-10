@@ -10,8 +10,8 @@ import { sendSellerApprovalEmail } from "../emailService.js";
 import logger from "../logger.js";
 
 function buildSellerCode() {
-  const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `SV-${randomCode}`;
+  const randomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `S${randomCode}`;
 }
 
 async function ensureSellerCodeForCertificate(seller) {
@@ -137,7 +137,7 @@ export async function approveSellerApplicationById({ sellerId, reviewedBy, certi
   const sellerCode = existingSeller.sellerCode || buildSellerCode();
   const certNo =
     certificateDetails?.certificateNo ||
-    `SF-AS-${sellerCode.replace(/[^a-zA-Z0-9]/g, "")}-${Date.now().toString().slice(-6)}`;
+    `CRT-${sellerCode.replace(/[^a-zA-Z0-9]/g, "")}-${Date.now().toString().slice(-4)}`;
 
   const todayStr = new Date().toLocaleDateString("en-IN", {
     day: "2-digit",

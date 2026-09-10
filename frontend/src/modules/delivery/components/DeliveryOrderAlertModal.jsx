@@ -5,6 +5,11 @@ import { Truck, BellRing, ArrowRight, X, Volume2, VolumeX, MapPin, DollarSign, P
 import { useAuth } from "@core/context/AuthContext";
 import { getOrderSocket, onDeliveryBroadcast } from "@core/services/orderSocket";
 import { notificationSound } from "@core/utils/notificationSound";
+import {
+  getDeliverySettings,
+  startDeliveryVibration,
+  stopDeliveryVibration,
+} from "../utils/deliverySettings";
 
 export default function DeliveryOrderAlertModal() {
   const { user, token } = useAuth();
@@ -20,22 +25,36 @@ export default function DeliveryOrderAlertModal() {
 
       const payload = data?.preview || data;
       setNewOrder(payload);
-      setIsMuted(false);
-      notificationSound.startRepeatingOrderAlert();
+
+      const settings = getDeliverySettings();
+      if (settings.vibration) {
+        startDeliveryVibration();
+      }
+
+      if (settings.sound) {
+        setIsMuted(false);
+        notificationSound.startRepeatingOrderAlert();
+      } else {
+        setIsMuted(true);
+        notificationSound.stopRepeatingAlert();
+      }
     });
 
     return () => {
       cleanupListener();
+      stopDeliveryVibration();
       notificationSound.stopRepeatingAlert();
     };
   }, [user, token]);
 
   const handleDismiss = () => {
+    stopDeliveryVibration();
     notificationSound.stopRepeatingAlert();
     setNewOrder(null);
   };
 
   const handleViewDetails = () => {
+    stopDeliveryVibration();
     notificationSound.stopRepeatingAlert();
     const orderId = newOrder?.orderId || newOrder?._id;
     setNewOrder(null);
@@ -51,6 +70,7 @@ export default function DeliveryOrderAlertModal() {
       notificationSound.startRepeatingOrderAlert();
       setIsMuted(false);
     } else {
+      stopDeliveryVibration();
       notificationSound.stopRepeatingAlert();
       setIsMuted(true);
     }

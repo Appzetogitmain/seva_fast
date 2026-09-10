@@ -46,6 +46,7 @@ const CustomOrders = React.lazy(() => import("../pages/CustomOrders"));
 const CodCash = React.lazy(() => import("../pages/CodCash"));
 
 const ProductDemands = React.lazy(() => import("../pages/ProductDemands"));
+const Splash = React.lazy(() => import("../pages/Splash"));
 
 const navItems = [
   { label: "Dashboard", path: "/seller", icon: HiOutlineSquares2X2, end: true },
@@ -176,6 +177,7 @@ const SellerRoutes = () => {
         <SellerCertificateModal seller={user} />
       )}
       <Routes>
+        <Route path="/splash" element={<Splash />} />
         <Route path="/" element={<Dashboard />} />
         <Route path="/products" element={<ProductManagement />} />
         <Route path="/products/add" element={<AddProduct />} />

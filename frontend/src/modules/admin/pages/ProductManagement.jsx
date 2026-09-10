@@ -673,7 +673,7 @@ const ProductManagement = () => {
                                     <td className="px-6 py-5 align-middle">
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className="h-11 w-11 shrink-0 rounded-xl overflow-hidden bg-slate-100 ring-1 ring-slate-200 shadow-sm">
-                                                <img src={p.mainImage || p.images?.[0]} alt={p.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                <img src={p.mainImage || p.images?.[0] || '/default-product.png'} alt={p.name} onError={(e) => { e.target.onerror = null; e.target.src = '/default-product.png'; }} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="truncate text-[13px] font-semibold leading-5 text-slate-900" title={p.name}>{p.name}</p>

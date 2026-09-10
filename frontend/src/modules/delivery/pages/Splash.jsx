@@ -32,15 +32,15 @@ const Splash = () => {
         </p>
       </div>
 
-      <div className="absolute bottom-12 text-center w-full z-10 px-6">
-        <p className="text-xl font-bold mb-1">Deliver Faster.</p>
-        <p className="text-xl font-bold text-white/80">Earn Better.</p>
+      <div className="absolute bottom-0 left-0 right-0 py-8 px-6 text-center z-10 bg-white text-slate-900 rounded-t-3xl shadow-2xl border-t border-slate-100">
+        <p className="text-xl font-black mb-0.5 text-slate-900">Deliver Faster.</p>
+        <p className="text-sm font-bold text-slate-500">Earn Better.</p>
 
         {/* Minimal Loading Animation */}
-        <div className="mt-8 flex justify-center space-x-2">
-          <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-          <div className="w-2 h-2 bg-white rounded-full animate-pulse delay-100" />
-          <div className="w-2 h-2 bg-white rounded-full animate-pulse delay-200" />
+        <div className="mt-5 flex justify-center space-x-2">
+          <div className="w-2.5 h-2.5 bg-primary rounded-full animate-pulse" />
+          <div className="w-2.5 h-2.5 bg-primary/70 rounded-full animate-pulse delay-100" />
+          <div className="w-2.5 h-2.5 bg-primary/40 rounded-full animate-pulse delay-200" />
         </div>
       </div>
     </div>

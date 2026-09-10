@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, User, Mail, Phone, MapPin, Calendar, Droplet } from "lucide-react";
+import { ArrowLeft, Save, User, Mail, Phone, MapPin, Calendar, Droplet, Camera, Loader2 } from "lucide-react";
 import Button from "@/shared/components/ui/Button";
 import Input from "@/shared/components/ui/Input";
 import { toast } from "sonner";
@@ -11,6 +11,9 @@ const PersonalDetails = () => {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef(null);
+
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
@@ -41,6 +44,46 @@ const PersonalDetails = () => {
       });
     }
   }, [user]);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file (PNG, JPG, JPEG)");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be less than 5MB");
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      toast.info("Uploading profile photo...");
+
+      const formDataUpload = new FormData();
+      formDataUpload.append("profileImage", file);
+
+      const res = await axiosInstance.put('/delivery/profile', formDataUpload, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (res.data?.success) {
+        await refreshUser();
+        toast.success("Profile photo updated successfully!");
+      }
+    } catch (err) {
+      console.error("Failed to upload profile photo:", err);
+      toast.error(err.response?.data?.message || "Failed to upload profile photo");
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -94,9 +137,24 @@ const PersonalDetails = () => {
       <div className="p-4 max-w-lg mx-auto space-y-6">
         {/* Profile Photo */}
         <div className="flex flex-col items-center justify-center py-6">
-          <div className="relative">
-            <div className="w-24 h-24 rounded-full p-1 bg-white shadow-md flex items-center justify-center overflow-hidden">
-              {user?.profileImage && !user.profileImage.includes('dicebear.com') ? (
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageUpload}
+            accept="image/*"
+            className="hidden"
+          />
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="relative cursor-pointer group"
+            title="Click to change profile photo"
+          >
+            <div className="w-24 h-24 rounded-full p-1 bg-white shadow-md flex items-center justify-center overflow-hidden border-2 border-transparent group-hover:border-primary/50 transition-all">
+              {isUploadingImage ? (
+                <div className="w-full h-full rounded-full bg-slate-100 flex items-center justify-center text-primary">
+                  <Loader2 size={30} className="animate-spin text-primary" />
+                </div>
+              ) : user?.profileImage && !user.profileImage.includes('dicebear.com') ? (
                 <img
                   src={user.profileImage}
                   alt="Profile"
@@ -108,13 +166,34 @@ const PersonalDetails = () => {
                 </div>
               )}
             </div>
-            {isEditing && (
-              <button className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-1.5 rounded-full shadow-lg hover:bg-primary/90 transition-colors">
-                <User size={14} />
-              </button>
-            )}
+            
+            {/* Camera badge button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
+              disabled={isUploadingImage}
+              className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full shadow-lg hover:bg-primary/90 active:scale-95 transition-all cursor-pointer border-2 border-white flex items-center justify-center"
+              title="Change Photo"
+            >
+              {isUploadingImage ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Camera size={15} />
+              )}
+            </button>
           </div>
-          <p className="mt-3 text-sm text-gray-500">Delivery Partner ID: {user?._id ? user._id.slice(-6).toUpperCase() : "N/A"}</p>
+          <p className="mt-3 text-sm font-medium text-gray-500">
+            Delivery Partner ID: <span className="text-gray-800 font-bold">{user?._id ? user._id.slice(-6).toUpperCase() : "N/A"}</span>
+          </p>
+          <p
+            onClick={() => fileInputRef.current?.click()}
+            className="text-[11px] text-primary hover:underline cursor-pointer font-bold mt-1"
+          >
+            Tap to change photo
+          </p>
         </div>
 
         {/* Form Fields */}

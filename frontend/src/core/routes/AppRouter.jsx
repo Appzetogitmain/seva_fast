@@ -16,6 +16,7 @@ import ScrollToTop from '../../modules/customer/components/shared/ScrollToTop';
 // Public Pages
 import Auth from '../../modules/seller/pages/Auth';
 import ApplicationPending from '../../modules/seller/pages/ApplicationPending';
+import SellerSplash from '../../modules/seller/pages/Splash';
 import AdminAuth from '../../modules/admin/pages/AdminAuth';
 import DeliveryApplicationPending from '../../modules/delivery/pages/ApplicationPending';
 import DeliveryAuth from '../../modules/delivery/pages/DeliveryAuth';
@@ -150,6 +151,10 @@ const router = createBrowserRouter([
                 {
                     path: 'signup',
                     element: <CustomerAuth />,
+                },
+                {
+                    path: 'seller/splash',
+                    element: <SellerSplash />,
                 },
                 {
                     path: 'seller/auth',

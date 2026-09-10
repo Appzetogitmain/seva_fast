@@ -14,6 +14,18 @@ const preferenceSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    pushNotifications: {
+      type: Boolean,
+      default: true,
+    },
+    sound: {
+      type: Boolean,
+      default: true,
+    },
+    vibration: {
+      type: Boolean,
+      default: true,
+    },
     orderUpdates: {
       type: Boolean,
       default: true,

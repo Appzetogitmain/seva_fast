@@ -316,7 +316,14 @@ export const getNotificationPreferences = async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true },
     ).lean();
 
-    return handleResponse(res, 200, "Notification preferences fetched", preference);
+    const normalizedPreference = {
+      ...preference,
+      pushNotifications: preference.pushNotifications !== false,
+      sound: preference.sound !== false,
+      vibration: preference.vibration !== false,
+    };
+
+    return handleResponse(res, 200, "Notification preferences fetched", normalizedPreference);
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }
@@ -331,6 +338,15 @@ export const updateNotificationPreferences = async (req, res) => {
     }
 
     const update = {};
+    if (typeof req.body?.pushNotifications === "boolean") {
+      update.pushNotifications = req.body.pushNotifications;
+    }
+    if (typeof req.body?.sound === "boolean") {
+      update.sound = req.body.sound;
+    }
+    if (typeof req.body?.vibration === "boolean") {
+      update.vibration = req.body.vibration;
+    }
     if (typeof req.body?.orderUpdates === "boolean") {
       update.orderUpdates = req.body.orderUpdates;
     }
@@ -350,7 +366,38 @@ export const updateNotificationPreferences = async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true },
     ).lean();
 
-    return handleResponse(res, 200, "Notification preferences updated", preference);
+    // Synchronize PushToken active state based on pushNotifications toggle
+    if (update.pushNotifications === false) {
+      await PushToken.updateMany(
+        { userId, role, isActive: true },
+        {
+          $set: {
+            isActive: false,
+            invalidReason: "USER_DISABLED_PUSH",
+            invalidatedAt: new Date(),
+          },
+        },
+      );
+    } else if (update.pushNotifications === true) {
+      await PushToken.updateMany(
+        { userId, role, invalidReason: "USER_DISABLED_PUSH" },
+        {
+          $set: {
+            isActive: true,
+            invalidReason: "",
+            invalidatedAt: null,
+            lastUsedAt: new Date(),
+          },
+        },
+      );
+    }
+
+    const normalizedPreference = {
+      ...preference,
+      ...update,
+    };
+
+    return handleResponse(res, 200, "Notification preferences updated", normalizedPreference);
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }

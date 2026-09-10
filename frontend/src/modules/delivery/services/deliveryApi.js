@@ -83,4 +83,7 @@ export const deliveryApi = {
   verifyReturnDropOtp: (orderId, body) =>
     axiosInstance.post(`/orders/workflow/${orderId}/return-drop-otp/verify`, body),
   aiChat: (data) => axiosInstance.post("/delivery/ai/chat", data),
+  getPushPreferences: (config = {}) => axiosInstance.get("/push/preferences", config),
+  updatePushPreferences: (data) => axiosInstance.patch("/push/preferences", data),
+  removePushToken: (data = {}) => axiosInstance.delete("/push/remove", { data }),
 };

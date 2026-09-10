@@ -22,12 +22,13 @@ import {
 } from 'react-icons/hi2';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner';
+import { useToast } from '@shared/components/ui/Toast';
 import { adminApi } from '../services/adminApi';
 import AuthorisedSellerCertificateView from '@shared/components/AuthorisedSellerCertificateView';
 
 const PendingSellers = () => {
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const [pendingSellers, setPendingSellers] = useState([]);
     const [summaryStats, setSummaryStats] = useState({
         totalApplications: 0,
@@ -65,11 +66,11 @@ const PendingSellers = () => {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.type !== 'application/pdf') {
-            toast.error('Please upload a PDF document only.');
+            showToast('Please upload a PDF document only.', 'error');
             return;
         }
         if (file.size > 2 * 1024 * 1024) {
-            toast.error('File size exceeds 2 MB limit. Please select a smaller PDF document.');
+            showToast('File size exceeds 2 MB limit. Please select a smaller PDF document.', 'error');
             return;
         }
         const formData = new FormData();
@@ -84,11 +85,11 @@ const PendingSellers = () => {
                 officialKycDocumentUrl: updated.officialKycDocumentUrl || updated.officialKycDocumentUrl,
                 kycUploadedAt: updated.kycUploadedAt
             }));
-            toast.success('Official KYC Document PDF uploaded successfully! Seller notified.');
+            showToast('Official KYC Document PDF uploaded successfully! Seller notified.', 'success');
             await fetchPendingSellers();
         } catch (error) {
             console.error('Failed to upload KYC document', error);
-            toast.error(error.response?.data?.message || 'Failed to upload KYC document');
+            showToast(error.response?.data?.message || 'Failed to upload KYC document', 'error');
         } finally {
             setIsUploadingKyc(false);
         }
@@ -109,7 +110,7 @@ const PendingSellers = () => {
             });
         } catch (error) {
             console.error('Failed to fetch pending sellers', error);
-            toast.error(error.response?.data?.message || 'Failed to load seller applications');
+            showToast(error.response?.data?.message || 'Failed to load seller applications', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -239,11 +240,11 @@ const PendingSellers = () => {
             setIsApproveModalOpen(false);
             setIsReviewModalOpen(false);
             setViewingSeller(null);
-            toast.success('Seller approved & Authorised Certificate issued!');
+            showToast('Seller approved & Authorised Certificate issued!', 'success');
             await fetchPendingSellers();
         } catch (error) {
             console.error('Failed to approve seller', error);
-            toast.error(error.response?.data?.message || 'Failed to approve seller');
+            showToast(error.response?.data?.message || 'Failed to approve seller', 'error');
         } finally {
             setIsProcessing(false);
         }
@@ -257,11 +258,11 @@ const PendingSellers = () => {
                 await adminApi.rejectSeller(id, { reason });
                 setIsReviewModalOpen(false);
                 setViewingSeller(null);
-                toast.success('Seller application rejected');
+                showToast('Seller application rejected', 'success');
                 await fetchPendingSellers();
             } catch (error) {
                 console.error('Failed to reject seller', error);
-                toast.error(error.response?.data?.message || 'Failed to reject seller');
+                showToast(error.response?.data?.message || 'Failed to reject seller', 'error');
             } finally {
                 setIsProcessing(false);
             }

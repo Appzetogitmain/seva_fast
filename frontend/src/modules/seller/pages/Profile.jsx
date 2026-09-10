@@ -95,8 +95,13 @@ const SellerProfile = () => {
       const cleaned = value.replace(/[0-9]/g, "");
       setFormData({ ...formData, [name]: cleaned });
     } else if (name === "phone") {
-      const digitsOnly = value.replace(/[^0-9]/g, "").slice(0, 10);
-      setFormData({ ...formData, [name]: digitsOnly });
+      let digits = value.replace(/[^0-9]/g, "");
+      if (digits.length === 12 && digits.startsWith("91")) {
+        digits = digits.slice(2);
+      } else if (digits.length === 11 && digits.startsWith("0")) {
+        digits = digits.slice(1);
+      }
+      setFormData({ ...formData, [name]: digits.slice(0, 10) });
     } else if (name === "email") {
       setFormData({ ...formData, [name]: value.trimStart() });
     } else {
@@ -106,8 +111,11 @@ const SellerProfile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!/^[0-9]{10}$/.test(formData.phone)) {
-      toast.error("Please enter a valid 10-digit phone number.");
+    let cleanPhone = String(formData.phone || "").replace(/\D/g, "");
+    if (cleanPhone.length === 12 && cleanPhone.startsWith("91")) cleanPhone = cleanPhone.slice(2);
+    else if (cleanPhone.length === 11 && cleanPhone.startsWith("0")) cleanPhone = cleanPhone.slice(1);
+    if (!/^[6-9][0-9]{9}$/.test(cleanPhone)) {
+      toast.error("Please enter a valid 10-digit phone number starting with 6-9.");
       return;
     }
     if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {

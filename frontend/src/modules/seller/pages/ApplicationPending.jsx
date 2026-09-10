@@ -1,21 +1,40 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle2, Clock3, ShieldAlert, Store, RotateCw, Sparkles } from "lucide-react";
 import { useAuth } from "@core/context/AuthContext";
 import { useSettings } from "@core/context/SettingsContext";
 import { onSellerApprovalStatus } from "@core/services/orderSocket";
+import { sellerApi } from "../services/sellerApi";
 import { toast } from "sonner";
 
 const ApplicationPending = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, role, user, isLoading, refreshUser, token } = useAuth();
+  const { isAuthenticated, role, user, isLoading, refreshUser, updateUser, token } = useAuth();
   const { settings } = useSettings();
   const [isChecking, setIsChecking] = useState(false);
+  const isTransitioningRef = useRef(false);
 
   const appName = settings?.appName || "App";
   const logoUrl = settings?.logoUrl || "";
+
+  const sellerId =
+    location.state?.sellerId ||
+    user?._id ||
+    user?.id ||
+    (typeof localStorage !== "undefined" ? localStorage.getItem("pending_seller_id") : "") ||
+    "";
+
+  useEffect(() => {
+    if (sellerId && typeof localStorage !== "undefined") {
+      try {
+        localStorage.setItem("pending_seller_id", String(sellerId));
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [sellerId]);
 
   // Prioritize live user object status over stale location.state
   const currentStatus = user?.applicationStatus || (user?.isVerified ? "approved" : location.state?.applicationStatus || "pending");
@@ -25,11 +44,34 @@ const ApplicationPending = () => {
     user.isActive === true &&
     currentStatus === "approved";
 
-  const handleApprovedTransition = () => {
+  const handleApprovedTransition = (updatedSeller) => {
+    if (isTransitioningRef.current) return;
+    isTransitioningRef.current = true;
+
+    if (updatedSeller && updateUser) {
+      updateUser(updatedSeller);
+    } else if (updateUser) {
+      updateUser({
+        applicationStatus: "approved",
+        isVerified: true,
+        isActive: true,
+      });
+    }
+
+    try {
+      localStorage.removeItem("pending_seller_id");
+    } catch {
+      /* ignore */
+    }
+
     toast.success("🎉 Congratulations! Your store application has been approved by admin!", {
       duration: 5000,
     });
-    navigate("/seller", { replace: true });
+
+    // Full fresh transition into the seller dashboard
+    setTimeout(() => {
+      window.location.href = "/seller";
+    }, 400);
   };
 
   // If already approved on mount or state change, immediately redirect to seller dashboard
@@ -39,18 +81,32 @@ const ApplicationPending = () => {
 
   // 1. Real-time WebSocket listener for immediate approval without reload
   useEffect(() => {
-    if (!token || !isAuthenticated || role !== "seller") return;
+    const activeToken = token || (typeof localStorage !== "undefined" ? localStorage.getItem("auth_seller") : "");
+    if (!activeToken) return;
 
-    const cleanup = onSellerApprovalStatus(token, async (data) => {
+    const cleanup = onSellerApprovalStatus(activeToken, async (data) => {
       console.log("[SellerApplicationPending] Received approval status update:", data);
-      if (data?.status === "approved" || data?.applicationStatus === "approved") {
+      if (data?.status === "approved" || data?.applicationStatus === "approved" || data?.isVerified === true) {
+        let freshUser = null;
         if (refreshUser) {
-          await refreshUser();
+          try {
+            freshUser = await refreshUser();
+          } catch (e) {
+            console.warn("[SellerApplicationPending] refreshUser error:", e);
+          }
         }
-        handleApprovedTransition();
+        handleApprovedTransition(freshUser || {
+          applicationStatus: "approved",
+          isVerified: true,
+          isActive: true,
+        });
       } else if (data?.status === "rejected") {
         if (refreshUser) {
-          await refreshUser();
+          try {
+            await refreshUser();
+          } catch {
+            /* ignore */
+          }
         }
         toast.error(`Store application rejected: ${data?.reason || "Please review and re-submit."}`);
       }
@@ -59,41 +115,84 @@ const ApplicationPending = () => {
     return () => {
       if (typeof cleanup === "function") cleanup();
     };
-  }, [token, isAuthenticated, role, refreshUser]);
+  }, [token, refreshUser]);
 
-  // 2. Active 3-second heartbeat polling fallback (in case socket reconnects)
+  // 2. Active 3-second heartbeat polling fallback
   useEffect(() => {
-    if (!isAuthenticated || role !== "seller" || isApproved) return;
+    if (isApproved || isTransitioningRef.current) return;
 
     const interval = setInterval(async () => {
-      try {
-        if (refreshUser) {
+      if (isTransitioningRef.current) return;
+
+      const activeToken = token || (typeof localStorage !== "undefined" ? localStorage.getItem("auth_seller") : "");
+      const targetSellerId = sellerId || user?._id || (typeof localStorage !== "undefined" ? localStorage.getItem("pending_seller_id") : "");
+
+      // Check via refreshUser if token is active
+      if (activeToken && refreshUser) {
+        try {
           const freshUser = await refreshUser();
           const freshStatus = freshUser?.applicationStatus || (freshUser?.isVerified ? "approved" : "pending");
           if (freshUser?.isVerified === true && freshUser?.isActive === true && freshStatus === "approved") {
             clearInterval(interval);
-            handleApprovedTransition();
+            handleApprovedTransition(freshUser);
+            return;
           }
+        } catch (err) {
+          console.warn("[SellerApplicationPending] Poll check error:", err);
         }
-      } catch (err) {
-        console.warn("[SellerApplicationPending] Poll check error:", err);
+      }
+
+      // Check via checkApprovalStatus endpoint as an ultra-reliable fallback
+      if (targetSellerId) {
+        try {
+          const res = await sellerApi.checkApprovalStatus({ sellerId: targetSellerId });
+          const result = res?.data?.result;
+          if (result?.isApproved === true || result?.applicationStatus === "approved") {
+            clearInterval(interval);
+            handleApprovedTransition({
+              applicationStatus: "approved",
+              isVerified: true,
+              isActive: true,
+            });
+            return;
+          }
+        } catch (err) {
+          console.warn("[SellerApplicationPending] checkApprovalStatus poll error:", err);
+        }
       }
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isAuthenticated, role, isApproved, refreshUser]);
+  }, [token, sellerId, user, isApproved, refreshUser]);
 
   const handleManualCheck = async () => {
     setIsChecking(true);
     try {
-      if (refreshUser) {
+      const activeToken = token || (typeof localStorage !== "undefined" ? localStorage.getItem("auth_seller") : "");
+      const targetSellerId = sellerId || user?._id || (typeof localStorage !== "undefined" ? localStorage.getItem("pending_seller_id") : "");
+
+      if (activeToken && refreshUser) {
         const freshUser = await refreshUser();
         const freshStatus = freshUser?.applicationStatus || (freshUser?.isVerified ? "approved" : "pending");
         if (freshUser?.isVerified === true && freshUser?.isActive === true && freshStatus === "approved") {
-          handleApprovedTransition();
+          handleApprovedTransition(freshUser);
           return;
         }
       }
+
+      if (targetSellerId) {
+        const res = await sellerApi.checkApprovalStatus({ sellerId: targetSellerId });
+        const result = res?.data?.result;
+        if (result?.isApproved === true || result?.applicationStatus === "approved") {
+          handleApprovedTransition({
+            applicationStatus: "approved",
+            isVerified: true,
+            isActive: true,
+          });
+          return;
+        }
+      }
+
       toast.info("Application is still under review by admin.");
     } catch {
       toast.error("Failed to check status. Please try again.");
@@ -101,6 +200,45 @@ const ApplicationPending = () => {
       setIsChecking(false);
     }
   };
+
+  // Run immediate status check on mount so opening/reopening the app instantly detects approval
+  useEffect(() => {
+    const runImmediateCheck = async () => {
+      const activeToken = token || (typeof localStorage !== "undefined" ? localStorage.getItem("auth_seller") : "");
+      const targetSellerId = sellerId || user?._id || (typeof localStorage !== "undefined" ? localStorage.getItem("pending_seller_id") : "");
+
+      if (activeToken && refreshUser) {
+        try {
+          const freshUser = await refreshUser();
+          const freshStatus = freshUser?.applicationStatus || (freshUser?.isVerified ? "approved" : "pending");
+          if (freshUser?.isVerified === true && freshUser?.isActive === true && freshStatus === "approved") {
+            handleApprovedTransition(freshUser);
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (targetSellerId) {
+        try {
+          const res = await sellerApi.checkApprovalStatus({ sellerId: targetSellerId });
+          const result = res?.data?.result;
+          if (result?.isApproved === true || result?.applicationStatus === "approved") {
+            handleApprovedTransition({
+              applicationStatus: "approved",
+              isVerified: true,
+              isActive: true,
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
+    runImmediateCheck();
+  }, []);
 
   const isRejected = currentStatus === "rejected";
   const isStatusUnknown = !currentStatus;
@@ -190,10 +328,10 @@ const ApplicationPending = () => {
               </button>
             )}
             <Link
-              to="/seller/auth"
+              to="/seller/auth?switch=true"
               className="w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-white/10 hover:bg-white/20 text-white px-5 py-3 text-sm font-black tracking-wide transition-colors border border-white/10"
             >
-              Back To Seller Login
+              Log In As Another Store
             </Link>
           </div>
         </motion.div>
