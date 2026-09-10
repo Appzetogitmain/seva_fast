@@ -164,8 +164,9 @@ export const getSellerStats = async (req, res) => {
         ]);
 
         // Extract facet results
-        const overviewRaw = statsResult.overview[0] || { totalSales: 0, totalOrders: 0, totalCostPrice: 0, totalNetProfit: 0 };
+        const overviewRaw = statsResult.overview[0] || { totalSales: 0, totalEarnings: 0, totalOrders: 0, totalCostPrice: 0, totalNetProfit: 0 };
         const totalSales = overviewRaw.totalSales;
+        const totalEarnings = overviewRaw.totalEarnings || 0;
         const totalOrders = overviewRaw.totalOrders;
         const totalCostPrice = overviewRaw.totalCostPrice || 0;
         const totalNetProfit = overviewRaw.totalNetProfit || 0;
@@ -303,6 +304,7 @@ export const getSellerStats = async (req, res) => {
         return handleResponse(res, 200, "Stats fetched successfully", {
             overview: {
                 totalSales: `₹${totalSales.toLocaleString()}`,
+                totalEarnings: `₹${totalEarnings.toLocaleString()}`,
                 totalOrders: totalOrders.toLocaleString(),
                 totalNetProfit: `₹${totalNetProfit.toLocaleString()}`,
                 totalCostPrice: `₹${totalCostPrice.toLocaleString()}`,
@@ -341,19 +343,34 @@ export const getSellerEarnings = async (req, res) => {
             .sort({ createdAt: -1 })
             .populate("order", "orderId");
 
+        const settledEarnings = transactions
+            .filter((t) => (t.type === "Order Payment" || t.type === "Delivery Earning" || t.type === "Bonus" || t.type === "Incentive") && t.status === "Settled")
+            .reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
+        const settledWithdrawals = transactions
+            .filter((t) => t.type === "Withdrawal" && t.status === "Settled")
+            .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
+
+        const pendingPayouts = transactions
+            .filter(t => t.type === 'Withdrawal' && (t.status === 'Pending' || t.status === 'Processing'))
+            .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
+
         const pendingOrderEarnings = transactions
             .filter((t) => t.type === "Order Payment" && t.status === "Pending")
             .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
-        const pendingPayouts = transactions
-            .filter(t => t.type === 'Withdrawal' && (t.status === 'Pending' || t.status === 'Processing'))
-            .reduce((acc, t) => acc + Math.abs(t.amount), 0);
-
         const wallet = await Wallet.findOne({ ownerType: 'SELLER', ownerId: sellerId });
-        const availableBalance = Number(wallet?.availableBalance || 0);
-        const onHoldBalance = Number(wallet?.pendingBalance || 0);
-        const totalWalletBalance = availableBalance + onHoldBalance;
-        const withdrawableBalance = Math.max(0, availableBalance);
+        const walletAvailable = Number(wallet?.availableBalance || 0);
+        const txnNetAvailable = Math.max(0, settledEarnings - settledWithdrawals);
+        const availableBalance = roundMoney(Math.max(walletAvailable, txnNetAvailable));
+
+        const walletPending = Number(wallet?.pendingBalance || 0);
+        const onHoldBalance = roundMoney(Math.max(walletPending, pendingOrderEarnings));
+
+        const totalWalletBalance = roundMoney(availableBalance + onHoldBalance);
+        const withdrawableBalance = roundMoney(Math.max(0, availableBalance - pendingPayouts));
+
+        const seller = await Seller.findById(sellerId).select("name shopName phone bankDetails").lean();
 
         // Total revenue, cost, profit = sum of delivered order amounts only
         const [orderRevenueAgg] = await Order.aggregate([
@@ -374,9 +391,7 @@ export const getSellerEarnings = async (req, res) => {
         const totalNetProfit = Number(orderRevenueAgg?.totalNetProfit || 0);
         const netProfitMargin = totalRevenue > 0 ? Number(((totalNetProfit / totalRevenue) * 100).toFixed(1)) : 0;
 
-        const totalWithdrawn = transactions
-            .filter(t => t.type === 'Withdrawal' && t.status === 'Settled')
-            .reduce((acc, t) => acc + Math.abs(t.amount), 0);
+        const totalWithdrawn = settledWithdrawals;
 
         // Monthly Revenue Aggregation (Last 6 Months)
         const sixMonthsAgo = new Date();
@@ -418,25 +433,31 @@ export const getSellerEarnings = async (req, res) => {
                 settledBalance: totalWalletBalance,
                 pendingPayouts: pendingPayouts,
                 onHoldBalance,
-                availableBalance: withdrawableBalance,
+                availableBalance,
+                withdrawableBalance,
                 pendingOrderEarnings,
                 totalWalletBalance,
                 totalRevenue: totalRevenue,
                 totalCostPrice: totalCostPrice,
                 totalNetProfit: totalNetProfit,
                 netProfitMargin: netProfitMargin,
-                totalWithdrawn: totalWithdrawn
+                totalWithdrawn: totalWithdrawn,
+                bankDetails: seller?.bankDetails || null,
             },
             monthlyChart: chartData,
             ledger: transactions.map(t => ({
                 id: (t.reference || t._id).toString(),
+                _id: t._id.toString(),
                 type: t.type,
                 amount: t.amount,
                 status: t.status,
                 date: formatDate(t.createdAt),
                 time: formatTime(t.createdAt),
-                customer: t.type === 'Withdrawal' ? 'Bank Transfer' : 'Customer',
-                ref: t.order ? `#${t.order.orderId}` : t.reference || t._id
+                createdAt: t.createdAt,
+                customer: t.type === 'Withdrawal' ? (seller?.bankDetails?.bankName || 'Bank Transfer') : 'Customer',
+                ref: t.order ? `#${t.order.orderId}` : t.reference || t._id,
+                notes: t.notes || t.reason || '',
+                reason: t.notes || t.reason || '',
             }))
         });
     } catch (error) {

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Order from "../models/order.js";
 import Delivery from "../models/delivery.js";
 import Seller from "../models/seller.js";
@@ -66,7 +67,10 @@ export function buildSellerOrdersQuery({
   if (role === "sub-admin" && Array.isArray(assignedZones) && assignedZones.length > 0) {
     base = { zoneId: { $in: assignedZones } };
   } else if (role === "seller") {
-    base = { seller: userId };
+    const sellerOid = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(String(userId))
+      : userId;
+    base = { seller: sellerOid };
   }
   const withStatus = {
     ...base,

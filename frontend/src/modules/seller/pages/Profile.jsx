@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   Clock,
   ArrowRight,
+  Camera,
+  Image as ImageIcon,
 } from "lucide-react";
 import { sellerApi } from "../services/sellerApi";
 import { toast } from "sonner";
@@ -230,16 +232,7 @@ const SellerProfile = () => {
                     {profile?.isActive ? "Active Shop" : "Inactive Shop"}
                   </button>
 
-                  <button
-                    onClick={togglePhotoOrders}
-                    className={`inline-flex items-center gap-1.5 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-full border transition-all hover:scale-105 active:scale-95 shadow-sm ${
-                      profile?.acceptsPhotoOrders
-                        ? "bg-indigo-600 text-white border-indigo-500"
-                        : "bg-slate-100 text-slate-600 border-slate-200"
-                    }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${profile?.acceptsPhotoOrders ? "bg-indigo-200 animate-pulse" : "bg-slate-400"}`} />
-                    {profile?.acceptsPhotoOrders ? "Photo Orders ON" : "Photo Orders OFF"}
-                  </button>
+                  {/* Photo orders toggle removed from here - moved to dedicated card */}
                 </div>
 
                 <div className="flex items-center justify-center md:justify-start gap-2 pt-0.5">
@@ -302,9 +295,9 @@ const SellerProfile = () => {
         {/* Main 2-Column Section */}
         <div className="lg:col-span-2 space-y-6">
           {/* Subscription Plan Status Card */}
-          <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-start sm:items-center gap-3.5">
+          <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3.5 min-w-0">
                 <div className={`p-3 rounded-xl shrink-0 ${
                   profile?.commissionModel === 'PLAN_BASED' && profile?.subscription?.expiresAt && new Date(profile.subscription.expiresAt) > new Date()
                     ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200'
@@ -343,7 +336,7 @@ const SellerProfile = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/seller/plans')}
-                  className="w-full sm:w-auto px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 active:scale-95 font-bold tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 transition-all shrink-0 cursor-pointer">
+                  className="w-full xl:w-auto px-4 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 active:scale-95 font-bold tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 transition-all shrink-0 cursor-pointer">
                   <ShieldCheck size={15} className="shrink-0 text-emerald-600" />
                   <span>View Active Pass</span>
                   <ArrowRight size={13} className="shrink-0 text-emerald-600" />
@@ -352,7 +345,7 @@ const SellerProfile = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/seller/plans')}
-                  className="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all shrink-0 cursor-pointer">
+                  className="w-full xl:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all shrink-0 cursor-pointer">
                   <Sparkles size={15} className="shrink-0 text-amber-300" />
                   <span>Browse 0% Plans</span>
                   <ArrowRight size={13} className="shrink-0" />
@@ -585,6 +578,52 @@ const SellerProfile = () => {
 
         {/* Sidebar Column (1 Col) */}
         <div className="space-y-6">
+          {/* Custom Photo Orders Feature Card */}
+          <Card className="p-5 sm:p-6 shadow-sm rounded-2xl bg-indigo-50 border border-indigo-200 relative overflow-hidden">
+            <div className="flex items-center justify-between mb-4 border-b border-indigo-200/80 pb-3.5 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-200">
+                  <Camera size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-indigo-900">
+                    Custom Photo Orders
+                  </h4>
+                  <p className="text-[10px] text-indigo-600/80 font-semibold mt-0.5">
+                    Allow customers to send pictures
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 relative z-10">
+              <p className="text-xs text-indigo-900/80 font-medium leading-relaxed">
+                When enabled, customers can upload handwritten lists or prescriptions directly to your store. You can review the photos, manually add the items with prices, and send the final bill back to the customer for payment and confirmation.
+              </p>
+
+              <button
+                type="button"
+                onClick={togglePhotoOrders}
+                className={`w-full py-3 px-4 font-black tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer border ${
+                  profile?.acceptsPhotoOrders 
+                    ? "bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-600 shadow-emerald-500/20" 
+                    : "bg-white hover:bg-slate-50 text-indigo-900 border-indigo-200 hover:border-indigo-300"
+                }`}>
+                {profile?.acceptsPhotoOrders ? (
+                  <>
+                    <CheckCircle size={15} />
+                    <span>Accepting Photo Orders</span>
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon size={15} />
+                    <span>Turn On Photo Orders</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </Card>
+
           {/* Security & Verification Card */}
           <Card className="p-6 border-none shadow-sm rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white">
             <h4 className="text-[10px] font-black uppercase tracking-[3px] text-white/50 mb-5">

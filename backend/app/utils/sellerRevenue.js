@@ -50,7 +50,17 @@ export function sellerOrderEarningAmount() {
   return {
     $ifNull: [
       "$paymentBreakdown.sellerPayoutTotal",
-      { $ifNull: ["$pricing.total", 0] },
+      {
+        $max: [
+          {
+            $subtract: [
+              sellerOrderRevenueAmount(),
+              sellerOrderCommissionAmount(),
+            ],
+          },
+          0,
+        ],
+      },
     ],
   };
 }

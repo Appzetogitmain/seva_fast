@@ -1101,16 +1101,6 @@ const OrderDetails = () => {
                     </div>
                   </div>
                   <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9"
-                      onClick={() =>
-                        toast.info("Chat isn't available yet — please call the customer instead.")
-                      }
-                    >
-                      <MessageSquare size={18} />
-                    </Button>
                     {(isReturn ? order.seller?.phone : order.address?.phone) && (
                       <Button
                         variant="outline"

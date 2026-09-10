@@ -1,5 +1,6 @@
 import Seller from "../models/seller.js";
 import Transaction from "../models/transaction.js";
+import Wallet from "../models/wallet.js";
 import { handleResponse, calculateDistance } from "../utils/helper.js";
 import mongoose from "mongoose";
 import { invalidateSellerName } from "../services/entityNameCache.js";
@@ -75,12 +76,22 @@ export const requestWithdrawal = async (req, res) => {
     const sellerId = req.user.id;
     const { amount } = req.body;
 
-    if (!amount || amount <= 0) {
-      return handleResponse(res, 400, "Please enter a valid amount");
+    const withdrawAmount = Number(amount);
+    if (!withdrawAmount || isNaN(withdrawAmount) || withdrawAmount <= 0) {
+      return handleResponse(res, 400, "Please enter a valid amount greater than 0");
     }
 
-    // 1. Calculate current available balance
-    // Consistent with getSellerEarnings logic in sellerStatsController.js
+    // Check seller bank details
+    const seller = await Seller.findById(sellerId).select("name shopName bankDetails").lean();
+    if (!seller?.bankDetails?.accountNumber || !seller?.bankDetails?.ifscCode) {
+      return handleResponse(
+        res,
+        400,
+        "Please add your bank account details in your profile before requesting a withdrawal",
+      );
+    }
+
+    // 1. Calculate current available balance consistently with getSellerEarnings
     const transactions = await Transaction.find({
       user: sellerId,
       userModel: "Seller",
@@ -88,9 +99,20 @@ export const requestWithdrawal = async (req, res) => {
       .select("status amount type")
       .lean();
 
-    const settledBalance = transactions
-      .filter((t) => t.status === "Settled")
+    const settledEarnings = transactions
+      .filter(
+        (t) =>
+          (t.type === "Order Payment" ||
+            t.type === "Delivery Earning" ||
+            t.type === "Bonus" ||
+            t.type === "Incentive") &&
+          t.status === "Settled",
+      )
       .reduce((acc, t) => acc + (t.amount || 0), 0);
+
+    const settledWithdrawals = transactions
+      .filter((t) => t.type === "Withdrawal" && t.status === "Settled")
+      .reduce((acc, t) => acc + Math.abs(t.amount || 0), 0);
 
     const pendingPayouts = transactions
       .filter(
@@ -100,25 +122,37 @@ export const requestWithdrawal = async (req, res) => {
       )
       .reduce((acc, t) => acc + Math.abs(t.amount || 0), 0);
 
-    const availableBalance = settledBalance - pendingPayouts;
+    const wallet = await Wallet.findOne({
+      ownerType: "SELLER",
+      ownerId: sellerId,
+    }).lean();
 
-    if (amount > availableBalance) {
+    const walletAvailable = Number(wallet?.availableBalance || 0);
+    const txnNetAvailable = Math.max(0, settledEarnings - settledWithdrawals);
+    const availableBalance = Math.max(walletAvailable, txnNetAvailable);
+    const withdrawableBalance = Math.max(0, availableBalance - pendingPayouts);
+
+    if (withdrawAmount > withdrawableBalance) {
       return handleResponse(
         res,
         400,
-        `Insufficient balance. Available: ₹${availableBalance}`,
+        `Insufficient withdrawable balance. You can withdraw up to ₹${withdrawableBalance.toLocaleString()}`,
       );
     }
 
+    const bankSummary = `${seller.bankDetails.bankName || "Bank"} (A/C: ****${String(seller.bankDetails.accountNumber).slice(-4)})`;
+
     // 2. Create Withdrawal Transaction
-    // Withdrawals have negative amounts per the model comment
+    // Withdrawals have negative amounts per the model convention
     const withdrawal = await Transaction.create({
       user: sellerId,
       userModel: "Seller",
       type: "Withdrawal",
-      amount: -Math.abs(amount),
+      amount: -Math.abs(withdrawAmount),
       status: "Pending",
       reference: `WDR-${Date.now()}`,
+      notes: `Payout request to ${bankSummary}`,
+      customer: seller.bankDetails.bankName || "Bank Transfer",
     });
 
     return handleResponse(

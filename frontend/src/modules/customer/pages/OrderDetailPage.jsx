@@ -1011,6 +1011,7 @@ const OrderDetailPage = () => {
               status={order.workflowStatus || order.status}
               eta={estimatedArrival.arrivingInText}
               riderName={order.deliveryBoy?.name}
+              riderPhone={order.deliveryBoy?.phone}
               hasAssignedRider={Boolean(order.deliveryBoy)}
               riderLocation={liveLocation}
               sellerLocation={sellerLocation}
@@ -1132,12 +1133,18 @@ const OrderDetailPage = () => {
                 <p className="text-[11px] text-slate-500 mt-1 leading-none">On the way to you</p>
               </div>
               <div className="flex items-center gap-2">
-                <button className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200">
+                <a
+                  href={`sms:${order.deliveryBoy?.phone}`}
+                  className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200"
+                >
                   <MessageSquare size={16} className="text-slate-600" />
-                </button>
-                <button className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200">
+                </a>
+                <a
+                  href={`tel:${order.deliveryBoy?.phone}`}
+                  className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200"
+                >
                   <Phone size={16} className="text-slate-600" />
-                </button>
+                </a>
               </div>
             </div>
           </motion.div>

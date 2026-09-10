@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Order from "../../models/order.js";
+import Transaction from "../../models/transaction.js";
 import {
   LEDGER_DIRECTION,
   LEDGER_TRANSACTION_TYPE,
@@ -301,9 +302,13 @@ export async function releaseExpiredHeldSellerPayouts({ sellerId = null } = {}) 
   const now = new Date();
   const query = {
     status: "delivered",
-    "financeFlags.sellerPayoutHeld": true,
-    "financeFlags.sellerPayoutQueued": { $ne: true },
+    returnStatus: { $nin: ["returned", "qc_passed", "refund_completed"] },
     returnWindowExpiresAt: { $lte: now },
+    $or: [
+      { "financeFlags.sellerPayoutHeld": true },
+      { "settlementStatus.sellerPayout": { $in: ["HOLD", "PENDING"] } },
+      { "financeFlags.codWalletsPending": true },
+    ],
   };
   if (sellerId) query.seller = sellerId;
 
@@ -313,6 +318,17 @@ export async function releaseExpiredHeldSellerPayouts({ sellerId = null } = {}) 
     try {
       const payout = await releaseHeldSellerPayout(order._id);
       if (payout) released.push(order.orderId);
+
+      // Ensure corresponding seller Transaction is marked Settled
+      await Transaction.updateMany(
+        {
+          $or: [{ order: order._id }, { reference: order.orderId }],
+          userModel: "Seller",
+          type: "Order Payment",
+          status: "Pending",
+        },
+        { $set: { status: "Settled" } },
+      );
     } catch (error) {
       console.warn(
         `[releaseExpiredHeldSellerPayouts] Failed for order ${order.orderId}:`,

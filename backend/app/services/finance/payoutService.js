@@ -169,7 +169,17 @@ export async function processPayout(payoutId, { remarks = "", adminId = null } =
 
       if (payout.payoutType === PAYOUT_TYPE.SELLER) {
         order.settlementStatus = { ...(order.settlementStatus || {}), sellerPayout: "COMPLETED" };
-        order.financeFlags = { ...(order.financeFlags || {}), sellerPayoutQueued: true };
+        order.financeFlags = { ...(order.financeFlags || {}), sellerPayoutQueued: true, sellerPayoutHeld: false };
+        await Transaction.updateMany(
+          {
+            $or: [{ order: order._id }, { reference: order.orderId }],
+            userModel: "Seller",
+            type: "Order Payment",
+            status: "Pending",
+          },
+          { $set: { status: "Settled" } },
+          { session },
+        );
       } else if (payout.payoutType === PAYOUT_TYPE.DELIVERY_PARTNER) {
         order.settlementStatus = { ...(order.settlementStatus || {}), riderPayout: "COMPLETED" };
         order.financeFlags = { ...(order.financeFlags || {}), riderPayoutQueued: true };
