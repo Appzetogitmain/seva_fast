@@ -70,6 +70,37 @@ const CATEGORIES = [
     },
 ];
 
+const CUSTOMER_AUTH_DRAFT_KEY = 'customer_auth_draft';
+
+const getStoredCustomerDraft = () => {
+    try {
+        const raw = localStorage.getItem(CUSTOMER_AUTH_DRAFT_KEY) || sessionStorage.getItem(CUSTOMER_AUTH_DRAFT_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+};
+
+const persistCustomerDraft = (data) => {
+    try {
+        const json = JSON.stringify(data);
+        localStorage.setItem(CUSTOMER_AUTH_DRAFT_KEY, json);
+        sessionStorage.setItem(CUSTOMER_AUTH_DRAFT_KEY, json);
+    } catch {
+        // ignore
+    }
+};
+
+const removeCustomerDraft = () => {
+    try {
+        localStorage.removeItem(CUSTOMER_AUTH_DRAFT_KEY);
+        sessionStorage.removeItem(CUSTOMER_AUTH_DRAFT_KEY);
+        sessionStorage.removeItem('seva_referral_code');
+    } catch {
+        // ignore
+    }
+};
+
 const CustomerAuth = () => {
     const [isLogin, setIsLogin] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
@@ -90,7 +121,8 @@ const CustomerAuth = () => {
 
     const urlReferral = searchParams.get('ref') || searchParams.get('referralCode') || searchParams.get('refId') || '';
     const [referralCode, setReferralCode] = useState(() => {
-        return (urlReferral || sessionStorage.getItem('seva_referral_code') || '').trim().toUpperCase();
+        const draft = getStoredCustomerDraft();
+        return (urlReferral || draft?.referralCode || sessionStorage.getItem('seva_referral_code') || '').trim().toUpperCase();
     });
 
     useEffect(() => {
@@ -101,12 +133,24 @@ const CustomerAuth = () => {
         }
     }, [urlReferral]);
 
-    const [formData, setFormData] = useState({
-        phone: location.state?.phone || '',
-        otp: '',
-        name: '',
-        dateOfBirth: '',
+    const [formData, setFormData] = useState(() => {
+        const draft = getStoredCustomerDraft();
+        return {
+            phone: location.state?.phone || draft?.phone || '',
+            otp: '',
+            name: draft?.name || '',
+            dateOfBirth: draft?.dateOfBirth || '',
+        };
     });
+
+    useEffect(() => {
+        persistCustomerDraft({
+            phone: formData.phone || '',
+            name: formData.name || '',
+            dateOfBirth: formData.dateOfBirth || '',
+            referralCode: referralCode || '',
+        });
+    }, [formData.phone, formData.name, formData.dateOfBirth, referralCode]);
 
     useEffect(() => {
         setIsLogin(!isSignupRoute);
@@ -240,6 +284,7 @@ const CustomerAuth = () => {
             const { token, customer } = responseData;
 
             login({ ...customer, token, role: 'customer' });
+            removeCustomerDraft();
 
             if (!isLogin && !customer.currentPlan) {
                 toast.success('Account created! Please select a plan to continue.');
@@ -531,8 +576,10 @@ const CustomerAuth = () => {
                                             </div>
                                             <input
                                                 required
+                                                type="tel"
                                                 name="phone"
                                                 maxLength={10}
+                                                value={formData.phone || ''}
                                                 placeholder="Mobile Number"
                                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-20 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
                                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
@@ -612,6 +659,7 @@ const CustomerAuth = () => {
                                                     key={i}
                                                     type="tel"
                                                     maxLength={1}
+                                                    value={formData.otp[i] || ''}
                                                     className="w-10 h-14 md:w-12 md:h-16 bg-white border-2 border-gray-200 rounded-2xl text-center text-xl font-black outline-none shadow-[0_18px_45px_rgba(15,23,42,0.25)] focus:bg-white focus:border-[var(--theme-color)] focus:shadow-[0_24px_65px_rgba(15,23,42,0.35)] transition-all"
                                                     style={{ color: activeCategory.theme }}
                                                     onKeyDown={(e) => {

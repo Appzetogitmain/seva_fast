@@ -298,12 +298,14 @@ const ProductDetailPage = () => {
         }
     };
 
-    const handleAddToCart = () => {
-        addToCart({
+    const handleAddToCart = async () => {
+        const result = await addToCart({
             ...selectedProduct,
             variantSku: variantKey,
         });
-        showToast(`${selectedProduct.name} added to cart`, 'success');
+        if (result !== false) {
+            showToast(`${selectedProduct.name} added to cart`, 'success');
+        }
     };
 
     const handleNotifyMe = async (e) => {

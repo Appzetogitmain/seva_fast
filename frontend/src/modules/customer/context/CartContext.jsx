@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from "react";
 import { customerApi } from "../services/customerApi";
 import { useAuth } from "../../../core/context/AuthContext";
+import { toast } from "sonner";
 import {
   cartItemUnitPrice,
   resolveVariantPricing as getVariantPricing,
+  getAvailableStock,
 } from "../utils/productPricing";
 
 const CartContext = createContext();
@@ -130,13 +132,28 @@ export const CartProvider = ({ children }) => {
     const variantSku = String(product?.variantSku || product?.variantName || "").trim();
     const id = product.id || product._id;
     const key = `${id}::${variantSku || ""}`;
+
+    const existingItem = cart.find(
+      (item) => `${item.id || item._id}::${String(item.variantSku || "").trim()}` === key,
+    );
+    const currentQty = existingItem ? existingItem.quantity : 0;
+    const mergedProduct = { ...existingItem, ...product };
+    const maxStock = getAvailableStock(mergedProduct, variantSku);
+
+    if (maxStock <= 0) {
+      toast.error("This product is currently out of stock");
+      return false;
+    }
+
+    if (currentQty + 1 > maxStock) {
+      toast.error(`Cannot add more than available stock (${maxStock} in stock)`);
+      return false;
+    }
+
     const { price, salePrice, variantName } = getVariantPricing(product, variantSku);
 
     // Optimistic UI update for instant feedback
     setCart((prev) => {
-      const existingItem = prev.find(
-        (item) => `${item.id || item._id}::${String(item.variantSku || "").trim()}` === key,
-      );
       if (existingItem) {
         return prev.map((item) =>
           `${item.id || item._id}::${String(item.variantSku || "").trim()}` === key
@@ -279,14 +296,18 @@ export const CartProvider = ({ children }) => {
           const qty = Math.max(Number(item.quantity) || 1, 1);
           const { price, salePrice, variantName } = getVariantPricing(item, variantSku);
 
+          const maxStock = getAvailableStock(item, variantSku);
+          if (maxStock <= 0) return;
+
           const existingIndex = updated.findIndex(
             (ci) => `${ci.id || ci._id}::${String(ci.variantSku || "").trim()}` === key
           );
 
           if (existingIndex > -1) {
+            const newQty = Math.min(updated[existingIndex].quantity + qty, maxStock);
             updated[existingIndex] = {
               ...updated[existingIndex],
-              quantity: updated[existingIndex].quantity + qty,
+              quantity: newQty,
             };
           } else {
             updated.push({
@@ -296,7 +317,7 @@ export const CartProvider = ({ children }) => {
               variantName,
               price: item.price || price,
               salePrice: item.salePrice || salePrice,
-              quantity: qty,
+              quantity: Math.min(qty, maxStock),
               image: item.image || item.mainImage,
             });
           }
@@ -353,6 +374,14 @@ export const CartProvider = ({ children }) => {
     if (newQty === 0) {
       removeFromCart(productId, normalizedVariantSku);
       return;
+    }
+
+    if (delta > 0) {
+      const maxStock = getAvailableStock(currentItem, normalizedVariantSku);
+      if (newQty > maxStock) {
+        toast.error(`Cannot exceed available stock (${maxStock} in stock)`);
+        return false;
+      }
     }
 
     // Optimistic update

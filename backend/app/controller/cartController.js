@@ -92,7 +92,7 @@ export const addToCart = async (req, res) => {
     const { productId, quantity = 1, variantSku = "" } = req.body;
     const normalizedVariantSku = String(variantSku || "").trim();
     const customerVisibleProduct = await getCustomerVisibleProductById(productId, {
-      select: "_id name variants sellerId",
+      select: "_id name variants sellerId stock",
     });
     if (!customerVisibleProduct) {
       return handleResponse(res, 404, "Product is not available for purchase");
@@ -126,6 +126,23 @@ export const addToCart = async (req, res) => {
         item.productId.toString() === productId &&
         String(item.variantSku || "").trim() === normalizedVariantSku,
     );
+
+    let availableStock = typeof customerVisibleProduct.stock === "number" ? customerVisibleProduct.stock : 9999;
+    if (productHasVariants(customerVisibleProduct)) {
+      const v = resolveVariantByKey(customerVisibleProduct.variants, normalizedVariantSku);
+      if (v && typeof v.stock === "number") {
+        availableStock = v.stock;
+      }
+    }
+
+    const currentQty = itemIndex > -1 ? cart.items[itemIndex].quantity : 0;
+    if (currentQty + quantity > availableStock) {
+      return handleResponse(
+        res,
+        400,
+        `Cannot add more than available stock (${availableStock} in stock)`
+      );
+    }
 
     if (itemIndex > -1) {
       cart.items[itemIndex].quantity += quantity;
@@ -164,6 +181,28 @@ export const updateQuantity = async (req, res) => {
     );
 
     if (itemIndex > -1) {
+      if (quantity > 0) {
+        const product = await getCustomerVisibleProductById(productId, {
+          select: "_id name variants stock",
+        });
+        if (product) {
+          let availableStock = typeof product.stock === "number" ? product.stock : 9999;
+          if (productHasVariants(product)) {
+            const v = resolveVariantByKey(product.variants, normalizedVariantSku);
+            if (v && typeof v.stock === "number") {
+              availableStock = v.stock;
+            }
+          }
+          if (quantity > availableStock) {
+            return handleResponse(
+              res,
+              400,
+              `Cannot exceed available stock (${availableStock} in stock)`
+            );
+          }
+        }
+      }
+
       cart.items[itemIndex].quantity = quantity;
       if (cart.items[itemIndex].quantity <= 0) {
         cart.items.splice(itemIndex, 1);
