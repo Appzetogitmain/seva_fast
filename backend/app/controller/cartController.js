@@ -233,3 +233,116 @@ export const clearCart = async (req, res) => {
     return handleResponse(res, 500, error.message);
   }
 };
+
+/* ===============================
+   BATCH ADD TO CART (AI / List)
+================================ */
+export const batchAddToCart = async (req, res) => {
+  try {
+    const customerId = req.user.id;
+    const { items = [] } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return handleResponse(res, 400, "Items list is required and cannot be empty");
+    }
+
+    let cart = await Cart.findOne({ customerId });
+    if (!cart) {
+      cart = new Cart({ customerId, items: [] });
+    }
+
+    const addedItems = [];
+    const skippedItems = [];
+
+    for (const item of items) {
+      const { productId, variantSku = "", quantity = 1 } = item;
+      const normalizedVariantSku = String(variantSku || "").trim();
+      const numQty = Math.max(Number(quantity) || 1, 1);
+
+      const customerVisibleProduct = await getCustomerVisibleProductById(productId, {
+        select: "_id name variants sellerId stock price salePrice",
+      });
+
+      if (!customerVisibleProduct) {
+        skippedItems.push({ productId, reason: "Product is not available for purchase" });
+        continue;
+      }
+
+      const variantError = validateVariantSelection(
+        customerVisibleProduct,
+        normalizedVariantSku,
+      );
+      if (variantError) {
+        skippedItems.push({ productId, name: customerVisibleProduct.name, reason: variantError });
+        continue;
+      }
+
+      // Enforce single-seller cart constraint
+      if (cart.items.length > 0) {
+        const firstItemProductId = cart.items[0].productId;
+        const firstProduct = await getCustomerVisibleProductById(firstItemProductId, { select: "sellerId" });
+
+        if (firstProduct && String(firstProduct.sellerId) !== String(customerVisibleProduct.sellerId)) {
+          return handleResponse(
+            res,
+            400,
+            "Cart contains items from another store. Please clear your cart before adding items from a different seller."
+          );
+        }
+      }
+
+      // Check stock
+      let availableStock = customerVisibleProduct.stock || 0;
+      if (productHasVariants(customerVisibleProduct)) {
+        const v = resolveVariantByKey(customerVisibleProduct.variants, normalizedVariantSku);
+        if (v) {
+          availableStock = typeof v.stock === "number" ? v.stock : customerVisibleProduct.stock || 0;
+        }
+      }
+
+      if (availableStock <= 0) {
+        skippedItems.push({ productId, name: customerVisibleProduct.name, reason: "Out of stock" });
+        continue;
+      }
+
+      const safeQuantity = Math.min(numQty, availableStock);
+
+      const itemIndex = cart.items.findIndex(
+        (ci) =>
+          ci.productId.toString() === productId &&
+          String(ci.variantSku || "").trim() === normalizedVariantSku,
+      );
+
+      if (itemIndex > -1) {
+        cart.items[itemIndex].quantity += safeQuantity;
+      } else {
+        cart.items.push({ productId, variantSku: normalizedVariantSku, quantity: safeQuantity });
+      }
+
+      addedItems.push({
+        productId,
+        name: customerVisibleProduct.name,
+        variantSku: normalizedVariantSku,
+        quantity: safeQuantity,
+      });
+    }
+
+    if (addedItems.length === 0) {
+      return handleResponse(res, 400, "None of the requested items could be added to cart", {
+        skippedItems,
+      });
+    }
+
+    await cart.save();
+    const updatedCart = await fetchPopulatedCart(cart._id);
+
+    return handleResponse(res, 200, `Successfully added ${addedItems.length} item(s) to cart`, {
+      cart: updatedCart,
+      addedItems,
+      skippedItems,
+    });
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+

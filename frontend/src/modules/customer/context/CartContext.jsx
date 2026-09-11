@@ -202,6 +202,111 @@ export const CartProvider = ({ children }) => {
     }
   };
 
+  const batchAddToCart = async (items = [], { skipConfirm = false } = {}) => {
+    if (!Array.isArray(items) || items.length === 0) return { success: false, message: "No items provided" };
+
+    // Check multi-store constraint with first item
+    if (cart.length > 0 && items[0]) {
+      const extractId = (val) => (val && typeof val === 'object' && val._id ? String(val._id) : String(val || ''));
+      const existingSellerId = extractId(cart[0].sellerId) || extractId(cart[0].seller);
+      const newSellerId = extractId(items[0].sellerId) || extractId(items[0].seller);
+
+      if (existingSellerId && newSellerId && existingSellerId !== newSellerId) {
+        if (!skipConfirm) {
+          const confirmReplace = window.confirm(
+            "Your cart contains items from another store. Do you want to clear your cart and add these items instead?"
+          );
+          if (!confirmReplace) return { success: false, message: "Action cancelled" };
+        }
+
+        if (isAuthenticated) {
+          try {
+            await customerApi.clearCart();
+          } catch (error) {
+            console.error("Failed to clear backend cart:", error);
+          }
+        }
+        setCart([]);
+      }
+    }
+
+    if (isAuthenticated) {
+      setLoading(true);
+      try {
+        const payload = items.map((it) => ({
+          productId: it.productId || it.id || it._id,
+          variantSku: String(it.variantSku || it.variantName || "").trim(),
+          quantity: Math.max(Number(it.quantity) || 1, 1),
+        }));
+
+        let res;
+        try {
+          res = await customerApi.batchAddToCart({ items: payload });
+        } catch (apiErr) {
+          const errMsg = String(apiErr?.response?.data?.message || apiErr?.message || "");
+          if (skipConfirm || errMsg.toLowerCase().includes("another store")) {
+            await customerApi.clearCart();
+            res = await customerApi.batchAddToCart({ items: payload });
+          } else {
+            throw apiErr;
+          }
+        }
+
+        if (res?.data?.result?.cart?.items) {
+          setCart(normalizeBackendCart(res.data.result.cart.items));
+        } else {
+          await fetchCart();
+        }
+        return { success: true, count: items.length };
+      } catch (error) {
+        console.error("Failed to batch add items to cart:", error);
+        await fetchCart();
+        return {
+          success: false,
+          message: error?.response?.data?.message || "Failed to add items to cart",
+        };
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // Guest mode: update local cart state
+      setCart((prev) => {
+        let updated = [...prev];
+        items.forEach((item) => {
+          const id = item.productId || item.id || item._id;
+          const variantSku = String(item.variantSku || item.variantName || "").trim();
+          const key = `${id}::${variantSku}`;
+          const qty = Math.max(Number(item.quantity) || 1, 1);
+          const { price, salePrice, variantName } = getVariantPricing(item, variantSku);
+
+          const existingIndex = updated.findIndex(
+            (ci) => `${ci.id || ci._id}::${String(ci.variantSku || "").trim()}` === key
+          );
+
+          if (existingIndex > -1) {
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              quantity: updated[existingIndex].quantity + qty,
+            };
+          } else {
+            updated.push({
+              ...item,
+              id,
+              variantSku,
+              variantName,
+              price: item.price || price,
+              salePrice: item.salePrice || salePrice,
+              quantity: qty,
+              image: item.image || item.mainImage,
+            });
+          }
+        });
+        return updated;
+      });
+      return { success: true, count: items.length };
+    }
+  };
+
   const removeFromCart = async (productId, variantSku = "") => {
     const normalizedVariantSku = String(variantSku || "").trim();
     const key = `${productId}::${normalizedVariantSku || ""}`;
@@ -304,6 +409,7 @@ export const CartProvider = ({ children }) => {
   const cartValue = useMemo(() => ({
     cart,
     addToCart,
+    batchAddToCart,
     removeFromCart,
     updateQuantity,
     clearCart,

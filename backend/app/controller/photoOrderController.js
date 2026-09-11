@@ -8,20 +8,41 @@ import { getIO } from "../socket/socketManager.js";
  ================================ */
 export const getSellersByCity = async (req, res) => {
     try {
-        const { city } = req.query;
+        const { city, lat, lng } = req.query;
         let query = { acceptsPhotoOrders: true };
         
-        if (city) {
-            const cityRegex = new RegExp(city, 'i');
-            query.$or = [
-                { city: cityRegex },
-                { address: cityRegex }
-            ];
+        if (city && typeof city === "string" && city.trim()) {
+            const raw = city.trim();
+            // 1. Primary city (first segment before comma)
+            const primaryCity = raw.split(",")[0].trim();
+            const escapedPrimary = primaryCity.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const escapedRaw = raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+            // 2. Individual words / tokens
+            const tokens = raw
+                .split(/[\s,]+/)
+                .map((t) => t.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+                .filter((t) => t.length > 2);
+
+            const searchPatterns = Array.from(
+                new Set([escapedPrimary, escapedRaw, ...tokens])
+            ).filter(Boolean);
+
+            const matchClauses = searchPatterns.flatMap((pat) => [
+                { city: { $regex: pat, $options: "i" } },
+                { locality: { $regex: pat, $options: "i" } },
+                { state: { $regex: pat, $options: "i" } },
+                { address: { $regex: pat, $options: "i" } },
+                { shopName: { $regex: pat, $options: "i" } },
+            ]);
+
+            query.$or = matchClauses;
         }
 
         const sellers = await Seller.find(query)
-            .select("name shopName city _id")
-            .limit(50);
+            .select("name shopName city address locality state _id")
+            .limit(50)
+            .lean();
             
         return handleResponse(res, 200, "Sellers fetched successfully", sellers);
     } catch (error) {

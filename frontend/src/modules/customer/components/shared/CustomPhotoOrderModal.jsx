@@ -88,12 +88,28 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     const cropImgRef = useRef(null);
 
     useEffect(() => {
-        if (isOpen && city.length > 2) fetchSellers();
-    }, [city, isOpen]);
+        if (isOpen && city && city.trim().length >= 2) {
+            fetchSellers(city.trim());
+        } else if (isOpen && !city && (currentLocation?.city || currentLocation?.name)) {
+            const raw = currentLocation.city || currentLocation.name || "";
+            const cleanCity = raw.split(",")[0].trim().replace(/[^a-zA-Z\s]/g, "");
+            if (cleanCity) {
+                setCity(cleanCity);
+                fetchSellers(cleanCity);
+            }
+        }
+    }, [city, isOpen, currentLocation]);
 
-    const fetchSellers = async () => {
+    const fetchSellers = async (overrideCity = null) => {
+        const queryCity = overrideCity || city;
+        if (!queryCity || queryCity.trim().length < 2) return;
         try {
-            const res = await axiosInstance.get(`/photo-orders/sellers?city=${city}`);
+            const params = new URLSearchParams({ city: queryCity.trim() });
+            if (currentLocation?.latitude && currentLocation?.longitude) {
+                params.append("lat", currentLocation.latitude);
+                params.append("lng", currentLocation.longitude);
+            }
+            const res = await axiosInstance.get(`/photo-orders/sellers?${params.toString()}`);
             setSellers(res.data.result || res.data.results || []);
         } catch (error) {
             console.error("Failed to fetch sellers:", error);
@@ -319,10 +335,16 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                                 <MapPin size={12} className="text-indigo-500" />
                                 Your City
                             </label>
-                            {currentLocation?.city && (
+                            {(currentLocation?.city || currentLocation?.name) && (
                                 <button
                                     type="button"
-                                    onClick={() => setCity(currentLocation.city)}
+                                    onClick={() => {
+                                        const raw = currentLocation.city || currentLocation.name || "";
+                                        const cleanCity = raw.split(",")[0].trim().replace(/[^a-zA-Z\s]/g, "");
+                                        const targetCity = cleanCity || raw.trim();
+                                        setCity(targetCity);
+                                        fetchSellers(targetCity);
+                                    }}
                                     className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-full flex items-center gap-1 cursor-pointer"
                                 >
                                     <MapPin size={10} /> Auto Detect

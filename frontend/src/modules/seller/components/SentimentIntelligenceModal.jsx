@@ -42,6 +42,11 @@ export default function SentimentIntelligenceModal({ isOpen, onClose, productId 
   useEffect(() => {
     if (isOpen) {
       fetchIntelligence();
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
     } else {
       setData(null);
       setError(null);
@@ -68,54 +73,55 @@ export default function SentimentIntelligenceModal({ isOpen, onClose, productId 
   const sentiment = intel?.sentimentScore || { positivePercent: 70, neutralPercent: 20, negativePercent: 10 };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-6 bg-slate-950/65 backdrop-blur-xs">
+      <div className="fixed inset-0" onClick={onClose} />
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
-        className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 flex flex-col max-h-[90vh] overflow-hidden"
+        className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 flex flex-col h-[88vh] sm:h-auto sm:max-h-[88vh] overflow-hidden z-10"
       >
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white px-6 py-4.5 flex justify-between items-center shrink-0 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary to-orange-400 flex items-center justify-center shadow-md shadow-primary/20 text-white shrink-0">
-              <Sparkles size={20} className="animate-pulse" />
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white px-4 sm:px-6 py-4 flex justify-between items-center shrink-0 border-b border-slate-800">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-primary to-orange-400 flex items-center justify-center shadow-md shadow-primary/20 text-white shrink-0">
+              <Sparkles size={18} className="animate-pulse" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">Review & Sentiment Intelligence</h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h2 className="text-sm sm:text-lg font-bold text-white tracking-tight">Review & Sentiment Intelligence</h2>
+                <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 uppercase tracking-wider">
                   AI Return Reduction
                 </span>
               </div>
-              <p className="text-xs text-slate-300 truncate max-w-[280px] sm:max-w-md">
+              <p className="text-[11px] sm:text-xs text-slate-300 truncate max-w-[200px] sm:max-w-md">
                 {productName || intel?.productName || "Entire Catalog & Return Requests"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {intel && (
               <button
                 onClick={handleCopy}
-                className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors text-xs flex items-center gap-1.5"
+                className="p-1.5 sm:p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors text-xs flex items-center gap-1.5"
                 title="Copy Summary"
               >
-                {copied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                {copied ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
                 <span className="hidden sm:inline text-xs">{copied ? "Copied" : "Copy"}</span>
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+              className="p-1.5 sm:p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-7 space-y-6 bg-slate-50/50 dark:bg-slate-900/50">
+        {/* Modal Body with smooth mobile touch scrolling */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-7 space-y-4 sm:space-y-6 bg-slate-50/50 dark:bg-slate-900/50 touch-pan-y [webkit-overflow-scrolling:touch]">
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center space-y-4">
               <div className="relative">

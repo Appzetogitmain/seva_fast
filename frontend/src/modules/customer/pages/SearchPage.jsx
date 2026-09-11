@@ -388,18 +388,48 @@ const SearchPage = () => {
                                 ))}
                             </div>
                         ) : !isLoading ? (
-                            <div className="py-16 flex flex-col items-center text-center">
-                                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 mb-3">
-                                    <Search size={32} />
+                            <div className="space-y-8">
+                                {/* Not Found Notice Card */}
+                                <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-5 md:p-6 text-center max-w-xl mx-auto shadow-xs">
+                                    <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <Search size={22} />
+                                    </div>
+                                    <h3 className="text-base md:text-lg font-bold text-slate-900 mb-1">
+                                        No exact product found for &ldquo;<span className="text-amber-800 font-extrabold">{query}</span>&rdquo;
+                                    </h3>
+                                    <p className="text-xs md:text-sm text-slate-600 max-w-md mx-auto mb-4">
+                                        We couldn't find an exact match for this item in our store right now. Check out the similar products below:
+                                    </p>
+                                    <button
+                                        onClick={() => setIsVoiceModalOpen(true)}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white font-bold rounded-xl text-xs shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
+                                    >
+                                        <Mic size={15} /> Try Voice Search Again
+                                    </button>
                                 </div>
-                                <h3 className="text-xl font-black text-slate-800 tracking-tight mb-2">No items found</h3>
-                                <p className="text-slate-500 font-medium max-w-xs mb-4">We couldn't find anything matching "{query}". Try searching with different keywords like "Mango" or "Milk"!</p>
-                                <button
-                                    onClick={() => setIsVoiceModalOpen(true)}
-                                    className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary font-extrabold rounded-xl text-xs flex items-center gap-2 transition-colors"
-                                >
-                                    <Mic size={16} /> Try Voice Search
-                                </button>
+
+                                {/* Similar Products Section */}
+                                {allProducts.length > 0 && (
+                                    <div className="space-y-4 pt-2">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <Sparkles size={18} className="text-primary animate-pulse" />
+                                                <h3 className="text-base md:text-lg font-extrabold text-slate-900 tracking-tight">
+                                                    Similar Products
+                                                </h3>
+                                            </div>
+                                            <span className="text-xs font-semibold text-slate-500">Available in store</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-3 md:gap-x-4 gap-y-6 md:gap-y-10">
+                                            {allProducts.slice(0, 10).map((product) => (
+                                                <div key={product.id || product._id} className="flex justify-center">
+                                                    <ProductCard product={product} compact={isMobile} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ) : null}
                     </section>

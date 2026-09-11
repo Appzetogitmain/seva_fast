@@ -239,6 +239,13 @@ const ProductManagement = () => {
     ],
   });
 
+  const selectedCategoryName = useMemo(() => {
+    if (!formData.category) return "";
+    const header = categories.find((h) => (h._id || h.id) === formData.header);
+    const cat = header?.children?.find((c) => (c._id || c.id) === formData.category);
+    return cat?.name || header?.name || "";
+  }, [categories, formData.header, formData.category]);
+
   const safeProducts = useMemo(
     () => (Array.isArray(products) ? products : []),
     [products]
