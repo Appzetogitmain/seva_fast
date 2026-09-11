@@ -125,35 +125,59 @@ export async function fetchSellerOrdersPage({
           totalOrders: { $sum: 1 },
           totalAmount: {
             $sum: {
-              $let: {
-                vars: {
-                  breakdown: { $ifNull: ["$paymentBreakdown.sellerPayoutTotal", 0] },
-                  subtotal: { $ifNull: ["$pricing.subtotal", 0] },
-                  commission: {
-                    $ifNull: ["$paymentBreakdown.adminProductCommissionTotal", 0],
-                  },
-                  deliveryFee: {
-                    $ifNull: [
-                      "$pricing.deliveryFee",
-                      { $ifNull: ["$paymentBreakdown.deliveryFeeCharged", 0] },
-                    ],
-                  },
-                },
-                in: {
-                  $cond: [
-                    { $gt: ["$$breakdown", 0] },
-                    "$$breakdown",
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$status", "delivered"] },
                     {
-                      $add: [
-                        {
-                          $max: [{ $subtract: ["$$subtotal", "$$commission"] }, 0],
-                        },
-                        { $multiply: ["$$deliveryFee", 0.8] },
+                      $nin: [
+                        { $ifNull: ["$returnStatus", "none"] },
+                        [
+                          "returned",
+                          "qc_passed",
+                          "refund_completed",
+                          "return_approved",
+                          "return_in_transit",
+                          "return_drop_pending",
+                          "return_pickup_assigned",
+                        ],
                       ],
                     },
                   ],
                 },
-              },
+                {
+                  $let: {
+                    vars: {
+                      breakdown: { $ifNull: ["$paymentBreakdown.sellerPayoutTotal", 0] },
+                      subtotal: { $ifNull: ["$pricing.subtotal", 0] },
+                      commission: {
+                        $ifNull: ["$paymentBreakdown.adminProductCommissionTotal", 0],
+                      },
+                      deliveryFee: {
+                        $ifNull: [
+                          "$pricing.deliveryFee",
+                          { $ifNull: ["$paymentBreakdown.deliveryFeeCharged", 0] },
+                        ],
+                      },
+                    },
+                    in: {
+                      $cond: [
+                        { $gt: ["$$breakdown", 0] },
+                        "$$breakdown",
+                        {
+                          $add: [
+                            {
+                              $max: [{ $subtract: ["$$subtotal", "$$commission"] }, 0],
+                            },
+                            { $multiply: ["$$deliveryFee", 0.8] },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                },
+                0,
+              ],
             },
           },
           pending: {
@@ -169,7 +193,31 @@ export async function fetchSellerOrdersPage({
             $sum: { $cond: [{ $eq: ["$status", "out_for_delivery"] }, 1, 0] },
           },
           delivered: {
-            $sum: { $cond: [{ $eq: ["$status", "delivered"] }, 1, 0] },
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$status", "delivered"] },
+                    {
+                      $nin: [
+                        { $ifNull: ["$returnStatus", "none"] },
+                        [
+                          "returned",
+                          "qc_passed",
+                          "refund_completed",
+                          "return_approved",
+                          "return_in_transit",
+                          "return_drop_pending",
+                          "return_pickup_assigned",
+                        ],
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
           },
           cancelled: {
             $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] },
@@ -178,10 +226,18 @@ export async function fetchSellerOrdersPage({
             $sum: {
               $cond: [
                 {
-                  $and: [
-                    { $ne: ["$returnStatus", null] },
-                    { $ne: ["$returnStatus", ""] },
-                    { $ne: ["$returnStatus", "none"] },
+                  $in: [
+                    "$returnStatus",
+                    [
+                      "return_requested",
+                      "return_approved",
+                      "return_pickup_assigned",
+                      "return_in_transit",
+                      "return_drop_pending",
+                      "returned",
+                      "qc_passed",
+                      "refund_completed",
+                    ],
                   ],
                 },
                 1,

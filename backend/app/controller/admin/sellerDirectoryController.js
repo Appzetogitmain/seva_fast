@@ -24,6 +24,7 @@ export const getSellerLocations = async (req, res) => {
     });
 
     const assignedZones = req.assignedZones || [];
+    const assignedCategories = req.assignedCategories || [];
 
     const data = await getSellerLocationsData({
       q,
@@ -36,6 +37,7 @@ export const getSellerLocations = async (req, res) => {
       limit,
       skip,
       assignedZones,
+      assignedCategories,
     });
 
     return handleResponse(res, 200, "Seller locations fetched successfully", data);
@@ -52,6 +54,7 @@ export const getActiveSellers = async (req, res) => {
       maxLimit: 100,
     });
     const assignedZones = req.assignedZones || [];
+    const assignedCategories = req.assignedCategories || [];
 
     const data = await getActiveSellersData({
       q,
@@ -61,9 +64,8 @@ export const getActiveSellers = async (req, res) => {
       limit,
       skip,
       assignedZones,
+      assignedCategories,
     });
-
-
 
     return handleResponse(res, 200, "Active sellers fetched successfully", data);
   } catch (error) {
@@ -74,7 +76,8 @@ export const getActiveSellers = async (req, res) => {
 export const getSellers = async (req, res) => {
   try {
     const assignedZones = req.assignedZones || [];
-    const sellers = await getSellerOptions(assignedZones);
+    const assignedCategories = req.assignedCategories || [];
+    const sellers = await getSellerOptions({ assignedZones, assignedCategories });
     return handleResponse(res, 200, "Sellers fetched", sellers);
   } catch (error) {
     return handleResponse(res, 500, error.message);

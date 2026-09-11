@@ -122,10 +122,10 @@ const getTrackingRoutePhase = (order) => {
 };
 
 const matchesOrderIdentifier = (payloadOrderId, identifiers = []) => {
-  const normalizedPayloadId = String(payloadOrderId || "").trim();
+  const normalizedPayloadId = String(payloadOrderId || "").trim().toLowerCase();
   if (!normalizedPayloadId) return false;
   return identifiers
-    .map((value) => String(value || "").trim())
+    .map((value) => String(value || "").trim().toLowerCase())
     .filter(Boolean)
     .includes(normalizedPayloadId);
 };
@@ -273,10 +273,12 @@ const OrderDetailPage = () => {
         .getOrderDetails(orderId)
         .then(async (r) => {
           const ord = r.data.result;
-          setOrder(ord);
+          if (ord) {
+            setOrder(ord);
+          }
           try {
             const retRes = await customerApi.getReturnDetails(resolveOrderLookupId(ord));
-            setReturnDetails(retRes.data.result);
+            setReturnDetails(retRes.data?.result || null);
           } catch {
             setReturnDetails(null);
           }
@@ -288,8 +290,17 @@ const OrderDetailPage = () => {
     };
 
     const offStatus = onOrderStatusUpdate(getToken, (payload) => {
+      // Ensure the socket event belongs to this specific order
+      if (
+        !matchesOrderIdentifier(payload?.orderId, identifiersRef.current) &&
+        !matchesOrderIdentifier(payload?._id, identifiersRef.current) &&
+        !matchesOrderIdentifier(payload?.orderDbId, identifiersRef.current)
+      ) {
+        return;
+      }
+
       // Immediately update order state from socket payload — no waiting for API re-fetch
-      const ws = String(payload?.workflowStatus || "").toUpperCase();
+      const ws = String(payload?.workflowStatus || payload?.status || "").toUpperCase();
       if (ws) {
         setOrder((prev) => {
           if (!prev) return prev;
@@ -299,8 +310,14 @@ const OrderDetailPage = () => {
             // Keep legacy status in sync for components that read order.status
             ...(ws === "DELIVERED" && { status: "delivered" }),
             ...(ws === "DELIVERY_SEARCH" && { status: "confirmed" }),
+            ...(ws === "DELIVERY_ASSIGNED" && { status: "confirmed" }),
+            ...(ws === "PICKUP_READY" && { status: "packed" }),
             ...(ws === "OUT_FOR_DELIVERY" && { status: "out_for_delivery" }),
             ...(ws === "CANCELLED" && { status: "cancelled" }),
+            ...(ws === "SELLER_ACCEPTED" && { status: "confirmed" }),
+            ...(ws === "SELLER_PENDING" && { status: "pending" }),
+            ...(ws === "CREATED" && { status: "pending" }),
+            ...(payload?.cancelReason && { cancelReason: payload.cancelReason }),
           };
         });
       }
@@ -325,13 +342,13 @@ const OrderDetailPage = () => {
       offReturnOtp();
       leaveOrderRoom(orderId, getToken);
     };
-  }, [orderId]);
+  }, [orderId, order?.orderId]);
 
   useEffect(() => {
-    identifiersRef.current = [orderId, order?.orderId, order?.checkoutGroupId]
+    identifiersRef.current = [orderId, order?.orderId, order?.checkoutGroupId, order?._id]
       .map((value) => String(value || "").trim())
       .filter(Boolean);
-  }, [orderId, order?.orderId, order?.checkoutGroupId]);
+  }, [orderId, order?.orderId, order?.checkoutGroupId, order?._id]);
 
   useEffect(() => {
     if (!orderId) return undefined;
@@ -1133,12 +1150,6 @@ const OrderDetailPage = () => {
                 <p className="text-[11px] text-slate-500 mt-1 leading-none">On the way to you</p>
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href={`sms:${order.deliveryBoy?.phone}`}
-                  className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200"
-                >
-                  <MessageSquare size={16} className="text-slate-600" />
-                </a>
                 <a
                   href={`tel:${order.deliveryBoy?.phone}`}
                   className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors border border-slate-200"

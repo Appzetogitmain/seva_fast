@@ -1,6 +1,8 @@
 import Seller from "../../models/seller.js";
 import Order from "../../models/order.js";
 import Product from "../../models/product.js";
+import Zone from "../../models/zone.js";
+import Category from "../../models/category.js";
 import SellerStorePromotion from "../../models/sellerStorePromotion.js";
 import { formatDate } from "../../utils/formatDate.js";
 import {
@@ -16,6 +18,116 @@ import {
   sortActiveSellerRows,
 } from "./shared/sellerAdminUtils.js";
 
+export async function buildSellerScopeFilter({ assignedZones = [], assignedCategories = [] } = {}) {
+  const scopeConditions = [];
+
+  // Zone scoping
+  if (Array.isArray(assignedZones) && assignedZones.length > 0) {
+    const zoneObjectIds = assignedZones
+      .filter(Boolean)
+      .map((z) => (typeof z === "object" && z._id ? z._id : z));
+
+    if (zoneObjectIds.length > 0) {
+      try {
+        const zones = await Zone.find({ _id: { $in: zoneObjectIds } }).lean();
+        const zoneGeoQueries = [];
+        for (const z of zones) {
+          if (
+            z.coordinates &&
+            z.coordinates.type === "Polygon" &&
+            Array.isArray(z.coordinates.coordinates) &&
+            z.coordinates.coordinates.length > 0
+          ) {
+            zoneGeoQueries.push({
+              location: {
+                $geoWithin: {
+                  $geometry: z.coordinates,
+                },
+              },
+            });
+          }
+        }
+
+        if (zoneGeoQueries.length > 0) {
+          scopeConditions.push({
+            $or: [{ zoneId: { $in: zoneObjectIds } }, ...zoneGeoQueries],
+          });
+        } else {
+          scopeConditions.push({ zoneId: { $in: zoneObjectIds } });
+        }
+      } catch (err) {
+        scopeConditions.push({ zoneId: { $in: zoneObjectIds } });
+      }
+    }
+  }
+
+  // Category scoping
+  if (Array.isArray(assignedCategories) && assignedCategories.length > 0) {
+    const categoryObjectIds = assignedCategories
+      .filter(Boolean)
+      .map((c) => (typeof c === "object" && c._id ? c._id : c));
+
+    if (categoryObjectIds.length > 0) {
+      try {
+        const level1And2 = await Category.find({
+          $or: [{ _id: { $in: categoryObjectIds } }, { parentId: { $in: categoryObjectIds } }],
+        })
+          .select("_id name slug parentId")
+          .lean();
+
+        const level1And2Ids = level1And2.map((c) => c._id);
+        const level3 = await Category.find({
+          parentId: { $in: level1And2Ids },
+        })
+          .select("_id name slug parentId")
+          .lean();
+
+        const allCategories = [...level1And2, ...level3];
+        const allCategoryIds = [...new Set(allCategories.map((c) => c._id))];
+        const allCategoryNames = [...new Set(allCategories.map((c) => c.name).filter(Boolean))];
+        const allCategorySlugs = [...new Set(allCategories.map((c) => c.slug).filter(Boolean))];
+
+        // Find sellers who have products in these categories
+        const productSellerIds = await Product.distinct("sellerId", {
+          $or: [
+            { category: { $in: allCategoryIds } },
+            { subCategory: { $in: allCategoryIds } },
+          ],
+        });
+
+        const categoryRegexes = allCategoryNames.map(
+          (name) => new RegExp(`^${escapeRegExp(name)}$`, "i"),
+        );
+        const slugRegexes = allCategorySlugs.map(
+          (slug) => new RegExp(`^${escapeRegExp(slug)}$`, "i"),
+        );
+
+        const categoryOrConditions = [];
+        if (categoryRegexes.length > 0 || slugRegexes.length > 0) {
+          categoryOrConditions.push({
+            category: { $in: [...categoryRegexes, ...slugRegexes] },
+          });
+        }
+        if (productSellerIds.length > 0) {
+          categoryOrConditions.push({
+            _id: { $in: productSellerIds },
+          });
+        }
+
+        if (categoryOrConditions.length > 0) {
+          scopeConditions.push({
+            $or: categoryOrConditions,
+          });
+        }
+      } catch (err) {
+        console.error("Error scoping categories for subadmin:", err);
+      }
+    }
+  }
+
+  return scopeConditions;
+}
+
 export async function getSellerLocationsData({
   q = "",
   category = "all",
@@ -26,7 +138,8 @@ export async function getSellerLocationsData({
   page,
   limit,
   skip,
-  assignedZones,
+  assignedZones = [],
+  assignedCategories = [],
 }) {
   const normalizedLifecycle = String(lifecycle || "all").trim().toLowerCase();
   const normalizedCategory = String(category || "all").trim();
@@ -39,9 +152,11 @@ export async function getSellerLocationsData({
     : 500;
 
   const filters = [];
-  if (assignedZones && assignedZones.length > 0) {
-    filters.push({ zoneId: { $in: assignedZones } });
+  const scopeConditions = await buildSellerScopeFilter({ assignedZones, assignedCategories });
+  if (scopeConditions.length > 0) {
+    filters.push(...scopeConditions);
   }
+
   if (normalizedCategory && normalizedCategory !== "all") {
     filters.push({
       category: new RegExp(`^${escapeRegExp(normalizedCategory)}$`, "i"),
@@ -62,7 +177,7 @@ export async function getSellerLocationsData({
     });
   }
 
-  const baseQuery = filters.length ? { $and: filters } : {};
+  const baseQuery = filters.length > 1 ? { $and: filters } : (filters[0] || {});
   const sellers = await Seller.find(baseQuery)
     .select(
       "_id name shopName email phone category address location serviceRadius isActive isVerified applicationStatus reviewedAt createdAt rejectionReason",
@@ -291,13 +406,17 @@ export async function getActiveSellersData({
   page,
   limit,
   skip,
-  assignedZones,
+  assignedZones = [],
+  assignedCategories = [],
 }) {
-  const baseQuery = { isVerified: true, isActive: true };
-  if (assignedZones && assignedZones.length > 0) {
-    baseQuery.zoneId = { $in: assignedZones };
-  }
-  const filters = [baseQuery];
+  const baseStatus = { isVerified: true, isActive: true };
+  const scopeConditions = await buildSellerScopeFilter({ assignedZones, assignedCategories });
+
+  const baseQuery = scopeConditions.length > 0
+    ? { $and: [baseStatus, ...scopeConditions] }
+    : baseStatus;
+
+  const filters = [baseStatus, ...scopeConditions];
 
   if (category && category !== "all") {
     filters.push({
@@ -320,7 +439,7 @@ export async function getActiveSellersData({
     });
   }
 
-  const query = filters.length > 1 ? { $and: filters } : baseQuery;
+  const query = filters.length > 1 ? { $and: filters } : filters[0];
 
   const [sellers, totalActiveCount, allActiveSellers] = await Promise.all([
     Seller.find(query).lean(),
@@ -549,11 +668,11 @@ export async function getActiveSellersData({
   };
 }
 
-export async function getSellerOptions(assignedZones) {
-  const query = {};
-  if (assignedZones && assignedZones.length > 0) {
-    query.zoneId = { $in: assignedZones };
-  }
+export async function getSellerOptions(options = {}) {
+  const assignedZones = Array.isArray(options) ? options : (options.assignedZones || []);
+  const assignedCategories = Array.isArray(options) ? [] : (options.assignedCategories || []);
+  const scopeConditions = await buildSellerScopeFilter({ assignedZones, assignedCategories });
+  const query = scopeConditions.length > 1 ? { $and: scopeConditions } : (scopeConditions[0] || {});
   return Seller.find(query)
     .select("_id shopName name email phone")
     .sort({ shopName: 1 })

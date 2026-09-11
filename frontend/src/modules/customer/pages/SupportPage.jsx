@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { MessageCircle, Phone, Mail, ChevronDown, ChevronUp, FileText, ChevronLeft, PlusCircle, X, Send } from 'lucide-react';
 import { useToast } from '@shared/components/ui/Toast';
 import { useSettings } from '@core/context/SettingsContext';
@@ -14,6 +14,7 @@ const FAQ_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const SupportPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { showToast } = useToast();
     const { settings } = useSettings();
     const supportEmail = settings?.supportEmail || '';
@@ -27,6 +28,15 @@ const SupportPage = () => {
         priority: 'medium'
     });
     const [faqs, setFaqs] = useState([]);
+
+    useEffect(() => {
+        const queryParams = new URLSearchParams(location.search);
+        const issueParam = queryParams.get('issue') || location.state?.subject;
+        if (issueParam) {
+            setTicketData(prev => ({ ...prev, subject: issueParam }));
+            setIsTicketModalOpen(true);
+        }
+    }, [location]);
 
     useEffect(() => {
         if (isTicketModalOpen) {
