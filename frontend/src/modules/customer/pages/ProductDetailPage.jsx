@@ -123,18 +123,23 @@ const ProductDetailPage = () => {
     // Update variant when product changes
     useEffect(() => {
         if (selectedProduct?.variants?.length > 0) {
+            const variants = selectedProduct.variants;
+            const hasInStock = variants.some((v) => Number(v.stock ?? 0) > 0);
+
             const listingSku = String(selectedProduct.listingVariantSku || "").trim();
             const listingVariant = listingSku
-              ? selectedProduct.variants.find(
+              ? variants.find(
                   (variant) => variantIdentityKey(variant) === listingSku,
                 )
               : null;
 
-            setSelectedVariant(
-              listingVariant ||
-                pickListingVariant(selectedProduct)?.variant ||
-                selectedProduct.variants[0],
-            );
+            const initialVariant =
+              (listingVariant && (!hasInStock || Number(listingVariant.stock ?? 0) > 0) ? listingVariant : null) ||
+              pickListingVariant(selectedProduct)?.variant ||
+              variants.find((v) => Number(v.stock ?? 0) > 0) ||
+              variants[0];
+
+            setSelectedVariant(initialVariant);
         } else {
             setSelectedVariant(null);
         }
@@ -694,22 +699,39 @@ const ProductDetailPage = () => {
                                             <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100/50 mt-4">
                                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Select Variant</h4>
                                                 <div className="flex gap-2.5 flex-wrap">
-                                                    {selectedProduct.variants.map((v, idx) => (
-                                                        <motion.button
-                                                            key={idx}
-                                                            whileHover={{ scale: 1.02 }}
-                                                            whileTap={{ scale: 0.98 }}
-                                                            onClick={() => setSelectedVariant(v)}
-                                                            className={cn(
-                                                                'px-4 py-2 font-black rounded-xl text-xs transition-all border-2',
-                                                                selectedVariant && variantsMatch(selectedVariant, v)
-                                                                    ? 'bg-white border-primary text-primary shadow-sm shadow-brand-100'
-                                                                    : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
-                                                            )}
-                                                        >
-                                                            {v.name}
-                                                        </motion.button>
-                                                    ))}
+                                                    {selectedProduct.variants.map((v, idx) => {
+                                                        const isSelected = selectedVariant && variantsMatch(selectedVariant, v);
+                                                        const vStock = Number(v.stock ?? 0);
+                                                        const isVOutOfStock = vStock <= 0;
+
+                                                        return (
+                                                            <motion.button
+                                                                key={idx}
+                                                                whileHover={{ scale: 1.02 }}
+                                                                whileTap={{ scale: 0.98 }}
+                                                                onClick={() => setSelectedVariant(v)}
+                                                                className={cn(
+                                                                    'px-4 py-2 font-black rounded-xl text-xs transition-all border-2 flex items-center gap-1.5',
+                                                                    isSelected
+                                                                        ? 'bg-white border-primary text-primary shadow-sm shadow-brand-100'
+                                                                        : isVOutOfStock
+                                                                            ? 'bg-slate-100/80 border-slate-200 text-slate-400 opacity-75 hover:border-slate-300'
+                                                                            : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                                                                )}
+                                                            >
+                                                                <span>{v.name}</span>
+                                                                {isVOutOfStock ? (
+                                                                    <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wider border border-red-100">
+                                                                        Out of Stock
+                                                                    </span>
+                                                                ) : vStock <= 5 ? (
+                                                                    <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
+                                                                        Only {vStock} left
+                                                                    </span>
+                                                                ) : null}
+                                                            </motion.button>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         )}

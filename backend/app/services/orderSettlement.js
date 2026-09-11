@@ -50,6 +50,42 @@ export async function applyDeliveredSettlement(order, orderIdString) {
         { upsert: true, new: true },
       );
     }
+
+    // Unlike the seller (who is genuinely owed money admin hasn't received
+    // yet), the rider already collected the cash from the customer and
+    // netted their commission out of it — they aren't waiting on anyone.
+    // Credit this immediately so it shows up in the app right after
+    // delivery instead of only after admin later reconciles the COD cash
+    // (finalizeCodAfterAdminCredit, which still runs afterwards and just
+    // upserts the same reference, keeping this idempotent).
+    if (settled.deliveryBoy) {
+      const deliveryEarning = Math.round(settled.paymentBreakdown?.riderPayoutTotal || 0);
+      const deliveryMeta = {
+        tipAmount: Math.round(settled.paymentBreakdown?.riderTipAmount || 0),
+        payoutBase: Math.round(settled.paymentBreakdown?.riderPayoutBase || 0),
+        payoutDistance: Math.round(settled.paymentBreakdown?.riderPayoutDistance || 0),
+        payoutBonus: Math.round(settled.paymentBreakdown?.riderPayoutBonus || 0),
+        settledViaCash: true,
+      };
+      await Transaction.findOneAndUpdate(
+        { reference: `DEL-ERN-${orderIdString}` },
+        {
+          $set: {
+            amount: deliveryEarning,
+            status: "Settled",
+            meta: deliveryMeta,
+          },
+          $setOnInsert: {
+            user: settled.deliveryBoy,
+            userModel: "Delivery",
+            order: settled._id,
+            type: "Delivery Earning",
+            reference: `DEL-ERN-${orderIdString}`,
+          },
+        },
+        { upsert: true, new: true },
+      );
+    }
     return settled;
   }
 
