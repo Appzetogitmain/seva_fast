@@ -56,26 +56,18 @@ const SubscriptionExpiryModal = () => {
                     <div className="flex items-center gap-3 max-w-4xl mx-auto">
                         <AlertTriangle className="h-5 w-5 shrink-0 animate-bounce" />
                         <p className="text-xs md:text-sm font-bold">
-                            Warning: Your plan <span className="underline font-black">{sub?.planName}</span> will expire in{" "}
+                            Heads up! Your subscription plan <span className="underline font-black">{sub?.planName}</span> will expire in{" "}
                             <span className="bg-black/20 px-2 py-0.5 rounded font-mono">{statusData.hoursRemaining} hours</span> (
                             {sub?.expiresAt ? new Date(sub.expiresAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : ""}).
-                            Renew now to retain 0% commission!
+                            {" "}Please renew your plan before it expires to continue enjoying 0% commission benefits.
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={handleGoToPlans}
-                            className="px-4 py-1.5 bg-white text-slate-900 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-100 transition-all shrink-0"
-                        >
-                            Renew Plan
-                        </button>
-                        <button
-                            onClick={() => setIsDismissedWarning(true)}
-                            className="text-white/80 hover:text-white p-1 text-xs font-bold"
-                        >
-                            ✕
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => setIsDismissedWarning(true)}
+                        className="text-white/80 hover:text-white p-1 text-xs font-bold shrink-0"
+                    >
+                        ✕
+                    </button>
                 </div>
             )}
 

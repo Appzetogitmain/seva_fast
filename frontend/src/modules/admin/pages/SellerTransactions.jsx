@@ -143,10 +143,17 @@ const SellerTransactions = () => {
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
+            a.style.display = 'none';
             a.href = url;
             a.download = `master-ledger-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
             a.click();
-            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                if (document.body.contains(a)) {
+                    document.body.removeChild(a);
+                }
+                URL.revokeObjectURL(url);
+            }, 2000);
             toast.success('Master ledger downloaded!');
         } catch (e) {
             toast.error('Export failed');

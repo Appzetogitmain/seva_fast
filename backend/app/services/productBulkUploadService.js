@@ -393,13 +393,13 @@ function parseVariantsFromColumns(row, productName, rowIndexForSku) {
       continue;
     }
     if (!name) {
-      return { error: `variant${i}Name is required when variant ${i} is provided` };
+      return { error: `Variant ${i} Name is missing. Please provide a name for this variant.` };
     }
     if (price === null || price < 0) {
-      return { error: `variant${i}Price must be a valid number (>= 0)` };
+      return { error: `Please enter a valid price for Variant ${i}. It must be a number 0 or greater.` };
     }
     if (stock === null || stock < 0) {
-      return { error: `variant${i}Stock must be a valid number (>= 0)` };
+      return { error: `Please enter a valid stock quantity for Variant ${i}. It must be a number 0 or greater.` };
     }
 
     variants.push({
@@ -430,12 +430,12 @@ function parseVariants(row, productName, rowIndexForSku) {
         const stock = Number(v.stock);
         const sku = String(v.sku || "").trim();
 
-        if (!name) return { error: `variantsJson[${i}].name is required` };
+        if (!name) return { error: `Name is missing in variant at position ${i + 1}. Please provide a name.` };
         if (!Number.isFinite(price) || price < 0) {
-          return { error: `variantsJson[${i}].price must be >= 0` };
+          return { error: `Please enter a valid price for variant at position ${i + 1}. It must be 0 or greater.` };
         }
         if (!Number.isFinite(stock) || stock < 0) {
-          return { error: `variantsJson[${i}].stock must be >= 0` };
+          return { error: `Please enter a valid stock quantity for variant at position ${i + 1}. It must be 0 or greater.` };
         }
 
         variants.push({
@@ -460,7 +460,7 @@ function validateScheduledFields(productData) {
   if (deliveryType !== "scheduled") return null;
 
   if (!parseWeightKgFromString(productData.weight)) {
-    return "Weight is required for scheduled nationwide delivery products";
+    return "Weight is missing. It is required for scheduled nationwide delivery products.";
   }
 
   const length = parsePositiveNumber(productData.packageLength);
@@ -468,7 +468,7 @@ function validateScheduledFields(productData) {
   const height = parsePositiveNumber(productData.packageHeight);
 
   if (!length || !breadth || !height) {
-    return "Package length, breadth and height (cm) are required for scheduled delivery";
+    return "Package dimensions (length, breadth, and height in cm) are missing or invalid. They are required for scheduled delivery.";
   }
 
   productData.packageLength = length;
@@ -576,14 +576,14 @@ export async function bulkCreateProductsFromRows(rows, { sellerId }) {
 
     try {
       if (!name) {
-        errors.push({ row: excelRow, name: "", message: "Product name is required" });
+        errors.push({ row: excelRow, name: "", message: "Product Name is missing. Please provide a name for this product." });
         continue;
       }
 
       const trimmedName = name.trim();
       const lowerName = trimmedName.toLowerCase();
       if (batchNames.has(lowerName)) {
-        errors.push({ row: excelRow, name, message: `Duplicate product "${trimmedName}" in the same upload file` });
+        errors.push({ row: excelRow, name, message: `You have already added the product "${trimmedName}" in this file. Please remove the duplicate.` });
         continue;
       }
 
@@ -594,7 +594,7 @@ export async function bulkCreateProductsFromRows(rows, { sellerId }) {
       }).lean();
 
       if (existingProduct) {
-        errors.push({ row: excelRow, name, message: `Product "${trimmedName}" already exists in your inventory` });
+        errors.push({ row: excelRow, name, message: `A product named "${trimmedName}" already exists in your store. Please use a different name or edit the existing product.` });
         continue;
       }
 
@@ -602,13 +602,13 @@ export async function bulkCreateProductsFromRows(rows, { sellerId }) {
 
       const price = cellNum(row, "price");
       if (price === null || price < 0) {
-        errors.push({ row: excelRow, name, message: "Valid price is required (≥ 0)" });
+        errors.push({ row: excelRow, name, message: "Please enter a valid price for this product. It must be a number 0 or greater." });
         continue;
       }
 
       const stock = cellNum(row, "stock", 0);
       if (stock === null || stock < 0) {
-        errors.push({ row: excelRow, name, message: "Stock cannot be negative" });
+        errors.push({ row: excelRow, name, message: "Stock quantity cannot be negative. Please enter a valid number (e.g., 0, 10)." });
         continue;
       }
 
@@ -626,7 +626,7 @@ export async function bulkCreateProductsFromRows(rows, { sellerId }) {
         errors.push({
           row: excelRow,
           name,
-          message: 'deliveryType must be "instant" or "scheduled"',
+          message: 'Delivery Type is invalid. Please enter either "instant" or "scheduled".',
         });
         continue;
       }
