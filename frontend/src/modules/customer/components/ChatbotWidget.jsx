@@ -103,17 +103,42 @@ export default function ChatbotWidget() {
       activeUtteranceRef.current = null;
     }
 
-    // 4. Force cancel browser speech synthesis queue
+    // 4. Force cancel browser speech synthesis queue + delayed fallbacks for Chrome queue bugs
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
         window.speechSynthesis.pause();
         window.speechSynthesis.cancel();
+        setTimeout(() => {
+          try {
+            if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+              window.speechSynthesis.cancel();
+            }
+          } catch (_) {}
+        }, 50);
+        setTimeout(() => {
+          try {
+            if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+              window.speechSynthesis.cancel();
+            }
+          } catch (_) {}
+        }, 150);
       } catch (e) {
         console.warn("Speech synthesis cancel error:", e);
       }
     }
 
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (_) {}
+    }
+
+    setIsListening(false);
     setIsSpeaking(false);
+    setIsLoading(false);
+    setMessages((prev) =>
+      prev.map((msg) => (msg.isStreaming ? { ...msg, isStreaming: false } : msg))
+    );
   };
 
   useEffect(() => {
@@ -1400,7 +1425,7 @@ export default function ChatbotWidget() {
           }`}
           title={isListening ? "Listening... Click to stop" : "Click to Speak"}
         >
-          {isListening ? <FiMicOff size={17} /> : <FiMic size={17} />}
+          {isListening ? <FiMic size={17} className="animate-pulse text-white" /> : <FiMicOff size={17} />}
         </button>
 
         {/* Text Input */}
@@ -1420,14 +1445,26 @@ export default function ChatbotWidget() {
           disabled={isLoading}
         />
 
-        {/* Send Button */}
-        <button
-          type="submit"
-          disabled={isLoading || !input.trim()}
-          className="p-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 transition-all shadow-xs cursor-pointer"
-        >
-          <FiSend size={16} />
-        </button>
+        {/* Send or Stop Button */}
+        {isLoading || isSpeaking ? (
+          <button
+            type="button"
+            onClick={stopSpeaking}
+            className="p-2.5 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-all shadow-xs cursor-pointer shrink-0 flex items-center justify-center animate-pulse"
+            title="Stop AI Response & Voice"
+          >
+            <div className="w-3.5 h-3.5 bg-white rounded-xs" />
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            className="p-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 transition-all shadow-xs cursor-pointer"
+            title="Send Message"
+          >
+            <FiSend size={16} />
+          </button>
+        )}
       </form>
     </div>
   );
