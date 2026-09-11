@@ -559,6 +559,24 @@ const PendingSellers = () => {
                                                 </div>
                                             </div>
 
+                                            <div className="pt-6 border-t border-slate-200 space-y-4">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Referral</h4>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100">
+                                                        <span className="text-xs text-slate-500">Referred By</span>
+                                                        <span className="text-xs font-bold text-slate-700">
+                                                            {viewingSeller.referredBy
+                                                                ? `${viewingSeller.referredBy.name || 'Unknown'}${viewingSeller.referredBy.phone ? ` (${viewingSeller.referredBy.phone})` : ''}`
+                                                                : 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center bg-white p-2 rounded-lg border border-slate-100">
+                                                        <span className="text-xs text-slate-500">Referral Code</span>
+                                                        <span className="text-xs font-bold text-slate-700">{viewingSeller.referralCode || 'N/A'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <div className="pt-6 border-t border-slate-200">
                                                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Bank Details</h4>
                                                 <div className="space-y-2">

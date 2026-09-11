@@ -126,6 +126,7 @@ function mapOrderItemsForPersistence(hydratedItems = []) {
     quantity: item.quantity,
     price: item.price,
     variantSlot: String(item.variantSku || item.variantSlot || "").trim() || undefined,
+      variantName: String(item.variantName || "").trim() || undefined,
     image: item.image || "",
     weight: item.weight || "",
     packageLength: Number.isFinite(Number(item.packageLength))
@@ -785,3 +786,4 @@ export async function placeOrderAtomic({
 export default {
   placeOrderAtomic,
 };
+

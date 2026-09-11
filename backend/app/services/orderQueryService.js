@@ -327,6 +327,12 @@ export async function fetchAvailableOrdersForDelivery({
     assignedReturnPickups = assignedReturnPickupsRaw.map((rp) => ({
       ...rp,
       isReturnPickup: true,
+      distanceKm:
+        rp.distanceSnapshot?.distanceKmRounded ??
+        rp.distanceSnapshot?.distanceKmActual ??
+        rp.paymentBreakdown?.distanceKmRounded ??
+        rp.paymentBreakdown?.distanceKmActual ??
+        null,
     }));
 
     // Unassigned broadcasts (returnDeliveryBoy still null) — covers riders who
@@ -356,7 +362,16 @@ export async function fetchAvailableOrdersForDelivery({
             if (!loc || typeof loc.lat !== "number" || typeof loc.lng !== "number") return false;
             return distanceMeters(rlat, rlng, loc.lat, loc.lng) <= 5000;
           })
-          .map((order) => ({ ...order, isReturnPickup: true }));
+          .map((order) => ({
+            ...order,
+            isReturnPickup: true,
+            distanceKm:
+              order.distanceSnapshot?.distanceKmRounded ??
+              order.distanceSnapshot?.distanceKmActual ??
+              order.paymentBreakdown?.distanceKmRounded ??
+              order.paymentBreakdown?.distanceKmActual ??
+              null,
+          }));
 
         for (const order of nearbyBroadcasts) {
           if (!assignedReturnPickups.some((rp) => rp.orderId === order.orderId)) {

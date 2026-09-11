@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import BottomNav from './BottomNav';
+import NotificationPermissionBanner from '@/shared/components/NotificationPermissionBanner';
 import { sellerApi } from '@/modules/seller/services/sellerApi';
 import { useAuth } from "@core/context/AuthContext";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -514,6 +515,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
             />
             <div className={cn("transition-all duration-300", (role === "admin" || role === "seller" || role === "sub-admin") ? "pl-0 md:pl-72" : "pl-72")}>
                 <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
+                {role === 'seller' && <NotificationPermissionBanner role="seller" />}
                 <main className={cn("p-4 md:p-6 min-h-screen overflow-x-hidden", (role === "admin" || role === "seller" || role === "sub-admin") ? "pt-20 md:pt-6 pb-24 md:pb-6" : "pt-20")}>
                     <div className="w-full pb-12">
                         <SellerOrdersContext.Provider

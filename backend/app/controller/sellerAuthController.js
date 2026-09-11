@@ -360,6 +360,11 @@ export const signupSeller = async (req, res) => {
                 return handleResponse(res, 400, "Invalid referral code. Please check and try again.");
             }
 
+            // Persist the code that was actually used regardless of whether it
+            // qualifies for an onboarding reward below, so admin can still see
+            // which code brought this seller in.
+            sellerData.referralCodeUsed = normalizedReferralCode;
+
             if (referrerUser && referrerUser.currentPlan && referrerUser.planExpiry > new Date()) {
                 const Plan = (await import("../models/plan.js")).default;
                 const plan = await Plan.findById(referrerUser.currentPlan);

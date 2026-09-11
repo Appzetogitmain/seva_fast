@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
 import DeliveryChatbotWidget from "../components/DeliveryChatbotWidget";
+import NotificationPermissionBanner from "@/shared/components/NotificationPermissionBanner";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { BellRing, MapPin, Navigation } from "lucide-react";
@@ -817,6 +818,8 @@ const DeliveryLayout = () => {
           </AnimatePresence>,
           document.body,
         )}
+
+      <NotificationPermissionBanner role="delivery" />
 
       <main
         className={`h-full min-h-screen overflow-y-auto ${shouldShowBottomNav ? "pb-24" : ""} no-scrollbar`}>

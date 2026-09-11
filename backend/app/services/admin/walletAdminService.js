@@ -3,6 +3,7 @@ import Notification from "../../models/notification.js";
 import { getAdminFinanceSummary } from "../finance/walletService.js";
 import { getLedgerEntries } from "../finance/ledgerService.js";
 import { formatDate, formatTime } from "../../utils/formatDate.js";
+import { backfillMissingCodRiderEarningsGlobal } from "../orderSettlement.js";
 
 export async function getAdminWalletOverview({ page, limit }) {
   const stats = await getAdminFinanceSummary();
@@ -43,6 +44,16 @@ export async function getAdminWalletOverview({ page, limit }) {
 }
 
 export async function getDeliveryTransactionsData({ page, limit, skip }) {
+  // Self-heal any COD delivery earnings that never got recorded, only on the
+  // first page so this bounded sweep doesn't re-run on every page flip.
+  if (Number(page) <= 1) {
+    try {
+      await backfillMissingCodRiderEarningsGlobal();
+    } catch (backfillError) {
+      console.warn("[getDeliveryTransactionsData] COD earnings backfill failed:", backfillError.message);
+    }
+  }
+
   const query = { userModel: "Delivery" };
   const transactions = await Transaction.find(query)
     .populate("user", "name phone documents")

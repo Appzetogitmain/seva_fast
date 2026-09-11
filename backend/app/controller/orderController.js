@@ -783,6 +783,13 @@ export const requestReturn = async (req, res) => {
         returnRequestedAt: order.returnRequestedAt,
       },
     });
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: order.returnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
 
     return handleResponse(
       res,
@@ -1470,6 +1477,13 @@ export const approveReturnRequest = async (req, res) => {
         refundAmount,
       },
     });
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: order.returnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
 
     return handleResponse(res, 200, "Return request approved", order);
   } catch (error) {
@@ -1534,6 +1548,13 @@ export const rejectReturnRequest = async (req, res) => {
         reason: order.returnRejectedReason,
       },
     });
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: order.returnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
 
     return handleResponse(res, 200, "Return request rejected", order);
   } catch (error) {
@@ -1609,6 +1630,14 @@ export const updateReturnQcStatus = async (req, res) => {
       const updated = await completeReturnAndRefund(order);
       return handleResponse(res, 200, "QC passed and refund processed", updated);
     }
+
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: order.returnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
 
     // QC failed: allow seller payout release if on hold
     // Fraud guard — prevent double release
@@ -1719,6 +1748,31 @@ export const assignReturnDelivery = async (req, res) => {
     order.returnStatus = "return_pickup_assigned";
 
     await order.save();
+
+    // Return pickup is customer -> seller, i.e. the reverse leg of the original
+    // delivery — reuse the seller's real address and the order's stored distance
+    // snapshot instead of the "Customer Address"/"Seller Store" placeholders that
+    // were previously hardcoded and never replaced with real data.
+    const sellerDoc = await Seller.findById(order.seller).select(
+      "shopName address locality city",
+    );
+    const sellerAddressParts = [sellerDoc?.address, sellerDoc?.locality, sellerDoc?.city]
+      .filter((part) => typeof part === "string" && part.trim())
+      .join(", ");
+    const sellerLabel = sellerAddressParts
+      ? `${sellerDoc?.shopName || "Seller"} — ${sellerAddressParts}`
+      : sellerDoc?.shopName || "Seller Store";
+    const customerAddressLabel =
+      typeof order.address?.address === "string" && order.address.address.trim()
+        ? order.address.address.trim()
+        : "Customer Address";
+    const returnDistanceKm =
+      order.distanceSnapshot?.distanceKmRounded ??
+      order.distanceSnapshot?.distanceKmActual ??
+      order.paymentBreakdown?.distanceKmRounded ??
+      order.paymentBreakdown?.distanceKmActual ??
+      null;
+
     if (riderId) {
       emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_PICKUP_ASSIGNED, {
         orderId: order.orderId,
@@ -1732,8 +1786,9 @@ export const assignReturnDelivery = async (req, res) => {
           orderId: order.orderId,
           type: "RETURN_PICKUP",
           preview: {
-            pickup: "Customer Address",
-            drop: "Seller Store",
+            pickup: customerAddressLabel,
+            drop: sellerLabel,
+            distanceKm: returnDistanceKm,
             total: order.pricing?.total || 0,
           },
           deliverySearchExpiresAt: new Date(Date.now() + 60 * 1000).toISOString(),
@@ -1752,8 +1807,9 @@ export const assignReturnDelivery = async (req, res) => {
           image: item.image || item.thumbnail
         })),
         preview: {
-          pickup: order.address?.completeAddress || "Customer Address",
-          drop: order.sellerBranchArea || "Seller Store",
+          pickup: customerAddressLabel,
+          drop: sellerLabel,
+          distanceKm: returnDistanceKm,
           total: order.pricing?.total || 0,
           earnings: order.returnDeliveryCommission || 0,
         },
@@ -1770,6 +1826,14 @@ export const assignReturnDelivery = async (req, res) => {
         customerId: order.customer,
       });
     }
+
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: order.returnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
 
     return handleResponse(
       res,
@@ -1833,6 +1897,13 @@ export const submitReturnSelfCollection = async (req, res) => {
       customerId: order.customer,
       data: { message: "Seller collected the product directly. Admin QC pending." },
     });
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: order.returnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
 
     return handleResponse(res, 200, "Return marked as self-collected. Admin will review the product.", order);
   } catch (error) {
@@ -1885,6 +1956,13 @@ export const acceptReturnPickup = async (req, res) => {
         deliveryId: userId,
         data: { message: "A delivery partner has accepted your return pickup!" },
       });
+      emitOrderStatusUpdate(
+        order.orderId,
+        { returnStatus: order.returnStatus },
+        order.customer,
+        order.seller,
+        order._id,
+      );
     }
 
     return handleResponse(res, 200, "Return pickup accepted", order);
@@ -1944,6 +2022,13 @@ export const rejectReturnPickup = async (req, res) => {
       customerId: order.customer,
       data: { reason: "Delivery partner rejected the pickup request." },
     });
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: order.returnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
 
     return handleResponse(res, 200, "Pickup rejected successfully.");
   } catch (error) {
@@ -2112,6 +2197,13 @@ export const completeReturnAndRefund = async (order) => {
       isCOD: order.paymentMode === "COD"
     },
   });
+  emitOrderStatusUpdate(
+    order.orderId,
+    { returnStatus: order.returnStatus },
+    order.customer,
+    order.seller,
+    order._id,
+  );
   return order;
 };
 
@@ -2184,6 +2276,13 @@ export const updateReturnStatus = async (req, res) => {
         order.returnPickedAt = now;
       }
       await order.save();
+      emitOrderStatusUpdate(
+        order.orderId,
+        { returnStatus: order.returnStatus },
+        order.customer,
+        order.seller,
+        order._id,
+      );
       return handleResponse(res, 200, "Return status updated", order);
     }
 
@@ -2193,11 +2292,25 @@ export const updateReturnStatus = async (req, res) => {
         order.returnDeliveredBackAt = now;
       }
       await order.save();
+      emitOrderStatusUpdate(
+        order.orderId,
+        { returnStatus: order.returnStatus },
+        order.customer,
+        order.seller,
+        order._id,
+      );
       return handleResponse(res, 200, "Return received", order);
     }
 
     order.returnStatus = returnStatus;
     await order.save();
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: order.returnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
 
     return handleResponse(res, 200, "Return status updated", order);
   } catch (error) {

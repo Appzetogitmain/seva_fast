@@ -116,6 +116,14 @@ export function formatSellerApplication(seller) {
       ? Math.min(100, 55 + docs.length * 12 + (seller.address ? 10 : 0))
       : 40,
     missingInfo,
+    referredBy: seller.onboardedBy
+      ? {
+          id: String(seller.onboardedBy._id || seller.onboardedBy),
+          name: seller.onboardedBy.name || "",
+          phone: seller.onboardedBy.phone || "",
+        }
+      : null,
+    referralCode: seller.referralCodeUsed || "",
   };
 }
 

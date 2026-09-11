@@ -14,7 +14,7 @@ import { notifyPendingDemandsForRestock } from "../services/productDemandService
 ================================ */
 export const adjustStock = async (req, res) => {
     try {
-        const { productId, type, quantity, note } = req.body;
+        const { productId, type, quantity, note, variantSku } = req.body;
         const sellerId = req.user.id;
 
         const product = await Product.findOne({ _id: productId, sellerId });
@@ -22,15 +22,41 @@ export const adjustStock = async (req, res) => {
             return handleResponse(res, 404, "Product not found or unauthorized");
         }
 
-        const qtyChange = Number(quantity);
-        const previousStock = Number(product.stock || 0);
-        const finalStock = type === 'Restock' ? product.stock + qtyChange : product.stock - qtyChange;
+        const normalizedVariantSku = String(variantSku || "").trim();
+        let variant = null;
+        if (normalizedVariantSku) {
+            variant = (product.variants || []).find(
+                (v) => String(v?.sku || "").trim() === normalizedVariantSku,
+            );
+            if (!variant) {
+                return handleResponse(res, 404, "Variant not found for this product");
+            }
+        }
 
+        const qtyChange = Number(quantity);
+        const isRestock = type === 'Restock';
+        const previousStock = Number(product.stock || 0);
+        const previousVariantStock = variant ? Number(variant.stock || 0) : null;
+
+        const finalStock = isRestock ? previousStock + qtyChange : previousStock - qtyChange;
         if (finalStock < 0) {
             return handleResponse(res, 400, "Stock cannot be negative");
         }
 
-        // 1. Update Product Stock
+        let finalVariantStock = null;
+        if (variant) {
+            finalVariantStock = isRestock
+                ? previousVariantStock + qtyChange
+                : previousVariantStock - qtyChange;
+            if (finalVariantStock < 0) {
+                return handleResponse(res, 400, "Variant stock cannot be negative");
+            }
+            variant.stock = finalVariantStock;
+        }
+
+        // 1. Update Product Stock — the master `stock` total is kept in lockstep
+        // with each variant's own stock, mirroring how checkout decrements both
+        // together (see stockService.js reserveStockForItems).
         product.stock = finalStock;
         await product.save();
 
@@ -39,8 +65,10 @@ export const adjustStock = async (req, res) => {
             product: productId,
             seller: sellerId,
             type, // Restock, Correction
-            quantity: type === 'Restock' ? qtyChange : -qtyChange,
-            note: note || `Manual ${type} adjustment`
+            quantity: isRestock ? qtyChange : -qtyChange,
+            note:
+                note ||
+                `Manual ${type} adjustment${variant ? ` [variant: ${variant.name || normalizedVariantSku}]` : ""}`,
         });
 
         await historyEntry.save();
@@ -58,6 +86,9 @@ export const adjustStock = async (req, res) => {
                 product,
                 previousStock,
                 currentStock: finalStock,
+                variantSku: normalizedVariantSku,
+                previousVariantStock,
+                currentVariantStock: finalVariantStock,
             });
             if (lowStockAlert) {
                 emitNotificationEvent(NOTIFICATION_EVENTS.LOW_STOCK_ALERT, lowStockAlert);
@@ -66,6 +97,7 @@ export const adjustStock = async (req, res) => {
 
         return handleResponse(res, 200, "Stock adjusted successfully", {
             newStock: product.stock,
+            newVariantStock: finalVariantStock,
             historyEntry
         });
 

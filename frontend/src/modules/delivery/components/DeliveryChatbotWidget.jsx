@@ -33,6 +33,10 @@ export default function DeliveryChatbotWidget() {
     voiceModeRef.current = voiceMode;
   }, [voiceMode]);
 
+  // Guards async speech callbacks (an AI reply/speak() call that resolves after the
+  // widget was closed) so voice never starts or continues once the chat is closed.
+  const isOpenRef = useRef(isOpen);
+
   useEffect(() => {
     const handleOpenChatbot = () => {
       setIsOpen(true);
@@ -107,6 +111,7 @@ export default function DeliveryChatbotWidget() {
 
   // Automatically halt speech and speech recognition whenever chat modal is closed or unmounted
   useEffect(() => {
+    isOpenRef.current = isOpen;
     if (!isOpen) {
       stopSpeaking();
       if (isListening && recognitionRef.current) {
@@ -200,6 +205,7 @@ export default function DeliveryChatbotWidget() {
 
     const formattedText = formatAiText(fullReplyText);
     const cleanSpeech = formattedText.replace(/[*#_~`>•-]/g, '').trim();
+    const words = formattedText.split(" ");
 
     // Start with empty placeholder for model reply
     const modelMessageId = Date.now();
@@ -208,8 +214,45 @@ export default function DeliveryChatbotWidget() {
       { id: modelMessageId, role: "model", content: "", isStreaming: true }
     ]);
 
+    const revealUpTo = (count) => {
+      const clamped = Math.max(0, Math.min(words.length, count));
+      const currentStreamText = words.slice(0, clamped).join(" ");
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === modelMessageId
+            ? { ...msg, content: clamped >= words.length ? formattedText : currentStreamText, isStreaming: clamped < words.length }
+            : msg
+        )
+      );
+    };
+
+    let currentWordIdx = 0;
+    const startWordStreaming = (msPerWord = 35) => {
+      if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
+      streamIntervalRef.current = setInterval(() => {
+        if (!isOpenRef.current) {
+          clearInterval(streamIntervalRef.current);
+          streamIntervalRef.current = null;
+          return;
+        }
+        currentWordIdx += 1;
+        revealUpTo(currentWordIdx);
+        if (currentWordIdx >= words.length) {
+          clearInterval(streamIntervalRef.current);
+          streamIntervalRef.current = null;
+          if (!shouldSpeak) setIsSpeaking(false);
+        }
+      }, msPerWord);
+    };
+
     // If speech is requested and browser supports SpeechSynthesis
     if (shouldSpeak && typeof window !== 'undefined' && 'speechSynthesis' in window && cleanSpeech) {
+      // Never start/continue audio once the widget has been closed — an AI reply
+      // can resolve asynchronously after the user has already exited the chat.
+      if (!isOpenRef.current) {
+        startWordStreaming(25);
+        return;
+      }
       try {
         const utterance = new SpeechSynthesisUtterance(cleanSpeech);
         const { voice: chosenVoice, lang: chosenLang } = getBestVoiceForText(cleanSpeech);
@@ -223,70 +266,62 @@ export default function DeliveryChatbotWidget() {
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
 
+        let boundaryFired = false;
+        let boundaryWordIdx = 0;
+
+        utterance.onboundary = (event) => {
+          if (!isOpenRef.current) return;
+          if (event.name && event.name !== 'word') return;
+          boundaryFired = true;
+          if (streamIntervalRef.current) {
+            clearInterval(streamIntervalRef.current);
+            streamIntervalRef.current = null;
+          }
+          boundaryWordIdx++;
+          revealUpTo(boundaryWordIdx);
+        };
+
         utterance.onstart = () => {
+          if (!isOpenRef.current) {
+            stopSpeaking();
+            return;
+          }
           setIsSpeaking(true);
+          // Fallback pacing for voices that never fire onboundary.
+          setTimeout(() => {
+            if (!boundaryFired && isOpenRef.current) {
+              const estSec = words.length / 2.3;
+              const intervalMs = Math.max(20, Math.min(180, (estSec * 1000) / (words.length || 1)));
+              startWordStreaming(intervalMs);
+            }
+          }, 400);
         };
 
         utterance.onend = () => {
           setIsSpeaking(false);
-          // Ensure full text is committed on end
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === modelMessageId
-                ? { ...msg, content: formattedText, isStreaming: false }
-                : msg
-            )
-          );
+          revealUpTo(words.length);
         };
 
         utterance.onerror = () => {
           setIsSpeaking(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === modelMessageId
-                ? { ...msg, content: formattedText, isStreaming: false }
-                : msg
-            )
-          );
+          revealUpTo(words.length);
         };
 
         activeUtteranceRef.current = utterance;
         window.speechSynthesis.speak(utterance);
       } catch (err) {
         console.error("Speech synthesis error:", err);
+        startWordStreaming(35);
       }
+    } else {
+      startWordStreaming(25);
     }
-
-    // Progressive real-time typewriter word stream
-    const words = formattedText.split(" ");
-    let currentWordIdx = 0;
-    const streamSpeed = shouldSpeak ? 65 : 25; // Synced with speech rate if speaking
-
-    streamIntervalRef.current = setInterval(() => {
-      currentWordIdx += 1;
-      const currentStreamText = words.slice(0, currentWordIdx).join(" ");
-
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === modelMessageId
-            ? { ...msg, content: currentStreamText, isStreaming: currentWordIdx < words.length }
-            : msg
-        )
-      );
-
-      if (currentWordIdx >= words.length) {
-        clearInterval(streamIntervalRef.current);
-        streamIntervalRef.current = null;
-        if (!shouldSpeak) {
-          setIsSpeaking(false);
-        }
-      }
-    }, streamSpeed);
   };
 
   // Voice speech synthesis helper for individual manual clicks
   const speakText = (text) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (!isOpenRef.current) return;
     stopSpeaking();
 
     try {
@@ -305,10 +340,17 @@ export default function DeliveryChatbotWidget() {
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
 
-      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onstart = () => {
+        if (!isOpenRef.current) {
+          stopSpeaking();
+          return;
+        }
+        setIsSpeaking(true);
+      };
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
 
+      activeUtteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.error("Speech synthesis error:", err);
