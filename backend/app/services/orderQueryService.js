@@ -72,8 +72,16 @@ export function buildSellerOrdersQuery({
       : userId;
     base = { seller: sellerOid };
   }
+  // Hide unpaid online orders (paymentMode ONLINE with workflowStatus CREATED) from seller view
+  const hideUnpaidOnline = {
+    $nor: [
+      { paymentMode: "ONLINE", workflowStatus: WORKFLOW_STATUS.CREATED },
+      { paymentMode: "ONLINE", status: "pending", workflowStatus: { $exists: false } },
+    ],
+  };
   const withStatus = {
     ...base,
+    ...hideUnpaidOnline,
     ...normalizeSellerStatusFilter(statusParam),
   };
   return appendDateRange(withStatus, { startDate, endDate });

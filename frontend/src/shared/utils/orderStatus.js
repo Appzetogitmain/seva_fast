@@ -53,21 +53,35 @@ function legacyFromWorkflow(workflowStatus) {
  */
 export function getLegacyStatusFromOrder(order) {
   if (!order) return "pending";
-  const v = Number(order.workflowVersion) || 0;
-  if (v >= 2 && order.workflowStatus) {
-    const workflowStatus = String(order.workflowStatus).toUpperCase();
 
+  const legacyStatus = String(order.status ?? "pending").toLowerCase();
+  const workflowStatus = order.workflowStatus ? String(order.workflowStatus).toUpperCase() : "";
+
+  // Terminal states (delivered / cancelled) ALWAYS take priority over all heuristics or workflow states
+  if (
+    legacyStatus === "delivered" ||
+    workflowStatus === WORKFLOW_STATUS.DELIVERED ||
+    Boolean(order.deliveredAt)
+  ) {
+    return "delivered";
+  }
+
+  if (
+    legacyStatus === "cancelled" ||
+    legacyStatus === "canceled" ||
+    workflowStatus === WORKFLOW_STATUS.CANCELLED
+  ) {
+    return "cancelled";
+  }
+
+  const v = Number(order.workflowVersion) || 0;
+  if (v >= 2 && workflowStatus) {
     if (workflowStatus === WORKFLOW_STATUS.OUT_FOR_DELIVERY) {
       return "out_for_delivery";
     }
-    if (workflowStatus === WORKFLOW_STATUS.DELIVERED) {
-      return "delivered";
-    }
     if (workflowStatus === WORKFLOW_STATUS.DELIVERY_ASSIGNED) {
-      // Rider may be assigned at packed stage; keep the later legacy status if present.
-      const legacy = String(order.status ?? "").toLowerCase();
-      if (legacy === "packed" || legacy === "out_for_delivery" || legacy === "delivered") {
-        return legacy;
+      if (legacyStatus === "packed" || legacyStatus === "out_for_delivery") {
+        return legacyStatus;
       }
       return "confirmed";
     }
@@ -79,11 +93,6 @@ export function getLegacyStatusFromOrder(order) {
   }
 
   const riderStep = Number(order.deliveryRiderStep) || 0;
-  const legacyStatus = String(order.status ?? "pending").toLowerCase();
-  // Cancelled/delivered always win over rider-assignment heuristics.
-  if (legacyStatus === "cancelled" || legacyStatus === "delivered") {
-    return legacyStatus;
-  }
   if (riderStep >= 3 || order.outForDeliveryAt || order.pickupConfirmedAt) {
     return "out_for_delivery";
   }

@@ -114,6 +114,25 @@ const AppZetoBridge = {
         }
       }, 15000); // Higher timeout for GPS
     });
+  },
+
+  /**
+   * Tell Flutter native layer to start playing the order alert sound in a loop.
+   * This works even when the WebView is in the background.
+   */
+  playOrderAlert: () => {
+    if (window.Flutter) {
+      window.Flutter.postMessage("play_order_alert");
+    }
+  },
+
+  /**
+   * Tell Flutter native layer to stop the order alert sound loop.
+   */
+  stopOrderAlert: () => {
+    if (window.Flutter) {
+      window.Flutter.postMessage("stop_order_alert");
+    }
   }
 };
 

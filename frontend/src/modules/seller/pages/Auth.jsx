@@ -125,6 +125,14 @@ const Auth = () => {
   const appName = settings?.appName || "App";
   const logoUrl = settings?.logoUrl || "";
   const isProcessing = useRef(false);
+  const formPanelRef = useRef(null);
+
+  useEffect(() => {
+    if (formPanelRef.current) {
+      formPanelRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [signupStep, isLogin]);
 
   const isSwitchingAccount = searchParams.get("switch") === "true" || searchParams.get("logout") === "true";
   const [checkingExistingSession, setCheckingExistingSession] = useState(
@@ -1124,7 +1132,7 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen items-center justify-center gap-4 bg-[#fcfaff] p-4 sm:p-6 font-['Outfit'] overflow-x-hidden overflow-y-auto relative">
+    <div className="flex flex-col min-h-screen min-h-dvh items-center justify-start md:justify-center gap-4 bg-[#fcfaff] p-3 sm:p-6 py-6 md:py-10 font-['Outfit'] overflow-x-hidden overflow-y-auto relative">
       {/* Elegant Ambient Background */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] bg-slate-100/50 rounded-full blur-[120px]" />
@@ -1134,9 +1142,9 @@ const Auth = () => {
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative z-10 w-full max-w-[1000px] min-h-0 sm:min-h-[600px] max-h-none sm:max-h-[90vh] bg-white rounded-lg shadow-[0_50px_120px_rgba(0,0,0,0.04)] border border-white flex flex-col md:flex-row overflow-hidden my-auto">
+        className="relative z-10 w-full max-w-[1000px] min-h-0 md:h-[760px] md:max-h-[90vh] bg-white rounded-2xl shadow-[0_50px_120px_rgba(0,0,0,0.06)] border border-slate-100 flex flex-col md:flex-row overflow-hidden my-auto">
         {/* Visual Side Panel */}
-        <div className="hidden md:flex w-[45%] bg-linear-to-br from-slate-900 via-slate-950 to-black relative flex-col items-center justify-center p-10 overflow-hidden">
+        <div className="hidden md:flex w-[45%] h-full bg-linear-to-br from-slate-900 via-slate-950 to-black relative flex-col items-center justify-center p-10 overflow-hidden shrink-0">
           {/* Brand Logo */}
           <div className="absolute top-6 left-6 z-20 inline-flex items-center gap-2.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2">
             {logoUrl ? (
@@ -1196,6 +1204,8 @@ const Auth = () => {
 
         {/* Form Content Side */}
         <div
+          ref={formPanelRef}
+          className="w-full md:w-[55%] flex-1 min-h-0 p-6 pt-8 sm:p-8 sm:pt-8 md:p-12 md:pt-10 flex flex-col justify-start bg-white md:overflow-y-auto md:overscroll-contain md:touch-pan-y md:custom-scrollbar relative"
           className="w-full md:w-[55%] min-h-0 p-6 pt-8 sm:p-8 sm:pt-8 md:p-12 md:pt-10 flex flex-col justify-start bg-white overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar relative"
           style={{ WebkitOverflowScrolling: "touch" }}>
           <div className="hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 z-20">
@@ -1218,7 +1228,7 @@ const Auth = () => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-              className="space-y-6 sm:space-y-8 py-2 md:py-4 my-auto">
+              className={`space-y-6 sm:space-y-8 py-2 md:py-4 w-full ${isLogin ? "my-auto" : "my-0"}`}>
               <div className="flex md:hidden items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2.5">
                   {!isLogin && (

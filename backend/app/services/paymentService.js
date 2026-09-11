@@ -955,3 +955,107 @@ export async function verifyClientPaymentCallback(data) {
     correlationId: data.correlationId,
   });
 }
+
+export async function cancelOnlinePaymentAttempt({ orderRef, userId, reason = "Payment cancelled by user" }) {
+  const target = await resolvePaymentTarget(orderRef);
+  if (!target?.orders?.length) {
+    const err = new Error("Order not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const primaryOrder = target.primaryOrder;
+  if (userId && String(primaryOrder.customer) !== String(userId)) {
+    const err = new Error("Not authorized to cancel this payment");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+
+    let walletToRefund = 0;
+    for (const order of target.orders) {
+      const orderForUpdate = await Order.findById(order._id, null, { session });
+      if (
+        orderForUpdate &&
+        orderForUpdate.paymentMode === "ONLINE" &&
+        orderForUpdate.paymentStatus !== ORDER_PAYMENT_STATUS.PAID &&
+        orderForUpdate.status !== "cancelled"
+      ) {
+        await releaseReservedStockForOrder(orderForUpdate, {
+          session,
+          reason: reason || "Online payment cancelled",
+        });
+
+        const orderWalletUsed = Number(orderForUpdate.pricing?.walletAmount || 0);
+        if (orderWalletUsed > 0) {
+          walletToRefund += orderWalletUsed;
+        }
+
+        orderForUpdate.status = "cancelled";
+        orderForUpdate.orderStatus = "cancelled";
+        orderForUpdate.workflowStatus = WORKFLOW_STATUS.CANCELLED;
+        orderForUpdate.cancelledBy = "customer_cancelled_payment";
+        orderForUpdate.cancelReason = reason || "Online payment cancelled";
+        orderForUpdate.paymentStatus = ORDER_PAYMENT_STATUS.FAILED;
+        await orderForUpdate.save({ session });
+      }
+    }
+
+    // Refund wallet balance if any was deducted at order placement
+    if (walletToRefund > 0 && primaryOrder.customer) {
+      const UserDoc = (await import("../models/customer.js")).default;
+      const TransactionDoc = (await import("../models/transaction.js")).default;
+      const user = await UserDoc.findById(primaryOrder.customer).session(session);
+      if (user) {
+        user.walletBalance = Math.round(((user.walletBalance || 0) + walletToRefund) * 100) / 100;
+        await user.save({ session });
+
+        const refKey = target.checkoutGroupId || primaryOrder.orderId;
+        await TransactionDoc.create(
+          [
+            {
+              user: user._id,
+              userModel: "User",
+              type: "Wallet Refund",
+              amount: Math.round(walletToRefund * 100) / 100,
+              status: "Settled",
+              reference: `WLT-REFUND-${refKey}`,
+              meta: { orderRef: refKey, reason },
+            },
+          ],
+          { session },
+        );
+      }
+    }
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+
+  if (target.checkoutGroupId) {
+    await updateCheckoutGroupPaymentStatus(target.checkoutGroupId, PAYMENT_STATUS.CANCELLED);
+  }
+
+  const paymentScopeQuery = target.checkoutGroupId
+    ? { checkoutGroupId: target.checkoutGroupId }
+    : { order: primaryOrder._id };
+  await Payment.updateMany(
+    { ...paymentScopeQuery, status: { $ne: PAYMENT_STATUS.CAPTURED } },
+    {
+      $set: {
+        status: PAYMENT_STATUS.CANCELLED,
+        failureReason: reason,
+        failedAt: new Date(),
+      },
+    },
+  );
+
+  return { success: true, message: "Online payment cancelled and order released" };
+}

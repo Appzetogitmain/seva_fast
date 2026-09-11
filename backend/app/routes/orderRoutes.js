@@ -34,6 +34,7 @@ import {
   previewCheckoutFinance,
   reconcileCodCashSubmission,
   verifyOnlineOrderPayment,
+  cancelOnlineOrderPayment,
 } from "../controller/orderFinanceController.js";
 import {
   confirmPickup,
@@ -82,6 +83,12 @@ router.post(
   verifyToken,
   allowRoles("customer", "user", "admin"),
   verifyOnlineOrderPayment,
+);
+router.post(
+  "/:id/payment/cancel-online",
+  verifyToken,
+  allowRoles("customer", "user", "admin"),
+  cancelOnlineOrderPayment,
 );
 router.post(
   "/:id/cod/mark-collected",

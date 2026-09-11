@@ -5,6 +5,7 @@ import { ShoppingBag, BellRing, ArrowRight, X, Volume2, VolumeX, MapPin, CreditC
 import { useAuth } from "@core/context/AuthContext";
 import { getOrderSocket, onSellerOrderNew } from "@core/services/orderSocket";
 import { notificationSound } from "@core/utils/notificationSound";
+import AppZetoBridge from "@/lib/appZetoBridge";
 
 export default function SellerOrderAlertModal() {
   const { user, token } = useAuth();
@@ -22,21 +23,25 @@ export default function SellerOrderAlertModal() {
       setNewOrder(orderInfo);
       setIsMuted(false);
       notificationSound.startRepeatingOrderAlert();
+      AppZetoBridge.playOrderAlert();
     });
 
     return () => {
       cleanupListener();
       notificationSound.stopRepeatingAlert();
+      AppZetoBridge.stopOrderAlert();
     };
   }, [user, token]);
 
   const handleDismiss = () => {
     notificationSound.stopRepeatingAlert();
+    AppZetoBridge.stopOrderAlert();
     setNewOrder(null);
   };
 
   const handleViewOrders = () => {
     notificationSound.stopRepeatingAlert();
+    AppZetoBridge.stopOrderAlert();
     setNewOrder(null);
     navigate("/seller/orders");
   };
@@ -44,9 +49,11 @@ export default function SellerOrderAlertModal() {
   const toggleMute = () => {
     if (isMuted) {
       notificationSound.startRepeatingOrderAlert();
+      AppZetoBridge.playOrderAlert();
       setIsMuted(false);
     } else {
       notificationSound.stopRepeatingAlert();
+      AppZetoBridge.stopOrderAlert();
       setIsMuted(true);
     }
   };

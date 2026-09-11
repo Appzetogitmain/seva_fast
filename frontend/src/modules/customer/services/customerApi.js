@@ -74,6 +74,8 @@ export const customerApi = {
   },
   verifyOnlineOrderPayment: (orderId, data) =>
     axiosInstance.post(`/orders/${orderId}/payment/verify-online`, data),
+  cancelOnlineOrderPayment: (orderId, data) =>
+    axiosInstance.post(`/orders/${orderId}/payment/cancel-online`, data || {}),
   markOrderDelivered: (orderId, data) =>
     axiosInstance.post(`/orders/${orderId}/delivered`, data || {}),
   markOrderCodCollected: (orderId, data) =>

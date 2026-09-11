@@ -43,7 +43,7 @@ export default function ChatbotWidget() {
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
   const navigate = useNavigate();
-  const { addToCart, removeFromCart, batchAddToCart, cartCount } = useCart();
+  const { addToCart, removeFromCart, updateQuantity, batchAddToCart, cartCount } = useCart();
   const { currentLocation } = useAppLocation();
 
   const voiceModeRef = useRef(voiceMode);
@@ -273,52 +273,56 @@ export default function ChatbotWidget() {
       },
     ]);
 
+    let wordIdx = 0;
     let speechStarted = false;
 
-    const startWordStreaming = (msPerWord = 310) => {
-      if (streamIntervalRef.current) {
-        clearInterval(streamIntervalRef.current);
-      }
+    const startWordStreaming = (msPerWord = 35) => {
+      if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
 
-      let currentWordIdx = 0;
       streamIntervalRef.current = setInterval(() => {
-        currentWordIdx += 1;
-        const currentStreamText = words.slice(0, currentWordIdx).join(" ");
+        if (!isOpenRef.current) {
+          clearInterval(streamIntervalRef.current);
+          streamIntervalRef.current = null;
+          return;
+        }
+
+        wordIdx++;
+        const currentText = words.slice(0, wordIdx).join(" ");
 
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === modelMessageId
               ? {
                   ...msg,
-                  parts: [{ text: currentStreamText }],
-                  isStreaming: currentWordIdx < words.length,
+                  parts: [{ text: currentText }],
+                  isStreaming: wordIdx < words.length,
                 }
               : msg
           )
         );
 
-        if (currentWordIdx >= words.length) {
+        if (wordIdx >= words.length) {
           clearInterval(streamIntervalRef.current);
           streamIntervalRef.current = null;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === modelMessageId
+                ? { ...msg, parts: [{ text: formattedText }], isStreaming: false }
+                : msg
+            )
+          );
         }
       }, msPerWord);
     };
 
-    if (
-      shouldSpeak &&
-      typeof window !== "undefined" &&
-      "speechSynthesis" in window &&
-      cleanSpeech
-    ) {
+    if (shouldSpeak && cleanSpeech && typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
         const utterance = new SpeechSynthesisUtterance(cleanSpeech);
-        const { voice: chosenVoice, lang: chosenLang } =
-          getBestVoiceForText(cleanSpeech);
+        const { voice: chosenVoice, lang: chosenLang } = getBestVoiceForText(cleanSpeech);
 
         if (chosenVoice) utterance.voice = chosenVoice;
         utterance.lang = chosenLang || "en-IN";
-        // Calm, relaxed, human-like pacing (Gemini style)
-        utterance.rate = 0.90;
+        utterance.rate = 0.92;
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
 
@@ -329,30 +333,17 @@ export default function ChatbotWidget() {
           }
           speechStarted = true;
           setIsSpeaking(true);
-          // Start word streaming strictly when voice actually begins
-          startWordStreaming(310);
-        };
 
-        utterance.onboundary = (event) => {
-          if (!isOpenRef.current) return;
-          if (event.name === "word" && typeof event.charIndex === "number") {
-            const charIdx = event.charIndex;
-            const upToChar = formattedText.slice(0, charIdx + (event.charLength || 6));
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === modelMessageId
-                  ? { ...msg, parts: [{ text: upToChar }], isStreaming: true }
-                  : msg
-              )
-            );
-          }
+          const totalSpeechDurationEstimateSec = (words.length / 2.3);
+          const intervalMs = Math.max(
+            20,
+            Math.min(180, (totalSpeechDurationEstimateSec * 1000) / (words.length || 1))
+          );
+
+          startWordStreaming(intervalMs);
         };
 
         utterance.onend = () => {
-          if (!isOpenRef.current) {
-            stopSpeaking();
-            return;
-          }
           if (streamIntervalRef.current) {
             clearInterval(streamIntervalRef.current);
             streamIntervalRef.current = null;
@@ -366,7 +357,6 @@ export default function ChatbotWidget() {
             )
           );
 
-          // In voice talk mode, automatically and smoothly re-open mic after speaking (only if modal is open)
           if (voiceModeRef.current && isOpenRef.current) {
             voiceTimeoutRef.current = setTimeout(() => {
               if (voiceModeRef.current && isOpenRef.current && !isListening) {
@@ -394,10 +384,9 @@ export default function ChatbotWidget() {
         activeUtteranceRef.current = utterance;
         window.speechSynthesis.speak(utterance);
 
-        // Fallback: If utterance doesn't fire onstart within 800ms (browser speech engine lag), start streaming
         setTimeout(() => {
           if (!speechStarted && !streamIntervalRef.current && isOpenRef.current) {
-            startWordStreaming(40);
+            startWordStreaming(35);
           }
         }, 800);
       } catch (err) {
@@ -405,7 +394,6 @@ export default function ChatbotWidget() {
         startWordStreaming(35);
       }
     } else {
-      // Silent text mode: clean fast typewriter effect
       startWordStreaming(25);
     }
   };
@@ -483,43 +471,61 @@ export default function ChatbotWidget() {
     }
   };
 
+  const toggleVoiceMode = () => {
+    const nextVoiceMode = !voiceMode;
+    setVoiceMode(nextVoiceMode);
+
+    if (nextVoiceMode) {
+      startVoiceInput();
+    } else {
+      stopSpeaking();
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop?.();
+        } catch (_) {}
+      }
+      setIsListening(false);
+    }
+  };
+
   const startVoiceInput = () => {
-    stopSpeaking();
+    if (typeof window === "undefined") return;
 
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
+
     if (!SpeechRecognition) {
       alert(
-        "Voice input is supported in Google Chrome & Edge. Please allow microphone permissions."
+        "Voice input is not supported in this browser. Please use Google Chrome or Microsoft Edge."
       );
       return;
     }
 
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
+    stopSpeaking();
 
     try {
-      setVoiceMode(true);
       const recognition = new SpeechRecognition();
-      let finalTranscript = "";
-      recognition.lang = speechLang;
-      recognition.interimResults = true;
       recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = speechLang;
 
-      recognition.onstart = () => setIsListening(true);
+      let finalTranscript = "";
 
-      recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map((result) => result[0].transcript)
-          .join("");
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
 
-        if (transcript) {
-          finalTranscript = transcript;
-          setInput(transcript);
+      recognition.onresult = (e) => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const text = e.results[i][0].transcript;
+          if (e.results[i].isFinal) {
+            finalTranscript += text;
+          } else {
+            interim += text;
+          }
         }
+        setInput(finalTranscript || interim);
       };
 
       recognition.onerror = (e) => {
@@ -634,7 +640,15 @@ export default function ChatbotWidget() {
       if (action === "ADD_TO_CART" && actionPayload) {
         await addToCart(actionPayload, { skipConfirm: true });
       } else if (action === "REMOVE_FROM_CART" && actionPayload) {
-        removeFromCart(actionPayload.productId, actionPayload.variantSku);
+        if (actionPayload.quantity && Number(actionPayload.quantity) > 0) {
+          await updateQuantity(
+            actionPayload.productId,
+            -Number(actionPayload.quantity),
+            actionPayload.variantSku
+          );
+        } else {
+          await removeFromCart(actionPayload.productId, actionPayload.variantSku);
+        }
       }
 
       if (reply) {

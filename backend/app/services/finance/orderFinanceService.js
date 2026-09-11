@@ -340,7 +340,7 @@ export async function releaseExpiredHeldSellerPayouts({ sellerId = null } = {}) 
 }
 
 export async function createPendingRiderPayout(order, { session, actorId } = {}) {
-  if (!order?.deliveryBoy) {
+  if (!order?.deliveryBoy || order?.deliveryMode === 'self') {
     order.settlementStatus = {
       ...(order.settlementStatus || {}),
       riderPayout: "NOT_APPLICABLE",

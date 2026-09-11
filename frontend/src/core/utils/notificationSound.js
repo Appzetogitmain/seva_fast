@@ -1,11 +1,29 @@
 /**
- * Web Audio API Notification Sound Player
+ * Web Audio API + HTML Audio Notification Sound Player
  * Creates multi-frequency chime beeps reliably without needing external audio files.
+ * Falls back to HTML Audio element for background/suspended AudioContext scenarios.
  */
+
+/** Order-related FCM event types that should trigger the loud alert */
+export const ORDER_ALERT_EVENTS = new Set([
+  "NEW_ORDER",
+  "NEW_DELIVERY_BROADCAST",
+  "NEW_RETURN_BROADCAST",
+  "DELIVERY_ASSIGNED",
+  "ORDER_READY",
+  "SELLER_TIMEOUT_ALERT",
+  "NO_RIDER_ALERT",
+]);
+
+export function isOrderAlertEvent(eventType) {
+  return ORDER_ALERT_EVENTS.has(String(eventType || "").toUpperCase());
+}
+
 class NotificationSound {
   constructor() {
     this.audioCtx = null;
     this.loopInterval = null;
+    this.audioElement = null;
   }
 
   init() {
@@ -20,10 +38,36 @@ class NotificationSound {
     }
   }
 
-  playOrderAlertSound() {
+  /**
+   * Try to play the WAV file from /order_alert.wav using an HTML Audio element.
+   * This works even when AudioContext is suspended (e.g. tab not focused).
+   * Returns true if playback started, false otherwise.
+   */
+  _playAudioFile() {
+    try {
+      if (!this.audioElement) {
+        this.audioElement = new Audio("/order_alert.wav");
+        this.audioElement.volume = 1.0;
+      }
+      // Reset to beginning if already playing
+      this.audioElement.currentTime = 0;
+      const playPromise = this.audioElement.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {
+          // Audio file playback failed (autoplay policy), fall through to WebAudio
+        });
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  _playWebAudioChime() {
     try {
       this.init();
-      if (!this.audioCtx) return;
+      if (!this.audioCtx) return false;
+      if (this.audioCtx.state === "suspended") return false;
 
       const now = this.audioCtx.currentTime;
 
@@ -62,8 +106,19 @@ class NotificationSound {
       gain3.connect(this.audioCtx.destination);
       osc3.start(now + 0.32);
       osc3.stop(now + 0.7);
+
+      return true;
     } catch (e) {
-      console.warn("[notificationSound] Audio playback failed:", e);
+      console.warn("[notificationSound] WebAudio playback failed:", e);
+      return false;
+    }
+  }
+
+  playOrderAlertSound() {
+    // Try HTML Audio first (works in more background scenarios), then WebAudio
+    const audioPlayed = this._playAudioFile();
+    if (!audioPlayed) {
+      this._playWebAudioChime();
     }
   }
 
@@ -79,6 +134,15 @@ class NotificationSound {
     if (this.loopInterval) {
       clearInterval(this.loopInterval);
       this.loopInterval = null;
+    }
+    // Stop audio element if playing
+    if (this.audioElement) {
+      try {
+        this.audioElement.pause();
+        this.audioElement.currentTime = 0;
+      } catch {
+        // ignore
+      }
     }
   }
 }

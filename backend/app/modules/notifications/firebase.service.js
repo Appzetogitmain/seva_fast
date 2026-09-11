@@ -103,6 +103,14 @@ export async function sendFCM(tokens = [], payload = {}, options = {}) {
     responses: [],
   };
 
+  const orderAlert = options.orderAlert === true;
+  const androidChannelId = orderAlert ? "order_alert_channel" : "high_importance_channel";
+  const androidSound = soundEnabled ? (orderAlert ? "order_alert" : "default") : undefined;
+  const apnsSound = soundEnabled ? (orderAlert ? "order_alert.wav" : "default") : undefined;
+  const webVibrate = vibrationEnabled
+    ? (orderAlert ? [300, 200, 300, 200, 300, 200, 300] : [200, 100, 200])
+    : [0];
+
   for (const chunk of chunks) {
     const result = await messaging.sendEachForMulticast({
       tokens: chunk,
@@ -115,9 +123,9 @@ export async function sendFCM(tokens = [], payload = {}, options = {}) {
       android: {
         priority: "high",
         notification: {
-          channelId: "high_importance_channel",
-          sound: soundEnabled ? "default" : undefined,
-          defaultSound: soundEnabled,
+          channelId: androidChannelId,
+          sound: androidSound,
+          defaultSound: soundEnabled && !orderAlert,
           defaultVibrateTimings: vibrationEnabled,
           priority: "high",
           visibility: "public",
@@ -128,7 +136,8 @@ export async function sendFCM(tokens = [], payload = {}, options = {}) {
         payload: {
           aps: {
             "content-available": 1,
-            sound: soundEnabled ? "default" : undefined,
+            sound: apnsSound,
+            ...(orderAlert ? { "interruption-level": "time-sensitive" } : {}),
           },
         },
       },
@@ -146,12 +155,13 @@ export async function sendFCM(tokens = [], payload = {}, options = {}) {
           requireInteraction: true,
           renotify: true,
           silent: !soundEnabled,
-          vibrate: vibrationEnabled ? [200, 100, 200] : [0],
+          vibrate: webVibrate,
           ...(image ? { image } : {}),
           data: {
             link: link || absoluteLink || "/",
             orderId: data.orderId || "",
             eventType: data.eventType || "",
+            orderAlert: orderAlert ? "true" : "false",
           },
         },
         // Only set absolute fcmOptions when FRONTEND_URL is configured (avoid localhost).

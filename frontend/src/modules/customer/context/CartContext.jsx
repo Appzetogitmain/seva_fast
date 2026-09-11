@@ -132,6 +132,7 @@ export const CartProvider = ({ children }) => {
     const variantSku = String(product?.variantSku || product?.variantName || "").trim();
     const id = product.id || product._id;
     const key = `${id}::${variantSku || ""}`;
+    const deltaQty = Math.max(1, Number(product?.quantity) || 1);
 
     const existingItem = cart.find(
       (item) => `${item.id || item._id}::${String(item.variantSku || "").trim()}` === key,
@@ -145,7 +146,7 @@ export const CartProvider = ({ children }) => {
       return false;
     }
 
-    if (currentQty + 1 > maxStock) {
+    if (currentQty + deltaQty > maxStock) {
       toast.error(`Cannot add more than available stock (${maxStock} in stock)`);
       return false;
     }
@@ -157,7 +158,7 @@ export const CartProvider = ({ children }) => {
       if (existingItem) {
         return prev.map((item) =>
           `${item.id || item._id}::${String(item.variantSku || "").trim()}` === key
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + deltaQty }
             : item,
         );
       }
@@ -171,7 +172,7 @@ export const CartProvider = ({ children }) => {
           variantName,
           price,
           salePrice,
-          quantity: 1,
+          quantity: deltaQty,
           image: product.image || product.mainImage,
         },
       ];
@@ -185,7 +186,7 @@ export const CartProvider = ({ children }) => {
           response = await customerApi.addToCart({
             productId: id,
             variantSku,
-            quantity: 1,
+            quantity: deltaQty,
           });
         } catch (apiErr) {
           const errMsg = String(apiErr?.response?.data?.message || apiErr?.message || "");
@@ -195,7 +196,7 @@ export const CartProvider = ({ children }) => {
               response = await customerApi.addToCart({
                 productId: id,
                 variantSku,
-                quantity: 1,
+                quantity: deltaQty,
               });
             } catch (retryErr) {
               throw retryErr;
