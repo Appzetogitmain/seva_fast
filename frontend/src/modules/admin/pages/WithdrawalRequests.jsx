@@ -164,10 +164,17 @@ const WithdrawalRequests = () => {
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
+            a.style.display = 'none';
             a.href = url;
             a.download = `withdrawal-requests-${activeTab}-${Date.now()}.csv`;
+            document.body.appendChild(a);
             a.click();
-            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                if (document.body.contains(a)) {
+                    document.body.removeChild(a);
+                }
+                URL.revokeObjectURL(url);
+            }, 2000);
             toast.success("Export successful");
         } catch (error) {
             toast.error("Export failed");

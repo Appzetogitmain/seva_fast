@@ -840,10 +840,17 @@ const Orders = () => {
         const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
+        a.style.display = "none";
         a.href = url;
         a.download = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => {
+            if (document.body.contains(a)) {
+                document.body.removeChild(a);
+            }
+            URL.revokeObjectURL(url);
+        }, 2000);
         showToast(`Exported ${data.length} order(s) as CSV`, "success");
     };
 

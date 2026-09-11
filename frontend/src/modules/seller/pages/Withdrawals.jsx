@@ -113,10 +113,17 @@ const Withdrawals = () => {
         const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
+        a.style.display = 'none';
         a.href = url;
         a.download = `withdrawal-receipt-${id}.csv`;
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => {
+            if (document.body.contains(a)) {
+                document.body.removeChild(a);
+            }
+            URL.revokeObjectURL(url);
+        }, 2000);
         toast.success('Receipt downloaded');
     };
 

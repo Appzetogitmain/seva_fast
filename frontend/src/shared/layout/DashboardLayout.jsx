@@ -616,9 +616,9 @@ const DashboardLayout = ({ children, navItems, title }) => {
                                     Please share the OTP below:
                                 </p>
 
-                                <div className="flex items-center justify-center gap-3 mb-8">
+                                <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 mb-8">
                                     {returnDropOtpAlert.otp.split('').map((char, i) => (
-                                        <div key={i} className="h-16 w-14 bg-slate-50 rounded-2xl shadow-sm border border-brand-100 flex items-center justify-center text-4xl font-black text-slate-900 border-b-4 border-b-brand-600">
+                                        <div key={i} className="h-12 w-10 sm:h-16 sm:w-14 bg-slate-50 rounded-xl sm:rounded-2xl shadow-sm border border-brand-100 flex items-center justify-center text-2xl sm:text-4xl font-black text-slate-900 border-b-4 border-b-brand-600 shrink-0">
                                             {char}
                                         </div>
                                     ))}

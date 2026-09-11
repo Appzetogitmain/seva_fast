@@ -42,12 +42,17 @@ const BulkUploadProducts = () => {
       });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
+      a.style.display = "none";
       a.href = url;
       a.download = "product-bulk-upload-sample.xlsx";
       document.body.appendChild(a);
       a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => {
+        if (document.body.contains(a)) {
+          document.body.removeChild(a);
+        }
+        window.URL.revokeObjectURL(url);
+      }, 60000);
       toast.success("Sample Excel downloaded");
     } catch (error) {
       toast.error(
