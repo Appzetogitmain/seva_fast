@@ -4,6 +4,7 @@ import {
   formatSellerApplication,
   formatSellerDocuments,
 } from "./shared/sellerAdminUtils.js";
+import { buildSellerScopeFilter } from "./sellerDirectoryService.js";
 import { registerOrUpdateSellerPickupLocation } from "../shiprocket/shiprocketOrderService.js";
 import { generateSellerCertificatePdf } from "../sellerCertificateService.js";
 import { sendSellerApprovalEmail } from "../emailService.js";
@@ -35,7 +36,8 @@ export async function getPendingSellerApplications({
   page,
   limit,
   skip,
-  assignedZones,
+  assignedZones = [],
+  assignedCategories = [],
 }) {
   const normalizedStatus = String(status || "pending").trim().toLowerCase();
   let baseStatusQuery = { isVerified: { $ne: true } };
@@ -56,10 +58,9 @@ export async function getPendingSellerApplications({
     };
   }
 
-  const conditions = [baseStatusQuery];
-  if (assignedZones && assignedZones.length > 0) {
-    conditions.push({ zoneId: { $in: assignedZones } });
-  }
+  const scopeConditions = await buildSellerScopeFilter({ assignedZones, assignedCategories });
+
+  const conditions = [baseStatusQuery, ...scopeConditions];
   const search = String(q || "").trim();
   if (search) {
     const regex = new RegExp(escapeRegExp(search), "i");
@@ -83,9 +84,8 @@ export async function getPendingSellerApplications({
       { applicationStatus: { $exists: false } },
     ],
   };
-  if (assignedZones && assignedZones.length > 0) {
-    statsQuery.zoneId = { $in: assignedZones };
-  }
+  const statsConditions = [statsQuery, ...scopeConditions];
+  const finalStatsQuery = statsConditions.length > 1 ? { $and: statsConditions } : statsConditions[0];
 
   const [sellers, total, allPendingForStats] = await Promise.all([
     Seller.find(query)
@@ -95,7 +95,7 @@ export async function getPendingSellerApplications({
       .populate("onboardedBy", "name phone referralCode")
       .lean(),
     Seller.countDocuments(query),
-    Seller.find(statsQuery)
+    Seller.find(finalStatsQuery)
       .select("address documents createdAt")
       .lean(),
   ]);

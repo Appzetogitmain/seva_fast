@@ -105,70 +105,70 @@ router.use(loadSubadminZones);
 router.get(
     "/profile",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getAdminProfile
 );
 
 router.put(
     "/profile",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     updateAdminProfile
 );
 
 router.put(
     "/profile/password",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     updateAdminPassword
 );
 
 router.get(
     "/stats",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getAdminStats
 );
 router.get(
     "/analytics/overview",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getAdminAnalytics
 );
 router.get(
     "/finance/summary",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getAdminFinanceSummaryController,
 );
 router.get(
     "/finance/cod-partners",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getCodPartnerBreakdownController,
 );
 router.get(
     "/finance/ledger",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getAdminFinanceLedgerController,
 );
 router.get(
     "/finance/order-earnings",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getAdminOrderEarningsController,
 );
 router.get(
     "/finance/commission-splits",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getCommissionSplitsReportController,
 );
 router.get(
     "/finance/payouts",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getAdminFinancePayoutsController,
 );
 router.post(
@@ -180,7 +180,7 @@ router.post(
 router.get(
     "/finance/export-statement",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     exportAdminFinanceStatementController,
 );
 router.get(
@@ -207,26 +207,26 @@ router.put(
     allowRoles("admin"),
     updatePlatformSettings
 );
-router.get("/users", verifyToken, allowRoles("admin"), getUsers);
-router.get("/users/:id", verifyToken, allowRoles("admin"), getUserById);
-router.get("/users/:id/referral-tree", verifyToken, allowRoles("admin"), getUserReferralTree);
+router.get("/users", verifyToken, allowRoles("admin", "sub-admin"), getUsers);
+router.get("/users/:id", verifyToken, allowRoles("admin", "sub-admin"), getUserById);
+router.get("/users/:id/referral-tree", verifyToken, allowRoles("admin", "sub-admin"), getUserReferralTree);
 router.put("/users/:id/wallet", verifyToken, allowRoles("admin"), updateUserWallet);
-router.get("/sellers", verifyToken, allowRoles("admin"), getSellers);
-router.get("/sellers/locations", verifyToken, allowRoles("admin"), getSellerLocations);
-router.get("/sellers/active", verifyToken, allowRoles("admin"), getActiveSellers);
-router.get("/sellers/pending", verifyToken, allowRoles("admin"), getPendingSellers);
-router.patch("/sellers/approve/:id", verifyToken, allowRoles("admin"), approveSellerApplication);
-router.delete("/sellers/reject/:id", verifyToken, allowRoles("admin"), rejectSellerApplication);
+router.get("/sellers", verifyToken, allowRoles("admin", "sub-admin"), getSellers);
+router.get("/sellers/locations", verifyToken, allowRoles("admin", "sub-admin"), getSellerLocations);
+router.get("/sellers/active", verifyToken, allowRoles("admin", "sub-admin"), getActiveSellers);
+router.get("/sellers/pending", verifyToken, allowRoles("admin", "sub-admin"), getPendingSellers);
+router.patch("/sellers/approve/:id", verifyToken, allowRoles("admin", "sub-admin"), approveSellerApplication);
+router.delete("/sellers/reject/:id", verifyToken, allowRoles("admin", "sub-admin"), rejectSellerApplication);
 router.post("/sellers/:id/kyc-document", verifyToken, allowRoles("admin", "sub-admin"), upload.single("kycDocument"), uploadSellerKycDocument);
 router.put("/sellers/:id", verifyToken, allowRoles("admin", "sub-admin"), updateSellerDetails);
-router.delete("/sellers/:id", verifyToken, allowRoles("admin"), deleteSeller);
+router.delete("/sellers/:id", verifyToken, allowRoles("admin", "sub-admin"), deleteSeller);
 
-// Seller Subscription Plans (Admin)
+// Seller Subscription Plans (Admin & Sub-Admin)
 router.post("/seller-plans", verifyToken, allowRoles("admin"), createSellerPlan);
-router.get("/seller-plans", verifyToken, allowRoles("admin"), getAdminSellerPlans);
+router.get("/seller-plans", verifyToken, allowRoles("admin", "sub-admin"), getAdminSellerPlans);
 router.put("/seller-plans/:id", verifyToken, allowRoles("admin"), updateSellerPlan);
 router.delete("/seller-plans/:id", verifyToken, allowRoles("admin"), deleteSellerPlan);
-router.post("/sellers/:id/assign-plan", verifyToken, allowRoles("admin"), assignSellerPlanToSeller);
+router.post("/sellers/:id/assign-plan", verifyToken, allowRoles("admin", "sub-admin"), assignSellerPlanToSeller);
 
 // Custom Photo Orders (Admin & Sub-Admin)
 router.get("/photo-orders", verifyToken, allowRoles("admin", "sub-admin"), getAdminPhotoOrders);
@@ -236,52 +236,52 @@ router.patch("/photo-orders/:id/toggle-chat", verifyToken, allowRoles("admin", "
 router.get(
     "/delivery-partners",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     getDeliveryPartners
 );
 
 router.put(
     "/delivery-partners/:id",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     updateDeliveryPartner
 );
 
 router.patch(
     "/delivery-partners/approve/:id",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     approveDeliveryPartner
 );
 
 router.delete(
     "/delivery-partners/reject/:id",
     verifyToken,
-    allowRoles("admin"),
+    allowRoles("admin", "sub-admin"),
     rejectDeliveryPartner
 );
 
 // Active fleet stays seller-accessible: it's order tracking scoped by order.seller,
 // not rider roster management (riders are platform-owned, managed by admin only).
-router.get("/active-fleet", verifyToken, allowRoles("admin", "seller"), getActiveFleet);
-router.get("/wallet-data", verifyToken, allowRoles("admin"), getAdminWalletData);
+router.get("/active-fleet", verifyToken, allowRoles("admin", "sub-admin", "seller"), getActiveFleet);
+router.get("/wallet-data", verifyToken, allowRoles("admin", "sub-admin"), getAdminWalletData);
 
 // Delivery Payouts / Funds
-router.get("/delivery-transactions", verifyToken, allowRoles("admin"), getDeliveryTransactions);
-router.put("/transactions/:id/settle", verifyToken, allowRoles("admin"), settleTransaction);
-router.put("/transactions/bulk-settle-delivery", verifyToken, allowRoles("admin"), bulkSettleDelivery);
+router.get("/delivery-transactions", verifyToken, allowRoles("admin", "sub-admin"), getDeliveryTransactions);
+router.put("/transactions/:id/settle", verifyToken, allowRoles("admin", "sub-admin"), settleTransaction);
+router.put("/transactions/bulk-settle-delivery", verifyToken, allowRoles("admin", "sub-admin"), bulkSettleDelivery);
 
 // Cash Collection Hub
-router.get("/delivery-cash", verifyToken, allowRoles("admin"), getDeliveryCashBalances);
-router.get("/rider-cash-details/:id", verifyToken, allowRoles("admin"), getRiderCashDetails);
-router.post("/settle-cash", verifyToken, allowRoles("admin"), settleRiderCash);
-router.get("/cash-history", verifyToken, allowRoles("admin"), getCashSettlementHistory);
+router.get("/delivery-cash", verifyToken, allowRoles("admin", "sub-admin"), getDeliveryCashBalances);
+router.get("/rider-cash-details/:id", verifyToken, allowRoles("admin", "sub-admin"), getRiderCashDetails);
+router.post("/settle-cash", verifyToken, allowRoles("admin", "sub-admin"), settleRiderCash);
+router.get("/cash-history", verifyToken, allowRoles("admin", "sub-admin"), getCashSettlementHistory);
 
 // Seller Withdrawal Management
-router.get("/seller-withdrawals", verifyToken, allowRoles("admin"), getSellerWithdrawals);
-router.get("/delivery-withdrawals", verifyToken, allowRoles("admin"), getDeliveryWithdrawals);
-router.get("/seller-transactions", verifyToken, allowRoles("admin"), getSellerTransactions);
-router.put("/withdrawals/:id", verifyToken, allowRoles("admin"), updateWithdrawalStatus);
+router.get("/seller-withdrawals", verifyToken, allowRoles("admin", "sub-admin"), getSellerWithdrawals);
+router.get("/delivery-withdrawals", verifyToken, allowRoles("admin", "sub-admin"), getDeliveryWithdrawals);
+router.get("/seller-transactions", verifyToken, allowRoles("admin", "sub-admin"), getSellerTransactions);
+router.put("/withdrawals/:id", verifyToken, allowRoles("admin", "sub-admin"), updateWithdrawalStatus);
 
 // Zone Management
 router.get("/zones", verifyToken, allowRoles("admin", "sub-admin"), getZones);

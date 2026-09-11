@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, Circle, Clock, Truck, Home } from "lucide-react";
+import { CheckCircle, Circle, Clock, Truck, Home, XCircle } from "lucide-react";
 import { getLegacyStatusFromOrder } from "@/shared/utils/orderStatus";
 
 const STATUS_TO_STAGE = {
@@ -69,8 +69,18 @@ const OrderProgressTracker = ({
 
   if (status === "cancelled") {
     return (
-      <div className="bg-rose-50 border border-rose-200 rounded-3xl p-5">
-        <p className="text-center text-rose-700 font-semibold">Order Cancelled</p>
+      <div className="bg-rose-50 border border-rose-200 rounded-3xl p-5 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="h-11 w-11 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+            <XCircle size={24} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-rose-900 leading-tight">Order Cancelled</h3>
+            <p className="text-xs text-rose-600 mt-0.5 leading-snug">
+              {order?.cancelReason || order?.cancelledReason || "This order has been cancelled."}
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

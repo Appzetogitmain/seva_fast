@@ -18,6 +18,7 @@ export const getPendingSellers = async (req, res) => {
     });
 
     const assignedZones = req.assignedZones || [];
+    const assignedCategories = req.assignedCategories || [];
 
     const data = await getPendingSellerApplications({
       q,
@@ -26,6 +27,7 @@ export const getPendingSellers = async (req, res) => {
       limit,
       skip,
       assignedZones,
+      assignedCategories,
     });
 
     return handleResponse(res, 200, "Pending seller applications fetched", data);

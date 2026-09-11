@@ -5,7 +5,6 @@ import {
   MapPin,
   Navigation,
   Phone,
-  MessageSquare,
   Clock,
   Search,
   Loader2,
@@ -474,12 +473,6 @@ const LiveTrackingMap = memo(({
                   className="h-8 w-8 rounded-full bg-brand-50 flex items-center justify-center text-primary hover:bg-brand-100 transition-colors"
                 >
                   <Phone size={14} />
-                </a>
-                <a 
-                  href={`sms:${riderPhone}`}
-                  className="h-8 w-8 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 hover:bg-brand-100 transition-colors"
-                >
-                  <MessageSquare size={14} />
                 </a>
               </div>
             </div>

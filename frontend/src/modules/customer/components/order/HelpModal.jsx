@@ -1,14 +1,42 @@
 import React from 'react';
 import { X, MessageCircle, Phone, ChevronRight, AlertCircle, PackageX, Truck, PlusCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSettings } from '@core/context/SettingsContext';
+import { toast } from 'sonner';
 
 const HelpModal = ({ isOpen, onClose }) => {
+    const navigate = useNavigate();
+    const { settings } = useSettings();
+    const supportPhone = settings?.supportPhone || '';
+
     const issues = [
         { icon: PackageX, label: 'Items missing or incorrect', sub: 'Get a refund or replacement' },
         { icon: AlertCircle, label: 'Item quality issue', sub: 'Report damaged or expired items' },
         { icon: Truck, label: 'Delivery delay', sub: 'Track your order status' },
     ];
+
+    const handleCall = (e) => {
+        if (!supportPhone) {
+            e.preventDefault();
+            toast.error('Support phone number is not available right now. Please use Chat or Raise a Ticket.');
+            return;
+        }
+
+        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+        if (isMobile) {
+            window.location.href = `tel:${supportPhone}`;
+        } else {
+            navigator.clipboard?.writeText(supportPhone)
+                .then(() => toast.success(`Support number ${supportPhone} copied!`))
+                .catch(() => toast.info(`Call support at: ${supportPhone}`));
+        }
+    };
+
+    const handleIssueClick = (item) => {
+        onClose();
+        navigate(`/support?issue=${encodeURIComponent(item.label)}`);
+    };
 
     return (
         <AnimatePresence>
@@ -43,7 +71,11 @@ const HelpModal = ({ isOpen, onClose }) => {
 
                                 <div className="space-y-3 mb-8">
                                     {issues.map((item, idx) => (
-                                        <button key={idx} className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-brand-200 hover:bg-brand-50/50 transition-all group">
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleIssueClick(item)}
+                                            className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-brand-200 hover:bg-brand-50/50 transition-all group text-left cursor-pointer"
+                                        >
                                             <div className="flex items-center gap-4">
                                                 <div className="h-10 w-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-500 group-hover:bg-white group-hover:text-primary transition-colors">
                                                     <item.icon size={20} />
@@ -59,15 +91,27 @@ const HelpModal = ({ isOpen, onClose }) => {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Link to="/support" className="col-span-2 py-3.5 rounded-xl border-2 border-primary text-primary font-bold flex items-center justify-center gap-2 hover:bg-brand-50 transition-colors shadow-lg shadow-brand-50">
+                                    <Link
+                                        to="/support"
+                                        onClick={onClose}
+                                        className="col-span-2 py-3.5 rounded-xl border-2 border-primary text-primary font-bold flex items-center justify-center gap-2 hover:bg-brand-50 transition-colors shadow-lg shadow-brand-50"
+                                    >
                                         <PlusCircle size={18} /> Raise a Ticket
                                     </Link>
-                                    <Link to="/chat" className="py-3.5 rounded-xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors">
+                                    <Link
+                                        to="/chat"
+                                        onClick={onClose}
+                                        className="py-3.5 rounded-xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors"
+                                    >
                                         <MessageCircle size={18} /> Chat Us
                                     </Link>
-                                    <button className="py-3.5 rounded-xl border border-slate-200 text-slate-700 font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+                                    <a
+                                        href={supportPhone ? `tel:${supportPhone}` : "#"}
+                                        onClick={handleCall}
+                                        className="py-3.5 rounded-xl border border-slate-200 text-slate-700 font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer"
+                                    >
                                         <Phone size={18} /> Call Us
-                                    </button>
+                                    </a>
                                 </div>
                             </div>
                         </motion.div>

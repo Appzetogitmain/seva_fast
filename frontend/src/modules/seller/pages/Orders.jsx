@@ -1364,11 +1364,11 @@ const Orders = () => {
                                             <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                                 <div className="p-3 sm:p-4 rounded-2xl bg-brand-50 border border-brand-100">
                                                     <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Your Earnings</p>
-                                                    <p className="text-base sm:text-xl font-black text-brand-700 truncate">₹{summary.totalAmount.toLocaleString('en-IN')}</p>
+                                                    <p className="text-base sm:text-xl font-black text-brand-700 truncate">₹{Number(summary.totalAmount || 0).toLocaleString('en-IN')}</p>
                                                 </div>
                                                 <div className="p-3 sm:p-4 rounded-2xl bg-brand-50 border border-brand-100">
                                                     <p className="text-[10px] sm:text-xs font-bold text-brand-400 uppercase tracking-widest mb-1">Avg. Earning / Order</p>
-                                                    <p className="text-base sm:text-xl font-black text-brand-700">₹{summary.totalOrders ? (summary.totalAmount / summary.totalOrders).toFixed(0) : '0'}</p>
+                                                    <p className="text-base sm:text-xl font-black text-brand-700">₹{summary.delivered > 0 ? (summary.totalAmount / summary.delivered).toFixed(0) : (summary.totalOrders > 0 ? (summary.totalAmount / summary.totalOrders).toFixed(0) : '0')}</p>
                                                 </div>
                                             </div>
                                         </div>

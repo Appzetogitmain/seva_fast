@@ -259,28 +259,28 @@ const ActiveSellers = () => {
     () => [
       {
         label: "Active Sellers",
-        value: stats.totalActiveSellers.toLocaleString("en-IN"),
+        value: Number(stats?.totalActiveSellers || 0).toLocaleString("en-IN"),
         icon: Store,
         color: "blue",
         note: "Verified and live",
       },
       {
         label: "Gross Revenue",
-        value: currency(stats.totalRevenue),
+        value: currency(stats?.totalRevenue || 0),
         icon: HiOutlineArrowTrendingUp,
         color: "emerald",
         note: "Delivered order value",
       },
       {
         label: "Total Orders",
-        value: stats.totalOrders.toLocaleString("en-IN"),
+        value: Number(stats?.totalOrders || 0).toLocaleString("en-IN"),
         icon: HiOutlineDocumentText,
         color: "amber",
         note: "Lifetime order volume",
       },
       {
         label: "New This Month",
-        value: stats.newThisMonth.toLocaleString("en-IN"),
+        value: Number(stats?.newThisMonth || 0).toLocaleString("en-IN"),
         icon: HiOutlineCalendarDays,
         color: "rose",
         note: "Recently approved",

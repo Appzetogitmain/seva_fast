@@ -45,36 +45,57 @@ export const getSubadmins = async (req, res) => {
 export const createSubadmin = async (req, res) => {
   try {
     const { name, email, password, phone, assignedZones, allowedPermissions, assignedCategories, categoryCommissionRate } = req.body;
-    if (!name || !email || !password) {
-      return handleResponse(res, 400, "Name, email and password are required");
+    if (!name || !name.trim()) {
+      return handleResponse(res, 400, "Full name is required");
     }
     // Bug 254: Name must contain only alphabets and spaces
     if (!/^[a-zA-Z\s]+$/.test(name.trim())) {
       return handleResponse(res, 400, "Full name must contain only alphabets and spaces");
     }
-
-    // Validate categoryCommissionRate if provided
-    if (categoryCommissionRate !== undefined && categoryCommissionRate !== null) {
-      const rate = Number(categoryCommissionRate);
-      if (isNaN(rate) || rate < 0 || rate > 100) {
-        return handleResponse(res, 400, "categoryCommissionRate must be a number between 0 and 100");
-      }
+    if (!email || !email.trim()) {
+      return handleResponse(res, 400, "Email address is required");
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return handleResponse(res, 400, "Please provide a valid email address");
+    }
+    const cleanPhone = String(phone || "").replace(/\D/g, "");
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return handleResponse(res, 400, "Phone number is required and must be exactly 10 digits");
+    }
+    if (!password || password.length < 8) {
+      return handleResponse(res, 400, "Password is required and must be at least 8 characters long");
+    }
+    if (!Array.isArray(assignedZones) || assignedZones.length === 0) {
+      return handleResponse(res, 400, "At least one geographical zone must be assigned");
+    }
+    if (!Array.isArray(assignedCategories) || assignedCategories.length === 0) {
+      return handleResponse(res, 400, "At least one header category must be assigned");
+    }
+    if (categoryCommissionRate === undefined || categoryCommissionRate === null || categoryCommissionRate === "") {
+      return handleResponse(res, 400, "Category commission rate is required");
+    }
+    const rate = Number(categoryCommissionRate);
+    if (isNaN(rate) || rate < 0 || rate > 100) {
+      return handleResponse(res, 400, "Category commission rate must be a number between 0 and 100");
+    }
+    if (!Array.isArray(allowedPermissions) || allowedPermissions.length === 0) {
+      return handleResponse(res, 400, "At least one sidebar permission must be selected");
     }
 
-    const existing = await Admin.findOne({ email });
+    const existing = await Admin.findOne({ email: email.trim().toLowerCase() });
     if (existing) {
       return handleResponse(res, 409, "User with this email already exists");
     }
 
     const subadmin = await Admin.create({
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password,
-      phone,
+      phone: cleanPhone,
       role: "sub-admin",
       assignedZones: assignedZones || [],
       assignedCategories: assignedCategories || [],
-      categoryCommissionRate: categoryCommissionRate != null ? Number(categoryCommissionRate) : null,
+      categoryCommissionRate: rate,
       allowedPermissions: allowedPermissions || [],
       isVerified: true,
     });
@@ -107,11 +128,14 @@ export const updateSubadmin = async (req, res) => {
     }
 
     if (email && email !== subadmin.email) {
-      const existing = await Admin.findOne({ email });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        return handleResponse(res, 400, "Please provide a valid email address");
+      }
+      const existing = await Admin.findOne({ email: email.trim().toLowerCase() });
       if (existing) {
         return handleResponse(res, 409, "User with this email already exists");
       }
-      subadmin.email = email;
+      subadmin.email = email.trim().toLowerCase();
     }
 
     if (name) {
@@ -119,12 +143,23 @@ export const updateSubadmin = async (req, res) => {
       if (!/^[a-zA-Z\s]+$/.test(name.trim())) {
         return handleResponse(res, 400, "Full name must contain only alphabets and spaces");
       }
-      subadmin.name = name;
+      subadmin.name = name.trim();
     }
-    if (phone) subadmin.phone = phone;
+    if (phone) {
+      const cleanPhone = String(phone).replace(/\D/g, "");
+      if (cleanPhone.length !== 10) {
+        return handleResponse(res, 400, "Phone number must be exactly 10 digits");
+      }
+      subadmin.phone = cleanPhone;
+    }
     if (assignedZones) subadmin.assignedZones = assignedZones;
     if (allowedPermissions) subadmin.allowedPermissions = allowedPermissions;
-    if (password) subadmin.password = password;
+    if (password) {
+      if (password.length < 8) {
+        return handleResponse(res, 400, "Password must be at least 8 characters long");
+      }
+      subadmin.password = password;
+    }
     // Update assignedCategories (allow setting to empty array to clear)
     if (assignedCategories !== undefined) subadmin.assignedCategories = assignedCategories;
     // Update per-sub-admin commission rate (null to revert to global rate)

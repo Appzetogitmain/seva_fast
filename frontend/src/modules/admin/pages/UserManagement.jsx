@@ -177,26 +177,73 @@ const UserManagement = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        // Bug 254: Validate name - only alphabets and spaces allowed
+        // Validate name - only alphabets and spaces allowed
         const nameRegex = /^[a-zA-Z\s]+$/;
+        if (!formData.name.trim()) {
+            showToast('Full name is required', 'error');
+            return;
+        }
         if (!nameRegex.test(formData.name.trim())) {
             showToast('Full name must contain only alphabets and spaces', 'error');
             return;
         }
-        if (formData.phone.length !== 10) {
+        if (!formData.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+            showToast('Please enter a valid email address', 'error');
+            return;
+        }
+        const cleanPhone = formData.phone.replace(/\D/g, '');
+        if (cleanPhone.length !== 10) {
             showToast('Phone number must be exactly 10 digits', 'error');
             return;
         }
+
+        if (!editingUser) {
+            if (!formData.password) {
+                showToast('Password is required for new sub-admin', 'error');
+                return;
+            }
+            if (formData.password.length < 8) {
+                showToast('Password must be at least 8 characters long', 'error');
+                return;
+            }
+        } else if (formData.password && formData.password.length < 8) {
+            showToast('Password must be at least 8 characters long', 'error');
+            return;
+        }
+
+        if (!formData.assignedZones || formData.assignedZones.length === 0) {
+            showToast('Please select at least one geographical zone', 'error');
+            return;
+        }
+
+        if (!formData.assignedCategories || formData.assignedCategories.length === 0) {
+            showToast('Please select at least one header category', 'error');
+            return;
+        }
+
+        if (formData.categoryCommissionRate === '' || formData.categoryCommissionRate === null || formData.categoryCommissionRate === undefined) {
+            showToast('Category commission rate is required (0 - 100%)', 'error');
+            return;
+        }
+        const commRate = Number(formData.categoryCommissionRate);
+        if (isNaN(commRate) || commRate < 0 || commRate > 100) {
+            showToast('Category commission rate must be between 0 and 100', 'error');
+            return;
+        }
+
+        if (!formData.allowedPermissions || formData.allowedPermissions.length === 0) {
+            showToast('Please select at least one sidebar permission', 'error');
+            return;
+        }
+
         try {
             const payload = {
-                name: formData.name,
-                email: formData.email,
-                phone: formData.phone,
+                name: formData.name.trim(),
+                email: formData.email.trim().toLowerCase(),
+                phone: cleanPhone,
                 assignedZones: formData.assignedZones,
-                assignedCategories: formData.assignedCategories || [],
-                categoryCommissionRate: formData.categoryCommissionRate !== '' && formData.categoryCommissionRate !== null
-                    ? Number(formData.categoryCommissionRate)
-                    : null,
+                assignedCategories: formData.assignedCategories,
+                categoryCommissionRate: commRate,
                 allowedPermissions: formData.allowedPermissions
             };
 
@@ -210,10 +257,6 @@ const UserManagement = () => {
                     showToast('Sub-admin updated successfully', 'success');
                 }
             } else {
-                if (!formData.password) {
-                    showToast('Password is required for new sub-admin', 'error');
-                    return;
-                }
                 const res = await adminApi.createSubadmin(payload);
                 if (res.data.success) {
                     showToast('New sub-admin created successfully', 'success');
@@ -514,7 +557,9 @@ const UserManagement = () => {
             >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Full Name</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                            Full Name <span className="text-rose-500 font-black text-xs">*</span>
+                        </label>
                         <input
                             required
                             type="text"
@@ -531,7 +576,9 @@ const UserManagement = () => {
 
                     <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                Email Address <span className="text-rose-500 font-black text-xs">*</span>
+                            </label>
                             <input
                                 required
                                 type="email"
@@ -542,10 +589,13 @@ const UserManagement = () => {
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone Number</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                Phone Number <span className="text-rose-500 font-black text-xs">* (10 digits)</span>
+                            </label>
                             <input
                                 required
                                 type="text"
+                                maxLength={10}
                                 value={formData.phone}
                                 onChange={(e) => {
                                     const val = e.target.value.replace(/\D/g, '').slice(0, 10);
@@ -560,14 +610,15 @@ const UserManagement = () => {
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                             <HiOutlineKey className="h-4 w-4 text-slate-400" />
-                            Password {editingUser && <span className="text-[9px] text-amber-500 font-bold lowercase">(leave blank to keep unchanged)</span>}
+                            Password {!editingUser && <span className="text-rose-500 font-black text-xs">* (min 8 chars)</span>} {editingUser && <span className="text-[9px] text-amber-500 font-bold lowercase">(leave blank to keep unchanged, min 8 chars if changing)</span>}
                         </label>
                         <input
                             required={!editingUser}
+                            minLength={8}
                             type="password"
                             value={formData.password}
                             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                            placeholder="••••••••"
+                            placeholder="•••••••• (at least 8 characters)"
                             className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none"
                         />
                     </div>
@@ -576,7 +627,7 @@ const UserManagement = () => {
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                             <HiOutlineMapPin className="h-4 w-4 text-slate-400" />
-                            Assigned Geographical Zones
+                            Assigned Geographical Zones <span className="text-rose-500 font-black text-xs">*</span>
                         </label>
                         <div className="bg-slate-50 rounded-2xl p-4 max-h-36 overflow-y-auto grid grid-cols-2 gap-3 border border-slate-100">
                             {zones.map((zone) => {
@@ -614,7 +665,7 @@ const UserManagement = () => {
                         <div className="flex items-center justify-between">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                                 <HiOutlineTag className="h-4 w-4 text-slate-400" />
-                                Assigned Header Categories
+                                Assigned Header Categories <span className="text-rose-500 font-black text-xs">*</span>
                             </label>
                             <div className="flex gap-2">
                                 <button
@@ -636,7 +687,7 @@ const UserManagement = () => {
                         </div>
                         <p className="text-[9px] text-slate-400 font-medium flex items-center gap-1">
                             <HiOutlineInformationCircle className="h-3.5 w-3.5" />
-                            Leave empty to manage all categories. Commission is credited only for matched category items.
+                            Select categories this sub-admin will manage. Commission is credited for matched category items.
                         </p>
                         <div className="bg-slate-50 rounded-2xl p-4 max-h-36 overflow-y-auto grid grid-cols-2 gap-3 border border-slate-100">
                             {headerCategories.map((cat) => {
@@ -673,20 +724,21 @@ const UserManagement = () => {
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                             <HiOutlineCurrencyRupee className="h-4 w-4 text-slate-400" />
-                            Category Commission Rate (%)
+                            Category Commission Rate (%) <span className="text-rose-500 font-black text-xs">*</span>
                         </label>
                         <p className="text-[9px] text-slate-400 font-medium flex items-center gap-1">
                             <HiOutlineInformationCircle className="h-3.5 w-3.5" />
-                            Leave blank to use the global sub-admin commission rate from Finance Settings.
+                            Enter sub-admin's commission percentage (0 - 100%).
                         </p>
                         <input
+                            required
                             type="number"
                             min="0"
                             max="100"
                             step="0.01"
                             value={formData.categoryCommissionRate}
                             onChange={(e) => setFormData({ ...formData, categoryCommissionRate: e.target.value })}
-                            placeholder="e.g. 8.5 (leave blank = use global rate)"
+                            placeholder="e.g. 10 (commission % earned on orders)"
                             className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none ring-1 ring-transparent focus:ring-violet-200 transition-all"
                         />
                     </div>
@@ -696,7 +748,7 @@ const UserManagement = () => {
                         <div className="flex items-center justify-between">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                                 <HiOutlineShieldCheck className="h-4 w-4 text-slate-400" />
-                                Allowed Sidebar Permissions (Functionalities)
+                                Allowed Sidebar Permissions (Functionalities) <span className="text-rose-500 font-black text-xs">*</span>
                             </label>
                             <div className="flex gap-2">
                                 <button
