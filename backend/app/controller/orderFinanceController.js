@@ -245,6 +245,23 @@ export const verifyOnlineOrderPayment = async (req, res) => {
   }
 };
 
+export const cancelOnlineOrderPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    const { cancelOnlinePaymentAttempt } = await import("../services/paymentService.js");
+    const result = await cancelOnlinePaymentAttempt({
+      orderRef: id,
+      userId: req.user?.id,
+      reason: reason || "Online payment cancelled by user",
+    });
+
+    return handleResponse(res, 200, "Online payment attempt cancelled and order released", result);
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
+  }
+};
+
 export const markCodCollectedAfterDelivery = async (req, res) => {
   try {
     const { id } = req.params;

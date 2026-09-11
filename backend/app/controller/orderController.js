@@ -279,8 +279,15 @@ export const getMyOrders = async (req, res) => {
     const result = await getOrSet(
       cacheKey,
       async () => {
+        const customerOrdersQuery = {
+          customer: customerId,
+          $nor: [
+            { paymentMode: "ONLINE", workflowStatus: WORKFLOW_STATUS.CREATED },
+            { paymentMode: "ONLINE", status: "pending", workflowStatus: { $exists: false } },
+          ],
+        };
         const [orders, total] = await Promise.all([
-          Order.find({ customer: customerId })
+          Order.find(customerOrdersQuery)
             .select(
               "orderId checkoutGroupId customer seller items address payment pricing status workflowStatus workflowVersion returnStatus timeSlot createdAt attentionRequired sellerTimeoutAlert",
             )
@@ -289,7 +296,7 @@ export const getMyOrders = async (req, res) => {
             .limit(limit)
             .populate("items.product", "name mainImage price salePrice")
             .lean(),
-          Order.countDocuments({ customer: customerId }),
+          Order.countDocuments(customerOrdersQuery),
         ]);
 
         console.log(`[getMyOrders Debug] Customer ID: ${customerId} | Total Orders: ${total} | Skip: ${skip} | Limit: ${limit}`);

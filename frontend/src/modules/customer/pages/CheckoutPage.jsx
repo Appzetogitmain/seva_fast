@@ -1119,6 +1119,13 @@ const CheckoutPage = () => {
 
             if (checkoutResult?.cancelled) {
               setIsPlacingOrder(false);
+              try {
+                await customerApi.cancelOnlineOrderPayment(paymentRef, {
+                  reason: "Payment cancelled by user",
+                });
+              } catch (cancelErr) {
+                console.warn("[CheckoutPage] Failed to release unpaid online order:", cancelErr);
+              }
               setPaymentFailureModal({
                 isOpen: true,
                 reason: "Online payment was cancelled before completion. Your cart items are preserved — you can retry or switch payment method below.",
@@ -1131,6 +1138,13 @@ const CheckoutPage = () => {
             return;
           } catch (payError) {
             setIsPlacingOrder(false);
+            try {
+              await customerApi.cancelOnlineOrderPayment(paymentRef, {
+                reason: payError.response?.data?.message || payError.message || "Payment failed",
+              });
+            } catch (cancelErr) {
+              console.warn("[CheckoutPage] Failed to release failed online order:", cancelErr);
+            }
             setPaymentFailureModal({
               isOpen: true,
               reason:

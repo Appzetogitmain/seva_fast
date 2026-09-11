@@ -88,6 +88,22 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId || firebaseConfig.apiKey
 
   const messaging = firebase.messaging();
 
+  /** Event types that should trigger a loud, persistent notification */
+  const ORDER_ALERT_EVENTS = new Set([
+    "NEW_ORDER",
+    "NEW_DELIVERY_BROADCAST",
+    "NEW_RETURN_BROADCAST",
+    "DELIVERY_ASSIGNED",
+    "ORDER_READY",
+    "SELLER_TIMEOUT_ALERT",
+    "NO_RIDER_ALERT",
+  ]);
+
+  function isOrderAlert(data = {}) {
+    const eventType = String(data.eventType || "").toUpperCase();
+    return ORDER_ALERT_EVENTS.has(eventType);
+  }
+
   function buildNotificationOptions(payload = {}) {
     const notification = payload?.notification || {};
     const data = payload?.data || {};
@@ -96,6 +112,7 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId || firebaseConfig.apiKey
     const link = data.link || "/";
     const tag = notification.tag || data.orderId || data.eventType || "quick-commerce";
     const image = String(notification.image || data.image || data.imageUrl || "").trim();
+    const orderAlert = isOrderAlert(data);
 
     return {
       title,
@@ -106,13 +123,17 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId || firebaseConfig.apiKey
         badge: "/favicon.png",
         requireInteraction: true,
         renotify: true,
-        vibrate: [200, 100, 200],
+        silent: false,
+        vibrate: orderAlert
+          ? [300, 200, 300, 200, 300, 200, 300]
+          : [200, 100, 200],
         ...(image ? { image } : {}),
         data: {
           link,
           orderId: data.orderId || "",
           eventType: data.eventType || "",
           image,
+          orderAlert,
         },
       },
     };
@@ -147,6 +168,13 @@ self.addEventListener("push", (event) => {
       const tag = notification.tag || data.tag || data.orderId || "quick-commerce";
       const image = String(notification.image || data.image || data.imageUrl || "").trim();
 
+      const ORDER_ALERT_EVENTS_PUSH = new Set([
+        "NEW_ORDER", "NEW_DELIVERY_BROADCAST", "NEW_RETURN_BROADCAST",
+        "DELIVERY_ASSIGNED", "ORDER_READY", "SELLER_TIMEOUT_ALERT", "NO_RIDER_ALERT",
+      ]);
+      const eventType = String(data.eventType || "").toUpperCase();
+      const isAlert = ORDER_ALERT_EVENTS_PUSH.has(eventType);
+
       event.waitUntil(
         self.registration.getNotifications({ tag }).then((existingNotifications) => {
           // Prevent duplicate if already shown by Firebase SDK
@@ -160,12 +188,16 @@ self.addEventListener("push", (event) => {
             badge: "/favicon.png",
             requireInteraction: true,
             renotify: true,
-            vibrate: [200, 100, 200],
+            silent: false,
+            vibrate: isAlert
+              ? [300, 200, 300, 200, 300, 200, 300]
+              : [200, 100, 200],
             ...(image ? { image } : {}),
             data: {
               link,
               orderId: data.orderId || "",
               eventType: data.eventType || "",
+              orderAlert: isAlert,
             },
           });
         }),

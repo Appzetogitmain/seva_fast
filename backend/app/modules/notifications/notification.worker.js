@@ -155,6 +155,19 @@ export async function deliverNotificationById(notificationId) {
     return;
   }
 
+  const ORDER_ALERT_EVENT_TYPES = new Set([
+    "NEW_ORDER",
+    "NEW_DELIVERY_BROADCAST",
+    "NEW_RETURN_BROADCAST",
+    "DELIVERY_ASSIGNED",
+    "ORDER_READY",
+    "SELLER_TIMEOUT_ALERT",
+    "NO_RIDER_ALERT",
+  ]);
+  const isOrderAlertType = ORDER_ALERT_EVENT_TYPES.has(
+    String(notification.type || "").toUpperCase()
+  );
+
   let fcmResponse;
   try {
     fcmResponse = await Promise.race([
@@ -169,6 +182,7 @@ export async function deliverNotificationById(notificationId) {
         {
           sound: preference?.sound !== false,
           vibration: preference?.vibration !== false,
+          orderAlert: isOrderAlertType,
         },
       ),
       new Promise((_, reject) =>

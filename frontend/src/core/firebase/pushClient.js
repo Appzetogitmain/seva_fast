@@ -2,6 +2,7 @@ import { isSupported, getMessaging, getToken, onMessage } from "firebase/messagi
 import { getFirebaseApp } from "./client";
 import axiosInstance from "@core/api/axios";
 import AppZetoBridge from "../../lib/appZetoBridge";
+import { notificationSound, isOrderAlertEvent } from "@core/utils/notificationSound";
 
 let foregroundListenerStarted = false;
 let foregroundUnsubscribe = null;
@@ -314,6 +315,18 @@ export async function startForegroundPushListener() {
       payload?.notification?.title || payload?.data?.title || "Notification";
     const body =
       payload?.notification?.body || payload?.data?.body || "";
+    const eventType = payload?.data?.eventType || "";
+
+    // Play the order alert sound for order-related events (works even if
+    // the SellerOrderAlertModal / DeliveryOrderAlertModal haven't mounted)
+    if (isOrderAlertEvent(eventType)) {
+      try {
+        notificationSound.playOrderAlertSound();
+      } catch {
+        // Sound playback is best-effort
+      }
+    }
+
     await showSystemNotification({
       title,
       body,

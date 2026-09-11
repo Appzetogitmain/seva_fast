@@ -139,24 +139,25 @@ const generateInvoicePdf = async ({
     y += 6;
   }
 
+  const rightYStart = 26;
   doc.setFont(undefined, 'bold');
   doc.setFontSize(14);
-  doc.text('TAX INVOICE', pageWidth - margin, 18, { align: 'right' });
+  doc.text('TAX INVOICE', pageWidth - margin, rightYStart, { align: 'right' });
   doc.setFontSize(9);
   doc.setFont(undefined, 'normal');
-  doc.text(`#${invoiceId}`, pageWidth - margin, 24, { align: 'right' });
-  doc.text(`Date: ${formatDateTime(order.createdAt)}`, pageWidth - margin, 30, { align: 'right' });
+  doc.text(`#${invoiceId}`, pageWidth - margin, rightYStart + 6, { align: 'right' });
+  doc.text(`Date: ${formatDateTime(order.createdAt)}`, pageWidth - margin, rightYStart + 12, { align: 'right' });
   if (order.deliveredAt) {
-    doc.text(`Delivered: ${formatDateTime(order.deliveredAt)}`, pageWidth - margin, 36, { align: 'right' });
+    doc.text(`Delivered: ${formatDateTime(order.deliveredAt)}`, pageWidth - margin, rightYStart + 18, { align: 'right' });
   }
   doc.text(
     `Status: ${formatOrderStatus(order.status || order.orderStatus)}`,
     pageWidth - margin,
-    order.deliveredAt ? 42 : 36,
+    order.deliveredAt ? rightYStart + 24 : rightYStart + 18,
     { align: 'right' },
   );
 
-  y += 4;
+  y = Math.max(y, order.deliveredAt ? rightYStart + 28 : rightYStart + 22);
   doc.setDrawColor(220, 220, 220);
   doc.line(margin, y, pageWidth - margin, y);
   y += 8;
@@ -179,8 +180,9 @@ const generateInvoicePdf = async ({
 
   const leftAddressY = y;
   addressLines.forEach((line) => {
-    doc.text(line, margin, y);
-    y += 4;
+    const splitLines = doc.splitTextToSize(line, contentWidth / 2 - 8);
+    doc.text(splitLines, margin, y);
+    y += splitLines.length * 4;
   });
   let rightY = leftAddressY;
   const sellerLines = doc.splitTextToSize(String(sellerAddress || '—'), contentWidth / 2 - 8);

@@ -61,11 +61,16 @@ const LiveTrackingMap = memo(({
 }) => {
   const mapRef = useRef(null);
   const [mapInstance, setMapInstance] = useState(null);
-  // No real rider assigned yet ⇒ still "searching", regardless of order status
-  // (e.g. packed but nobody has accepted the delivery yet) — never show live
-  // tracking / a rider card until there's an actual assigned partner.
+  const normStatus = status?.toLowerCase() || "";
+  const isDeliveredOrCancelled =
+    normStatus === "delivered" ||
+    normStatus === "cancelled" ||
+    normStatus === "canceled";
+
+  // Searching state is only valid if the order is NOT delivered/cancelled AND has no assigned rider OR is in searching status
   const isSearching =
-    !hasAssignedRider || SEARCHING_STATUSES.includes(status?.toLowerCase());
+    !isDeliveredOrCancelled &&
+    (!hasAssignedRider || SEARCHING_STATUSES.includes(normStatus));
   const [progress, setProgress] = useState(0);
   const [dots, setDots] = useState("");
 

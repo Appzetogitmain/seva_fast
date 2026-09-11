@@ -5,6 +5,7 @@ import { Truck, BellRing, ArrowRight, X, Volume2, VolumeX, MapPin, DollarSign, P
 import { useAuth } from "@core/context/AuthContext";
 import { getOrderSocket, onDeliveryBroadcast } from "@core/services/orderSocket";
 import { notificationSound } from "@core/utils/notificationSound";
+import AppZetoBridge from "@/lib/appZetoBridge";
 import {
   getDeliverySettings,
   startDeliveryVibration,
@@ -34,9 +35,11 @@ export default function DeliveryOrderAlertModal() {
       if (settings.sound) {
         setIsMuted(false);
         notificationSound.startRepeatingOrderAlert();
+        AppZetoBridge.playOrderAlert();
       } else {
         setIsMuted(true);
         notificationSound.stopRepeatingAlert();
+        AppZetoBridge.stopOrderAlert();
       }
     });
 
@@ -44,18 +47,21 @@ export default function DeliveryOrderAlertModal() {
       cleanupListener();
       stopDeliveryVibration();
       notificationSound.stopRepeatingAlert();
+      AppZetoBridge.stopOrderAlert();
     };
   }, [user, token]);
 
   const handleDismiss = () => {
     stopDeliveryVibration();
     notificationSound.stopRepeatingAlert();
+    AppZetoBridge.stopOrderAlert();
     setNewOrder(null);
   };
 
   const handleViewDetails = () => {
     stopDeliveryVibration();
     notificationSound.stopRepeatingAlert();
+    AppZetoBridge.stopOrderAlert();
     const orderId = newOrder?.orderId || newOrder?._id;
     setNewOrder(null);
     if (orderId) {
@@ -68,10 +74,12 @@ export default function DeliveryOrderAlertModal() {
   const toggleMute = () => {
     if (isMuted) {
       notificationSound.startRepeatingOrderAlert();
+      AppZetoBridge.playOrderAlert();
       setIsMuted(false);
     } else {
       stopDeliveryVibration();
       notificationSound.stopRepeatingAlert();
+      AppZetoBridge.stopOrderAlert();
       setIsMuted(true);
     }
   };
