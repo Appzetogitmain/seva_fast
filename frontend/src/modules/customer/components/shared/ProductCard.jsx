@@ -43,19 +43,30 @@ const ProductCard = React.memo(
       const variants = Array.isArray(product?.variants) ? product.variants : [];
       if (!variants.length) return null;
 
+      const hasInStock = variants.some((v) => Number(v.stock ?? 0) > 0);
+
       const listingSku = String(product?.listingVariantSku || "").trim();
       if (listingSku) {
         const listingVariant = variants.find(
           (variant) => variantIdentityKey(variant) === listingSku,
         );
-        if (listingVariant) return listingVariant;
+        if (listingVariant && (!hasInStock || Number(listingVariant.stock ?? 0) > 0)) {
+          return listingVariant;
+        }
       }
 
       const targetPrice = Number(product?.price || 0);
       const pricedVariant = variants.find(
-        (variant) => variantEffectiveUnitPrice(variant) === targetPrice,
+        (variant) =>
+          variantEffectiveUnitPrice(variant) === targetPrice &&
+          (!hasInStock || Number(variant.stock ?? 0) > 0),
       );
-      return pricedVariant || pickListingVariant(product)?.variant || variants[0];
+      return (
+        pricedVariant ||
+        pickListingVariant(product)?.variant ||
+        variants.find((v) => Number(v.stock ?? 0) > 0) ||
+        variants[0]
+      );
     }, [
       product?.variants,
       product?.price,
@@ -68,8 +79,8 @@ const ProductCard = React.memo(
       : "";
 
     const isOutOfStock = defaultVariant 
-      ? (defaultVariant.stock <= 0) 
-      : (product.stock <= 0);
+      ? (Number(defaultVariant.stock ?? 0) <= 0) 
+      : (Number(product.stock ?? 0) <= 0);
 
     const displayPrice = defaultVariant
       ? (Number(defaultVariant.salePrice) > 0 && Number(defaultVariant.salePrice) < Number(defaultVariant.price)

@@ -74,7 +74,13 @@ export function pickListingVariant(product) {
 
   if (!entries.length) return null;
 
-  return entries.reduce((best, current) =>
+  const inStockEntries = entries.filter(
+    (entry) => Number(entry.variant?.stock ?? 0) > 0,
+  );
+
+  const pool = inStockEntries.length > 0 ? inStockEntries : entries;
+
+  return pool.reduce((best, current) =>
     current.effective < best.effective ? current : best,
   );
 }
