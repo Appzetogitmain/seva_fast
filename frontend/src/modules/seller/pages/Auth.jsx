@@ -1132,7 +1132,7 @@ const Auth = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen items-center justify-center gap-4 bg-[#fcfaff] p-3 sm:p-6 font-['Outfit'] overflow-x-hidden overflow-y-auto relative">
+    <div className="flex flex-col min-h-screen min-h-dvh items-center justify-start md:justify-center gap-4 bg-[#fcfaff] p-3 sm:p-6 py-6 md:py-10 font-['Outfit'] overflow-x-hidden overflow-y-auto relative">
       {/* Elegant Ambient Background */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] bg-slate-100/50 rounded-full blur-[120px]" />
@@ -1205,7 +1205,7 @@ const Auth = () => {
         {/* Form Content Side */}
         <div
           ref={formPanelRef}
-          className="w-full md:w-[55%] flex-1 min-h-0 p-6 pt-8 sm:p-8 sm:pt-8 md:p-12 md:pt-10 flex flex-col justify-start bg-white overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar relative"
+          className="w-full md:w-[55%] flex-1 min-h-0 p-6 pt-8 sm:p-8 sm:pt-8 md:p-12 md:pt-10 flex flex-col justify-start bg-white md:overflow-y-auto md:overscroll-contain md:touch-pan-y md:custom-scrollbar relative"
           style={{ WebkitOverflowScrolling: "touch" }}>
           <div className="hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 z-20">
             <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
