@@ -165,3 +165,36 @@ export function resolveDisplayedProductPrice(product, selectedVariant = null) {
     hasDiscount: sale > 0 && sale < mrp,
   };
 }
+
+export function getAvailableStock(productOrItem, variantSku = "") {
+  if (!productOrItem) return 0;
+
+  const normalizedVariantSku = String(
+    variantSku || productOrItem.variantSku || productOrItem.listingVariantSku || ""
+  ).trim();
+
+  const variants = Array.isArray(productOrItem.variants)
+    ? productOrItem.variants
+    : [];
+
+  if (variants.length > 0 && normalizedVariantSku) {
+    const matchedVariant = variants.find((v) => {
+      const sku = String(v?.sku || "").trim();
+      const name = String(v?.name || "").trim();
+      return (
+        (sku && sku === normalizedVariantSku) ||
+        (!sku && name === normalizedVariantSku) ||
+        name === normalizedVariantSku
+      );
+    });
+    if (matchedVariant && typeof matchedVariant.stock === "number") {
+      return Math.max(0, matchedVariant.stock);
+    }
+  }
+
+  if (typeof productOrItem.stock === "number") {
+    return Math.max(0, productOrItem.stock);
+  }
+
+  return 9999;
+}

@@ -715,8 +715,8 @@ const Dashboard = () => {
                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
                 className="w-full max-w-lg sm:max-w-2xl relative z-10 bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
               >
-                {/* Modal Header - same as Orders */}
-                <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex-shrink-0">
                   <div className="flex items-center space-x-3">
                     <div className="h-10 w-10 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg">
                       <HiOutlineTruck className="h-5 w-5" />
@@ -737,23 +737,34 @@ const Dashboard = () => {
                         </span>
                       </div>
                     </div>
+                  </div>
+                  <button
+                    onClick={() => setIsOrderModalOpen(false)}
+                    className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600"
+                  >
+                    <HiOutlineXMark className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Modal Body - scrollable */}
+                <div className="overflow-y-auto flex-1 min-h-0 px-4 py-4 sm:px-6 sm:py-5 space-y-4 sm:space-y-6 overscroll-contain">
+                  {/* Address, Contact Info, Delivery Partner Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <HiOutlineMapPin className="h-3 w-3 text-primary" /> Delivery Address
+                      </h4>
+                      <p className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
+                        {selectedOrder.address}
+                      </p>
+                    </div>
+
                     {["packed", "out_for_delivery", "delivered"].includes(
-                      String(selectedOrder.status || "").toLowerCase(),
-                    ) ? (
-                      <div className="space-y-4">
-                        <div>
-                          <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <HiOutlineMapPin className="h-3 w-3 text-primary" />{" "}
-                            Delivery Address
-                          </h4>
-                          <p className="text-xs font-bold text-slate-800 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
-                            {selectedOrder.address}
-                          </p>
-                        </div>
-                        <div>
+                      String(selectedOrder.status || "").toLowerCase()
+                    ) && selectedOrder.customer && (
+                      <div>
                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                          <HiOutlinePhone className="h-3 w-3 text-brand-500" />{" "}
-                          Contact Info
+                          <HiOutlinePhone className="h-3 w-3 text-brand-500" /> Contact Info
                         </h4>
                         <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm">
                           <p className="text-xs font-bold text-slate-800">
@@ -764,37 +775,40 @@ const Dashboard = () => {
                           </p>
                         </div>
                       </div>
-                      {selectedOrder.status.toLowerCase() !== 'pending' && selectedOrder.status.toLowerCase() !== 'cancelled' && (
-                        <div>
-                          <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
-                          </h4>
-                          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm space-y-2">
-                            {selectedOrder.deliveryMode === 'self' ? (
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <p className="text-xs font-bold text-slate-800">
-                                    {selectedOrder.selfDeliveryPerson?.name || 'Own delivery person'}
-                                  </p>
-                                  {selectedOrder.selfDeliveryPerson?.phone && (
-                                    <p className="text-[11px] font-semibold text-slate-600">{selectedOrder.selfDeliveryPerson.phone}</p>
-                                  )}
-                                </div>
-                                <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Own Delivery</span>
-                              </div>
-                            ) : selectedOrder.deliveryBoy ? (
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <p className="text-xs font-bold text-slate-800">{selectedOrder.deliveryBoy.name}</p>
-                                  <p className="text-[11px] font-semibold text-slate-600">{selectedOrder.deliveryBoy.phone}</p>
-                                </div>
-                                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Assigned</span>
-                              </div>
-                            ) : (
-                              <p className="text-[11px] text-slate-500 font-medium">No delivery partner assigned.</p>
-                            )}
+                    )}
 
-                            {ownDeliveryFormOrderId === selectedOrder.id ? (
+                    {selectedOrder.status.toLowerCase() !== 'pending' && selectedOrder.status.toLowerCase() !== 'cancelled' && (
+                      <div>
+                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
+                        </h4>
+                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+                          {selectedOrder.deliveryMode === 'self' ? (
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">
+                                  {selectedOrder.selfDeliveryPerson?.name || 'Own delivery person'}
+                                </p>
+                                {selectedOrder.selfDeliveryPerson?.phone && (
+                                  <p className="text-[11px] font-semibold text-slate-600">{selectedOrder.selfDeliveryPerson.phone}</p>
+                                )}
+                              </div>
+                              <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Own Delivery</span>
+                            </div>
+                          ) : selectedOrder.deliveryBoy ? (
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">{selectedOrder.deliveryBoy.name}</p>
+                                <p className="text-[11px] font-semibold text-slate-600">{selectedOrder.deliveryBoy.phone}</p>
+                              </div>
+                              <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Assigned</span>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-500 font-medium">No delivery partner assigned.</p>
+                          )}
+
+                          {["packed", "out_for_delivery"].includes(String(selectedOrder.status || "").toLowerCase()) && (
+                            ownDeliveryFormOrderId === selectedOrder.id ? (
                               <div className="space-y-2">
                                 <div className="h-px bg-slate-200 my-1" />
                                 <input
@@ -838,11 +852,15 @@ const Dashboard = () => {
                                     <option value="">
                                       {selectedOrder.deliveryBoy ? 'Change Rider...' : 'Assign Rider...'}
                                     </option>
-                                    {deliveryBoys
-                                      .filter(boy => (boy._id || boy.id) !== (selectedOrder.deliveryBoy?._id || selectedOrder.deliveryBoy?.id))
-                                      .map(boy => (
-                                        <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
-                                      ))}
+                                    {deliveryBoys.length === 0 ? (
+                                      <option value="" disabled>No online riders available</option>
+                                    ) : (
+                                      deliveryBoys
+                                        .filter(boy => (boy._id || boy.id) !== (selectedOrder.deliveryBoy?._id || selectedOrder.deliveryBoy?.id))
+                                        .map(boy => (
+                                          <option key={boy._id} value={boy._id}>{boy.name} ({boy.phone})</option>
+                                        ))
+                                    )}
                                   </select>
                                   <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
                                 </div>
@@ -853,119 +871,138 @@ const Dashboard = () => {
                                   {selectedOrder.deliveryMode === 'self' ? 'Edit own delivery details' : 'Use my own delivery person instead'}
                                 </button>
                               </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
-                    <div className="space-y-3 sm:space-y-4">
-                      <div className="bg-slate-50 p-3 sm:p-4 rounded-3xl border border-slate-100">
-                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                          Order Amount (Customer)
-                        </h4>
-                        <p className="text-lg font-black text-slate-900">
-                          ₹{getCustomerOrderBill(selectedOrder).grandTotal.toFixed(2)}
-                        </p>
-                      </div>
-                      <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
-                        <h4 className="text-[10px] font-black text-primary uppercase tracking-widest mb-3">
-                          Your Earning
-                        </h4>
-                        <div className="space-y-2">
-                          {(() => {
-                            const { productEarning, deliveryShare, total } =
-                              getSellerEarningBreakdown(selectedOrder);
-                            return (
-                              <>
-                                <div className="flex justify-between text-xs">
-                                  <span className="font-bold text-slate-600">Product</span>
-                                  <span className="font-black text-slate-900">
-                                    ₹{productEarning.toFixed(2)}
-                                  </span>
-                                </div>
-                                {deliveryShare > 0 ? (
-                                  <div className="flex justify-between text-xs">
-                                    <span className="font-bold text-slate-600">
-                                      Delivery (80%)
-                                    </span>
-                                    <span className="font-black text-brand-600">
-                                      ₹{deliveryShare.toFixed(2)}
-                                    </span>
-                                  </div>
-                                ) : null}
-                                <div className="h-px bg-primary/10 my-2" />
-                                <div className="flex justify-between text-sm">
-                                  <span className="font-black text-slate-900">
-                                    Your Earning
-                                  </span>
-                                  <span className="font-black text-primary">
-                                    ₹{total.toFixed(2)}
-                                  </span>
-                                </div>
-                              </>
-                            );
-                          })()}
+                            )
+                          )}
                         </div>
                       </div>
-                      <div className="bg-slate-900 p-3 sm:p-4 rounded-3xl text-white shadow-xl shadow-slate-900/10">
-                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2">
-                          Payment Status
-                        </h4>
-                        <div className="flex items-center gap-2">
-                          <HiOutlineBanknotes className="h-5 w-5 text-brand-400" />
-                          <span className="text-xs font-bold tracking-tight">
-                            {selectedOrder.payment}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    )}
 
-                  <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">
-                    Items Ordered ({selectedOrder.items.length})
-                  </h4>
-                  <div className="space-y-3 max-h-52 sm:max-h-64 overflow-y-auto pr-1">
-                    {selectedOrder.items.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-3 bg-white ring-1 ring-slate-100 rounded-2xl group hover:shadow-md transition-all"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-xl overflow-hidden bg-slate-50 ring-1 ring-slate-200">
-                            {item.image ? (
-                              <img
-                                src={item.image}
-                                alt={item.name}
-                                className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
-                              />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center text-slate-600 text-xs font-bold">
-                                —
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">
-                              {item.name}
-                            </p>
-                            <p className="text-[10px] font-semibold text-slate-600 mt-0.5">
-                              ₹{Number(item.price).toFixed(2)} × {item.qty}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs font-black text-slate-900">
-                            ₹{(item.price * item.qty).toFixed(2)}
+                    {selectedOrder.status.toLowerCase() === "confirmed" && (
+                      <div>
+                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
+                        </h4>
+                        <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 shadow-sm">
+                          <p className="text-[11px] text-amber-700 font-semibold">
+                            Mark order as <span className="font-black">Packed</span> to assign a delivery partner.
                           </p>
                         </div>
                       </div>
-                    ))}
+                    )}
+                  </div>
+
+                  {/* Order Pricing & Financials */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-slate-50 p-3 sm:p-4 rounded-3xl border border-slate-100">
+                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                        Order Amount (Customer)
+                      </h4>
+                      <p className="text-lg font-black text-slate-900">
+                        ₹{getCustomerOrderBill(selectedOrder).grandTotal.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-primary/5 p-3 sm:p-4 rounded-3xl border border-primary/10">
+                      <h4 className="text-[10px] font-black text-primary uppercase tracking-widest mb-3">
+                        Your Earning
+                      </h4>
+                      <div className="space-y-2">
+                        {(() => {
+                          const { productEarning, deliveryShare, total } =
+                            getSellerEarningBreakdown(selectedOrder);
+                          return (
+                            <>
+                              <div className="flex justify-between text-xs">
+                                <span className="font-bold text-slate-600">Product</span>
+                                <span className="font-black text-slate-900">
+                                  ₹{productEarning.toFixed(2)}
+                                </span>
+                              </div>
+                              {deliveryShare > 0 ? (
+                                <div className="flex justify-between text-xs">
+                                  <span className="font-bold text-slate-600">
+                                    Delivery (80%)
+                                  </span>
+                                  <span className="font-black text-brand-600">
+                                    ₹{deliveryShare.toFixed(2)}
+                                  </span>
+                                </div>
+                              ) : null}
+                              <div className="h-px bg-primary/10 my-2" />
+                              <div className="flex justify-between text-sm">
+                                <span className="font-black text-slate-900">
+                                  Your Earning
+                                </span>
+                                <span className="font-black text-primary">
+                                  ₹{total.toFixed(2)}
+                                </span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Status */}
+                  <div className="bg-slate-900 p-3 sm:p-4 rounded-3xl text-white shadow-xl shadow-slate-900/10">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                      Payment Status
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <HiOutlineBanknotes className="h-5 w-5 text-brand-400" />
+                      <span className="text-xs font-bold tracking-tight">
+                        {selectedOrder.payment}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Items Ordered */}
+                  <div>
+                    <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">
+                      Items Ordered ({selectedOrder.items?.length || 0})
+                    </h4>
+                    <div className="space-y-3">
+                      {selectedOrder.items?.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-3 bg-white ring-1 ring-slate-100 rounded-2xl group hover:shadow-md transition-all"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-xl overflow-hidden bg-slate-50 ring-1 ring-slate-200 flex-shrink-0">
+                              {item.image ? (
+                                <img
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center text-slate-600 text-xs font-bold">
+                                  —
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">
+                                {item.name}
+                              </p>
+                              <p className="text-[10px] font-semibold text-slate-600 mt-0.5">
+                                ₹{Number(item.price).toFixed(2)} × {item.qty}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs font-black text-slate-900">
+                              ₹{(item.price * item.qty).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                {/* Modal Footer - same as Orders */}
-                <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 sm:gap-0 sm:items-center justify-end">
+                {/* Modal Footer */}
+                <div className="px-4 py-3 sm:px-6 sm:py-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 sm:gap-0 sm:items-center justify-end flex-shrink-0">
                   <div className="flex gap-2 items-center w-full justify-between sm:justify-end">
                     <button
                       onClick={() => setIsOrderModalOpen(false)}
@@ -1022,18 +1059,6 @@ const Dashboard = () => {
                           <option value="delivered">Delivered</option>
                           <option value="cancelled">Cancelled</option>
                         </select>
-                      </div>
-                    )}
-                    {String(selectedOrder.status || "").toLowerCase() === "confirmed" && (
-                      <div>
-                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                          <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
-                        </h4>
-                        <div className="bg-amber-50 p-3 rounded-2xl border border-amber-100 shadow-sm">
-                          <p className="text-[11px] text-amber-700 font-semibold">
-                            Mark order as <span className="font-black">Packed</span> to assign a delivery partner.
-                          </p>
-                        </div>
                       </div>
                     )}
                   </div>

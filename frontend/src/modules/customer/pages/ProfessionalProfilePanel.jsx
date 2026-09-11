@@ -1429,14 +1429,13 @@ const ProfessionalProfilePanel = () => {
                                                 ) : (
                                                     <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-slate-600">
                                                         <Upload className="h-5 w-5" />
-                                                        <span className="text-[8px] font-black uppercase mt-1">Upload Photo</span>
+                                                        <span className="text-[8px] font-black uppercase mt-1">Upload Photo (Gallery / Files)</span>
                                                         <span className="text-[7px] text-slate-400 font-bold mt-0.5">JPEG, PNG up to 10MB</span>
                                                     </div>
                                                 )}
                                                 <input
                                                     type="file"
                                                     accept="image/*"
-                                                    capture="environment"
                                                     className="hidden"
                                                     onChange={(e) => {
                                                         handleUploadMediaFile(e, setPlatImageUrl, () => { });

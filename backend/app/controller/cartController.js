@@ -92,7 +92,7 @@ export const addToCart = async (req, res) => {
     const { productId, quantity = 1, variantSku = "" } = req.body;
     const normalizedVariantSku = String(variantSku || "").trim();
     const customerVisibleProduct = await getCustomerVisibleProductById(productId, {
-      select: "_id name variants sellerId",
+      select: "_id name variants sellerId stock",
     });
     if (!customerVisibleProduct) {
       return handleResponse(res, 404, "Product is not available for purchase");
@@ -126,6 +126,23 @@ export const addToCart = async (req, res) => {
         item.productId.toString() === productId &&
         String(item.variantSku || "").trim() === normalizedVariantSku,
     );
+
+    let availableStock = typeof customerVisibleProduct.stock === "number" ? customerVisibleProduct.stock : 9999;
+    if (productHasVariants(customerVisibleProduct)) {
+      const v = resolveVariantByKey(customerVisibleProduct.variants, normalizedVariantSku);
+      if (v && typeof v.stock === "number") {
+        availableStock = v.stock;
+      }
+    }
+
+    const currentQty = itemIndex > -1 ? cart.items[itemIndex].quantity : 0;
+    if (currentQty + quantity > availableStock) {
+      return handleResponse(
+        res,
+        400,
+        `Cannot add more than available stock (${availableStock} in stock)`
+      );
+    }
 
     if (itemIndex > -1) {
       cart.items[itemIndex].quantity += quantity;
@@ -164,6 +181,28 @@ export const updateQuantity = async (req, res) => {
     );
 
     if (itemIndex > -1) {
+      if (quantity > 0) {
+        const product = await getCustomerVisibleProductById(productId, {
+          select: "_id name variants stock",
+        });
+        if (product) {
+          let availableStock = typeof product.stock === "number" ? product.stock : 9999;
+          if (productHasVariants(product)) {
+            const v = resolveVariantByKey(product.variants, normalizedVariantSku);
+            if (v && typeof v.stock === "number") {
+              availableStock = v.stock;
+            }
+          }
+          if (quantity > availableStock) {
+            return handleResponse(
+              res,
+              400,
+              `Cannot exceed available stock (${availableStock} in stock)`
+            );
+          }
+        }
+      }
+
       cart.items[itemIndex].quantity = quantity;
       if (cart.items[itemIndex].quantity <= 0) {
         cart.items.splice(itemIndex, 1);
@@ -233,3 +272,116 @@ export const clearCart = async (req, res) => {
     return handleResponse(res, 500, error.message);
   }
 };
+
+/* ===============================
+   BATCH ADD TO CART (AI / List)
+================================ */
+export const batchAddToCart = async (req, res) => {
+  try {
+    const customerId = req.user.id;
+    const { items = [] } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return handleResponse(res, 400, "Items list is required and cannot be empty");
+    }
+
+    let cart = await Cart.findOne({ customerId });
+    if (!cart) {
+      cart = new Cart({ customerId, items: [] });
+    }
+
+    const addedItems = [];
+    const skippedItems = [];
+
+    for (const item of items) {
+      const { productId, variantSku = "", quantity = 1 } = item;
+      const normalizedVariantSku = String(variantSku || "").trim();
+      const numQty = Math.max(Number(quantity) || 1, 1);
+
+      const customerVisibleProduct = await getCustomerVisibleProductById(productId, {
+        select: "_id name variants sellerId stock price salePrice",
+      });
+
+      if (!customerVisibleProduct) {
+        skippedItems.push({ productId, reason: "Product is not available for purchase" });
+        continue;
+      }
+
+      const variantError = validateVariantSelection(
+        customerVisibleProduct,
+        normalizedVariantSku,
+      );
+      if (variantError) {
+        skippedItems.push({ productId, name: customerVisibleProduct.name, reason: variantError });
+        continue;
+      }
+
+      // Enforce single-seller cart constraint
+      if (cart.items.length > 0) {
+        const firstItemProductId = cart.items[0].productId;
+        const firstProduct = await getCustomerVisibleProductById(firstItemProductId, { select: "sellerId" });
+
+        if (firstProduct && String(firstProduct.sellerId) !== String(customerVisibleProduct.sellerId)) {
+          return handleResponse(
+            res,
+            400,
+            "Cart contains items from another store. Please clear your cart before adding items from a different seller."
+          );
+        }
+      }
+
+      // Check stock
+      let availableStock = customerVisibleProduct.stock || 0;
+      if (productHasVariants(customerVisibleProduct)) {
+        const v = resolveVariantByKey(customerVisibleProduct.variants, normalizedVariantSku);
+        if (v) {
+          availableStock = typeof v.stock === "number" ? v.stock : customerVisibleProduct.stock || 0;
+        }
+      }
+
+      if (availableStock <= 0) {
+        skippedItems.push({ productId, name: customerVisibleProduct.name, reason: "Out of stock" });
+        continue;
+      }
+
+      const safeQuantity = Math.min(numQty, availableStock);
+
+      const itemIndex = cart.items.findIndex(
+        (ci) =>
+          ci.productId.toString() === productId &&
+          String(ci.variantSku || "").trim() === normalizedVariantSku,
+      );
+
+      if (itemIndex > -1) {
+        cart.items[itemIndex].quantity += safeQuantity;
+      } else {
+        cart.items.push({ productId, variantSku: normalizedVariantSku, quantity: safeQuantity });
+      }
+
+      addedItems.push({
+        productId,
+        name: customerVisibleProduct.name,
+        variantSku: normalizedVariantSku,
+        quantity: safeQuantity,
+      });
+    }
+
+    if (addedItems.length === 0) {
+      return handleResponse(res, 400, "None of the requested items could be added to cart", {
+        skippedItems,
+      });
+    }
+
+    await cart.save();
+    const updatedCart = await fetchPopulatedCart(cart._id);
+
+    return handleResponse(res, 200, `Successfully added ${addedItems.length} item(s) to cart`, {
+      cart: updatedCart,
+      addedItems,
+      skippedItems,
+    });
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+

@@ -364,19 +364,40 @@ export const getProducts = async (req, res) => {
     if (search && String(search).trim()) {
       const cleanSearch = String(search).trim();
       const escapedSearch = cleanSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const searchRegex = new RegExp(escapedSearch.split('').join('.*?'), "i");
+      const phraseRegex = new RegExp(escapedSearch, "i");
+
+      // Extract individual search words with length > 1
+      const words = cleanSearch
+        .split(/\s+/)
+        .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .filter((w) => w.length > 1);
 
       searchOrConditions = [
-        { name: searchRegex },
-        { brand: searchRegex },
-        { tags: searchRegex },
-        { description: searchRegex },
-        { "variants.name": searchRegex },
+        { name: phraseRegex },
+        { brand: phraseRegex },
+        { tags: phraseRegex },
+        { description: phraseRegex },
+        { "variants.name": phraseRegex },
+        { "variants.sku": phraseRegex },
       ];
+
+      // If multi-word query (e.g. "Tata Salt", "Amul Butter"), match products where all tokens are present
+      if (words.length > 1) {
+        searchOrConditions.push({
+          $and: words.map((w) => ({
+            $or: [
+              { name: { $regex: w, $options: "i" } },
+              { brand: { $regex: w, $options: "i" } },
+              { tags: { $regex: w, $options: "i" } },
+              { "variants.name": { $regex: w, $options: "i" } },
+            ],
+          })),
+        });
+      }
 
       try {
         const matchingCategories = await Category.find(
-          { name: searchRegex },
+          { name: phraseRegex },
           { _id: 1 }
         ).lean();
         if (matchingCategories.length > 0) {

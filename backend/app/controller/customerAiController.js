@@ -1,5 +1,11 @@
 import { handleResponse } from "../utils/helper.js";
-import { generateChatResponse, analyzeImageForSearch, AiServiceError } from "../services/ai/geminiService.js";
+import {
+  generateChatResponse,
+  analyzeImageForSearch,
+  generateStructuredJson,
+  analyzeImageStructuredJson,
+  AiServiceError,
+} from "../services/ai/geminiService.js";
 import Product from "../models/product.js";
 import Order from "../models/order.js";
 import Coupon from "../models/coupon.js";
@@ -8,6 +14,7 @@ import Category from "../models/category.js";
 import Plan from "../models/plan.js";
 import Review from "../models/review.js";
 import { getNearbySellerIdsForCustomer } from "../services/customerVisibilityService.js";
+import { matchShoppingItemWithCatalog } from "../services/catalogMatcherService.js";
 
 const CUSTOMER_SYSTEM_INSTRUCTION = `
 You are "Seva AI", the official smart and multilingual assistant for "Seva Fast" - India's premier hyper-local quick-commerce, home services & community referral platform.
@@ -542,3 +549,171 @@ export const handleVisualSearch = async (req, res) => {
     return handleResponse(res, 500, error.message);
   }
 };
+
+const SHOPPING_LIST_EXTRACTION_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    items: {
+      type: "ARRAY",
+      description: "List of extracted product items requested by the user",
+      items: {
+        type: "OBJECT",
+        properties: {
+          rawText: { type: "STRING", description: "Original item text from input or image" },
+          searchTerm: {
+            type: "STRING",
+            description: "Clean English product keyword for catalog search (e.g. 'Nike Air Max 90', 'Puma T-shirt', 'Amul Butter', 'Milk', 'Basmati Rice')",
+          },
+          brand: { type: "STRING", description: "Brand name if present (e.g. 'Nike', 'Puma', 'Amul')" },
+          quantity: { type: "NUMBER", description: "Quantity requested, default to 1 if not specified" },
+          unit: { type: "STRING", description: "Unit of measure if mentioned (e.g. 'kg', 'g', 'liter', 'pack', 'pcs', 'bottle')" },
+          variantPreferences: {
+            type: "OBJECT",
+            properties: {
+              size: { type: "STRING", description: "Size/weight variant requested (e.g. '8', 'M', 'XL', '500g', '1kg')" },
+              color: { type: "STRING", description: "Color requested (e.g. 'Black', 'Blue', 'White')" },
+            },
+          },
+        },
+        required: ["searchTerm", "quantity"],
+      },
+    },
+  },
+  required: ["items"],
+};
+
+export const handleProcessShoppingList = async (req, res) => {
+  try {
+    const { text, imageBase64, mimeType, lat, lng } = req.body;
+
+    if (!text && (!imageBase64 || !mimeType)) {
+      return handleResponse(res, 400, "Either text or image (imageBase64 + mimeType) is required");
+    }
+
+    let nearbySellerIds = null;
+    if (lat && lng) {
+      try {
+        nearbySellerIds = await getNearbySellerIdsForCustomer(lat, lng);
+      } catch (geoErr) {
+        console.warn("[CustomerAI] Geo seller lookup warning:", geoErr.message);
+      }
+    }
+
+    let extractedData = null;
+
+    if (imageBase64 && mimeType) {
+      const imageBuffer = Buffer.from(imageBase64, "base64");
+      const visionPrompt = `Analyze this image carefully. It may be a handwritten grocery list, a printed shopping list/receipt, a medicine prescription, or a photo of grocery/household items. Extract all product items, their requested quantities, brand names, and size/color/weight variant preferences. Return ONLY structured JSON adhering to the schema.`;
+
+      extractedData = await analyzeImageStructuredJson({
+        imageBuffer,
+        mimeType,
+        prompt: visionPrompt,
+        systemInstruction: "You are an expert e-commerce catalog assistant. Extract every grocery and retail item accurately.",
+        responseSchema: SHOPPING_LIST_EXTRACTION_SCHEMA,
+      });
+    } else if (text) {
+      const textPrompt = `Analyze the following customer message/shopping request and extract all individual products, quantities, brands, and variant (size/color/weight) preferences:\n\n"${text}"`;
+
+      extractedData = await generateStructuredJson({
+        prompt: textPrompt,
+        systemInstruction: "You are an expert e-commerce catalog assistant. Extract product items, quantities, and variants from customer messages accurately.",
+        responseSchema: SHOPPING_LIST_EXTRACTION_SCHEMA,
+      });
+    }
+
+    const rawItems = Array.isArray(extractedData?.items) ? extractedData.items : [];
+
+    if (rawItems.length === 0) {
+      return handleResponse(res, 200, "No items recognized", {
+        summaryText: "I couldn't identify any products in your request. Please mention the items you would like to buy.",
+        matchedItems: [],
+        ambiguousItems: [],
+        unavailableItems: [],
+        batchPayload: [],
+        canBatchAdd: false,
+      });
+    }
+
+    // Match each extracted item with MongoDB product inventory
+    const matchedItems = [];
+    const ambiguousItems = [];
+    const unavailableItems = [];
+
+    for (const item of rawItems) {
+      const matchResult = await matchShoppingItemWithCatalog(item, { nearbySellerIds });
+      if (matchResult.status === "MATCHED") {
+        matchedItems.push(matchResult);
+      } else if (matchResult.status === "VARIANT_REQUIRED" || matchResult.status === "MULTIPLE_MATCHES") {
+        ambiguousItems.push(matchResult);
+      } else {
+        unavailableItems.push(matchResult);
+      }
+    }
+
+    // Compose a clear, friendly summary response
+    let summaryLines = [];
+    if (matchedItems.length > 0) {
+      summaryLines.push(`**I found the following items:**`);
+      matchedItems.forEach((m) => {
+        summaryLines.push(`• **${m.name}** — ₹${m.price} × ${m.quantity}`);
+      });
+    }
+
+    if (ambiguousItems.length > 0) {
+      if (summaryLines.length > 0) summaryLines.push("");
+      summaryLines.push(`**Please clarify the following:**`);
+      ambiguousItems.forEach((a) => {
+        summaryLines.push(`• ${a.message}`);
+      });
+    }
+
+    if (unavailableItems.length > 0) {
+      if (summaryLines.length > 0) summaryLines.push("");
+      summaryLines.push(`**Currently unavailable in store:**`);
+      unavailableItems.forEach((u) => {
+        const itemLabel = u.requestedItem?.searchTerm || u.product?.name || "Item";
+        summaryLines.push(`• ${itemLabel} — Out of stock or not available`);
+      });
+    }
+
+    if (matchedItems.length > 0) {
+      if (ambiguousItems.length === 0) {
+        summaryLines.push("");
+        summaryLines.push(`Should I add these **${matchedItems.length} item(s)** to your cart?`);
+      } else {
+        summaryLines.push("");
+        summaryLines.push(`You can choose the variants above, or add the confirmed items to your cart now.`);
+      }
+    }
+
+    const batchPayload = matchedItems.map((m) => ({
+      productId: m.productId,
+      variantSku: m.variantSku || "",
+      quantity: m.quantity || 1,
+      name: m.name,
+      price: m.price,
+      image: m.image,
+      sellerId: m.sellerId,
+    }));
+
+    return handleResponse(res, 200, "Shopping list processed successfully", {
+      summaryText: summaryLines.join("\n"),
+      matchedItems,
+      ambiguousItems,
+      unavailableItems,
+      canBatchAdd: batchPayload.length > 0,
+      batchPayload,
+    });
+  } catch (error) {
+    console.error("[CustomerAI] handleProcessShoppingList error:", error);
+    if (error instanceof AiServiceError) {
+      if (error.code === "RATE_LIMITED") {
+        return handleResponse(res, 429, "AI service is busy right now. Please try again in a moment.");
+      }
+      return handleResponse(res, 500, error.message);
+    }
+    return handleResponse(res, 500, error.message);
+  }
+};
+
