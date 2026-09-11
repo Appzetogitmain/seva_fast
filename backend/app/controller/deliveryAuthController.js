@@ -37,14 +37,8 @@ async function dispatchDeliveryOtpSms({ phone, otp, context }) {
         await sendSmsIndiaHubOtp({ phone: normalized, otp });
         return { sent: true };
     } catch (smsError) {
-        if (process.env.NODE_ENV === "production") {
-            throw smsError;
-        }
-        console.warn(
-            `[${context}] SMS dispatch failed in non-production; OTP saved for testing.`,
-            smsError.message,
-        );
-        return { sent: false, devOtp: otp };
+        console.error(`[${context}] SMS dispatch failed:`, smsError.message);
+        throw smsError;
     }
 }
 
@@ -160,18 +154,13 @@ export const signupDelivery = async (req, res) => {
             await delivery.save();
         }
 
-        const smsResult = await dispatchDeliveryOtpSms({
+        await dispatchDeliveryOtpSms({
             phone,
             otp,
             context: "signupDelivery",
         });
 
-        const payload = {};
-        if (smsResult.devOtp) {
-            payload.devOtp = smsResult.devOtp;
-        }
-
-        return handleResponse(res, 200, "OTP sent successfully", payload);
+        return handleResponse(res, 200, "OTP sent successfully");
     } catch (error) {
         return handleResponse(res, error.statusCode || 500, error.message);
     }
@@ -221,18 +210,13 @@ export const loginDelivery = async (req, res) => {
         delivery.otpExpiry = Date.now() + 5 * 60 * 1000;
         await delivery.save();
 
-        const smsResult = await dispatchDeliveryOtpSms({
+        await dispatchDeliveryOtpSms({
             phone,
             otp,
             context: "loginDelivery",
         });
 
-        const payload = {};
-        if (smsResult.devOtp) {
-            payload.devOtp = smsResult.devOtp;
-        }
-
-        return handleResponse(res, 200, "OTP sent successfully", payload);
+        return handleResponse(res, 200, "OTP sent successfully");
     } catch (error) {
         return handleResponse(res, error.statusCode || 500, error.message);
     }
