@@ -192,9 +192,24 @@ const DashboardLayout = ({ children, navItems, title }) => {
                 const pendingOrders = allOrders.filter(isSellerAlertEligible);
 
                 if (isFirstLoadRef.current) {
+                    isFirstLoadRef.current = false;
+                    // On first load (e.g. app opened from background push notification),
+                    // find if there is an active pending order whose timer has not expired.
+                    const activePendingOrder = pendingOrders.find((o) => {
+                        const hasExpiry = Boolean(o.sellerPendingExpiresAt ?? o.expiresAt);
+                        return !hasExpiry || secondsLeftUntilSellerExpiry(o) > 0;
+                    });
+
+                    if (activePendingOrder && !newOrderAlertRef.current) {
+                        setNewOrderAlert(activePendingOrder);
+                        setShownOrderIds(new Set([activePendingOrder.orderId]));
+                        shownOrderIdsRef.current = new Set([activePendingOrder.orderId]);
+                        newOrderAlertRef.current = activePendingOrder;
+                        return;
+                    }
+
                     const existingIds = new Set(pendingOrders.map((o) => o.orderId).filter(Boolean));
                     shownOrderIdsRef.current = existingIds;
-                    isFirstLoadRef.current = false;
                     setShownOrderIds(existingIds);
                     return;
                 }
