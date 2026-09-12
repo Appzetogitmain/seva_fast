@@ -50,6 +50,7 @@ const orderSchema = new mongoose.Schema(
           default: 0,
         },
         variantSlot: String,
+        variantName: String,
         image: String,
         // Snapshot for Shiprocket (scheduled nationwide shipping)
         weight: String,
@@ -477,6 +478,7 @@ const orderSchema = new mongoose.Schema(
           required: true,
         },
         variantSlot: String,
+        variantName: String,
         itemIndex: {
           type: Number,
         },
@@ -650,3 +652,4 @@ orderSchema.pre('findOneAndUpdate', function(next) {
 });
 
 export default mongoose.model("Order", orderSchema);
+

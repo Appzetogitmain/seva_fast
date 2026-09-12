@@ -92,6 +92,7 @@ export async function getPendingSellerApplications({
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
+      .populate("onboardedBy", "name phone referralCode")
       .lean(),
     Seller.countDocuments(query),
     Seller.find(finalStatsQuery)

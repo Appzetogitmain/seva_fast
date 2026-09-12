@@ -220,6 +220,15 @@ const sellerSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    // Raw referral code string entered at signup, kept even when it didn't
+    // qualify the referrer for an onboarding reward (onboardedBy stays null
+    // in that case) — so admin can still see which code was used.
+    referralCodeUsed: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: null,
+    },
     acceptsPhotoOrders: {
       type: Boolean,
       default: false,

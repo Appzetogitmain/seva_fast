@@ -237,6 +237,110 @@ export async function applyDeliveredSettlement(order, orderIdString) {
 }
 
 /**
+ * Shared core for the self-healing sweep below: a rider's COD delivery
+ * earning is normally credited immediately in applyDeliveredSettlement (see
+ * above), but if that write was ever missed — e.g. an unrelated error
+ * elsewhere in the same settlement call threw before reaching the credit
+ * step, and the OTP-validate endpoint just logs + swallows it — the rider is
+ * left delivered with no earning record and no retry. This creates any
+ * missing "Delivery Earning" transactions for the given delivered COD orders.
+ */
+async function backfillCodRiderEarningsForOrders(codOrders) {
+  if (codOrders.length === 0) return { created: 0 };
+
+  const references = codOrders.map((o) => `DEL-ERN-${o.orderId}`);
+  const existing = await Transaction.find({ reference: { $in: references } })
+    .select("reference")
+    .lean();
+  const existingRefs = new Set(existing.map((t) => t.reference));
+
+  const missing = codOrders.filter((o) => !existingRefs.has(`DEL-ERN-${o.orderId}`));
+  if (missing.length === 0) return { created: 0 };
+
+  let created = 0;
+  for (const order of missing) {
+    const amount = Math.round(order.paymentBreakdown?.riderPayoutTotal || 0);
+    if (amount <= 0) continue;
+    try {
+      await Transaction.findOneAndUpdate(
+        { reference: `DEL-ERN-${order.orderId}` },
+        {
+          $setOnInsert: {
+            user: order.deliveryBoy,
+            userModel: "Delivery",
+            order: order._id,
+            type: "Delivery Earning",
+            reference: `DEL-ERN-${order.orderId}`,
+            amount,
+            status: "Settled",
+            meta: {
+              tipAmount: Math.round(order.paymentBreakdown?.riderTipAmount || 0),
+              payoutBase: Math.round(order.paymentBreakdown?.riderPayoutBase || 0),
+              payoutDistance: Math.round(order.paymentBreakdown?.riderPayoutDistance || 0),
+              payoutBonus: Math.round(order.paymentBreakdown?.riderPayoutBonus || 0),
+              settledViaCash: true,
+              backfilled: true,
+            },
+          },
+        },
+        { upsert: true, new: true },
+      );
+      created += 1;
+    } catch (error) {
+      // Unique-index race with a concurrent settlement write for the same
+      // order — harmless, the other write already created the record.
+      console.warn(
+        `[backfillMissingCodRiderEarnings] Skipped order ${order.orderId}:`,
+        error.message,
+      );
+    }
+  }
+  return { created };
+}
+
+/** Per-rider sweep, called from the rider's own dashboard/earnings endpoints. */
+export async function backfillMissingCodRiderEarnings(deliveryBoyId) {
+  if (!deliveryBoyId) return { created: 0 };
+
+  const codOrders = await Order.find({
+    deliveryBoy: deliveryBoyId,
+    status: "delivered",
+    $or: [
+      { paymentMode: { $regex: /^cod$/i } },
+      { "payment.method": { $in: ["cod", "cash"] } },
+    ],
+  })
+    .select("_id orderId deliveryBoy paymentBreakdown")
+    .sort({ deliveredAt: -1 })
+    .limit(300)
+    .lean();
+
+  return backfillCodRiderEarningsForOrders(codOrders);
+}
+
+/**
+ * Platform-wide sweep (bounded to the most recent delivered COD orders) so
+ * the admin delivery-transactions view self-heals too, even for a rider who
+ * hasn't reopened their own app since the gap occurred.
+ */
+export async function backfillMissingCodRiderEarningsGlobal(limit = 500) {
+  const codOrders = await Order.find({
+    deliveryBoy: { $ne: null },
+    status: "delivered",
+    $or: [
+      { paymentMode: { $regex: /^cod$/i } },
+      { "payment.method": { $in: ["cod", "cash"] } },
+    ],
+  })
+    .select("_id orderId deliveryBoy paymentBreakdown")
+    .sort({ deliveredAt: -1 })
+    .limit(limit)
+    .lean();
+
+  return backfillCodRiderEarningsForOrders(codOrders);
+}
+
+/**
  * After COD admin credit: finish wallet settlement + legacy txns / cashback / levels.
  */
 export async function finalizeCodAfterAdminCredit(orderOrId, orderIdString) {

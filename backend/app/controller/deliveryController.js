@@ -10,7 +10,7 @@ import { WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
 import { writeDeliveryLocation, appendTrailPoint } from "../services/firebaseService.js";
 import { getRedisClient } from "../config/redis.js";
 import { distanceMeters } from "../utils/geoUtils.js";
-import { applyDeliveredSettlement } from "../services/orderSettlement.js";
+import { applyDeliveredSettlement, backfillMissingCodRiderEarnings } from "../services/orderSettlement.js";
 import { roundCurrency } from "../utils/money.js";
 import { sanitizeOrdersForDeliveryView } from "../utils/deliveryOrderView.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
@@ -54,6 +54,12 @@ async function throttleLocationUpdate(deliveryId, lat, lng) {
 export const getDeliveryStats = async (req, res) => {
     try {
         const deliveryBoyId = new mongoose.Types.ObjectId(req.user.id);
+
+        try {
+            await backfillMissingCodRiderEarnings(deliveryBoyId);
+        } catch (backfillError) {
+            console.warn("[getDeliveryStats] COD earnings backfill failed:", backfillError.message);
+        }
 
         const orders = await Order.find({ deliveryBoy: deliveryBoyId, status: 'delivered' })
             .select("_id")
@@ -152,6 +158,13 @@ export const getDeliveryStats = async (req, res) => {
 export const getDeliveryEarnings = async (req, res) => {
     try {
         const deliveryBoyId = new mongoose.Types.ObjectId(req.user.id);
+
+        try {
+            await backfillMissingCodRiderEarnings(deliveryBoyId);
+        } catch (backfillError) {
+            console.warn("[getDeliveryEarnings] COD earnings backfill failed:", backfillError.message);
+        }
+
         const { period } = req.query; // 'today', 'weekly', 'monthly'
 
         let dateFilter = {};

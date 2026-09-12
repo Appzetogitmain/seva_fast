@@ -33,7 +33,7 @@ import { BlurFade } from '@/components/ui/blur-fade';
 import ShimmerButton from '@/components/ui/shimmer-button';
 import { sellerApi } from '../services/sellerApi';
 import { useToast } from '@shared/components/ui/Toast';
-import { getLegacyStatusFromOrder } from '@/shared/utils/orderStatus';
+import { getLegacyStatusFromOrder, getOrderStatusLabel } from '@/shared/utils/orderStatus';
 import { Loader2 } from 'lucide-react';
 import Pagination from '@shared/components/ui/Pagination';
 import { DatePicker } from "@/components/ui/date-picker";
@@ -132,10 +132,12 @@ const Orders = () => {
                     avatar: (order.customer?.name || 'U').charAt(0)
                 },
                 items: (order.items || []).map(item => ({
-                    name: item.name,
+                    name: item.variantName ? `${item.name} (${item.variantName})` : (item.variantSlot ? `${item.name} (${item.variantSlot})` : item.name),
                     price: item.price,
                     qty: item.quantity,
-                    image: item.image
+                    image: item.image,
+                    variantName: item.variantName,
+                    variantSlot: item.variantSlot
                 })),
                 total: getSellerOrderEarning(order),
                 sellerEarning: getSellerOrderEarning(order),
@@ -144,6 +146,7 @@ const Orders = () => {
                 status: getLegacyStatusFromOrder(order),
                 workflowStatus: order.workflowStatus,
                 workflowVersion: order.workflowVersion,
+                returnStatus: order.returnStatus || null,
                 date: formatDate(order.createdAt, ''),
                 time: formatTime(order.createdAt, ''),
                 address: order.address
@@ -227,14 +230,16 @@ const Orders = () => {
                 else if (ws === "DELIVERED") nextStatus = "delivered";
                 else if (ws === "SELLER_PENDING" || ws === "CREATED") nextStatus = "pending";
             }
-            if (orderId && nextStatus) {
+            const nextReturnStatus = payload?.returnStatus;
+            if (orderId && (nextStatus || nextReturnStatus)) {
                 setOrders((prev) =>
                     prev.map((o) =>
                         o.id === orderId || o._id === orderId
                             ? {
                                 ...o,
-                                status: nextStatus,
+                                status: nextStatus || o.status,
                                 workflowStatus: payload?.workflowStatus || o.workflowStatus,
+                                returnStatus: nextReturnStatus || o.returnStatus,
                             }
                             : o,
                     ),
@@ -243,8 +248,9 @@ const Orders = () => {
                     prev && (prev.id === orderId || prev._id === orderId)
                         ? {
                             ...prev,
-                            status: nextStatus,
+                            status: nextStatus || prev.status,
                             workflowStatus: payload?.workflowStatus || prev.workflowStatus,
+                            returnStatus: nextReturnStatus || prev.returnStatus,
                         }
                         : prev,
                 );
@@ -307,7 +313,7 @@ const Orders = () => {
     ], [summary]);
 
     const getStatusColor = (status) => {
-        const s = status.toLowerCase();
+        const s = String(status || '').toLowerCase();
         switch (s) {
             case 'pending': return 'warning';
             case 'confirmed': return 'info';
@@ -315,9 +321,23 @@ const Orders = () => {
             case 'out_for_delivery': return 'secondary';
             case 'delivered': return 'success';
             case 'cancelled': return 'error';
+            case 'return_requested': return 'warning';
+            case 'return_approved': return 'info';
+            case 'return_pickup_assigned':
+            case 'return_in_transit': return 'primary';
+            case 'returned': return 'secondary';
+            case 'qc_passed': return 'success';
+            case 'qc_failed': return 'error';
+            case 'refund_completed': return 'success';
+            case 'return_rejected': return 'error';
             default: return 'secondary';
         }
     };
+
+    // Return status (when present) takes priority over the plain workflow
+    // status for both the badge color and label, mirroring getOrderStatusLabel.
+    const getDisplayStatusKey = (order) =>
+        order?.returnStatus && order.returnStatus !== 'none' ? order.returnStatus : order?.status;
 
     const handleViewDetails = (order) => {
         setSelectedOrder(order);
@@ -333,8 +353,8 @@ const Orders = () => {
         }
 
         const itemsHtml = order.items.map(item => {
-            const name = item.name;
-            const qtyStr = `x${item.qty}`;
+            const name = item.variantName ? `${item.name} (${item.variantName})` : (item.variantSlot ? `${item.name} (${item.variantSlot})` : item.name);
+            const qtyStr = `x${item.qty || item.quantity}`;
             const priceStr = `₹${(item.price * item.qty).toFixed(0)}`;
             const left = `${name} <span style="font-weight: 800; color: #000;">${qtyStr}</span>`;
             return `<div style="font-size: 18px; font-weight: 700; display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dotted #ccc;">
@@ -518,12 +538,14 @@ const Orders = () => {
 
         const itemsHtml = order.items.map((item, index) => {
             const price = item.price;
-            const total = item.price * item.qty;
+            const qty = item.qty || item.quantity;
+            const total = price * qty;
+            const name = item.variantName ? `${item.name} (${item.variantName})` : (item.variantSlot ? `${item.name} (${item.variantSlot})` : item.name);
             return `
                 <tr>
                     <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">${index + 1}</td>
                     <td style="padding: 12px; border-bottom: 1px solid #e2e8f0;">
-                        <div style="font-weight: bold; color: #1e293b;">${item.name}</div>
+                        <div style="font-weight: bold; color: #1e293b;">${name}</div>
                     </td>
                     <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center;">${item.qty}</td>
                     <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">₹${price.toFixed(2)}</td>
@@ -1067,8 +1089,8 @@ const Orders = () => {
                                                             <p className="text-sm font-black text-slate-900">₹{order.total.toLocaleString()}</p>
                                                         </div>
                                                         <div className="flex flex-col items-end gap-2 shrink-0">
-                                                            <Badge variant={getStatusColor(order.status)} className="text-[10px] font-black uppercase px-2 py-0">
-                                                                {order.status}
+                                                            <Badge variant={getStatusColor(getDisplayStatusKey(order))} className="text-[10px] font-black uppercase px-2 py-0">
+                                                                {getOrderStatusLabel(order)}
                                                             </Badge>
                                                             <select
                                                                 value={order.status}
@@ -1397,7 +1419,7 @@ const Orders = () => {
                                                 <div>
                                                     <h3 className="text-base font-black text-slate-900">Order Details</h3>
                                                     <div className="flex items-center space-x-2 mt-0.5">
-                                                        <Badge variant={getStatusColor(selectedOrder.status)} className="text-[10px] font-black uppercase tracking-widest px-1.5 py-0">{selectedOrder.status}</Badge>
+                                                        <Badge variant={getStatusColor(getDisplayStatusKey(selectedOrder))} className="text-[10px] font-black uppercase tracking-widest px-1.5 py-0">{getOrderStatusLabel(selectedOrder)}</Badge>
                                                         <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">#{selectedOrder.id}</span>
                                                     </div>
                                                     {(selectedOrder.date || selectedOrder.time) && (
@@ -1676,7 +1698,7 @@ const Orders = () => {
                                                                     <img src={item.image || '/default-product.png'} alt={item.name} onError={(e) => { e.target.onerror = null; e.target.src = '/default-product.png'; }} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                                                 </div>
                                                                 <div>
-                                                                    <p className="text-xs font-bold text-slate-900">{item.name}</p>
+                                                                    <p className="text-xs font-bold text-slate-900">{item.variantName ? `${item.name} (${item.variantName})` : (item.variantSlot ? `${item.name} (${item.variantSlot})` : item.name)}</p>
                                                                     <p className="text-xs font-semibold text-slate-600 mt-0.5">₹{item.price.toFixed(2)} × {item.qty}</p>
                                                                 </div>
                                                             </div>
@@ -1738,3 +1760,6 @@ const Orders = () => {
 };
 
 export default Orders;
+
+
+

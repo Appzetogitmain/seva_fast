@@ -108,16 +108,26 @@ export default function ChatbotWidget() {
       try {
         window.speechSynthesis.pause();
         window.speechSynthesis.cancel();
+        // These delayed fallback cancels exist because Chrome sometimes leaves
+        // cancel() pending. They must NOT fire if a *new* utterance has since
+        // started (activeUtteranceRef gets set again once new speech begins) -
+        // otherwise they wrongly cut off the new reply a moment after it starts.
         setTimeout(() => {
           try {
-            if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+            if (
+              !activeUtteranceRef.current &&
+              (window.speechSynthesis.speaking || window.speechSynthesis.pending)
+            ) {
               window.speechSynthesis.cancel();
             }
           } catch (_) {}
         }, 50);
         setTimeout(() => {
           try {
-            if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+            if (
+              !activeUtteranceRef.current &&
+              (window.speechSynthesis.speaking || window.speechSynthesis.pending)
+            ) {
               window.speechSynthesis.cancel();
             }
           } catch (_) {}
@@ -274,7 +284,22 @@ export default function ChatbotWidget() {
     ]);
 
     let wordIdx = 0;
-    let speechStarted = false;
+
+    const revealUpTo = (count) => {
+      const clamped = Math.max(0, Math.min(words.length, count));
+      const currentText = words.slice(0, clamped).join(" ");
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === modelMessageId
+            ? {
+                ...msg,
+                parts: [{ text: clamped >= words.length ? formattedText : currentText }],
+                isStreaming: clamped < words.length,
+              }
+            : msg
+        )
+      );
+    };
 
     const startWordStreaming = (msPerWord = 35) => {
       if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
@@ -287,30 +312,11 @@ export default function ChatbotWidget() {
         }
 
         wordIdx++;
-        const currentText = words.slice(0, wordIdx).join(" ");
-
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === modelMessageId
-              ? {
-                  ...msg,
-                  parts: [{ text: currentText }],
-                  isStreaming: wordIdx < words.length,
-                }
-              : msg
-          )
-        );
+        revealUpTo(wordIdx);
 
         if (wordIdx >= words.length) {
           clearInterval(streamIntervalRef.current);
           streamIntervalRef.current = null;
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === modelMessageId
-                ? { ...msg, parts: [{ text: formattedText }], isStreaming: false }
-                : msg
-            )
-          );
         }
       }, msPerWord);
     };
@@ -326,6 +332,25 @@ export default function ChatbotWidget() {
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
 
+        // Text reveal is driven by the TTS engine's actual word-boundary events so the
+        // on-screen text tracks what's being spoken in real time, instead of a fixed
+        // timer that drifts out of sync with the browser's real speech pace.
+        let speechStarted = false;
+        let boundaryFired = false;
+        let boundaryWordIdx = 0;
+
+        utterance.onboundary = (event) => {
+          if (!isOpenRef.current) return;
+          if (event.name && event.name !== "word") return;
+          boundaryFired = true;
+          if (streamIntervalRef.current) {
+            clearInterval(streamIntervalRef.current);
+            streamIntervalRef.current = null;
+          }
+          boundaryWordIdx++;
+          revealUpTo(boundaryWordIdx);
+        };
+
         utterance.onstart = () => {
           if (!isOpenRef.current) {
             stopSpeaking();
@@ -334,13 +359,18 @@ export default function ChatbotWidget() {
           speechStarted = true;
           setIsSpeaking(true);
 
-          const totalSpeechDurationEstimateSec = (words.length / 2.3);
-          const intervalMs = Math.max(
-            20,
-            Math.min(180, (totalSpeechDurationEstimateSec * 1000) / (words.length || 1))
-          );
-
-          startWordStreaming(intervalMs);
+          // Fallback for engines/voices that never fire onboundary (e.g. some mobile
+          // voices): estimate pace so text still streams roughly alongside the audio.
+          setTimeout(() => {
+            if (!boundaryFired && isOpenRef.current) {
+              const totalSpeechDurationEstimateSec = words.length / 2.3;
+              const intervalMs = Math.max(
+                20,
+                Math.min(180, (totalSpeechDurationEstimateSec * 1000) / (words.length || 1))
+              );
+              startWordStreaming(intervalMs);
+            }
+          }, 400);
         };
 
         utterance.onend = () => {
@@ -349,13 +379,7 @@ export default function ChatbotWidget() {
             streamIntervalRef.current = null;
           }
           setIsSpeaking(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === modelMessageId
-                ? { ...msg, parts: [{ text: formattedText }], isStreaming: false }
-                : msg
-            )
-          );
+          revealUpTo(words.length);
 
           if (voiceModeRef.current && isOpenRef.current) {
             voiceTimeoutRef.current = setTimeout(() => {
@@ -372,13 +396,7 @@ export default function ChatbotWidget() {
             streamIntervalRef.current = null;
           }
           setIsSpeaking(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === modelMessageId
-                ? { ...msg, parts: [{ text: formattedText }], isStreaming: false }
-                : msg
-            )
-          );
+          revealUpTo(words.length);
         };
 
         activeUtteranceRef.current = utterance;
@@ -499,6 +517,19 @@ export default function ChatbotWidget() {
         "Voice input is not supported in this browser. Please use Google Chrome or Microsoft Edge."
       );
       return;
+    }
+
+    // Speak a silent utterance synchronously inside this click/tap handler so
+    // browsers (esp. mobile Safari/Chrome) treat speech synthesis as
+    // "unlocked" for this session. Without this, calling speak() later from
+    // the async recognition.onend -> API response chain (well outside the
+    // original user gesture) gets silently ignored on some browsers.
+    if ("speechSynthesis" in window) {
+      try {
+        const primer = new SpeechSynthesisUtterance(" ");
+        primer.volume = 0;
+        window.speechSynthesis.speak(primer);
+      } catch (_) {}
     }
 
     stopSpeaking();

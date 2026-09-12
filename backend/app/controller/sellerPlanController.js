@@ -241,6 +241,26 @@ export const verifySellerPlanPurchase = async (req, res) => {
             return handleResponse(res, 400, "Payment verification failed");
         }
 
+        // Signature match alone only proves the payload was signed by Razorpay for this
+        // order+payment pair — it does not prove money actually moved. Confirm the payment
+        // itself is captured before activating, so a cancelled/failed attempt can never
+        // activate the plan even if a signature is somehow present.
+        const razorpay = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID || "dummy_key",
+            key_secret: process.env.RAZORPAY_KEY_SECRET || "dummy_secret"
+        });
+
+        let payment;
+        try {
+            payment = await razorpay.payments.fetch(razorpay_payment_id);
+        } catch (fetchError) {
+            return handleResponse(res, 400, "Unable to confirm payment with Razorpay");
+        }
+
+        if (!payment || payment.order_id !== razorpay_order_id || !["captured", "authorized"].includes(payment.status)) {
+            return handleResponse(res, 400, "Payment was not completed successfully");
+        }
+
         const plan = await SellerPlan.findById(planId);
         if (!plan) return handleResponse(res, 404, "Seller plan not found");
 

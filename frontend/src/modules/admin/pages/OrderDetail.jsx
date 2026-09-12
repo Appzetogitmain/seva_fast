@@ -308,7 +308,7 @@ const OrderDetail = () => {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <h4 className="text-sm font-black text-slate-900">{item.name}</h4>
+                                                        <h4 className="text-sm font-black text-slate-900">{item.variantName ? `${item.name} (${item.variantName})` : (item.variantSlot ? `${item.name} (${item.variantSlot})` : item.name)}</h4>
                                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">ID: {item.product?._id || item.product}</p>
                                                     </div>
                                                 </div>
@@ -858,7 +858,7 @@ const OrderDetail = () => {
                                     {order.items.map((item, idx) => (
                                         <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
                                             <td style={{ padding: "18px 20px" }}>
-                                                <div style={{ fontSize: "13px", fontWeight: "700", color: "#0f172a" }}>{item.name}</div>
+                                                <div style={{ fontSize: "13px", fontWeight: "700", color: "#0f172a" }}>{item.variantName ? `${item.name} (${item.variantName})` : (item.variantSlot ? `${item.name} (${item.variantSlot})` : item.name)}</div>
                                                 <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "4px" }}>Item Ref: {item.product?._id?.slice(-8).toUpperCase() || item._id?.slice(-8).toUpperCase()}</div>
                                             </td>
                                             <td align="center" style={{ padding: "18px 20px", fontSize: "13px", color: "#475569", fontWeight: "700" }}>₹{item.price}</td>
@@ -923,3 +923,5 @@ const OrderDetail = () => {
 };
 
 export default OrderDetail;
+
+

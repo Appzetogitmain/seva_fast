@@ -39,6 +39,7 @@ const StockManagement = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
+    const [selectedVariantSku, setSelectedVariantSku] = useState(''); // '' = whole product (no variants)
     const [adjustType, setAdjustType] = useState('Restock');
     const [adjustValue, setAdjustValue] = useState('');
     const [adjustNote, setAdjustNote] = useState('');
@@ -161,10 +162,24 @@ const StockManagement = () => {
         });
     }, [inventory, searchTerm, filterStatus]);
 
+    const itemVariants = useMemo(
+        () => (Array.isArray(selectedItem?.variants) ? selectedItem.variants.filter((v) => v && v.sku) : []),
+        [selectedItem]
+    );
+    const hasVariants = itemVariants.length > 0;
+    const selectedVariant = hasVariants
+        ? itemVariants.find((v) => v.sku === selectedVariantSku)
+        : null;
+    const displayedStock = selectedVariant ? (selectedVariant.stock || 0) : (selectedItem?.stock || 0);
+
     const handleFullAdjustment = async () => {
         const value = parseInt(adjustValue);
         if (isNaN(value) || value <= 0) {
             toast.error("Please enter a valid quantity");
+            return;
+        }
+        if (hasVariants && !selectedVariantSku) {
+            toast.error("Please select a variant to adjust");
             return;
         }
 
@@ -173,7 +188,8 @@ const StockManagement = () => {
                 productId: selectedItem.id,
                 type: adjustType === 'Restock' ? 'Restock' : 'Correction',
                 quantity: adjustType === 'Restock' ? value : -value,
-                note: adjustNote
+                note: adjustNote,
+                ...(selectedVariantSku ? { variantSku: selectedVariantSku } : {})
             });
 
             if (res.data.success) {
@@ -188,6 +204,8 @@ const StockManagement = () => {
 
     const openAdjustModal = (item) => {
         setSelectedItem(item);
+        const variants = Array.isArray(item?.variants) ? item.variants.filter((v) => v && v.sku) : [];
+        setSelectedVariantSku(variants.length > 0 ? variants[0].sku : '');
         setAdjustValue('');
         setAdjustNote('');
         setIsAdjustModalOpen(true);
@@ -356,6 +374,11 @@ const StockManagement = () => {
                                                                                 Low Stock
                                                                             </span>
                                                                         )}
+                                                                        {Array.isArray(item.variants) && item.variants.length > 0 && (
+                                                                            <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded w-fit mt-0.5">
+                                                                                {item.variants.length} variant{item.variants.length > 1 ? 's' : ''} (total)
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </td>
@@ -501,9 +524,48 @@ const StockManagement = () => {
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-black text-slate-900">{selectedItem.name}</h4>
-                                        <p className="text-[10px] font-bold text-slate-600">CURRENT STOCK: <span className="text-slate-900 font-black">{selectedItem.stock} UNITS</span></p>
+                                        <p className="text-[10px] font-bold text-slate-600">
+                                            {hasVariants ? 'TOTAL STOCK' : 'CURRENT STOCK'}: <span className="text-slate-900 font-black">{selectedItem.stock} UNITS</span>
+                                        </p>
                                     </div>
                                 </div>
+
+                                {hasVariants && (
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-black text-slate-600 uppercase tracking-widest ml-1">Select Variant</label>
+                                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                            {itemVariants.map((v) => (
+                                                <button
+                                                    type="button"
+                                                    key={v.sku}
+                                                    onClick={() => setSelectedVariantSku(v.sku)}
+                                                    className={cn(
+                                                        "w-full flex items-center justify-between px-4 py-3 rounded-2xl border text-left transition-all",
+                                                        selectedVariantSku === v.sku
+                                                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                                                            : "border-slate-200 bg-white hover:bg-slate-50"
+                                                    )}
+                                                >
+                                                    <div>
+                                                        <p className="text-xs font-black text-slate-900">{v.name || v.sku}</p>
+                                                        <p className="text-[10px] font-bold text-slate-500 mt-0.5">SKU: {v.sku}</p>
+                                                    </div>
+                                                    <span className={cn(
+                                                        "text-xs font-black shrink-0 ml-3",
+                                                        Number(v.stock || 0) <= 0 ? "text-rose-600" : "text-slate-900"
+                                                    )}>
+                                                        {v.stock || 0} units
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {selectedVariant && (
+                                            <p className="text-[10px] font-bold text-slate-600 ml-1 pt-1">
+                                                ADJUSTING: <span className="text-slate-900 font-black">{selectedVariant.name || selectedVariant.sku}</span> — currently <span className="text-slate-900 font-black">{displayedStock} units</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
 
                                 <div className="space-y-4">
                                     <div className="flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
