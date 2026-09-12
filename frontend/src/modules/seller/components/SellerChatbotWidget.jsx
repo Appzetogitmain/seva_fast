@@ -396,6 +396,19 @@ export default function SellerChatbotWidget() {
 
   // Web Speech Recognition setup (Voice to Text) with Barge-in
   const startVoiceInput = () => {
+    // Speak a silent utterance synchronously inside this click/tap handler so
+    // browsers (esp. mobile Safari/Chrome) treat speech synthesis as
+    // "unlocked" for this session. Without this, calling speak() later from
+    // the async recognition.onend -> API response chain (well outside the
+    // original user gesture) gets silently ignored on some browsers.
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      try {
+        const primer = new SpeechSynthesisUtterance(" ");
+        primer.volume = 0;
+        window.speechSynthesis.speak(primer);
+      } catch (_) {}
+    }
+
     // Barge-in: interrupt any ongoing AI speech immediately
     stopSpeaking();
 
