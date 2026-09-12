@@ -63,7 +63,7 @@ const router = express.Router();
 router.get(["/shipping/webhook", "/shipping/delivery-partner/webhook", "/shipping/shiprocket/webhook"], (req, res) => {
   return res.status(200).json({ success: true, message: "Shipping webhook endpoint is active and listening" });
 });
-router.post(["/shipping/webhook", "/shipping/delivery-partner/webhook", "/shipping/shiprocket/webhook"], handleShiprocketWebhook);
+router.post(["/shipping/webhook"], handleShiprocketWebhook);
 
 router.use(verifyToken);
 router.use(loadSubadminZones);
