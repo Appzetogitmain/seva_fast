@@ -16,7 +16,12 @@ function verifyWebhookSecret(req) {
     return true;
   }
 
-  const got = String(req.headers["x-api-key"] || "").trim();
+  const got = String(
+    req.headers["x-api-key"] ||
+    req.headers["x-shiprocket-token"] ||
+    req.headers["authorization"] ||
+    "",
+  ).replace(/^Bearer\s+/i, "").trim();
   if (!got) return false;
 
   const expectedBuf = Buffer.from(expected);
@@ -46,10 +51,12 @@ export async function handleShiprocketWebhook(req, res) {
       `[Shiprocket Webhook] AWB=${awbCode}, SR_OrderID=${shiprocketOrderId}, shipment=${shipmentId}, Status=${rawStatus}`,
     );
 
+    // Shiprocket initial verification / test ping handler
     if (!awbCode && !shiprocketOrderId && !shipmentId && !channelOrderId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing AWB / order / shipment id in payload" });
+      return res.status(200).json({
+        success: true,
+        message: "Shiprocket webhook endpoint verified successfully",
+      });
     }
 
     const orClauses = [];

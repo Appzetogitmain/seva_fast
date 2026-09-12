@@ -60,6 +60,9 @@ import { loadSubadminZones } from "../middleware/zoneRestrictionMiddleware.js";
 const router = express.Router();
 
 // Shiprocket Webhook (Public)
+router.get("/shipping/shiprocket/webhook", (req, res) => {
+  return res.status(200).json({ success: true, message: "Shiprocket webhook endpoint is active and listening" });
+});
 router.post("/shipping/shiprocket/webhook", handleShiprocketWebhook);
 
 router.use(verifyToken);
