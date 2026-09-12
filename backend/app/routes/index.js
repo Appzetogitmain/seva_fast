@@ -38,10 +38,17 @@ import deliveryAiRoute from "./deliveryAiRoutes.js";
 
 import express from "express";
 import { ensureDatabaseConnected } from "../middleware/databaseMiddleware.js";
+import { handleShiprocketWebhook } from "../controller/shippingWebhookController.js";
 
 const setupRoutes = (app) => {
     const router = express.Router();
     router.use(ensureDatabaseConnected);
+
+    // Direct Webhook Endpoint: /api/webhook (Public for Shiprocket / Shipping callbacks)
+    router.get("/webhook", (req, res) => {
+        return res.status(200).json({ success: true, message: "Webhook endpoint is active and listening" });
+    });
+    router.post("/webhook", handleShiprocketWebhook);
 
     // Health and metrics endpoints (no /api prefix for standard paths)
     app.use("/health", healthRoute);
