@@ -1,5 +1,5 @@
 import admin from "firebase-admin";
-import { getFirebaseAdminApp } from "../../config/firebaseAdmin.js";
+import { getFirebaseAdminApp, getFirebaseAppMessagingApp } from "../../config/firebaseAdmin.js";
 
 const MAX_FCM_MULTICAST_TOKENS = 500;
 
@@ -28,8 +28,8 @@ function chunkArray(input = [], size = MAX_FCM_MULTICAST_TOKENS) {
   return chunks;
 }
 
-function getMessagingClient() {
-  const app = getFirebaseAdminApp();
+function getMessagingClient(platform = "web") {
+  const app = platform === "app" ? getFirebaseAppMessagingApp() : getFirebaseAdminApp();
   if (!app) {
     const err = new Error("Firebase Admin is not configured for push notifications");
     err.code = "fcm/not-configured";
@@ -80,8 +80,9 @@ export async function sendFCM(tokens = [], payload = {}, options = {}) {
 
   const soundEnabled = options.sound !== false;
   const vibrationEnabled = options.vibration !== false;
+  const platform = options.platform || "web";
 
-  const messaging = getMessagingClient();
+  const messaging = getMessagingClient(platform);
   const data = toStringMap(payload.data || {});
   const link = String(data.link || payload?.data?.link || "").trim();
   const absoluteLink = resolveAbsoluteLink(link);
@@ -104,12 +105,21 @@ export async function sendFCM(tokens = [], payload = {}, options = {}) {
   };
 
   const orderAlert = options.orderAlert === true;
-  const androidChannelId = orderAlert ? "order_alert_channel" : "high_importance_channel";
+  // Use high_importance_channel as the standard channel to avoid Android silently dropping
+  // background notifications when order_alert_channel is not created in the native client APK.
+  const configuredChannel = process.env.ANDROID_NOTIFICATION_CHANNEL_ID;
+  const androidChannelId = configuredChannel || (orderAlert ? "high_importance_channel" : "high_importance_channel");
+  // Always allow defaultSound fallback so that devices without a bundled custom sound file still play sound.
   const androidSound = soundEnabled ? (orderAlert ? "order_alert" : "default") : undefined;
   const apnsSound = soundEnabled ? (orderAlert ? "order_alert.wav" : "default") : undefined;
   const webVibrate = vibrationEnabled
     ? (orderAlert ? [300, 200, 300, 200, 300, 200, 300] : [200, 100, 200])
     : [0];
+
+  // Enrich data payload so Flutter/Android background message handlers have full access
+  data.channelId = androidChannelId;
+  data.orderAlert = orderAlert ? "true" : "false";
+  data.sound = soundEnabled ? "default" : "none";
 
   for (const chunk of chunks) {
     const result = await messaging.sendEachForMulticast({
@@ -125,7 +135,7 @@ export async function sendFCM(tokens = [], payload = {}, options = {}) {
         notification: {
           channelId: androidChannelId,
           sound: androidSound,
-          defaultSound: soundEnabled && !orderAlert,
+          defaultSound: soundEnabled,
           defaultVibrateTimings: vibrationEnabled,
           priority: "high",
           visibility: "public",

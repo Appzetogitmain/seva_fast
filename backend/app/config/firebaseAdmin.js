@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 let firebaseAdminApp = null;
+let firebaseAppAdminApp = null;
 
 /**
  * Returns a firebase-admin app when FIREBASE_SERVICE_ACCOUNT (JSON string)
@@ -38,9 +39,35 @@ export const getFirebaseAdminApp = () => {
   }
 };
 
+/**
+ * Returns a dedicated firebase-admin app for mobile app push tokens if configured
+ * via FIREBASE_SERVICE_ACCOUNT_APP. Falls back to default getFirebaseAdminApp().
+ */
+export const getFirebaseAppMessagingApp = () => {
+  if (firebaseAppAdminApp) return firebaseAppAdminApp;
+
+  const json = process.env.FIREBASE_SERVICE_ACCOUNT_APP;
+  if (!json) {
+    return getFirebaseAdminApp();
+  }
+
+  try {
+    const serviceAccount = JSON.parse(json);
+    const config = {
+      credential: admin.credential.cert(serviceAccount),
+    };
+    firebaseAppAdminApp = admin.initializeApp(config, "app_mobile_push");
+    return firebaseAppAdminApp;
+  } catch (e) {
+    console.warn("[Firebase Mobile App] Init failed, falling back to default:", e.message);
+    return getFirebaseAdminApp();
+  }
+};
+
 export const getFirebaseRealtimeDb = () => {
   const app = getFirebaseAdminApp();
   if (!app) return null;
   return admin.database(app);
 };
+
 

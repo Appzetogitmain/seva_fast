@@ -1205,8 +1205,7 @@ const Auth = () => {
         {/* Form Content Side */}
         <div
           ref={formPanelRef}
-          className="w-full md:w-[55%] flex-1 min-h-0 p-6 pt-8 sm:p-8 sm:pt-8 md:p-12 md:pt-10 flex flex-col justify-start bg-white md:overflow-y-auto md:overscroll-contain md:touch-pan-y md:custom-scrollbar relative"
-          className="w-full md:w-[55%] min-h-0 p-6 pt-8 sm:p-8 sm:pt-8 md:p-12 md:pt-10 flex flex-col justify-start bg-white overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar relative"
+          className="w-full md:w-[55%] flex-1 min-h-0 p-6 pt-8 sm:p-8 sm:pt-8 md:p-12 md:pt-10 flex flex-col justify-start bg-white overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar relative"
           style={{ WebkitOverflowScrolling: "touch" }}>
           <div className="hidden md:flex absolute top-6 right-6 md:top-8 md:right-8 z-20">
             <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden">

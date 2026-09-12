@@ -181,8 +181,10 @@ export async function ensureFcmTokenRegistered({
     // Get token from Flutter native layer
     token = await AppZetoBridge.getFcmToken();
     if (!token) {
+      console.warn("[PushClient] Failed to obtain native FCM token from Flutter bridge");
       throw new Error("Failed to obtain native FCM token from Flutter");
     }
+    console.log("[PushClient] Native FCM token obtained from Flutter bridge:", token ? `${token.slice(0, 12)}...` : "null");
     // Set platform to 'app' to match backend validation (instead of android/ios)
     platform = "app";
   } else {

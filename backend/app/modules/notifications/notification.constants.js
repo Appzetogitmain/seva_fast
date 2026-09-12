@@ -84,6 +84,7 @@ export const NOTIFICATIONS_ENABLED = () =>
 export const INVALID_FCM_TOKEN_CODES = new Set([
   "messaging/invalid-registration-token",
   "messaging/registration-token-not-registered",
+  "messaging/mismatched-credential",
 ]);
 
 export function normalizeNotificationRole(role) {

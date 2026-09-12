@@ -52,7 +52,7 @@ async function refreshQueueMetrics() {
 }
 
 async function deactivateInvalidTokens(tokens = [], responses = []) {
-  const invalidTokenIds = [];
+  const invalidUpdates = [];
 
   responses.forEach((response, index) => {
     if (response?.success) return;
@@ -60,28 +60,49 @@ async function deactivateInvalidTokens(tokens = [], responses = []) {
     if (!INVALID_FCM_TOKEN_CODES.has(code)) return;
     const tokenDoc = tokens[index];
     if (tokenDoc?._id) {
-      invalidTokenIds.push(tokenDoc._id);
+      let reason = "FCM_TOKEN_INVALID";
+      if (code === "messaging/mismatched-credential") {
+        reason = "FCM_SENDER_ID_MISMATCH";
+        logger.warn("[NotificationWorker] Token rejected with SenderId mismatch", {
+          tokenId: tokenDoc._id,
+          platform: tokenDoc.platform,
+          role: tokenDoc.role,
+          message: "The mobile app was built with a different Firebase project than the backend service account. Align google-services.json or set FIREBASE_SERVICE_ACCOUNT_APP.",
+        });
+      }
+      invalidUpdates.push({ id: tokenDoc._id, reason });
     }
   });
 
-  if (!invalidTokenIds.length) {
+  if (!invalidUpdates.length) {
     return 0;
   }
 
-  await PushToken.updateMany(
-    { _id: { $in: invalidTokenIds } },
-    {
-      $set: {
-        isActive: false,
-        invalidReason: "FCM_TOKEN_INVALID",
-        invalidatedAt: new Date(),
-        lastUsedAt: new Date(),
-      },
-    },
-  );
+  // Group by reason and batch update via updateMany
+  const byReason = new Map();
+  for (const item of invalidUpdates) {
+    if (!byReason.has(item.reason)) {
+      byReason.set(item.reason, []);
+    }
+    byReason.get(item.reason).push(item.id);
+  }
 
-  incrementCounter("notifications_invalid_tokens_total", {}, invalidTokenIds.length);
-  return invalidTokenIds.length;
+  for (const [reason, ids] of byReason.entries()) {
+    await PushToken.updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          isActive: false,
+          invalidReason: reason,
+          invalidatedAt: new Date(),
+          lastUsedAt: new Date(),
+        },
+      },
+    );
+  }
+
+  incrementCounter("notifications_invalid_tokens_total", {}, invalidUpdates.length);
+  return invalidUpdates.length;
 }
 
 export async function deliverNotificationById(notificationId) {
@@ -168,23 +189,55 @@ export async function deliverNotificationById(notificationId) {
     String(notification.type || "").toUpperCase()
   );
 
-  let fcmResponse;
-  try {
-    fcmResponse = await Promise.race([
+  // Split tokens by platform (web vs app) so each can use appropriate Firebase client
+  const webTokens = tokens.filter((t) => t.platform !== "app");
+  const appTokens = tokens.filter((t) => t.platform === "app");
+
+  const sendPayload = {
+    title: notification.title,
+    body: notification.body || notification.message,
+    message: notification.message,
+    data: notification.data || {},
+  };
+
+  const baseOptions = {
+    sound: preference?.sound !== false,
+    vibration: preference?.vibration !== false,
+    orderAlert: isOrderAlertType,
+  };
+
+  const dispatchPromises = [];
+
+  if (webTokens.length > 0) {
+    dispatchPromises.push(
       sendFCM(
-        tokens.map((tokenDoc) => tokenDoc.token),
-        {
-          title: notification.title,
-          body: notification.body || notification.message,
-          message: notification.message,
-          data: notification.data || {},
-        },
-        {
-          sound: preference?.sound !== false,
-          vibration: preference?.vibration !== false,
-          orderAlert: isOrderAlertType,
-        },
-      ),
+        webTokens.map((t) => t.token),
+        sendPayload,
+        { ...baseOptions, platform: "web" },
+      ).then((res) => ({ ...res, tokenDocs: webTokens })),
+    );
+  }
+
+  if (appTokens.length > 0) {
+    dispatchPromises.push(
+      sendFCM(
+        appTokens.map((t) => t.token),
+        sendPayload,
+        { ...baseOptions, platform: "app" },
+      ).then((res) => ({ ...res, tokenDocs: appTokens })),
+    );
+  }
+
+  let aggregatedResponse = {
+    successCount: 0,
+    failureCount: 0,
+    responses: [],
+    tokensOrdered: [],
+  };
+
+  try {
+    const results = await Promise.race([
+      Promise.all(dispatchPromises),
       new Promise((_, reject) =>
         setTimeout(
           () => reject(new Error("FCM send timeout")),
@@ -192,6 +245,13 @@ export async function deliverNotificationById(notificationId) {
         ),
       ),
     ]);
+
+    for (const res of results) {
+      aggregatedResponse.successCount += Number(res?.successCount || 0);
+      aggregatedResponse.failureCount += Number(res?.failureCount || 0);
+      aggregatedResponse.responses.push(...(res?.responses || []));
+      aggregatedResponse.tokensOrdered.push(...(res?.tokenDocs || []));
+    }
   } catch (error) {
     await Notification.updateOne(
       { _id: notification._id },
@@ -211,10 +271,10 @@ export async function deliverNotificationById(notificationId) {
   }
 
   const attempted = Number(tokens.length || 0);
-  const sent = Number(fcmResponse?.successCount || 0);
-  const failed = Number(fcmResponse?.failureCount || 0);
-  const responses = fcmResponse?.responses || [];
-  const invalidTokens = await deactivateInvalidTokens(tokens, responses);
+  const sent = Number(aggregatedResponse.successCount || 0);
+  const failed = Number(aggregatedResponse.failureCount || 0);
+  const responses = aggregatedResponse.responses || [];
+  const invalidTokens = await deactivateInvalidTokens(aggregatedResponse.tokensOrdered, responses);
   const status = sent > 0 ? "sent" : "failed";
   const update = {
     status,
