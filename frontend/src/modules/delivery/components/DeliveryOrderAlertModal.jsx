@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Truck, BellRing, ArrowRight, X, Volume2, VolumeX, MapPin, DollarSign, Package } from "lucide-react";
 import { useAuth } from "@core/context/AuthContext";
-import { getOrderSocket, onDeliveryBroadcast } from "@core/services/orderSocket";
+import { getOrderSocket, onDeliveryBroadcast, onDeliveryBroadcastWithdrawn } from "@core/services/orderSocket";
 import { notificationSound } from "@core/utils/notificationSound";
 import AppZetoBridge from "@/lib/appZetoBridge";
 import {
@@ -43,8 +43,24 @@ export default function DeliveryOrderAlertModal() {
       }
     });
 
+    const cleanupWithdrawn = onDeliveryBroadcastWithdrawn(() => token, (payload) => {
+      const orderId = payload?.orderId;
+      if (!orderId) return;
+      setNewOrder((curr) => {
+        const currId = curr?.orderId || curr?._id;
+        if (currId === orderId) {
+          stopDeliveryVibration();
+          notificationSound.stopRepeatingAlert();
+          AppZetoBridge.stopOrderAlert();
+          return null;
+        }
+        return curr;
+      });
+    });
+
     return () => {
       cleanupListener();
+      cleanupWithdrawn();
       stopDeliveryVibration();
       notificationSound.stopRepeatingAlert();
       AppZetoBridge.stopOrderAlert();

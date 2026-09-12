@@ -126,26 +126,7 @@ export async function afterPlaceOrderV2(orderDoc) {
     payload,
   });
 
-  // 2. Broadcast to Delivery Partners
-  try {
-    const previewData = {
-      orderId: orderDoc.orderId,
-      sellerName: orderDoc.sellerName || "Store",
-      pickupAddress: orderDoc.pickupAddress || "",
-      deliveryAddress: orderDoc.shippingAddress?.address || "",
-      grandTotal: orderDoc.grandTotal,
-      itemsCount: orderDoc.items?.length || 0,
-      paymentMode: orderDoc.paymentMode || "COD",
-    };
-
-    void emitDeliveryBroadcastForSeller(orderDoc.seller?.toString(), {
-      orderId: orderDoc.orderId,
-      preview: previewData,
-      deliverySearchExpiresAt: new Date(Date.now() + 60000).toISOString(),
-    });
-  } catch (e) {
-    console.warn("[afterPlaceOrderV2] delivery broadcast failed:", e.message);
-  }
+  // Delivery partners will be broadcasted ONLY after the seller confirms the order (in sellerConfirmOrderV2).
 }
 
 const BULL_ADD_TIMEOUT_MS = () =>
