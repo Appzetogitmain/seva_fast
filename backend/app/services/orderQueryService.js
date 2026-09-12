@@ -130,18 +130,20 @@ export async function fetchSellerOrdersPage({
                   $and: [
                     { $eq: ["$status", "delivered"] },
                     {
-                      $nin: [
-                        { $ifNull: ["$returnStatus", "none"] },
-                        [
-                          "returned",
-                          "qc_passed",
-                          "refund_completed",
-                          "return_approved",
-                          "return_in_transit",
-                          "return_drop_pending",
-                          "return_pickup_assigned",
+                      $not: {
+                        $in: [
+                          { $ifNull: ["$returnStatus", "none"] },
+                          [
+                            "returned",
+                            "qc_passed",
+                            "refund_completed",
+                            "return_approved",
+                            "return_in_transit",
+                            "return_drop_pending",
+                            "return_pickup_assigned",
+                          ],
                         ],
-                      ],
+                      },
                     },
                   ],
                 },
@@ -199,18 +201,20 @@ export async function fetchSellerOrdersPage({
                   $and: [
                     { $eq: ["$status", "delivered"] },
                     {
-                      $nin: [
-                        { $ifNull: ["$returnStatus", "none"] },
-                        [
-                          "returned",
-                          "qc_passed",
-                          "refund_completed",
-                          "return_approved",
-                          "return_in_transit",
-                          "return_drop_pending",
-                          "return_pickup_assigned",
+                      $not: {
+                        $in: [
+                          { $ifNull: ["$returnStatus", "none"] },
+                          [
+                            "returned",
+                            "qc_passed",
+                            "refund_completed",
+                            "return_approved",
+                            "return_in_transit",
+                            "return_drop_pending",
+                            "return_pickup_assigned",
+                          ],
                         ],
-                      ],
+                      },
                     },
                   ],
                 },
