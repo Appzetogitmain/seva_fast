@@ -269,6 +269,29 @@ export const signupSeller = async (req, res) => {
             token: phoneVerificationToken,
         });
 
+        // 3. Address & Location Details Format Validation (Required for Shiprocket & Invoicing)
+        const cleanAddress = String(address || "").trim();
+        const cleanLocality = String(locality || "").trim();
+        const cleanCity = String(city || "").trim();
+        const cleanState = String(state || "").trim();
+        const cleanPincode = String(pincode || "").trim();
+
+        if (!cleanAddress) {
+            return handleResponse(res, 400, "Full store/pickup address is required for seller registration.");
+        }
+        if (!cleanLocality) {
+            return handleResponse(res, 400, "Locality / Area is required for seller registration.");
+        }
+        if (!cleanCity) {
+            return handleResponse(res, 400, "City is required for seller registration.");
+        }
+        if (!cleanState) {
+            return handleResponse(res, 400, "State is required for seller registration.");
+        }
+        if (!cleanPincode || !/^\d{6}$/.test(cleanPincode)) {
+            return handleResponse(res, 400, "A valid 6-digit Pincode is required for seller pickup location.");
+        }
+
         // Validate coordinates and radius if provided
         if (lat !== undefined && (!Number.isFinite(parsedLat) || parsedLat < -90 || parsedLat > 90)) {
             return handleResponse(res, 400, "Invalid latitude");

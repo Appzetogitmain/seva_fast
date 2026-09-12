@@ -879,6 +879,34 @@ const Auth = () => {
           }
         }
         if (signupStep === 4) {
+          // Re-verify Step 3 address details (required for Shiprocket pickup registration)
+          if (!formData.locality?.trim()) {
+            toast.error("Please enter Locality / Area in Store Location.");
+            isProcessing.current = false;
+            return;
+          }
+          const pin = String(formData.pincode || "").trim();
+          if (!pin || !/^\d{6}$/.test(pin)) {
+            toast.error("Please enter a valid 6-digit Pincode in Store Location.");
+            isProcessing.current = false;
+            return;
+          }
+          if (!formData.city?.trim()) {
+            toast.error("Please enter City in Store Location.");
+            isProcessing.current = false;
+            return;
+          }
+          if (!formData.state?.trim()) {
+            toast.error("Please enter State in Store Location.");
+            isProcessing.current = false;
+            return;
+          }
+          if (!formData.address?.trim()) {
+            toast.error("Please enter Full Store Address in Store Location.");
+            isProcessing.current = false;
+            return;
+          }
+
           // Re-verify Step 2 bank details before final submission
           const accNum = String(formData.accountNumber || "").trim();
           if (!accNum || !isValidAccountNumber(accNum)) {
