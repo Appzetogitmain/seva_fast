@@ -108,16 +108,26 @@ export default function ChatbotWidget() {
       try {
         window.speechSynthesis.pause();
         window.speechSynthesis.cancel();
+        // These delayed fallback cancels exist because Chrome sometimes leaves
+        // cancel() pending. They must NOT fire if a *new* utterance has since
+        // started (activeUtteranceRef gets set again once new speech begins) -
+        // otherwise they wrongly cut off the new reply a moment after it starts.
         setTimeout(() => {
           try {
-            if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+            if (
+              !activeUtteranceRef.current &&
+              (window.speechSynthesis.speaking || window.speechSynthesis.pending)
+            ) {
               window.speechSynthesis.cancel();
             }
           } catch (_) {}
         }, 50);
         setTimeout(() => {
           try {
-            if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+            if (
+              !activeUtteranceRef.current &&
+              (window.speechSynthesis.speaking || window.speechSynthesis.pending)
+            ) {
               window.speechSynthesis.cancel();
             }
           } catch (_) {}
