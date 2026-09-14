@@ -234,11 +234,18 @@ export const verifyDeliveryOTP = async (req, res) => {
         }
 
         const candidates = otpTestables.getPhoneCandidates(phone);
-        const delivery = await Delivery.findOne({
+        const isTestPhone = isDeliveryTestPhone(phone);
+        let delivery = await Delivery.findOne({
             phone: { $in: candidates },
             otp,
             otpExpiry: { $gt: Date.now() },
         }).select("+otp +otpExpiry");
+
+        if (!delivery && isTestPhone && String(otp).trim() === DELIVERY_TEST_OTP) {
+            delivery = await Delivery.findOne({
+                phone: { $in: candidates },
+            }).select("+otp +otpExpiry");
+        }
 
         if (!delivery) {
             return handleResponse(res, 400, "Invalid or expired OTP");
