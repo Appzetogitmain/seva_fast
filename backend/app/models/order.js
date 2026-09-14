@@ -548,6 +548,15 @@ const orderSchema = new mongoose.Schema(
       ref: "Delivery",
     },
     refundIssuedAt: { type: Date },
+    refundDetails: {
+      refundId: { type: String, default: null, index: true },
+      amount: { type: Number, default: 0 },
+      status: { type: String, default: null },
+      gateway: { type: String, default: "RAZORPAY" },
+      refundedAt: { type: Date, default: null },
+      failureReason: { type: String, default: null },
+      rawResponse: { type: mongoose.Schema.Types.Mixed, default: {} },
+    },
     sellerPayoutReleasedAt: { type: Date },
     deliveryProofImages: [{ type: String }],
     otpValidatedAt: {

@@ -133,6 +133,15 @@ const paymentSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    gatewayRefundId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    refundStatus: {
+      type: String,
+      default: null,
+    },
     capturedAt: {
       type: Date,
       default: null,
