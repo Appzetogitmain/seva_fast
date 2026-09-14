@@ -1059,3 +1059,138 @@ export async function cancelOnlinePaymentAttempt({ orderRef, userId, reason = "P
 
   return { success: true, message: "Online payment cancelled and order released" };
 }
+
+/**
+ * Initiates an atomic refund via Razorpay Refund API with duplicate protection.
+ *
+ * @param {Object} params
+ * @param {Object} params.order - The mongoose Order document or plain order object
+ * @param {number} params.amountRupees - The amount in rupees to refund via Razorpay
+ * @param {string} [params.reason] - Reason for refund
+ * @returns {Promise<{ success: boolean, refundId?: string, status?: string, alreadyRefunded?: boolean, raw?: Object, error?: string }>}
+ */
+export async function issueRazorpayRefund({
+  order,
+  amountRupees,
+  reason = "Order cancellation refund",
+}) {
+  if (!order || !order._id) {
+    throw new Error("Valid order is required for issuing refund");
+  }
+
+  const orderId = order.orderId || String(order._id);
+  const refundAmountPaise = Math.round(Number(amountRupees || 0) * 100);
+
+  if (!Number.isFinite(refundAmountPaise) || refundAmountPaise <= 0) {
+    return {
+      success: true,
+      alreadyRefunded: false,
+      amount: 0,
+      message: "No monetary refund required (zero amount)",
+    };
+  }
+
+  // 1. Duplicate check on order
+  if (
+    order.paymentStatus === ORDER_PAYMENT_STATUS.REFUNDED &&
+    order.refundDetails?.refundId
+  ) {
+    return {
+      success: true,
+      alreadyRefunded: true,
+      refundId: order.refundDetails.refundId,
+      status: order.refundDetails.status || "processed",
+      message: "Order has already been refunded",
+    };
+  }
+
+  // 2. Locate the captured Payment record
+  const paymentQuery = order.checkoutGroupId
+    ? { checkoutGroupId: order.checkoutGroupId, status: PAYMENT_STATUS.CAPTURED }
+    : { order: order._id, status: PAYMENT_STATUS.CAPTURED };
+
+  let payment = await Payment.findOne(paymentQuery).sort({ createdAt: -1 });
+
+  // Fallback: search by gatewayOrderId if available on order.payment
+  if (!payment && order.payment?.transactionId) {
+    payment = await Payment.findOne({
+      $or: [
+        { gatewayPaymentId: order.payment.transactionId },
+        { gatewayOrderId: order.payment.transactionId },
+      ],
+      status: PAYMENT_STATUS.CAPTURED,
+    });
+  }
+
+  if (!payment || !payment.gatewayPaymentId) {
+    const errorMsg = `No captured Razorpay payment found for order #${orderId}`;
+    return {
+      success: false,
+      error: errorMsg,
+    };
+  }
+
+  // Duplicate check on payment record
+  if (payment.gatewayRefundId && payment.status === PAYMENT_STATUS.REFUNDED) {
+    return {
+      success: true,
+      alreadyRefunded: true,
+      refundId: payment.gatewayRefundId,
+      status: payment.refundStatus || "processed",
+      message: "Payment has already been refunded",
+    };
+  }
+
+  const client = getRazorpayClient();
+  const idempotencyReceipt = `rfnd_${orderId}_${Date.now()}`.slice(0, 40);
+
+  try {
+    const refundPayload = {
+      amount: refundAmountPaise,
+      speed: "normal",
+      notes: {
+        orderId,
+        orderObjectId: String(order._id),
+        reason: String(reason).slice(0, 255),
+      },
+      receipt: idempotencyReceipt,
+    };
+
+    const refund = await client.payments.refund(payment.gatewayPaymentId, refundPayload);
+
+    if (!refund || !refund.id) {
+      throw new Error("Razorpay returned an empty refund response");
+    }
+
+    const refundId = refund.id;
+    const refundStatus = refund.status || "processed";
+
+    // Update Payment record
+    payment.gatewayRefundId = refundId;
+    payment.refundStatus = refundStatus;
+    payment.refundedAmount = (payment.refundedAmount || 0) + Number(amountRupees);
+    payment.refundedAt = new Date();
+
+    await transitionPaymentState(payment, {
+      nextStatus: PAYMENT_STATUS.REFUNDED,
+      source: PAYMENT_EVENT_SOURCE.SYSTEM,
+      reason: `Razorpay refund issued: ${refundId}`,
+      rawGatewayResponse: refund,
+    });
+
+    return {
+      success: true,
+      refundId,
+      status: refundStatus,
+      amount: amountRupees,
+      raw: refund,
+    };
+  } catch (err) {
+    const errMsg = err?.error?.description || err?.message || "Razorpay refund API call failed";
+    return {
+      success: false,
+      error: errMsg,
+      raw: err?.error || null,
+    };
+  }
+}

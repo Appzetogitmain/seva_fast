@@ -22,6 +22,7 @@ import { createPendingPayoutForOrder } from "./payoutService.js";
 import { resolveSellerOrderEarning } from "./pricingService.js";
 import { emitNotificationEvent } from "../../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
+import { issueRazorpayRefund } from "../paymentService.js";
 
 function toOrderIdQuery(orderOrId) {
   if (!orderOrId) return null;
@@ -1263,36 +1264,84 @@ export async function reverseOrderFinanceOnCancellation(
     session.startTransaction();
     const order = await findOrderForUpdate(orderOrId, session);
 
+    // Online Payment Refund via Razorpay API
     if (order.paymentMode === "ONLINE" && order.financeFlags?.onlinePaymentCaptured) {
-      const refundAmount = roundCurrency(order.paymentBreakdown?.grandTotal || 0);
-      if (refundAmount > 0) {
-        const debitResult = await debitWallet({
-          ownerType: OWNER_TYPE.ADMIN,
-          ownerId: null,
-          amount: refundAmount,
-          bucket: "available",
-          session,
-        });
+      const grandTotal = roundCurrency(order.paymentBreakdown?.grandTotal || 0);
+      const walletUsed = roundCurrency(order.pricing?.walletAmount || order.paymentBreakdown?.walletAmount || 0);
+      const onlinePaidAmount = roundCurrency(Math.max(0, grandTotal - walletUsed));
 
-        await createLedgerEntry(
-          {
-            orderId: order._id,
-            walletId: debitResult.wallet._id,
-            actorType: OWNER_TYPE.ADMIN,
-            actorId: null,
-            type: LEDGER_TRANSACTION_TYPE.REFUND,
-            direction: LEDGER_DIRECTION.DEBIT,
-            amount: refundAmount,
-            paymentMode: "ONLINE",
-            description: reason,
-            reference: order.orderId,
-            balanceBefore: debitResult.before,
-            balanceAfter: debitResult.after,
-          },
-          { session },
-        );
+      if (onlinePaidAmount > 0) {
+        let rzpRefundResult = null;
+        try {
+          rzpRefundResult = await issueRazorpayRefund({
+            order,
+            amountRupees: onlinePaidAmount,
+            reason,
+          });
+        } catch (refundApiErr) {
+          rzpRefundResult = {
+            success: false,
+            error: refundApiErr.message || "Failed to execute Razorpay refund call",
+          };
+        }
+
+        if (rzpRefundResult?.success) {
+          order.paymentStatus = ORDER_PAYMENT_STATUS.REFUNDED;
+          order.refundIssuedAt = new Date();
+          order.refundDetails = {
+            refundId: rzpRefundResult.refundId || null,
+            amount: onlinePaidAmount,
+            status: rzpRefundResult.status || "processed",
+            gateway: "RAZORPAY",
+            refundedAt: new Date(),
+            failureReason: null,
+            rawResponse: rzpRefundResult.raw || {},
+          };
+
+          const debitResult = await debitWallet({
+            ownerType: OWNER_TYPE.ADMIN,
+            ownerId: null,
+            amount: onlinePaidAmount,
+            bucket: "available",
+            session,
+          });
+
+          await createLedgerEntry(
+            {
+              orderId: order._id,
+              walletId: debitResult.wallet._id,
+              actorType: OWNER_TYPE.ADMIN,
+              actorId: null,
+              type: LEDGER_TRANSACTION_TYPE.REFUND,
+              direction: LEDGER_DIRECTION.DEBIT,
+              amount: onlinePaidAmount,
+              paymentMode: "ONLINE",
+              description: reason,
+              reference: order.orderId,
+              balanceBefore: debitResult.before,
+              balanceAfter: debitResult.after,
+            },
+            { session },
+          );
+        } else {
+          // Do NOT mark as REFUNDED if gateway refund was rejected / failed!
+          order.paymentStatus = ORDER_PAYMENT_STATUS.REFUND_FAILED;
+          order.attentionRequired = true;
+          order.attentionReason = `Razorpay refund failed: ${rzpRefundResult?.error || "Unknown error"}`;
+          order.refundDetails = {
+            refundId: null,
+            amount: onlinePaidAmount,
+            status: "FAILED",
+            gateway: "RAZORPAY",
+            refundedAt: null,
+            failureReason: rzpRefundResult?.error || "Gateway refund rejected",
+            rawResponse: rzpRefundResult?.raw || {},
+          };
+        }
+      } else {
+        // Full order was paid by wallet, no online amount to refund
+        order.paymentStatus = ORDER_PAYMENT_STATUS.REFUNDED;
       }
-      order.paymentStatus = ORDER_PAYMENT_STATUS.REFUNDED;
     }
 
     // NEW: Refund Wallet Amount Used

@@ -56,6 +56,20 @@ function makeOrder(overrides = {}) {
 jest.unstable_mockModule("mongoose", () => ({
   default: {
     startSession: mockStartSession,
+    Schema: Object.assign(
+      function MockSchema() {
+        this.index = jest.fn();
+        this.pre = jest.fn();
+        this.post = jest.fn();
+      },
+      {
+        Types: {
+          ObjectId: String,
+          Mixed: Object,
+        },
+      },
+    ),
+    model: jest.fn().mockReturnValue({}),
     Types: {
       ObjectId: class MockObjectId {
         constructor(value) {
@@ -70,6 +84,30 @@ jest.unstable_mockModule("mongoose", () => ({
       },
     },
   },
+}));
+
+jest.unstable_mockModule("../app/models/transaction.js", () => ({
+  default: {
+    create: jest.fn(),
+    findOne: jest.fn(),
+    findOneAndUpdate: jest.fn(),
+  },
+}));
+
+jest.unstable_mockModule("../app/models/product.js", () => ({
+  default: { find: jest.fn(), findOne: jest.fn(), findById: jest.fn() },
+}));
+
+jest.unstable_mockModule("../app/models/category.js", () => ({
+  default: { find: jest.fn(), findOne: jest.fn(), findById: jest.fn() },
+}));
+
+jest.unstable_mockModule("../app/models/customer.js", () => ({
+  default: { find: jest.fn(), findOne: jest.fn(), findById: jest.fn() },
+}));
+
+jest.unstable_mockModule("../app/models/seller.js", () => ({
+  default: { find: jest.fn(), findOne: jest.fn(), findById: jest.fn() },
 }));
 
 jest.unstable_mockModule("../app/models/order.js", () => ({
@@ -95,6 +133,15 @@ jest.unstable_mockModule("../app/services/finance/walletService.js", () => ({
 
 jest.unstable_mockModule("../app/services/finance/payoutService.js", () => ({
   createPendingPayoutForOrder: mockCreatePendingPayoutForOrder,
+  autoProcessSellerPayoutForOrder: jest.fn().mockResolvedValue(null),
+}));
+
+jest.unstable_mockModule("../app/services/paymentService.js", () => ({
+  issueRazorpayRefund: jest.fn().mockResolvedValue({
+    success: true,
+    refundId: "rfnd_test_123",
+    status: "processed",
+  }),
 }));
 
 const {
