@@ -36,27 +36,26 @@ function verifyWebhookSecret(req) {
  */
 export async function handleShiprocketWebhook(req, res) {
   try {
-    if (!verifyWebhookSecret(req)) {
-      return res.status(401).json({ success: false, message: "Invalid webhook secret" });
-    }
-
     const payload = req.body || {};
     const awbCode = payload.awb || payload.awb_code;
     const shiprocketOrderId = payload.order_id;
     const shipmentId = payload.shipment_id;
     const channelOrderId = payload.channel_order_id || payload.order_id;
-    const rawStatus = String(payload.current_status || "").trim().toUpperCase();
 
-    logger.info(
-      `[Shiprocket Webhook] AWB=${awbCode}, SR_OrderID=${shiprocketOrderId}, shipment=${shipmentId}, Status=${rawStatus}`,
-    );
-
-    // Shiprocket initial verification / test ping handler
+    // Shiprocket initial verification / test ping handler:
+    // Shiprocket sends a ping with empty payload or verification structure to test connectivity
     if (!awbCode && !shiprocketOrderId && !shipmentId && !channelOrderId) {
       return res.status(200).json({
         success: true,
         message: "Shiprocket webhook endpoint verified successfully",
       });
+    }
+
+    if (!verifyWebhookSecret(req)) {
+      logger.warn("[Shiprocket Webhook] Invalid secret header:", {
+        headers: req.headers,
+      });
+      return res.status(401).json({ success: false, message: "Invalid webhook secret" });
     }
 
     const orClauses = [];
