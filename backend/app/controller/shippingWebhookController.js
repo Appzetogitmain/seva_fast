@@ -42,20 +42,27 @@ export async function handleShiprocketWebhook(req, res) {
     const shipmentId = payload.shipment_id;
     const channelOrderId = payload.channel_order_id || payload.order_id;
 
-    // Shiprocket initial verification / test ping handler:
-    // Shiprocket sends a ping with empty payload or verification structure to test connectivity
-    if (!awbCode && !shiprocketOrderId && !shipmentId && !channelOrderId) {
-      return res.status(200).json({
-        success: true,
-        message: "Shiprocket webhook endpoint verified successfully",
-      });
-    }
+    logger.info("[Shiprocket Webhook] Received webhook call:", {
+      headers: {
+        "x-api-key": req.headers["x-api-key"] ? "[PRESENT]" : "[MISSING]",
+        "content-type": req.headers["content-type"],
+      },
+      body: req.body,
+    });
 
     if (!verifyWebhookSecret(req)) {
       logger.warn("[Shiprocket Webhook] Invalid secret header:", {
         headers: req.headers,
       });
       return res.status(401).json({ success: false, message: "Invalid webhook secret" });
+    }
+
+    // Shiprocket initial verification / test ping handler (empty body or test event)
+    if (!awbCode && !shiprocketOrderId && !shipmentId && !channelOrderId) {
+      return res.status(200).json({
+        success: true,
+        message: "Shiprocket webhook endpoint verified successfully",
+      });
     }
 
     const orClauses = [];
@@ -80,9 +87,13 @@ export async function handleShiprocketWebhook(req, res) {
 
     if (!order) {
       logger.warn(
-        `[Shiprocket Webhook] Order not found for AWB=${awbCode} order_id=${shiprocketOrderId} shipment_id=${shipmentId}`,
+        `[Shiprocket Webhook] Order not found for AWB=${awbCode} order_id=${shiprocketOrderId} shipment_id=${shipmentId}. Acknowledging 200 for Shiprocket test / unknown order.`,
       );
-      return res.status(404).json({ success: false, message: "Order not found" });
+      // Return 200 OK so Shiprocket "Test Webhook" verification passes and does not disable the webhook
+      return res.status(200).json({
+        success: true,
+        message: "Webhook acknowledged (order not found in local system or test event)",
+      });
     }
 
     order.shipmentDetails = {
