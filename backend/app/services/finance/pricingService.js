@@ -22,31 +22,26 @@ import {
 } from "../../utils/money.js";
 import { getOrCreateFinanceSettings } from "./financeSettingsService.js";
 
-export const DELIVERY_FEE_SELLER_SHARE = 0.8;
-export const DELIVERY_FEE_ADMIN_SHARE = 0.2;
+// Sellers no longer receive any share of the delivery fee — admin keeps the
+// full remainder after the rider is paid (COD flow overhaul: admin owns
+// rider earnings and Shiprocket/self-delivery logistics costs end-to-end).
+export const DELIVERY_FEE_SELLER_SHARE = 0;
+export const DELIVERY_FEE_ADMIN_SHARE = 1;
 
 /**
  * Splits the delivery fee between seller and admin — but only what's left
  * AFTER the rider is paid. The rider's payout (calculateRiderPayout) is a
  * fixed cost paid out of what the customer actually paid for delivery;
- * whatever remains is split by `sellerSharePercent` (admin-configurable via
- * Setting.sellerDeliveryFeeSharePercent, default 80) between seller/admin.
- * Pass 0 to stop giving sellers anything from delivery fee. If the rider's
- * payout consumes the whole fee (or more), nothing remains — seller and
- * admin both get ₹0 regardless of the percent (admin funds the rider's
- * shortfall from its other earnings, not from this split).
+ * whatever remains now goes to admin in full. Sellers get ₹0 from delivery
+ * fee. If the rider's payout consumes the whole fee (or more), nothing
+ * remains — admin gets ₹0 too (admin funds the rider's shortfall from its
+ * other earnings, not from this split).
  */
-export function splitDeliveryFee(deliveryFeeCharged = 0, riderPayoutTotal = 0, sellerSharePercent = null) {
+export function splitDeliveryFee(deliveryFeeCharged = 0, riderPayoutTotal = 0) {
   const fee = roundCurrency(deliveryFeeCharged || 0);
   const rider = roundCurrency(riderPayoutTotal || 0);
   const remaining = Math.max(roundCurrency(fee - rider), 0);
-  const sharePercent =
-    sellerSharePercent != null && Number.isFinite(Number(sellerSharePercent))
-      ? Math.min(100, Math.max(0, Number(sellerSharePercent)))
-      : DELIVERY_FEE_SELLER_SHARE * 100;
-  const sellerDeliveryFeeShare = roundCurrency(remaining * (sharePercent / 100));
-  const adminDeliveryFeeShare = roundCurrency(remaining - sellerDeliveryFeeShare);
-  return { sellerDeliveryFeeShare, adminDeliveryFeeShare };
+  return { sellerDeliveryFeeShare: 0, adminDeliveryFeeShare: remaining };
 }
 
 export function resolveSellerOrderEarning(order) {
@@ -89,12 +84,10 @@ export function recalculateLogisticsEarnings({
   riderPayoutDistance = 0,
   riderPayoutBonus = 0,
   riderPayoutTotal = 0,
-  sellerDeliveryFeeSharePercent = null,
 } = {}) {
   const { sellerDeliveryFeeShare, adminDeliveryFeeShare } = splitDeliveryFee(
     deliveryFeeCharged,
     riderPayoutTotal,
-    sellerDeliveryFeeSharePercent,
   );
   const handling = roundCurrency(handlingFeeCharged || 0);
   const tip = roundCurrency(tipTotal || 0);
@@ -962,7 +955,6 @@ export async function generateOrderPaymentBreakdown({
     riderPayoutDistance: rider.riderPayoutDistance,
     riderPayoutBonus: rider.riderPayoutBonus,
     riderPayoutTotal: rider.riderPayoutTotal,
-    sellerDeliveryFeeSharePercent: effectiveSettings.sellerDeliveryFeeSharePercent,
   });
 
   const adminProductCommissionTotal = totalCommissionAmount;

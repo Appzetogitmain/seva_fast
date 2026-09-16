@@ -51,41 +51,14 @@ export async function applyDeliveredSettlement(order, orderIdString) {
       );
     }
 
-    // Unlike the seller (who is genuinely owed money admin hasn't received
-    // yet), the rider already collected the cash from the customer and
-    // netted their commission out of it — they aren't waiting on anyone.
-    // Credit this immediately so it shows up in the app right after
-    // delivery instead of only after admin later reconciles the COD cash
-    // (finalizeCodAfterAdminCredit, which still runs afterwards and just
-    // upserts the same reference, keeping this idempotent).
-    if (settled.deliveryBoy) {
-      const deliveryEarning = Math.round(settled.paymentBreakdown?.riderPayoutTotal || 0);
-      const deliveryMeta = {
-        tipAmount: Math.round(settled.paymentBreakdown?.riderTipAmount || 0),
-        payoutBase: Math.round(settled.paymentBreakdown?.riderPayoutBase || 0),
-        payoutDistance: Math.round(settled.paymentBreakdown?.riderPayoutDistance || 0),
-        payoutBonus: Math.round(settled.paymentBreakdown?.riderPayoutBonus || 0),
-        settledViaCash: true,
-      };
-      await Transaction.findOneAndUpdate(
-        { reference: `DEL-ERN-${orderIdString}` },
-        {
-          $set: {
-            amount: deliveryEarning,
-            status: "Settled",
-            meta: deliveryMeta,
-          },
-          $setOnInsert: {
-            user: settled.deliveryBoy,
-            userModel: "Delivery",
-            order: settled._id,
-            type: "Delivery Earning",
-            reference: `DEL-ERN-${orderIdString}`,
-          },
-        },
-        { upsert: true, new: true },
-      );
-    }
+    // Unlike the old "keep cash in hand" model, the rider no longer nets
+    // their earning out of the cash they collect — they still physically owe
+    // the FULL amount up the chain. Their own earning is credited separately
+    // once they've actually returned that full amount (cash handed to the
+    // seller, or the customer paid admin directly via QR) — see
+    // creditRiderCodEarning in orderFinanceService.js, called from
+    // handoffCodCashToSeller / markSelfDeliveryCodCashWithSeller /
+    // markCodOnlinePaid. Do NOT credit it here at delivery time.
     return settled;
   }
 
@@ -238,12 +211,13 @@ export async function applyDeliveredSettlement(order, orderIdString) {
 
 /**
  * Shared core for the self-healing sweep below: a rider's COD delivery
- * earning is normally credited immediately in applyDeliveredSettlement (see
- * above), but if that write was ever missed — e.g. an unrelated error
- * elsewhere in the same settlement call threw before reaching the credit
- * step, and the OTP-validate endpoint just logs + swallows it — the rider is
- * left delivered with no earning record and no retry. This creates any
- * missing "Delivery Earning" transactions for the given delivered COD orders.
+ * earning is normally credited as soon as they've returned the full cash
+ * they collected (handoffCodCashToSeller / markSelfDeliveryCodCashWithSeller
+ * / markCodOnlinePaid — see creditRiderCodEarning in orderFinanceService.js),
+ * but if that write was ever missed the rider is left with no earning record
+ * and no retry. This creates any missing "Delivery Earning" transactions for
+ * COD orders that have actually reached that hand-off point — never for
+ * orders where the rider is still holding the cash.
  */
 async function backfillCodRiderEarningsForOrders(codOrders) {
   if (codOrders.length === 0) return { created: 0 };
@@ -278,7 +252,7 @@ async function backfillCodRiderEarningsForOrders(codOrders) {
               payoutBase: Math.round(order.paymentBreakdown?.riderPayoutBase || 0),
               payoutDistance: Math.round(order.paymentBreakdown?.riderPayoutDistance || 0),
               payoutBonus: Math.round(order.paymentBreakdown?.riderPayoutBonus || 0),
-              settledViaCash: true,
+              codFullAmountReturned: true,
               backfilled: true,
             },
           },
@@ -286,6 +260,10 @@ async function backfillCodRiderEarningsForOrders(codOrders) {
         { upsert: true, new: true },
       );
       created += 1;
+      await Order.updateOne(
+        { _id: order._id },
+        { $set: { "financeFlags.riderCodEarningCredited": true } },
+      );
     } catch (error) {
       // Unique-index race with a concurrent settlement write for the same
       // order — harmless, the other write already created the record.
@@ -298,6 +276,17 @@ async function backfillCodRiderEarningsForOrders(codOrders) {
   return { created };
 }
 
+// Only backfill orders where the rider has actually returned the full cash —
+// cash handed to the seller, or the customer paid admin directly via QR.
+// Orders where the rider is still holding the cash must NOT get an earning
+// record yet.
+const CASH_HANDED_OVER_FILTER = {
+  $or: [
+    { "financeFlags.codCashWithSeller": true },
+    { "financeFlags.codOnlinePaid": true },
+  ],
+};
+
 /** Per-rider sweep, called from the rider's own dashboard/earnings endpoints. */
 export async function backfillMissingCodRiderEarnings(deliveryBoyId) {
   if (!deliveryBoyId) return { created: 0 };
@@ -305,9 +294,14 @@ export async function backfillMissingCodRiderEarnings(deliveryBoyId) {
   const codOrders = await Order.find({
     deliveryBoy: deliveryBoyId,
     status: "delivered",
-    $or: [
-      { paymentMode: { $regex: /^cod$/i } },
-      { "payment.method": { $in: ["cod", "cash"] } },
+    $and: [
+      {
+        $or: [
+          { paymentMode: { $regex: /^cod$/i } },
+          { "payment.method": { $in: ["cod", "cash"] } },
+        ],
+      },
+      CASH_HANDED_OVER_FILTER,
     ],
   })
     .select("_id orderId deliveryBoy paymentBreakdown")
@@ -327,9 +321,14 @@ export async function backfillMissingCodRiderEarningsGlobal(limit = 500) {
   const codOrders = await Order.find({
     deliveryBoy: { $ne: null },
     status: "delivered",
-    $or: [
-      { paymentMode: { $regex: /^cod$/i } },
-      { "payment.method": { $in: ["cod", "cash"] } },
+    $and: [
+      {
+        $or: [
+          { paymentMode: { $regex: /^cod$/i } },
+          { "payment.method": { $in: ["cod", "cash"] } },
+        ],
+      },
+      CASH_HANDED_OVER_FILTER,
     ],
   })
     .select("_id orderId deliveryBoy paymentBreakdown")
@@ -390,33 +389,36 @@ export async function finalizeCodAfterAdminCredit(orderOrId, orderIdString) {
   }
 
   if (refreshed.deliveryBoy) {
+    // The rider's earning transaction is normally already created by
+    // creditRiderCodEarning (orderFinanceService.js) as soon as they hand
+    // over the full cash — well before the seller's own later remittance to
+    // admin gets here. This is a self-heal only: $setOnInsert so it never
+    // overwrites (and never re-marks as non-withdrawable) an earning record
+    // that already exists.
     const deliveryEarning = Math.round(refreshed.paymentBreakdown?.riderPayoutTotal || 0);
-    await Transaction.findOneAndUpdate(
-      { reference: `DEL-ERN-${ref}` },
-      {
-        $set: {
-          amount: deliveryEarning,
-          status: "Settled",
-          // COD: this earning was already kept in hand from the cash the
-          // rider collected (see createPendingRiderPayout) — it counts
-          // toward lifetime earnings history but must NOT also be treated
-          // as withdrawable balance, or it'd pay the same commission twice.
-          meta: {
-            settledViaCash: true,
-            codCollectedAmount: Math.round(refreshed.paymentBreakdown?.codCollectedAmount || 0),
-            codRemittedAmount: Math.round(refreshed.paymentBreakdown?.codRemittedAmount || 0),
+    if (deliveryEarning > 0) {
+      await Transaction.findOneAndUpdate(
+        { reference: `DEL-ERN-${ref}` },
+        {
+          $setOnInsert: {
+            user: refreshed.deliveryBoy,
+            userModel: "Delivery",
+            order: refreshed._id,
+            type: "Delivery Earning",
+            reference: `DEL-ERN-${ref}`,
+            amount: deliveryEarning,
+            status: "Settled",
+            meta: {
+              codCollectedAmount: Math.round(refreshed.paymentBreakdown?.codCollectedAmount || 0),
+              codRemittedAmount: Math.round(refreshed.paymentBreakdown?.codRemittedAmount || 0),
+              codFullAmountReturned: true,
+              backfilled: true,
+            },
           },
         },
-        $setOnInsert: {
-          user: refreshed.deliveryBoy,
-          userModel: "Delivery",
-          order: refreshed._id,
-          type: "Delivery Earning",
-          reference: `DEL-ERN-${ref}`,
-        },
-      },
-      { upsert: true, new: true },
-    );
+        { upsert: true, new: true },
+      );
+    }
   }
 
   if (!refreshed.financeFlags?.levelCommissionCredited) {

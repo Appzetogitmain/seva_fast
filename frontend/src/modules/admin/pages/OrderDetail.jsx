@@ -197,7 +197,7 @@ const OrderDetail = () => {
     const splitCheck = Math.round((sellerPayout + platformEarning) * 100) / 100;
     const platformParts = [
         { label: "Admin Commission (from products)", value: adminCommission },
-        { label: "Admin Delivery Share (20%)", value: adminDeliveryShare },
+        { label: "Admin Delivery Share (after rider payout)", value: adminDeliveryShare },
         { label: "Handling Fee", value: handlingFee },
         { label: "Tip (to platform)", value: tip },
     ].filter((row) => Number(row.value) > 0);

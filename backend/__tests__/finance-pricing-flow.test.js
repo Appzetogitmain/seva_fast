@@ -333,14 +333,16 @@ describe("finance pricing flow", () => {
     // Product split
     expect(breakdown.productSubtotal).toBe(200);
     expect(breakdown.adminProductCommissionTotal).toBe(20);
-    expect(breakdown.sellerPayoutTotal).toBe(220); // 180 product + 40 (80% of delivery fee)
+    expect(breakdown.sellerPayoutTotal).toBe(180); // product margin only — sellers get no delivery-fee share
 
-    // Logistics split: delivery fee goes 80% seller / 20% admin; rider gets nothing
+    // Logistics split: rider is paid first (30 base + 10 for 2km beyond the
+    // 0.5km free radius = 40), and whatever's left of the delivery fee (50 -
+    // 40 = 10) goes entirely to admin — sellers get nothing from it.
     expect(breakdown.deliveryFeeCharged).toBe(50);
     expect(breakdown.handlingFeeCharged).toBe(20);
-    expect(breakdown.sellerDeliveryFeeShare).toBe(40);
+    expect(breakdown.sellerDeliveryFeeShare).toBe(0);
     expect(breakdown.adminDeliveryFeeShare).toBe(10);
-    expect(breakdown.riderPayoutTotal).toBe(0);
+    expect(breakdown.riderPayoutTotal).toBe(40);
     expect(breakdown.platformLogisticsMargin).toBe(30); // 10 admin delivery share + 20 handling
 
     // Final totals
@@ -405,6 +407,6 @@ describe("finance pricing flow", () => {
 
     // Seller should lose only 10% product commission, not cumulative platform percentages.
     expect(breakdown.adminProductCommissionTotal).toBe(15);
-    expect(breakdown.sellerPayoutTotal).toBe(159); // 135 product + 24 (80% of delivery fee 30)
+    expect(breakdown.sellerPayoutTotal).toBe(135); // 135 product margin — no delivery-fee share for sellers
   });
 });

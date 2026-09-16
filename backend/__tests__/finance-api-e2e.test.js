@@ -460,9 +460,10 @@ async function seedCoreData() {
     expect(deliveredRes.status).toBe(200);
     expect(deliveredRes.body.result.paymentMode).toBe("COD");
     expect(deliveredRes.body.result.paymentStatus).toBe("CASH_COLLECTED");
-    // Net of rider commission (grandTotal 160 - riderPayoutTotal 35)
-    expect(deliveredRes.body.result.paymentBreakdown.codCollectedAmount).toBe(125);
-    expect(deliveredRes.body.result.paymentBreakdown.codPendingAmount).toBe(125);
+    // Rider returns the FULL amount collected (grandTotal 160) — no more
+    // netting out their own commission before it counts as system float.
+    expect(deliveredRes.body.result.paymentBreakdown.codCollectedAmount).toBe(160);
+    expect(deliveredRes.body.result.paymentBreakdown.codPendingAmount).toBe(160);
 
     const collectRes = await request(app)
       .post(`/api/orders/${orderId}/cod/mark-collected`)
@@ -471,7 +472,7 @@ async function seedCoreData() {
     expect(collectRes.status).toBe(200);
     expect(collectRes.body.message).toContain("already marked");
     expect(collectRes.body.result.paymentStatus).toBe("CASH_COLLECTED");
-    expect(collectRes.body.result.paymentBreakdown.codPendingAmount).toBe(125);
+    expect(collectRes.body.result.paymentBreakdown.codPendingAmount).toBe(160);
 
     const collectAgainRes = await request(app)
       .post(`/api/orders/${orderId}/cod/mark-collected`)
@@ -483,7 +484,7 @@ async function seedCoreData() {
     const overReconcile = await request(app)
       .post(`/api/orders/${orderId}/cod/reconcile`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ amount: 200, deliveryPartnerId: String(rider._id) });
+      .send({ amount: 250, deliveryPartnerId: String(rider._id) });
     expect(overReconcile.status).toBe(500);
     expect(overReconcile.body.message).toContain("exceeds COD pending amount");
 
@@ -493,15 +494,15 @@ async function seedCoreData() {
       .send({ amount: 60, deliveryPartnerId: String(rider._id) });
     expect(reconcilePartial.status).toBe(200);
     expect(reconcilePartial.body.result.paymentBreakdown.codRemittedAmount).toBe(60);
-    expect(reconcilePartial.body.result.paymentBreakdown.codPendingAmount).toBe(65);
+    expect(reconcilePartial.body.result.paymentBreakdown.codPendingAmount).toBe(100);
     expect(reconcilePartial.body.result.paymentStatus).toBe("PARTIALLY_REMITTED");
 
     const reconcileFinal = await request(app)
       .post(`/api/orders/${orderId}/cod/reconcile`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ amount: 65, deliveryPartnerId: String(rider._id) });
+      .send({ amount: 100, deliveryPartnerId: String(rider._id) });
     expect(reconcileFinal.status).toBe(200);
-    expect(reconcileFinal.body.result.paymentBreakdown.codRemittedAmount).toBe(125);
+    expect(reconcileFinal.body.result.paymentBreakdown.codRemittedAmount).toBe(160);
     expect(reconcileFinal.body.result.paymentBreakdown.codPendingAmount).toBe(0);
     expect(reconcileFinal.body.result.paymentStatus).toBe("COD_RECONCILED");
 
@@ -516,7 +517,7 @@ async function seedCoreData() {
     const codOrder = await Order.findOne({ orderId }).lean();
 
     expect(riderWallet.cashInHand).toBe(0);
-    expect(adminWallet.availableBalance).toBe(125);
+    expect(adminWallet.availableBalance).toBe(160);
     expect(codOrder.paymentBreakdown.codPendingAmount).toBe(0);
 
     const summaryRes = await request(app)
@@ -524,7 +525,7 @@ async function seedCoreData() {
       .set("Authorization", `Bearer ${adminToken}`);
     expect(summaryRes.status).toBe(200);
     expect(summaryRes.body.result.systemFloatCOD).toBe(0);
-    expect(summaryRes.body.result.reconciledCODInflows).toBe(125);
+    expect(summaryRes.body.result.reconciledCODInflows).toBe(160);
     expect(summaryRes.body.result.sellerPendingPayouts).toBe(90);
     expect(summaryRes.body.result.deliveryPendingPayouts).toBe(35);
 

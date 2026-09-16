@@ -47,11 +47,11 @@ function roundCurrency(value) {
 }
 
 function getCodNetAmountFromOrder(order) {
-  const gross = roundCurrency(
+  // Rider returns the FULL amount collected — no more netting out their own
+  // commission before handing cash onward or paying via admin QR.
+  return roundCurrency(
     order.paymentBreakdown?.grandTotal || order.pricing?.total || 0,
   );
-  const rider = roundCurrency(order.paymentBreakdown?.riderPayoutTotal || 0);
-  return roundCurrency(Math.max(gross - rider, 0));
 }
 
 function validateWithJoi(schema, payload) {

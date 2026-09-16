@@ -360,21 +360,18 @@ export async function createPendingRiderPayout(order, { session, actorId } = {})
     return null;
   }
 
-  // COD: the rider already netted their own commission out of the cash they
-  // collected (getCodNetAmount = gross - riderPayoutTotal is all they owe
-  // onward) — they're physically holding this amount already. Queuing a
-  // Payout here too would let it also be paid out electronically later,
-  // doubling this same commission. Mark it settled by cash retention instead
-  // of creating a payout/wallet credit for it.
+  // COD: the rider's earning is credited separately, as soon as the full
+  // cash they collected is handed over (to the seller, or to admin directly
+  // via QR) — see creditRiderCodEarning, called from handoffCodCashToSeller /
+  // markSelfDeliveryCodCashWithSeller / markCodOnlinePaid. That happens
+  // independent of — and typically well before — the seller's own later
+  // remittance to admin (which is what gates this function being called for
+  // COD). Don't queue a second payout here; just reflect whatever that
+  // earlier step already recorded.
   if (isCodOrder(order)) {
-    order.financeFlags = {
-      ...(order.financeFlags || {}),
-      riderPayoutQueued: true,
-      riderPayoutSettledViaCash: true,
-    };
     order.settlementStatus = {
       ...(order.settlementStatus || {}),
-      riderPayout: "COMPLETED",
+      riderPayout: order.financeFlags?.riderCodEarningCredited ? "COMPLETED" : "PENDING",
     };
     return null;
   }
@@ -926,14 +923,15 @@ export async function handleCodOrderFinance(
       throw new Error("COD collection amount must be greater than 0");
     }
 
-    // Requirement: system float (COD) should track remittable cash with delivery partners,
-    // i.e. gross order amount minus delivery partner commission.
+    // Riders no longer keep their delivery earning out of the cash they
+    // collect — they return the FULL amount up the chain (to the seller, or
+    // straight to admin via QR) and are paid their own earning separately by
+    // admin (see creditRiderCodEarning below). So cash-in-hand tracks the
+    // full gross amount, not gross-minus-commission.
     const deliveryPartnerCommission = roundCurrency(
       order.paymentBreakdown?.riderPayoutTotal || 0,
     );
-    const codAmountNet = roundCurrency(
-      Math.max(codAmountGross - deliveryPartnerCommission, 0),
-    );
+    const codAmountNet = codAmountGross;
 
     await updateCashInHand({
       ownerType: OWNER_TYPE.DELIVERY_PARTNER,
@@ -981,7 +979,7 @@ export async function handleCodOrderFinance(
         direction: LEDGER_DIRECTION.CREDIT,
         amount: codAmountNet,
         paymentMode: "COD",
-        description: "COD cash added to system float (net of rider commission)",
+        description: "COD cash added to system float (full amount collected)",
         reference: order.orderId,
       },
       { session },
@@ -1226,6 +1224,10 @@ export async function reconcileCodCash(
         ...(order.settlementStatus || {}),
         reconciledAt: new Date(),
       };
+      // Rider has now fully reconciled the full amount directly with admin —
+      // their own earning is payable immediately, same as any other
+      // cash-handed-over path.
+      await creditRiderCodEarning(order, { session });
     }
 
     await createFinanceAuditLog(
@@ -1433,12 +1435,58 @@ export async function reverseOrderFinanceOnCancellation(
   }
 }
 
-function getCodNetAmount(order) {
-  const gross = roundCurrency(
+function getCodGrossAmount(order) {
+  return roundCurrency(
     order.paymentBreakdown?.grandTotal || order.pricing?.total || 0,
   );
-  const rider = roundCurrency(order.paymentBreakdown?.riderPayoutTotal || 0);
-  return roundCurrency(Math.max(gross - rider, 0));
+}
+
+/**
+ * Credits a COD rider's own delivery earning to their wallet as payable
+ * balance, once the full cash they collected has actually left their hands
+ * (handed to the seller, or the customer paid admin directly via QR).
+ * Riders no longer net their earning out of the cash before passing it on —
+ * they return the full amount, and admin pays this earning out separately
+ * (end of day), fronting it from its own funds rather than from what the
+ * seller/customer remits. Idempotent per order via financeFlags.
+ */
+async function creditRiderCodEarning(order, { session } = {}) {
+  if (!order.deliveryBoy) return;
+  if (order.financeFlags?.riderCodEarningCredited) return;
+
+  const amount = roundCurrency(order.paymentBreakdown?.riderPayoutTotal || 0);
+  order.financeFlags = {
+    ...(order.financeFlags || {}),
+    riderCodEarningCredited: true,
+  };
+  order.settlementStatus = {
+    ...(order.settlementStatus || {}),
+    riderPayout: amount > 0 ? "COMPLETED" : "NOT_APPLICABLE",
+  };
+  if (amount <= 0) return;
+
+  await Transaction.findOneAndUpdate(
+    { reference: `DEL-ERN-${order.orderId}` },
+    {
+      $setOnInsert: {
+        user: order.deliveryBoy,
+        userModel: "Delivery",
+        order: order._id,
+        type: "Delivery Earning",
+        reference: `DEL-ERN-${order.orderId}`,
+        amount,
+        status: "Settled",
+        meta: {
+          tipAmount: roundCurrency(order.paymentBreakdown?.riderTipAmount || 0),
+          payoutBase: roundCurrency(order.paymentBreakdown?.riderPayoutBase || 0),
+          payoutDistance: roundCurrency(order.paymentBreakdown?.riderPayoutDistance || 0),
+          payoutBonus: roundCurrency(order.paymentBreakdown?.riderPayoutBonus || 0),
+          codFullAmountReturned: true,
+        },
+      },
+    },
+    { upsert: true, session },
+  );
 }
 
 export async function chooseCodCollectMethod(
@@ -1506,15 +1554,15 @@ export async function markCodOnlinePaid(orderOrId, { actorId = null } = {}) {
       return order;
     }
 
-    const net = getCodNetAmount(order);
-    if (net <= 0) {
+    const gross = getCodGrossAmount(order);
+    if (gross <= 0) {
       throw new Error("COD amount must be greater than 0");
     }
 
     const credit = await creditWallet({
       ownerType: OWNER_TYPE.ADMIN,
       ownerId: null,
-      amount: net,
+      amount: gross,
       bucket: "available",
       session,
     });
@@ -1527,9 +1575,9 @@ export async function markCodOnlinePaid(orderOrId, { actorId = null } = {}) {
         actorId: null,
         type: LEDGER_TRANSACTION_TYPE.COD_REMITTED,
         direction: LEDGER_DIRECTION.CREDIT,
-        amount: net,
+        amount: gross,
         paymentMode: "COD",
-        description: "COD paid online via admin QR",
+        description: "COD paid online via admin QR (full amount)",
         reference: `COD-QR-${order.orderId}`,
         balanceBefore: credit.before,
         balanceAfter: credit.after,
@@ -1540,10 +1588,14 @@ export async function markCodOnlinePaid(orderOrId, { actorId = null } = {}) {
     if (!order.paymentBreakdown) {
       order.paymentBreakdown = {};
     }
-    order.paymentBreakdown.codCollectedAmount = net;
-    order.paymentBreakdown.codRemittedAmount = net;
+    order.paymentBreakdown.codCollectedAmount = gross;
+    order.paymentBreakdown.codRemittedAmount = gross;
     order.paymentBreakdown.codPendingAmount = 0;
     ensurePaymentBreakdownSnapshots(order);
+
+    // Customer paid admin directly — admin has the money now, so the rider's
+    // own earning is payable immediately (admin fronts it, pays EOD).
+    await creditRiderCodEarning(order, { session });
 
     order.paymentStatus = ORDER_PAYMENT_STATUS.COD_RECONCILED;
     order.payment = {
@@ -1565,7 +1617,7 @@ export async function markCodOnlinePaid(orderOrId, { actorId = null } = {}) {
         actorType: OWNER_TYPE.DELIVERY_PARTNER,
         actorId: actorId || order.deliveryBoy || null,
         orderId: order._id,
-        metadata: { amountNet: net },
+        metadata: { amountGross: gross },
       },
       { session },
     );
@@ -1658,6 +1710,11 @@ export async function handoffCodCashToSeller(orderOrId, { actorId = null } = {})
       codCashWithSeller: true,
     };
 
+    // Rider has now returned the FULL amount to the seller — their own
+    // delivery earning is payable immediately, independent of when the
+    // seller later remits this cash onward to admin.
+    await creditRiderCodEarning(order, { session });
+
     await createFinanceAuditLog(
       {
         action: "COD_CASH_HANDOFF_TO_SELLER",
@@ -1683,10 +1740,9 @@ export async function handoffCodCashToSeller(orderOrId, { actorId = null } = {})
 /**
  * Self-delivered COD orders never go through a rider, so the cash the seller's
  * own person collects starts (and stays) with the seller — no rider cash-in-hand
- * debit needed, and no rider commission to net out (unlike handoffCodCashToSeller,
- * which nets out the rider's cut). This feeds the seller's existing COD-cash
- * remit flow (getSellerCodCashSummary / submitSellerCodCashToAdmin) the same way
- * a rider handoff would.
+ * debit needed. This feeds the seller's existing COD-cash remit flow
+ * (getSellerCodCashSummary / submitSellerCodCashToAdmin) the same way a rider
+ * handoff would.
  */
 export async function markSelfDeliveryCodCashWithSeller(orderOrId) {
   const session = await mongoose.startSession();
@@ -1731,6 +1787,11 @@ export async function markSelfDeliveryCodCashWithSeller(orderOrId) {
       codCashWithRider: false,
       codCashWithSeller: true,
     };
+
+    // No separate rider on a self-delivered order (deliveryBoy is normally
+    // unset), but if one is present this keeps behavior consistent with the
+    // rider-delivered handoff path.
+    await creditRiderCodEarning(order, { session });
 
     await createFinanceAuditLog(
       {

@@ -140,14 +140,14 @@ const EarningsPage = () => {
 
             <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/20 relative z-10">
               <div className="bg-white/10 p-2.5 rounded-xl">
-                <p className="text-brand-100 text-[10px] uppercase font-bold mb-0.5">In Your Pocket (COD)</p>
+                <p className="text-brand-100 text-[10px] uppercase font-bold mb-0.5">COD Kept (Old Orders)</p>
                 <p className="font-extrabold text-base">
                   {RUPEE}
                   {Number(earningsData.cashEarned || 0).toLocaleString()}
                 </p>
               </div>
               <div className="bg-white/10 p-2.5 rounded-xl">
-                <p className="text-brand-100 text-[10px] uppercase font-bold mb-0.5">Online / Bank Payout</p>
+                <p className="text-brand-100 text-[10px] uppercase font-bold mb-0.5">Payable Earnings</p>
                 <p className="font-extrabold text-base">
                   {RUPEE}
                   {Number(earningsData.onlineEarnings || 0).toLocaleString()}

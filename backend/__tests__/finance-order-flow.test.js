@@ -268,13 +268,15 @@ describe("finance order flow", () => {
 
     expect(updated.paymentStatus).toBe(ORDER_PAYMENT_STATUS.CASH_COLLECTED);
     expect(updated.financeFlags.codMarkedCollected).toBe(true);
-    // Net of rider commission (grandTotal 300 - riderPayoutTotal 50)
-    expect(updated.paymentBreakdown.codCollectedAmount).toBe(250);
-    expect(updated.paymentBreakdown.codPendingAmount).toBe(250);
+    // Rider returns the FULL amount collected — no more netting out their
+    // own commission (grandTotal 300, riderPayoutTotal 50 stays with admin
+    // to pay out separately).
+    expect(updated.paymentBreakdown.codCollectedAmount).toBe(300);
+    expect(updated.paymentBreakdown.codPendingAmount).toBe(300);
     expect(mockUpdateCashInHand).toHaveBeenCalledWith(
       expect.objectContaining({
         ownerType: "DELIVERY_PARTNER",
-        deltaAmount: 250,
+        deltaAmount: 300,
       }),
     );
   });

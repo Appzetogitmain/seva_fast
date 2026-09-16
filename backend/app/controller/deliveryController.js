@@ -360,7 +360,9 @@ export const getDeliveryCodCashSummary = async (req, res) => {
             const gross = roundCurrency(order.paymentBreakdown?.grandTotal ?? order.pricing?.total ?? 0);
             const riderCommission = roundCurrency(order.paymentBreakdown?.riderPayoutTotal ?? 0);
 
-            const estimatedNet = roundCurrency(Math.max(gross - riderCommission, 0));
+            // Rider hands over the FULL amount collected — their own earning
+            // is paid to them separately by admin, not netted out of this.
+            const estimatedNet = gross;
             const pendingNet = roundCurrency(order.paymentBreakdown?.codPendingAmount ?? 0);
             const remittedNet = roundCurrency(order.paymentBreakdown?.codRemittedAmount ?? 0);
             
@@ -401,7 +403,8 @@ export const getDeliveryCodCashSummary = async (req, res) => {
                 .filter((row) => row.codCashWithRider && Number(row.amountNetPending || 0) > 0)
                 .reduce((sum, row) => sum + Number(row.amountNetPending || 0), 0),
         );
-        // Rider's own commission across delivered COD orders kept in hand
+        // Rider's own commission across delivered COD orders — payable by
+        // admin once the full cash has been handed over (not kept in hand).
         const totalCodEarnings = roundCurrency(
             normalized
                 .filter((row) => row.isCollected || row.status === "delivered" || row.orderStatus === "delivered")

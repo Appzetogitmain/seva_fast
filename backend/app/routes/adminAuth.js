@@ -38,6 +38,8 @@ import {
     getRiderCashDetails,
     settleRiderCash,
     getCashSettlementHistory,
+    getRiderPayableBalances,
+    payRiderEodController,
     getUsers,
     getUserById,
     updateUserWallet,
@@ -276,6 +278,10 @@ router.get("/delivery-cash", verifyToken, allowRoles("admin", "sub-admin"), getD
 router.get("/rider-cash-details/:id", verifyToken, allowRoles("admin", "sub-admin"), getRiderCashDetails);
 router.post("/settle-cash", verifyToken, allowRoles("admin", "sub-admin"), settleRiderCash);
 router.get("/cash-history", verifyToken, allowRoles("admin", "sub-admin"), getCashSettlementHistory);
+
+// Rider EOD Payouts (delivery earnings — admin pays out separately from COD cash flow)
+router.get("/rider-payouts", verifyToken, allowRoles("admin", "sub-admin"), getRiderPayableBalances);
+router.post("/rider-payouts/pay", verifyToken, allowRoles("admin", "sub-admin"), payRiderEodController);
 
 // Seller Withdrawal Management
 router.get("/seller-withdrawals", verifyToken, allowRoles("admin", "sub-admin"), getSellerWithdrawals);

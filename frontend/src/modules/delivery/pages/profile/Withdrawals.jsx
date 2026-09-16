@@ -70,7 +70,7 @@ const Withdrawals = () => {
             return toast.error("Please enter a valid amount");
         }
         if (Number(amount) > stats.availableBalance) {
-            return toast.error("Insufficient balance. You cannot withdraw cash you already kept in pocket.");
+            return toast.error("Insufficient balance. You can only withdraw earnings admin has already credited to you.");
         }
 
         setLoading(true);
@@ -122,7 +122,7 @@ const Withdrawals = () => {
                                 <span className="text-xs font-bold">₹{stats.pendingWithdrawals.toLocaleString()}</span>
                             </div>
                             <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-md border border-white/10">
-                                <span className="text-[10px] text-brand-100 uppercase font-bold block">In Your Pocket (COD)</span>
+                                <span className="text-[10px] text-brand-100 uppercase font-bold block">COD Kept (Old Orders)</span>
                                 <span className="text-xs font-bold">₹{stats.cashKeptInHand.toLocaleString()}</span>
                             </div>
                         </div>
@@ -133,7 +133,7 @@ const Withdrawals = () => {
                     <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
                         <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                         <p>
-                            You already have <strong>₹{stats.cashKeptInHand.toLocaleString()}</strong> in physical cash in your pocket from COD deliveries. Only online/incentive earnings are withdrawable from Admin.
+                            You have <strong>₹{stats.cashKeptInHand.toLocaleString()}</strong> from older COD deliveries that was kept in hand under the old rules. New COD deliveries are fully handed over, and your earning is credited and paid out by admin instead.
                         </p>
                     </div>
                 )}

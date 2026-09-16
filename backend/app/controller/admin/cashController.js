@@ -4,6 +4,8 @@ import {
   getCashSettlementHistoryData,
   getDeliveryCashBalancesData,
   getRiderCashDetailsData,
+  getRiderPayableBalancesData,
+  payRiderEod,
   settleRiderCashEntry,
 } from "../../services/admin/cashService.js";
 
@@ -60,5 +62,49 @@ export const getCashSettlementHistory = async (req, res) => {
     return handleResponse(res, 200, "Settlement history fetched", data);
   } catch (error) {
     return handleResponse(res, 500, error.message);
+  }
+};
+
+/* ===============================
+   RIDER EOD PAYOUTS
+================================ */
+export const getRiderPayableBalances = async (req, res) => {
+  try {
+    const { page, limit, skip } = getPagination(req, {
+      defaultLimit: 25,
+      maxLimit: 200,
+    });
+    const search = String(req.query.search || "").trim();
+
+    const data = await getRiderPayableBalancesData({ page, limit, skip, search });
+    return handleResponse(res, 200, "Rider payable balances fetched", data);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+export const payRiderEodController = async (req, res) => {
+  try {
+    const { riderId, amount, method, note } = req.body || {};
+    const result = await payRiderEod({
+      riderId,
+      amount: Number(amount),
+      method,
+      note,
+      actorId: req.user?.id || null,
+    });
+
+    if (!result) {
+      return handleResponse(res, 404, "Rider not found");
+    }
+
+    return handleResponse(res, 201, "Rider paid successfully", result);
+  } catch (error) {
+    const statusCode =
+      error.message === "Missing riderId or invalid amount" ||
+      error.message?.includes("exceeds rider's payable balance")
+        ? 400
+        : 500;
+    return handleResponse(res, statusCode, error.message);
   }
 };

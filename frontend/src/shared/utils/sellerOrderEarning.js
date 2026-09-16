@@ -1,4 +1,6 @@
-const DELIVERY_FEE_SELLER_SHARE = 0.8;
+// Sellers no longer receive any share of the delivery fee — admin keeps the
+// full remainder after the rider is paid (COD flow overhaul).
+const DELIVERY_FEE_SELLER_SHARE = 0;
 
 function roundMoney(value) {
   return Math.round(Number(value || 0) * 100) / 100;

@@ -597,14 +597,15 @@ const OrderDetails = () => {
     return mode === "COD" || method === "cod" || method === "cash";
   }, [order]);
 
-  // COD breakdown: total cash to collect, the rider's own earning kept out
-  // of it, and what's left to hand over/settle with seller or admin.
+  // COD breakdown: total cash to collect (rider hands over the FULL amount —
+  // their own earning, shown separately, is paid to them by admin later, not
+  // netted out of what they hand over).
   const codBreakdown = useMemo(() => {
     if (!order) return { gross: 0, earning: 0, toSettle: 0 };
     const gross = Number(order.paymentBreakdown?.grandTotal ?? order.pricing?.total ?? 0);
     const earning = Number(order.riderEarnings || 0);
     const pendingActual = Number(order.codPendingAmount || 0);
-    const toSettle = pendingActual > 0 ? pendingActual : Math.max(gross - earning, 0);
+    const toSettle = pendingActual > 0 ? pendingActual : gross;
     return { gross, earning, toSettle };
   }, [order]);
 
@@ -1306,27 +1307,27 @@ const OrderDetails = () => {
                 </span>
               </div>
               <p className="text-xs text-gray-600 mb-4">
-                Follow the 3-step calculation below: Keep your earning in your pocket and hand over only the remaining amount.
+                Collect the full amount from the customer and hand over the entire amount — your earning is paid to you by admin separately.
               </p>
 
-              {/* Explicit 3-step calculation card */}
+              {/* Explicit calculation card */}
               <div className="bg-white rounded-2xl border border-orange-100 p-4 shadow-sm space-y-3 mb-4">
                 <div className="flex justify-between items-center text-sm py-1 border-b border-gray-100">
-                  <span className="text-gray-600 font-medium">1. Collect from Customer (Gross Total):</span>
+                  <span className="text-gray-600 font-medium">1. Collect from Customer (Full Amount):</span>
                   <span className="text-base font-extrabold text-gray-900">
                     ₹{codBreakdown.gross.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-sm py-1 border-b border-gray-100 bg-emerald-50/60 -mx-4 px-4">
-                  <span className="text-emerald-700 font-bold">2. Your Delivery Earning (Keep in Pocket):</span>
-                  <span className="text-base font-black text-emerald-600">
-                    - ₹{codBreakdown.earning.toLocaleString()}
-                  </span>
-                </div>
                 <div className="flex justify-between items-center text-base pt-1">
-                  <span className="text-orange-950 font-black">3. Net Amount to Hand Over:</span>
+                  <span className="text-orange-950 font-black">2. Full Amount to Hand Over:</span>
                   <span className="text-xl font-black text-orange-700">
                     ₹{codBreakdown.toSettle.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm py-1 border-t border-gray-100 bg-emerald-50/60 -mx-4 px-4 pt-3">
+                  <span className="text-emerald-700 font-bold">Your Earning (Paid by Admin):</span>
+                  <span className="text-base font-black text-emerald-600">
+                    ₹{codBreakdown.earning.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -1403,7 +1404,7 @@ const OrderDetails = () => {
 
               {codFlags.codCollectMethod === "cash" && !codFlags.codCashWithRider && !codFlags.codCashWithSeller && (
                 <Button disabled={codBusy} onClick={handleMarkCashCollected} className="w-full">
-                  {codBusy ? "Saving..." : `Mark Cash Collected (Keep ₹${codBreakdown.earning})`}
+                  {codBusy ? "Saving..." : `Mark Cash Collected (₹${codBreakdown.gross})`}
                 </Button>
               )}
 
@@ -1428,7 +1429,7 @@ const OrderDetails = () => {
                     ✓ Handed Over to {order.seller?.shopName || order.seller?.name || "Seller"}
                   </p>
                   <p className="text-xs text-emerald-600 mt-0.5">
-                    Your ₹{codBreakdown.earning.toLocaleString()} earning is settled and in your pocket.
+                    Your ₹{codBreakdown.earning.toLocaleString()} earning is credited — admin will pay it out to you.
                   </p>
                 </div>
               )}

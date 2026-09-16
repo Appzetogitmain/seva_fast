@@ -35,6 +35,7 @@ const ALL_PERMISSIONS = [
     "Money Requests",
     "Seller Payments",
     "Collect Cash",
+    "Rider Payouts",
     "Customers",
     "Sub-Admins",
     "Zones",

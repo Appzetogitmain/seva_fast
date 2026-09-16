@@ -30,7 +30,7 @@ const CodCash = () => {
   const [data, setData] = React.useState({
     systemFloatCOD: 0,
     cashInHand: 0,
-    totalCodEarnings: 0,
+    totalPayableEarnings: 0,
     totalCollected: 0,
     totalSettled: 0,
     toCollect: [],
@@ -53,7 +53,7 @@ const CodCash = () => {
         setData({
           systemFloatCOD: floatCOD,
           cashInHand: safeMoney(result.cashInHand || floatCOD),
-          totalCodEarnings: safeMoney(result.totalCodEarnings),
+          totalPayableEarnings: safeMoney(result.totalCodEarnings),
           totalCollected: safeMoney(result.totalCollected),
           totalSettled: safeMoney(result.totalSettled),
           toCollect: Array.isArray(result.toCollect) ? result.toCollect : [],
@@ -159,7 +159,7 @@ const CodCash = () => {
                 {safeMoney(data.systemFloatCOD).toLocaleString()}
               </p>
               <p className="text-[11px] text-gray-500 mt-1 leading-tight">
-                Net physical cash in your pocket after keeping your delivery earnings.
+                Full cash collected from customers — hand over the entire amount to the store.
               </p>
             </div>
             <div className="p-3 rounded-xl bg-orange-50 text-orange-600 shrink-0">
@@ -169,12 +169,12 @@ const CodCash = () => {
 
           <div className="grid grid-cols-2 gap-2 mt-3.5">
             <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-2.5">
-              <p className="text-[10px] font-bold text-emerald-700 uppercase">Your Earning (Kept)</p>
+              <p className="text-[10px] font-bold text-emerald-700 uppercase">Your Earning (Payable)</p>
               <p className="text-base font-extrabold text-emerald-700">
                 {RUPEE}
-                {safeMoney(data.totalCodEarnings).toLocaleString()}
+                {safeMoney(data.totalPayableEarnings).toLocaleString()}
               </p>
-              <p className="text-[9px] text-emerald-600">In your pocket</p>
+              <p className="text-[9px] text-emerald-600">Paid by admin, not kept from cash</p>
             </div>
             <div className="rounded-xl bg-gray-50 border border-gray-100 p-2.5">
               <p className="text-[10px] font-bold text-gray-500 uppercase">Total Settled So Far</p>
@@ -225,8 +225,8 @@ const CodCash = () => {
                     )}
                   </div>
 
-                  {/* 3-Step Math Calculation */}
-                  <div className="grid grid-cols-3 gap-1.5 text-center bg-orange-50/50 rounded-xl p-2.5 border border-orange-100 text-xs">
+                  {/* Full amount goes to the store — rider earning is paid separately by admin */}
+                  <div className="grid grid-cols-2 gap-1.5 text-center bg-orange-50/50 rounded-xl p-2.5 border border-orange-100 text-xs">
                     <div>
                       <p className="text-[9px] font-bold text-gray-500 uppercase">Customer Paid</p>
                       <p className="font-extrabold text-gray-900">
@@ -234,18 +234,15 @@ const CodCash = () => {
                       </p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-emerald-700 uppercase">Keep in Pocket</p>
-                      <p className="font-black text-emerald-700">
-                        - {RUPEE}{safeMoney(row.riderCommission).toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-bold text-orange-700 uppercase">Give to Store</p>
+                      <p className="text-[9px] font-bold text-orange-700 uppercase">Give to Store (Full)</p>
                       <p className="font-black text-orange-700 text-sm">
                         {RUPEE}{safeMoney(row.amountNetPending).toLocaleString()}
                       </p>
                     </div>
                   </div>
+                  <p className="text-[10px] text-emerald-700 font-semibold -mt-1">
+                    Your earning of {RUPEE}{safeMoney(row.riderCommission).toLocaleString()} will be paid to you by admin separately.
+                  </p>
 
                   {/* Action Button: I have handed over to this specific seller */}
                   <Button
@@ -355,23 +352,23 @@ const CodCash = () => {
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 space-y-1">
-                <div className="flex items-center gap-2 font-bold text-emerald-900">
-                  <span className="w-5 h-5 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center text-[10px]">2</span>
-                  Keep Your Delivery Earning in Pocket
+              <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-100 space-y-1">
+                <div className="flex items-center gap-2 font-bold text-blue-900">
+                  <span className="w-5 h-5 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-[10px]">2</span>
+                  Hand Over the FULL Amount to Store
                 </div>
                 <p className="text-gray-600 pl-7">
-                  You don't need to transfer your delivery commission (e.g., ₹30) — you keep this cash immediately in your pocket.
+                  Hand over the entire amount you collected (e.g., ₹520) to the specific merchant store and click <strong>"Hand Over to Store"</strong>. You do not keep any of it.
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-100 space-y-1">
-                <div className="flex items-center gap-2 font-bold text-blue-900">
-                  <span className="w-5 h-5 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-[10px]">3</span>
-                  Hand Over Remaining Cash to Store
+              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-100 space-y-1">
+                <div className="flex items-center gap-2 font-bold text-emerald-900">
+                  <span className="w-5 h-5 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center text-[10px]">3</span>
+                  Get Paid Your Earning by Admin
                 </div>
                 <p className="text-gray-600 pl-7">
-                  Hand over the remaining amount (₹520 - ₹30 = ₹490) to the specific merchant store and click <strong>"Hand Over to Store"</strong>.
+                  Your delivery earning (e.g., ₹30) is credited to your account as soon as the handover is confirmed, and admin pays it out to you at end of day.
                 </p>
               </div>
             </div>

@@ -227,6 +227,188 @@ export async function getRiderCashDetailsData(riderId) {
   }));
 }
 
+/**
+ * Riders' payable earnings balance — same "available balance" formula the
+ * rider app itself uses for withdrawal requests (Settled, non-legacy-cash
+ * transactions minus any withdrawal already pending). Under the new COD
+ * flow this includes COD delivery earnings too, since riders no longer
+ * keep any cash out of what they collect — admin pays this out at EOD.
+ */
+export async function getRiderPayableBalancesData({ page, limit, skip, search = "" }) {
+  const matchStage = search
+    ? { $or: [{ name: { $regex: search, $options: "i" } }, { phone: { $regex: search, $options: "i" } }] }
+    : {};
+
+  const pipeline = [
+    { $match: matchStage },
+    {
+      $lookup: {
+        from: "transactions",
+        localField: "_id",
+        foreignField: "user",
+        as: "txns",
+      },
+    },
+    {
+      $addFields: {
+        settledBalance: {
+          $sum: {
+            $map: {
+              input: {
+                $filter: {
+                  input: "$txns",
+                  as: "t",
+                  cond: {
+                    $and: [
+                      { $eq: ["$$t.status", "Settled"] },
+                      { $ne: ["$$t.meta.settledViaCash", true] },
+                    ],
+                  },
+                },
+              },
+              as: "t",
+              in: "$$t.amount",
+            },
+          },
+        },
+        pendingWithdrawals: {
+          $sum: {
+            $map: {
+              input: {
+                $filter: {
+                  input: "$txns",
+                  as: "t",
+                  cond: {
+                    $and: [
+                      { $in: ["$$t.status", ["Pending", "Processing"]] },
+                      { $eq: ["$$t.type", "Withdrawal"] },
+                    ],
+                  },
+                },
+              },
+              as: "t",
+              in: { $abs: "$$t.amount" },
+            },
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        availableBalance: {
+          $max: [{ $subtract: ["$settledBalance", "$pendingWithdrawals"] }, 0],
+        },
+      },
+    },
+    { $match: { availableBalance: { $gt: 0 } } },
+    {
+      $project: {
+        name: 1,
+        phone: 1,
+        avatar: "$documents.profileImage",
+        availableBalance: 1,
+        pendingWithdrawals: 1,
+      },
+    },
+    { $sort: { availableBalance: -1 } },
+    {
+      $facet: {
+        meta: [{ $count: "total" }],
+        totals: [{ $group: { _id: null, totalPayable: { $sum: "$availableBalance" } } }],
+        items: [{ $skip: skip }, { $limit: limit }],
+      },
+    },
+  ];
+
+  const [aggregateResult] = await Delivery.aggregate(pipeline);
+  const meta = aggregateResult?.meta?.[0];
+  const totals = aggregateResult?.totals?.[0];
+  const riders = (aggregateResult?.items ?? []).map((rider) => ({
+    id: rider._id,
+    name: rider.name,
+    phone: rider.phone,
+    avatar: rider.avatar || "",
+    availableBalance: rider.availableBalance || 0,
+    pendingWithdrawals: rider.pendingWithdrawals || 0,
+  }));
+  const total = meta?.total ?? 0;
+
+  return {
+    items: riders,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit) || 1,
+    stats: {
+      totalPayable: totals?.totalPayable ?? 0,
+      riderCount: total,
+    },
+  };
+}
+
+/**
+ * Admin pays a rider's payable earning balance at end of day, fronting it
+ * from admin's own funds — independent of when/whether the seller has
+ * remitted the underlying COD cash back to admin. Recorded the same way a
+ * rider-requested withdrawal would be once approved, so it folds into the
+ * rider's existing balance/history calculations without any parallel
+ * bookkeeping.
+ */
+export async function payRiderEod({ riderId, amount, method, note, actorId }) {
+  if (!riderId || !amount || amount <= 0) {
+    throw new Error("Missing riderId or invalid amount");
+  }
+
+  const rider = await Delivery.findById(riderId);
+  if (!rider) {
+    return null;
+  }
+
+  const transactions = await Transaction.find({ user: riderId, userModel: "Delivery" }).lean();
+  const settledBalance = transactions
+    .filter((t) => t.status === "Settled" && !t.meta?.settledViaCash)
+    .reduce((acc, t) => acc + Number(t.amount || 0), 0);
+  const pendingWithdrawals = transactions
+    .filter((t) => (t.status === "Pending" || t.status === "Processing") && t.type === "Withdrawal")
+    .reduce((acc, t) => acc + Math.abs(Number(t.amount || 0)), 0);
+  const availableBalance = Math.max(settledBalance - pendingWithdrawals, 0);
+
+  const requested = Math.round((Number(amount) + Number.EPSILON) * 100) / 100;
+  if (requested > availableBalance) {
+    throw new Error(`Amount exceeds rider's payable balance (₹${availableBalance})`);
+  }
+
+  const payout = await Transaction.create({
+    user: riderId,
+    userModel: "Delivery",
+    type: "Withdrawal",
+    amount: -Math.abs(requested),
+    status: "Settled",
+    reference: `EOD-${riderId}-${Date.now()}`,
+    notes: method ? `Method: ${method}` : "EOD payout by admin",
+    meta: {
+      source: "admin_eod_rider_payout",
+      method: method || "Cash",
+      note: note || "",
+      paidBy: actorId || null,
+    },
+  });
+
+  await Notification.create({
+    recipient: riderId,
+    recipientModel: "Delivery",
+    title: "Earnings Paid",
+    message: `Admin has paid your delivery earnings of ₹${requested}.`,
+    type: "payment",
+    data: { transactionId: payout._id },
+  });
+
+  return {
+    payout,
+    remainingBalance: Math.max(availableBalance - requested, 0),
+  };
+}
+
 export async function getCashSettlementHistoryData({ page, limit, skip }) {
   const query = { userModel: "Delivery", type: "Cash Settlement" };
 

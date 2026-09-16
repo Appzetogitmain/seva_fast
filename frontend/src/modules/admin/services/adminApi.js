@@ -131,6 +131,10 @@ export const adminApi = {
     settleRiderCash: (data) => axiosInstance.post('/admin/settle-cash', data),
     getCashSettlementHistory: (params) => axiosInstance.get('/admin/cash-history', { params }),
 
+    // Rider EOD Payouts (delivery earnings, separate from COD cash flow)
+    getRiderPayableBalances: (params) => axiosInstance.get('/admin/rider-payouts', { params }),
+    payRiderEod: (data) => axiosInstance.post('/admin/rider-payouts/pay', data),
+
     // FAQ Management
     getFAQs: (params) => axiosInstance.get('/admin/faqs', { params }),
     createFAQ: (data) => axiosInstance.post('/admin/faqs', data),

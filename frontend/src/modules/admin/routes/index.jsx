@@ -74,6 +74,7 @@ const SellerTransactions = React.lazy(
   () => import("../pages/SellerTransactions"),
 );
 const CashCollection = React.lazy(() => import("../pages/CashCollection"));
+const RiderPayouts = React.lazy(() => import("../pages/RiderPayouts"));
 const CustomerManagement = React.lazy(
   () => import("../pages/CustomerManagement"),
 );
@@ -217,6 +218,12 @@ const navItems = [
     path: "/admin/cash-collection",
     icon: CircleDollarSign,
     color: "green",
+  },
+  {
+    label: "Rider Payouts",
+    path: "/admin/rider-payouts",
+    icon: Banknote,
+    color: "cyan",
   },
   { label: "Customers", path: "/admin/customers", icon: Users, color: "sky" },
   {
@@ -377,6 +384,7 @@ const AdminRoutes = () => {
         <Route path="/withdrawals" element={<SubadminRoute permission="Money Requests"><WithdrawalRequests /></SubadminRoute>} />
         <Route path="/seller-transactions" element={<SubadminRoute permission="Seller Payments"><SellerTransactions /></SubadminRoute>} />
         <Route path="/cash-collection" element={<SubadminRoute permission="Collect Cash"><CashCollection /></SubadminRoute>} />
+        <Route path="/rider-payouts" element={<SubadminRoute permission="Rider Payouts"><RiderPayouts /></SubadminRoute>} />
         <Route path="/customers" element={<SubadminRoute permission="Customers"><CustomerManagement /></SubadminRoute>} />
         <Route path="/customers/:id" element={<SubadminRoute permission="Customers"><CustomerDetail /></SubadminRoute>} />
         <Route path="/referrals-plans" element={<SubadminRoute permission="Referrals & Plans"><ReferralsAndSubscriptions /></SubadminRoute>} />

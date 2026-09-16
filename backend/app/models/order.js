@@ -294,11 +294,16 @@ const orderSchema = new mongoose.Schema(
       sellerPayoutQueued: { type: Boolean, default: false },
       sellerPayoutHeld: { type: Boolean, default: false },
       riderPayoutQueued: { type: Boolean, default: false },
-      // Rider already nets their own commission out of COD cash before
-      // remitting the rest (see getCodNetAmount) — this marks that their
-      // payout was settled that way, so it's never also queued as a
-      // separate wallet/bank payout for the same amount.
+      // Legacy flag from the old "rider keeps their commission in hand"
+      // model — kept only for backward compatibility with orders settled
+      // under that rule. New COD orders use riderCodEarningCredited instead.
       riderPayoutSettledViaCash: { type: Boolean, default: false },
+      // Rider now returns the FULL COD amount collected — their own earning
+      // is credited to their wallet as soon as that full amount has been
+      // handed over (to the seller, direct QR payment, or direct admin
+      // reconciliation), independent of the seller's own later remittance.
+      // See creditRiderCodEarning in orderFinanceService.js.
+      riderCodEarningCredited: { type: Boolean, default: false },
       adminEarningCredited: { type: Boolean, default: false },
       cashbackCredited: { type: Boolean, default: false },
       levelCommissionCredited: { type: Boolean, default: false },
