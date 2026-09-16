@@ -233,4 +233,14 @@ export const adminApi = {
     getAdminPhotoOrders: () => axiosInstance.get('/admin/photo-orders'),
     getAdminPhotoOrderChat: (id) => axiosInstance.get(`/admin/photo-orders/${id}/chat`),
     toggleAdminPhotoOrderChat: (id, data) => axiosInstance.patch(`/admin/photo-orders/${id}/toggle-chat`, data),
+
+    // Chatbot Analytics & Moderation
+    getChatbotOverview: (params) => axiosInstance.get('/admin/chatbot/analytics/overview', { params }),
+    getChatbotSessions: (params) => axiosInstance.get('/admin/chatbot/sessions', { params }),
+    getChatbotSessionDetail: (sessionId) => axiosInstance.get(`/admin/chatbot/sessions/${sessionId}`),
+    getChatbotFlagged: (params) => axiosInstance.get('/admin/chatbot/flagged', { params }),
+    reviewChatbotFlagged: (id, data) => axiosInstance.patch(`/admin/chatbot/flagged/${id}`, data),
+    getChatbotAccessStatus: (role, userId) => axiosInstance.get(`/admin/chatbot/access/${role}/${userId}`),
+    disableChatbotAccess: (role, userId, data) => axiosInstance.post(`/admin/chatbot/access/${role}/${userId}/disable`, data),
+    enableChatbotAccess: (role, userId, data) => axiosInstance.post(`/admin/chatbot/access/${role}/${userId}/enable`, data),
 };

@@ -23,6 +23,18 @@ export default function SellerChatbotWidget() {
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
   const navigate = useNavigate();
+  // One id per widget mount — lets the backend group this conversation's
+  // turns into a single ChatSession for analytics/moderation.
+  const sessionIdRef = useRef(
+    globalThis.crypto?.randomUUID?.() || `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  );
+  // Bumped on every stopSpeaking()/new utterance so stale onstart/onboundary/
+  // onend/onerror callbacks from a superseded utterance no-op instead of
+  // resurrecting old audio/text-stream.
+  const speechSeqRef = useRef(0);
+  // Bumped on every new send so a slow/out-of-order network reply from an
+  // earlier message can't clobber or overlap the reply to a newer message.
+  const requestSeqRef = useRef(0);
 
   // recognition.onend fires asynchronously and calls handleSend from a
   // closure captured when startVoiceInput() ran — at that point
@@ -56,6 +68,9 @@ export default function SellerChatbotWidget() {
 
   // Stop all active speech synthesis and text streaming
   const stopSpeaking = () => {
+    // Invalidate any in-flight utterance's callbacks immediately so a
+    // barge-in (new message/voice input) can never be raced by old audio.
+    speechSeqRef.current += 1;
     if (activeUtteranceRef.current) {
       activeUtteranceRef.current.onstart = null;
       activeUtteranceRef.current.onend = null;
@@ -202,6 +217,7 @@ export default function SellerChatbotWidget() {
   // Synchronized Gemini-like Voice + Progressive Word Streaming
   const streamAndSpeakResponse = (fullReplyText, shouldSpeak = false) => {
     stopSpeaking();
+    const mySpeechSeq = speechSeqRef.current;
 
     const formattedText = formatAiText(fullReplyText);
     const cleanSpeech = formattedText.replace(/[*#_~`>•-]/g, '').trim();
@@ -230,7 +246,7 @@ export default function SellerChatbotWidget() {
     const startWordStreaming = (msPerWord = 35) => {
       if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
       streamIntervalRef.current = setInterval(() => {
-        if (!isOpenRef.current) {
+        if (!isOpenRef.current || speechSeqRef.current !== mySpeechSeq) {
           clearInterval(streamIntervalRef.current);
           streamIntervalRef.current = null;
           return;
@@ -270,7 +286,7 @@ export default function SellerChatbotWidget() {
         let boundaryWordIdx = 0;
 
         utterance.onboundary = (event) => {
-          if (!isOpenRef.current) return;
+          if (!isOpenRef.current || speechSeqRef.current !== mySpeechSeq) return;
           if (event.name && event.name !== 'word') return;
           boundaryFired = true;
           if (streamIntervalRef.current) {
@@ -282,13 +298,14 @@ export default function SellerChatbotWidget() {
         };
 
         utterance.onstart = () => {
+          if (speechSeqRef.current !== mySpeechSeq) return;
           if (!isOpenRef.current) {
             stopSpeaking();
             return;
           }
           setIsSpeaking(true);
           setTimeout(() => {
-            if (!boundaryFired && isOpenRef.current) {
+            if (!boundaryFired && isOpenRef.current && speechSeqRef.current === mySpeechSeq) {
               const estSec = words.length / 2.3;
               const intervalMs = Math.max(20, Math.min(180, (estSec * 1000) / (words.length || 1)));
               startWordStreaming(intervalMs);
@@ -297,11 +314,13 @@ export default function SellerChatbotWidget() {
         };
 
         utterance.onend = () => {
+          if (speechSeqRef.current !== mySpeechSeq) return;
           setIsSpeaking(false);
           revealUpTo(words.length);
         };
 
         utterance.onerror = () => {
+          if (speechSeqRef.current !== mySpeechSeq) return;
           setIsSpeaking(false);
           revealUpTo(words.length);
         };
@@ -329,6 +348,7 @@ export default function SellerChatbotWidget() {
     if (!isOpenRef.current) return;
 
     stopSpeaking();
+    const mySpeechSeq = speechSeqRef.current;
 
     try {
       const cleanText = formatAiText(text).replace(/[*#_~`>•-]/g, '').trim();
@@ -347,14 +367,21 @@ export default function SellerChatbotWidget() {
       utterance.volume = 1.0;
 
       utterance.onstart = () => {
+        if (speechSeqRef.current !== mySpeechSeq) return;
         if (!isOpenRef.current) {
           stopSpeaking();
           return;
         }
         setIsSpeaking(true);
       };
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      utterance.onend = () => {
+        if (speechSeqRef.current !== mySpeechSeq) return;
+        setIsSpeaking(false);
+      };
+      utterance.onerror = () => {
+        if (speechSeqRef.current !== mySpeechSeq) return;
+        setIsSpeaking(false);
+      };
 
       activeUtteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
@@ -481,6 +508,11 @@ export default function SellerChatbotWidget() {
 
     // Barge-in: stop any active speech immediately
     stopSpeaking();
+    // Claim this send as the latest — an earlier in-flight request's reply
+    // will see it's been superseded and discard itself instead of playing/
+    // rendering out of order over this one.
+    requestSeqRef.current += 1;
+    const mySeq = requestSeqRef.current;
 
     if (isListening) {
       recognitionRef.current?.stop();
@@ -489,7 +521,7 @@ export default function SellerChatbotWidget() {
 
     const userMessage = { role: "user", content: finalInput };
     const historyPayload = messages.map(m => ({ role: m.role, content: m.content }));
-    
+
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
@@ -497,9 +529,10 @@ export default function SellerChatbotWidget() {
     const shouldSpeakReply = isFromVoice || voiceModeRef.current;
 
     try {
-      const res = await sellerApi.aiChat({ message: finalInput, history: historyPayload });
+      const res = await sellerApi.aiChat({ message: finalInput, history: historyPayload, sessionId: sessionIdRef.current });
+      if (mySeq !== requestSeqRef.current) return; // superseded by a newer message
       const reply = res.data.result?.reply || res.data.data?.reply || res.data.reply || "";
-      
+
       setIsLoading(false);
 
       if (reply) {
@@ -509,6 +542,7 @@ export default function SellerChatbotWidget() {
         streamAndSpeakResponse(fallbackMsg, shouldSpeakReply);
       }
     } catch (error) {
+      if (mySeq !== requestSeqRef.current) return; // superseded by a newer message
       setIsLoading(false);
       const errMsg = error?.response?.data?.message || "Sorry, I am having trouble connecting right now. Please try again.";
       streamAndSpeakResponse(errMsg, shouldSpeakReply);

@@ -15,6 +15,8 @@ import Plan from "../models/plan.js";
 import Review from "../models/review.js";
 import { getNearbySellerIdsForCustomer } from "../services/customerVisibilityService.js";
 import { matchShoppingItemWithCatalog } from "../services/catalogMatcherService.js";
+import { applyOutputGuardrail } from "../services/chatbot/outputGuardrail.js";
+import { trackChatTurn } from "../services/chatbot/chatTrackingService.js";
 
 const CUSTOMER_SYSTEM_INSTRUCTION = `
 You are "Seva AI", the official smart and multilingual assistant for "Seva Fast" - India's premier hyper-local quick-commerce, home services & community referral platform.
@@ -177,8 +179,10 @@ const tools = [
 
 export const handleChat = async (req, res) => {
   try {
-    const { messages, lat, lng } = req.body;
-    
+    const { messages, lat, lng, sessionId, anonymousId } = req.body;
+    const chatRole = req.user?.role || "anonymous";
+    const chatUserRef = req.user?.id || null;
+
     if (!messages || !Array.isArray(messages)) {
       return handleResponse(res, 400, "Messages array is required");
     }
@@ -520,9 +524,24 @@ export const handleChat = async (req, res) => {
         : "I found what you were looking for:";
     }
 
-    return handleResponse(res, 200, "Success", { 
-      reply: replyText, 
-      messages, 
+    const guardrail = applyOutputGuardrail(replyText);
+    replyText = guardrail.text;
+
+    if (sessionId) {
+      trackChatTurn({
+        sessionId,
+        role: chatRole,
+        userRef: chatUserRef,
+        anonymousId: chatUserRef ? null : anonymousId || null,
+        messages,
+        replyText,
+        guardrailFlags: guardrail.flags,
+      }).catch(() => {});
+    }
+
+    return handleResponse(res, 200, "Success", {
+      reply: replyText,
+      messages,
       products: attachedProducts,
       action: pendingAction,
       actionPayload: pendingActionPayload

@@ -5,6 +5,8 @@ import Order from "../models/order.js";
 import Wallet from "../models/wallet.js";
 import Seller from "../models/seller.js";
 import mongoose from "mongoose";
+import { applyOutputGuardrail } from "../services/chatbot/outputGuardrail.js";
+import { trackChatTurn } from "../services/chatbot/chatTrackingService.js";
 
 const SELLER_SYSTEM_INSTRUCTION = `
 You are "Seva Seller AI", the official smart onboarding and operations assistant for the "Seva Fast" Seller Portal. Your goal is to guide local shop owners, merchants, and sellers through platform features, troubleshoot issues, and answer their business queries in a friendly, highly concise manner.
@@ -105,7 +107,7 @@ const tools = [
 
 export const handleSellerChat = async (req, res) => {
   try {
-    const { message, history = [] } = req.body;
+    const { message, history = [], sessionId } = req.body;
     const sellerId = req.user.id;
 
     if (!message) {
@@ -302,6 +304,20 @@ export const handleSellerChat = async (req, res) => {
 
     if (!finalResponseText) {
       finalResponseText = "Aapka request process ho gaya hai. Kya aapko kisi aur feature ya orders ke baare me janna hai?";
+    }
+
+    const guardrail = applyOutputGuardrail(finalResponseText);
+    finalResponseText = guardrail.text;
+
+    if (sessionId) {
+      trackChatTurn({
+        sessionId,
+        role: "seller",
+        userRef: sellerId,
+        messages,
+        replyText: finalResponseText,
+        guardrailFlags: guardrail.flags,
+      }).catch(() => {});
     }
 
     return handleResponse(res, 200, "Success", { reply: finalResponseText });

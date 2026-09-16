@@ -7,6 +7,8 @@ import Delivery from "../models/delivery.js";
 import Product from "../models/product.js";
 import Ticket from "../models/ticket.js";
 import Wallet from "../models/wallet.js";
+import { applyOutputGuardrail } from "../services/chatbot/outputGuardrail.js";
+import { trackChatTurn } from "../services/chatbot/chatTrackingService.js";
 
 const ADMIN_SYSTEM_INSTRUCTION_BASE = `
 You are "Seva Admin AI", the official smart and multilingual operations assistant built into the Admin & Sub-Admin panel of "Seva Fast". Your job is to help admins and sub-admins instantly understand what's happening on the platform right now, and to clearly explain HOW to operate every section/page of the panel and what the current workflow is — so they never have to dig through the panel manually or stay confused about a feature.
@@ -202,7 +204,7 @@ const ORDER_STATUS_LABELS = {
 
 export const handleAdminChat = async (req, res) => {
   try {
-    const { message, history = [], imageBase64, mimeType } = req.body;
+    const { message, history = [], imageBase64, mimeType, sessionId } = req.body;
 
     if (!message && !imageBase64) {
       return handleResponse(res, 400, "Message or image is required");
@@ -482,6 +484,20 @@ export const handleAdminChat = async (req, res) => {
     }
     if (!replyText) {
       replyText = "Sorry, I couldn't generate a response. Please try rephrasing your question.";
+    }
+
+    const guardrail = applyOutputGuardrail(replyText);
+    replyText = guardrail.text;
+
+    if (sessionId) {
+      trackChatTurn({
+        sessionId,
+        role: admin.role === "sub-admin" ? "sub-admin" : "admin",
+        userRef: req.user.id,
+        messages,
+        replyText,
+        guardrailFlags: guardrail.flags,
+      }).catch(() => {});
     }
 
     return handleResponse(res, 200, "Success", { reply: replyText });

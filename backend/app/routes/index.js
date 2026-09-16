@@ -35,6 +35,7 @@ import customerAiRoute from "./customerAiRoutes.js";
 import sellerAiRoute from "./sellerAiRoutes.js";
 import adminAiRoute from "./adminAiRoutes.js";
 import deliveryAiRoute from "./deliveryAiRoutes.js";
+import adminChatbotRoute from "./adminChatbotRoutes.js";
 
 import express from "express";
 import { ensureDatabaseConnected } from "../middleware/databaseMiddleware.js";
@@ -91,6 +92,7 @@ const setupRoutes = (app) => {
     router.use("/seller/ai", sellerAiRoute);
     router.use("/admin/ai", adminAiRoute);
     router.use("/delivery/ai", deliveryAiRoute);
+    router.use("/admin/chatbot", adminChatbotRoute);
 
     app.use("/api", router);
 }
