@@ -43,6 +43,32 @@ export default function ChatbotWidget() {
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
   const navigate = useNavigate();
+  // Bumped on every stopSpeaking()/new utterance so stale onstart/onboundary/
+  // onend/onerror callbacks from a superseded utterance can recognize
+  // they're stale and no-op instead of resurrecting old audio/text-stream.
+  const speechSeqRef = useRef(0);
+  // Bumped on every new send so a slow/out-of-order network reply from an
+  // earlier message can't clobber or overlap the reply to a newer message.
+  const requestSeqRef = useRef(0);
+  // One id per widget mount — lets the backend group this conversation's
+  // turns into a single ChatSession for analytics/moderation.
+  const sessionIdRef = useRef(
+    globalThis.crypto?.randomUUID?.() || `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  );
+  // Persisted per-browser id so an anonymous (logged-out) shopper's chatbot
+  // usage can still be tracked/moderated across sessions without an account.
+  const anonymousIdRef = useRef((() => {
+    try {
+      let id = localStorage.getItem("seva_chat_anon_id");
+      if (!id) {
+        id = globalThis.crypto?.randomUUID?.() || `anon_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem("seva_chat_anon_id", id);
+      }
+      return id;
+    } catch (_) {
+      return null;
+    }
+  })());
   const { addToCart, removeFromCart, updateQuantity, batchAddToCart, cartCount } = useCart();
   const { currentLocation } = useAppLocation();
 
@@ -82,6 +108,10 @@ export default function ChatbotWidget() {
   }, [messages, isLoading, isSpeaking]);
 
   const stopSpeaking = () => {
+    // 0. Invalidate any in-flight utterance's callbacks immediately so a
+    // barge-in (new message/voice input) can never be raced by old audio.
+    speechSeqRef.current += 1;
+
     // 1. Clear voice restart timeouts
     if (voiceTimeoutRef.current) {
       clearTimeout(voiceTimeoutRef.current);
@@ -264,6 +294,7 @@ export default function ChatbotWidget() {
     shoppingListResult = undefined
   ) => {
     stopSpeaking();
+    const mySpeechSeq = speechSeqRef.current;
 
     const formattedText = formatAiText(fullReplyText);
     const cleanSpeech = formattedText.replace(/[*#_~`>•-]/g, "").trim();
@@ -305,7 +336,7 @@ export default function ChatbotWidget() {
       if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
 
       streamIntervalRef.current = setInterval(() => {
-        if (!isOpenRef.current) {
+        if (!isOpenRef.current || speechSeqRef.current !== mySpeechSeq) {
           clearInterval(streamIntervalRef.current);
           streamIntervalRef.current = null;
           return;
@@ -340,7 +371,7 @@ export default function ChatbotWidget() {
         let boundaryWordIdx = 0;
 
         utterance.onboundary = (event) => {
-          if (!isOpenRef.current) return;
+          if (!isOpenRef.current || speechSeqRef.current !== mySpeechSeq) return;
           if (event.name && event.name !== "word") return;
           boundaryFired = true;
           if (streamIntervalRef.current) {
@@ -352,6 +383,7 @@ export default function ChatbotWidget() {
         };
 
         utterance.onstart = () => {
+          if (speechSeqRef.current !== mySpeechSeq) return;
           if (!isOpenRef.current) {
             stopSpeaking();
             return;
@@ -362,7 +394,7 @@ export default function ChatbotWidget() {
           // Fallback for engines/voices that never fire onboundary (e.g. some mobile
           // voices): estimate pace so text still streams roughly alongside the audio.
           setTimeout(() => {
-            if (!boundaryFired && isOpenRef.current) {
+            if (!boundaryFired && isOpenRef.current && speechSeqRef.current === mySpeechSeq) {
               const totalSpeechDurationEstimateSec = words.length / 2.3;
               const intervalMs = Math.max(
                 20,
@@ -374,6 +406,7 @@ export default function ChatbotWidget() {
         };
 
         utterance.onend = () => {
+          if (speechSeqRef.current !== mySpeechSeq) return;
           if (streamIntervalRef.current) {
             clearInterval(streamIntervalRef.current);
             streamIntervalRef.current = null;
@@ -383,7 +416,7 @@ export default function ChatbotWidget() {
 
           if (voiceModeRef.current && isOpenRef.current) {
             voiceTimeoutRef.current = setTimeout(() => {
-              if (voiceModeRef.current && isOpenRef.current && !isListening) {
+              if (voiceModeRef.current && isOpenRef.current && !isListening && speechSeqRef.current === mySpeechSeq) {
                 startVoiceInput();
               }
             }, 500);
@@ -391,6 +424,7 @@ export default function ChatbotWidget() {
         };
 
         utterance.onerror = () => {
+          if (speechSeqRef.current !== mySpeechSeq) return;
           if (streamIntervalRef.current) {
             clearInterval(streamIntervalRef.current);
             streamIntervalRef.current = null;
@@ -403,7 +437,7 @@ export default function ChatbotWidget() {
         window.speechSynthesis.speak(utterance);
 
         setTimeout(() => {
-          if (!speechStarted && !streamIntervalRef.current && isOpenRef.current) {
+          if (!speechStarted && !streamIntervalRef.current && isOpenRef.current && speechSeqRef.current === mySpeechSeq) {
             startWordStreaming(35);
           }
         }, 800);
@@ -420,6 +454,7 @@ export default function ChatbotWidget() {
     if (!isOpenRef.current) return;
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     stopSpeaking();
+    const mySpeechSeq = speechSeqRef.current;
 
     try {
       const cleanText = formatAiText(text).replace(/[*#_~`>•-]/g, "").trim();
@@ -436,14 +471,21 @@ export default function ChatbotWidget() {
       utterance.volume = 1.0;
 
       utterance.onstart = () => {
+        if (speechSeqRef.current !== mySpeechSeq) return;
         if (!isOpenRef.current) {
           stopSpeaking();
           return;
         }
         setIsSpeaking(true);
       };
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      utterance.onend = () => {
+        if (speechSeqRef.current !== mySpeechSeq) return;
+        setIsSpeaking(false);
+      };
+      utterance.onerror = () => {
+        if (speechSeqRef.current !== mySpeechSeq) return;
+        setIsSpeaking(false);
+      };
 
       activeUtteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
@@ -611,6 +653,11 @@ export default function ChatbotWidget() {
     if (!finalInput.trim() && !isLoading) return;
 
     stopSpeaking();
+    // Claim this send as the latest — any earlier in-flight request's reply
+    // will see it's been superseded and discard itself instead of playing/
+    // rendering out of order over this one.
+    requestSeqRef.current += 1;
+    const mySeq = requestSeqRef.current;
 
     if (isListening) {
       recognitionRef.current?.stop();
@@ -634,6 +681,7 @@ export default function ChatbotWidget() {
           lat: currentLocation?.latitude,
           lng: currentLocation?.longitude,
         });
+        if (mySeq !== requestSeqRef.current) return; // superseded by a newer message
 
         const data = res?.data?.result;
         if (
@@ -662,8 +710,11 @@ export default function ChatbotWidget() {
         messages: newMessages.map((m) => ({ role: m.role, parts: m.parts })),
         lat: currentLocation?.latitude,
         lng: currentLocation?.longitude,
+        sessionId: sessionIdRef.current,
+        anonymousId: anonymousIdRef.current,
       };
       const res = await aiApi.chat(params);
+      if (mySeq !== requestSeqRef.current) return; // superseded by a newer message
       const { reply, products, action, actionPayload } = res.data.result || {};
 
       setIsLoading(false);
@@ -690,6 +741,7 @@ export default function ChatbotWidget() {
         streamAndSpeakResponse(fallbackMsg, shouldSpeakReply, products);
       }
     } catch (error) {
+      if (mySeq !== requestSeqRef.current) return; // superseded by a newer message
       setIsLoading(false);
       const errMsg =
         error?.response?.data?.message ||
@@ -708,6 +760,8 @@ export default function ChatbotWidget() {
       const mimeType = file.type;
 
       stopSpeaking();
+      requestSeqRef.current += 1;
+      const mySeq = requestSeqRef.current;
       setMessages((prev) => [
         ...prev,
         {
@@ -725,6 +779,7 @@ export default function ChatbotWidget() {
           lat: currentLocation?.latitude,
           lng: currentLocation?.longitude,
         });
+        if (mySeq !== requestSeqRef.current) return; // superseded by a newer message
 
         const listData = listRes?.data?.result;
         if (
@@ -748,6 +803,7 @@ export default function ChatbotWidget() {
           imageBase64: base64String,
           mimeType,
         });
+        if (mySeq !== requestSeqRef.current) return; // superseded by a newer message
 
         const { keywords, products } = res.data.result;
         let botReply = `Maine aapki photo check ki aur matching items search kiye hain:`;
@@ -761,6 +817,7 @@ export default function ChatbotWidget() {
           );
         }
       } catch (error) {
+        if (mySeq !== requestSeqRef.current) return; // superseded by a newer message
         setIsLoading(false);
         streamAndSpeakResponse(
           "Failed to process the image. Please try again.",

@@ -31,6 +31,7 @@ import {
   PieChart,
   FileText,
   Star,
+  Bot,
 } from "lucide-react";
 
 const Dashboard = React.lazy(() => import("../pages/Dashboard"));
@@ -117,6 +118,7 @@ const AdminReviews = React.lazy(() => import("../pages/AdminReviews"));
 const StorePromotions = React.lazy(() => import("../pages/StorePromotions"));
 const AdminPhotoOrders = React.lazy(() => import("../pages/AdminPhotoOrders"));
 const AdvancedAnalytics = React.lazy(() => import("../pages/AdvancedAnalytics"));
+const ChatbotAnalytics = React.lazy(() => import("../pages/ChatbotAnalytics"));
 
 const navItems = [
   {
@@ -224,6 +226,12 @@ const navItems = [
     path: "/admin/rider-payouts",
     icon: Banknote,
     color: "cyan",
+  },
+  {
+    label: "Chatbot Analytics",
+    path: "/admin/chatbot-analytics",
+    icon: Bot,
+    color: "violet",
   },
   { label: "Customers", path: "/admin/customers", icon: Users, color: "sky" },
   {
@@ -385,6 +393,7 @@ const AdminRoutes = () => {
         <Route path="/seller-transactions" element={<SubadminRoute permission="Seller Payments"><SellerTransactions /></SubadminRoute>} />
         <Route path="/cash-collection" element={<SubadminRoute permission="Collect Cash"><CashCollection /></SubadminRoute>} />
         <Route path="/rider-payouts" element={<SubadminRoute permission="Rider Payouts"><RiderPayouts /></SubadminRoute>} />
+        <Route path="/chatbot-analytics" element={<SubadminRoute permission="Chatbot Analytics"><ChatbotAnalytics /></SubadminRoute>} />
         <Route path="/customers" element={<SubadminRoute permission="Customers"><CustomerManagement /></SubadminRoute>} />
         <Route path="/customers/:id" element={<SubadminRoute permission="Customers"><CustomerDetail /></SubadminRoute>} />
         <Route path="/referrals-plans" element={<SubadminRoute permission="Referrals & Plans"><ReferralsAndSubscriptions /></SubadminRoute>} />

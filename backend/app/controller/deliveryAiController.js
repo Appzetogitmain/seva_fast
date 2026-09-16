@@ -5,6 +5,8 @@ import Transaction from "../models/transaction.js";
 import Wallet from "../models/wallet.js";
 import Delivery from "../models/delivery.js";
 import mongoose from "mongoose";
+import { applyOutputGuardrail } from "../services/chatbot/outputGuardrail.js";
+import { trackChatTurn } from "../services/chatbot/chatTrackingService.js";
 
 const DELIVERY_SYSTEM_INSTRUCTION = `
 You are "Seva Rider AI", the official smart assistant for the "Seva Fast" Delivery Partner (Rider) App. Your goal is to clearly guide delivery partners (bike/cycle riders) through how the rider app works, troubleshoot issues, and answer their earnings/order queries in a friendly, highly concise manner.
@@ -119,7 +121,7 @@ const EARNING_TXN_TYPES = ["Delivery Earning", "Incentive", "Bonus"];
 
 export const handleDeliveryChat = async (req, res) => {
   try {
-    const { message, history = [] } = req.body;
+    const { message, history = [], sessionId } = req.body;
     const deliveryId = req.user.id;
 
     if (!message) {
@@ -320,6 +322,20 @@ export const handleDeliveryChat = async (req, res) => {
 
     if (!finalResponseText) {
       finalResponseText = "Aapka request process ho gaya hai. Kya aapko kisi aur order ya feature ke baare me janna hai?";
+    }
+
+    const guardrail = applyOutputGuardrail(finalResponseText);
+    finalResponseText = guardrail.text;
+
+    if (sessionId) {
+      trackChatTurn({
+        sessionId,
+        role: "delivery",
+        userRef: deliveryId,
+        messages,
+        replyText: finalResponseText,
+        guardrailFlags: guardrail.flags,
+      }).catch(() => {});
     }
 
     return handleResponse(res, 200, "Success", { reply: finalResponseText });
