@@ -46,8 +46,7 @@ import { sanitizeOrderForDeliveryView, sanitizeOrdersForDeliveryView } from "../
 import { sanitizeOrderForSellerView } from "../utils/sellerOrderView.js";
 import { createFinanceOrderSchema } from "../validation/financeValidation.js";
 import { placeOrderAtomic } from "../services/orderPlacementService.js";
-import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
-import { cancelShiprocketShipmentForOrder } from "../services/shiprocket/shiprocketOrderService.js";
+import { cancelShiprocketShipmentForOrder, getFormattedShiprocketTracking } from "../services/shiprocket/shiprocketOrderService.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import {
   emitDeliveryBroadcastForSeller,
@@ -573,6 +572,53 @@ export const getOrderDetails = async (req, res) => {
     return handleResponse(res, 200, "Order details fetched", order);
   } catch (error) {
     console.error(`[ORDER_ERROR] Error fetching order details:`, error);
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+/* ===============================
+   GET ORDER SHIPPING TRACKING (SHIPROCKET)
+================================ */
+export const getOrderShippingTracking = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { role } = req.user || {};
+    const userId = req.user?.id ?? req.user?._id;
+    const uid = userId != null ? String(userId).trim() : "";
+
+    const orderKey = orderMatchQueryFlexible(orderId);
+    if (!orderKey) {
+      return handleResponse(res, 404, "Order not found");
+    }
+
+    const order = await Order.findOne(orderKey).lean();
+    if (!order) {
+      return handleResponse(res, 404, "Order not found");
+    }
+
+    // Access check
+    const roleNorm = String(role || "").toLowerCase();
+    const customerIdStr = order.customer ? String(order.customer).trim() : "";
+    const sellerIdStr = order.seller ? String(order.seller).trim() : "";
+
+    const isOwnerCustomer =
+      (roleNorm === "customer" || roleNorm === "user") &&
+      customerIdStr === uid;
+    const isOwnerSeller = roleNorm === "seller" && sellerIdStr === uid;
+    const isAdmin = roleNorm === "admin" || roleNorm === "sub-admin";
+
+    if (!isOwnerCustomer && !isOwnerSeller && !isAdmin) {
+      return handleResponse(res, 403, "Access denied");
+    }
+
+    const trackingData = await getFormattedShiprocketTracking(order);
+    if (!trackingData) {
+      return handleResponse(res, 404, "Tracking details not available");
+    }
+
+    return handleResponse(res, 200, "Tracking details fetched", trackingData);
+  } catch (error) {
+    console.error(`[TRACKING_ERROR] Error fetching shipping tracking:`, error);
     return handleResponse(res, 500, error.message);
   }
 };

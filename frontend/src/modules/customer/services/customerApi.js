@@ -98,6 +98,12 @@ export const customerApi = {
       {},
       { ttl: 0 },
     ),
+  getShippingTracking: (orderId) =>
+    getWithDedupe(
+      `/orders/${encodeURIComponent(String(orderId ?? "").trim())}/shipping-tracking`,
+      {},
+      { ttl: 10000 },
+    ),
   getOrderRoute: (orderId, params) =>
     axiosInstance.get(`/orders/workflow/${orderId}/route`, { params }),
   cancelOrder: (orderId, data) =>

@@ -3,6 +3,7 @@ import {
   placeOrder,
   getMyOrders,
   getOrderDetails,
+  getOrderShippingTracking,
   cancelOrder,
   updateOrderStatus,
   getAvailableRiders,
@@ -152,6 +153,8 @@ router.post(
 );
 router.get("/my-orders", verifyToken, getMyOrders);
 router.get("/details/:orderId", verifyToken, getOrderDetails);
+router.get("/:orderId/shipping-tracking", verifyToken, getOrderShippingTracking);
+router.get("/shipping-tracking/:orderId", verifyToken, getOrderShippingTracking);
 router.put("/cancel/:orderId", verifyToken, cancelOrder);
 router.post("/:orderId/returns", verifyToken, requestReturn);
 router.get("/:orderId/returns", verifyToken, getReturnDetails);

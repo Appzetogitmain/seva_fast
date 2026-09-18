@@ -19,24 +19,20 @@ const CheckoutOrderSuccess = React.memo(function CheckoutOrderSuccess({ orderId,
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center select-none"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
         >
-          {/* Ambient Glows */}
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-emerald-500/20 rounded-full blur-[100px] pointer-events-none animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-60 h-60 bg-brand-500/15 rounded-full blur-[90px] pointer-events-none" />
-
-          {/* Success Card Modal */}
           <motion.div
             initial={{ scale: 0.85, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="relative z-10 max-w-sm w-full bg-slate-900/90 border border-slate-700/60 rounded-3xl p-7 shadow-2xl text-white backdrop-blur-md overflow-hidden"
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="relative w-full max-w-sm bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-emerald-500/30 rounded-3xl p-6 text-center shadow-2xl shadow-emerald-950/50 overflow-hidden"
           >
-            {/* Top Shine Bar */}
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-400 via-brand-400 to-teal-400" />
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-12 -left-12 w-36 h-36 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-12 -right-12 w-36 h-36 bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Glowing Icon */}
+            {/* Success Icon */}
             <div className="relative mx-auto w-20 h-20 mb-5 flex items-center justify-center">
               <div className="absolute inset-0 bg-emerald-500/30 rounded-full blur-xl animate-ping" />
               <div className="relative w-20 h-20 bg-gradient-to-tr from-emerald-600 to-emerald-400 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/40 border-2 border-white/20">
@@ -63,10 +59,14 @@ const CheckoutOrderSuccess = React.memo(function CheckoutOrderSuccess({ orderId,
                 <span className="text-slate-400 font-medium flex items-center gap-1.5">
                   <Clock size={13} className="text-emerald-400" /> Estimated Delivery
                 </span>
-                <span className="text-white font-bold">12-15 Mins</span>
+                <span className="text-white font-bold">
+                  {estimatedDeliveryText || "12-15 Mins"}
+                </span>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed border-t border-slate-700/40 pt-2">
-                Waiting for the nearest store to accept. You can live track your order status in real-time.
+                {isScheduled
+                  ? "Your order will be packed by the seller and shipped via Shiprocket nationwide courier."
+                  : "Waiting for the nearest store to accept. You can live track your order status in real-time."}
               </p>
             </div>
 

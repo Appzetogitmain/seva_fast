@@ -1,73 +1,142 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, Circle, Clock, Truck, Home, XCircle } from "lucide-react";
+import { CheckCircle, Circle, Clock, Truck, Home, XCircle, Package, Calendar } from "lucide-react";
 import { getLegacyStatusFromOrder } from "@/shared/utils/orderStatus";
 
-const STATUS_TO_STAGE = {
-  pending: "confirmed",
-  confirmed: "confirmed",
-  packed: "confirmed",
-  out_for_delivery: "out_for_delivery",
-  delivered: "delivered",
-};
+const LOCAL_STEPS = [
+  {
+    id: "confirmed",
+    label: "Order Confirmed",
+    icon: CheckCircle,
+  },
+  {
+    id: "out_for_delivery",
+    label: "Out for delivery",
+    icon: Truck,
+  },
+  {
+    id: "delivered",
+    label: "Delivered",
+    icon: Home,
+  },
+];
+
+const SCHEDULED_STEPS = [
+  {
+    id: "confirmed",
+    label: "Order Confirmed",
+    icon: CheckCircle,
+  },
+  {
+    id: "packed",
+    label: "Packed & Pickup Scheduled",
+    icon: Package,
+  },
+  {
+    id: "in_transit",
+    label: "In Transit with Courier",
+    icon: Truck,
+  },
+  {
+    id: "out_for_delivery",
+    label: "Out for Delivery",
+    icon: Truck,
+  },
+  {
+    id: "delivered",
+    label: "Delivered",
+    icon: Home,
+  },
+];
 
 const OrderProgressTracker = ({
   order,
   estimatedArrivalText = "12:45 PM",
   arrivingInText = "8 mins",
   totalDistanceText = "—",
+  shippingTracking = null,
 }) => {
   const status = getLegacyStatusFromOrder(order);
-  const currentStage = STATUS_TO_STAGE[status] || "confirmed";
+  const workflowStatus = String(order?.workflowStatus || "").toUpperCase();
+  const isScheduled = order?.deliveryType === "scheduled" || order?.shipmentDetails?.provider === "shiprocket";
 
-  const steps = [
-    {
-      id: "confirmed",
-      label: "Order Confirmed",
-      icon: CheckCircle,
-      statuses: ["confirmed"],
-    },
-    {
-      id: "out_for_delivery",
-      label: "Out for delivery",
-      icon: Truck,
-      statuses: ["out_for_delivery", "delivered"],
-    },
-    {
-      id: "delivered",
-      label: "Delivered",
-      icon: Home,
-      statuses: ["delivered"],
-    },
-  ];
+  const getScheduledStepStatus = (stepId) => {
+    if (status === "cancelled" || workflowStatus === "CANCELLED") return "cancelled";
+    if (status === "delivered" || workflowStatus === "DELIVERED") return "completed";
 
-  const getStepStatus = (step) => {
-    if (status === "cancelled") return "cancelled";
+    const hasAwb = Boolean(order?.shipmentDetails?.awbCode || shippingTracking?.awbCode);
+    const trackingStatus = String(shippingTracking?.currentStatus || order?.shipmentDetails?.lastSyncedStatus || "").toUpperCase();
 
-    const stepIndex = steps.findIndex((s) => s.id === step.id);
+    const isOutForDelivery =
+      trackingStatus.includes("OUT FOR DELIVERY") ||
+      workflowStatus === "OUT_FOR_DELIVERY" ||
+      status === "out_for_delivery";
 
-    if (status === "pending") {
-      return stepIndex === 0 ? "active" : "pending";
-    }
+    const isInTransit =
+      trackingStatus.includes("IN TRANSIT") ||
+      trackingStatus.includes("SHIPPED") ||
+      trackingStatus.includes("PICKED UP") ||
+      trackingStatus.includes("REACHED") ||
+      hasAwb;
 
-    if (status === "confirmed" || status === "packed") {
-      return stepIndex === 0 ? "completed" : "pending";
-    }
+    const isPacked =
+      order?.pickupReadyAt ||
+      workflowStatus === "PICKUP_READY" ||
+      workflowStatus === "SELLER_ACCEPTED" ||
+      order?.shipmentDetails?.shiprocketOrderId ||
+      isInTransit ||
+      isOutForDelivery;
 
-    if (status === "out_for_delivery") {
-      if (stepIndex === 0) return "completed";
-      if (stepIndex === 1) return "active";
-      return "pending";
-    }
-
-    if (status === "delivered") {
+    if (stepId === "confirmed") {
       return "completed";
     }
 
-    return step.id === "confirmed" ? "active" : "pending";
+    if (stepId === "packed") {
+      if (isInTransit || isOutForDelivery) return "completed";
+      if (isPacked) return "active";
+      return status === "pending" ? "pending" : "active";
+    }
+
+    if (stepId === "in_transit") {
+      if (isOutForDelivery) return "completed";
+      if (isInTransit) return "active";
+      return "pending";
+    }
+
+    if (stepId === "out_for_delivery") {
+      if (isOutForDelivery) return "active";
+      return "pending";
+    }
+
+    if (stepId === "delivered") {
+      return status === "delivered" ? "completed" : "pending";
+    }
+
+    return "pending";
   };
 
-  if (status === "cancelled") {
+  const getLocalStepStatus = (stepId) => {
+    if (status === "cancelled") return "cancelled";
+
+    if (stepId === "confirmed") {
+      if (status === "pending") return "active";
+      return "completed";
+    }
+
+    if (stepId === "out_for_delivery") {
+      if (status === "delivered") return "completed";
+      if (status === "out_for_delivery" || workflowStatus === "OUT_FOR_DELIVERY") return "active";
+      return "pending";
+    }
+
+    if (stepId === "delivered") {
+      return status === "delivered" ? "completed" : "pending";
+    }
+
+    return "pending";
+  };
+
+  if (status === "cancelled" || workflowStatus === "CANCELLED") {
     return (
       <div className="bg-rose-50 border border-rose-200 rounded-3xl p-5 shadow-xs">
         <div className="flex items-center gap-3.5">
@@ -85,6 +154,30 @@ const OrderProgressTracker = ({
     );
   }
 
+  const steps = isScheduled ? SCHEDULED_STEPS : LOCAL_STEPS;
+  const getStepStatus = isScheduled ? getScheduledStepStatus : getLocalStepStatus;
+
+  // Format expected delivery date for scheduled shipping
+  const rawEdd =
+    shippingTracking?.expectedDeliveryDate ||
+    order?.deliveryEta?.estimatedDeliveryDate;
+
+  let formattedEdd = null;
+  if (rawEdd) {
+    const d = new Date(rawEdd);
+    if (!isNaN(d.getTime())) {
+      formattedEdd = d.toLocaleDateString("en-IN", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      });
+    }
+  }
+
+  const etaDays =
+    shippingTracking?.shiprocketEtaDays ||
+    order?.deliveryEta?.shiprocketEtaDays;
+
   return (
     <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
       <motion.div
@@ -92,11 +185,10 @@ const OrderProgressTracker = ({
         animate={{ opacity: 1 }}
         className="space-y-4">
         {steps.map((step, index) => {
-          const stepStatus = getStepStatus(step);
+          const stepStatus = getStepStatus(step.id);
           const Icon = step.icon;
           const isCompleted = stepStatus === "completed";
           const isActive = stepStatus === "active";
-          const isPending = stepStatus === "pending";
 
           return (
             <div
@@ -105,39 +197,41 @@ const OrderProgressTracker = ({
               <div className="flex items-center gap-4">
                 {/* Icon Circle */}
                 <div
-                  className={`relative z-10 h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 ${isCompleted
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                  className={`relative z-10 h-11 w-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+                    isCompleted
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
                       : isActive
-                        ? "bg-amber-100 text-amber-600 border-2 border-amber-400"
+                        ? "bg-amber-100 text-amber-600 border-2 border-amber-400 animate-pulse"
                         : "bg-slate-100 text-slate-400"
-                    }`}
+                  }`}
                 >
                   {isCompleted ? (
-                    <CheckCircle size={24} className="fill-current" />
+                    <CheckCircle size={22} className="fill-current" />
                   ) : isActive ? (
-                    <div className="animate-spin">
-                      <Icon size={22} />
-                    </div>
+                    <Icon size={20} />
                   ) : (
-                    <Circle size={22} />
+                    <Circle size={20} />
                   )}
                 </div>
 
                 {/* Label */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p
-                    className={`text-sm font-bold ${isCompleted
+                    className={`text-sm font-bold ${
+                      isCompleted
                         ? "text-slate-900"
                         : isActive
-                          ? "text-amber-700"
+                          ? "text-amber-800"
                           : "text-slate-400"
-                      }`}
+                    }`}
                   >
                     {step.label}
                   </p>
                   {isActive && (
                     <p className="text-xs text-amber-600 font-medium mt-0.5">
-                      In progress...
+                      {isScheduled && step.id === "in_transit"
+                        ? `With ${shippingTracking?.courierName || order?.shipmentDetails?.courierName || "Courier Partner"}`
+                        : "In progress..."}
                     </p>
                   )}
                 </div>
@@ -152,10 +246,11 @@ const OrderProgressTracker = ({
 
               {/* Connecting Line */}
               {index < steps.length - 1 && (
-                <div className="absolute left-6 top-12 bottom-0 w-0.5 -mb-4">
+                <div className="absolute left-[21px] top-11 bottom-0 w-0.5 -mb-4">
                   <div
-                    className={`h-full w-full ${isCompleted ? "bg-primary" : "bg-slate-200"
-                      }`}
+                    className={`h-full w-full ${
+                      isCompleted ? "bg-primary" : "bg-slate-200"
+                    }`}
                   />
                 </div>
               )}
@@ -164,8 +259,34 @@ const OrderProgressTracker = ({
         })}
       </motion.div>
 
-      {/* ETA Display */}
-      {status !== "delivered" && order?.deliveryType !== "scheduled" && (
+      {/* ETA Display for Scheduled Shiprocket Delivery */}
+      {isScheduled && status !== "delivered" && (
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between bg-indigo-50/80 rounded-2xl p-3.5 gap-3 border border-indigo-100">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0">
+                <Calendar size={18} className="text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider leading-none mb-1">
+                  Expected Delivery Date
+                </p>
+                <p className="text-sm font-black text-slate-900 leading-none">
+                  {formattedEdd || (etaDays ? `In ~${etaDays} days` : "4-6 business days")}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-[10px] font-bold text-indigo-800">
+                {shippingTracking?.courierName || order?.shipmentDetails?.courierName || "Shiprocket"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ETA Display for Local Delivery */}
+      {!isScheduled && status !== "delivered" && (
         <div className="mt-3 pt-3 border-t border-slate-100">
           <div className="flex items-center justify-between bg-amber-50 rounded-xl p-3 gap-3">
             <div className="flex items-center gap-2.5">

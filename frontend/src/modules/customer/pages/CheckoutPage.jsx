@@ -393,13 +393,93 @@ const CheckoutPage = () => {
     }
   }, [useWallet, user?.walletBalance, pricingPreview?.grandTotal]);
 
-  // Delivery method is now decided automatically server-side per seller
-  // (distance to customer + Shiprocket serviceability) — see
-  // deliveryDecisionService.js. hasScheduled reflects whether any seller in
-  // this checkout resolved to nationwide Shiprocket shipping.
+  // Delivery method is decided automatically server-side per seller
+  // (distance to customer + Shiprocket serviceability) — see deliveryDecisionService.js.
   const hasScheduled = sellerDeliveryPreview.some(
     (sb) => sb.deliveryDecision?.method === "scheduled",
   );
+
+  const scheduledBreakdowns = useMemo(
+    () => sellerDeliveryPreview.filter((sb) => sb.deliveryDecision?.method === "scheduled"),
+    [sellerDeliveryPreview],
+  );
+  const localBreakdowns = useMemo(
+    () => sellerDeliveryPreview.filter((sb) => sb.deliveryDecision?.method !== "scheduled"),
+    [sellerDeliveryPreview],
+  );
+  const isAllScheduled =
+    sellerDeliveryPreview.length > 0 &&
+    scheduledBreakdowns.length === sellerDeliveryPreview.length;
+  const isPartiallyScheduled =
+    scheduledBreakdowns.length > 0 && localBreakdowns.length > 0;
+
+  const deliveryEtaBanner = useMemo(() => {
+    if (sellerDeliveryPreview.length === 0) {
+      return {
+        title: isExpressDelivery
+          ? "Express Delivery"
+          : (currentLocation?.time || "Delivery in 12-15 mins"),
+        subtitle: `Shipment of ${cartCount} ${cartCount === 1 ? "item" : "items"}`,
+        type: "local",
+        isScheduled: false,
+        shortText: isExpressDelivery ? "1-2 Hours" : (currentLocation?.time || "12-15 Mins"),
+      };
+    }
+
+    if (isAllScheduled) {
+      const maxEtaDays = Math.max(
+        ...scheduledBreakdowns.map((sb) => sb.deliveryDecision?.shiprocketEtaDays || 0),
+      );
+      const daysText =
+        maxEtaDays > 0 ? `~${maxEtaDays} day${maxEtaDays === 1 ? "" : "s"}` : "4-6 days";
+      return {
+        title: `Nationwide Delivery (Arrives in ${daysText})`,
+        subtitle: `Fulfilled via Shiprocket • Shipment of ${cartCount} ${cartCount === 1 ? "item" : "items"}`,
+        type: "scheduled",
+        isScheduled: true,
+        shortText: `~${maxEtaDays > 0 ? maxEtaDays : 5} Days (Shiprocket)`,
+      };
+    }
+
+    if (isPartiallyScheduled) {
+      const maxEtaDays = Math.max(
+        ...scheduledBreakdowns.map((sb) => sb.deliveryDecision?.shiprocketEtaDays || 0),
+      );
+      const daysText = maxEtaDays > 0 ? `~${maxEtaDays} days` : "4-6 days";
+      return {
+        title: `Split Delivery: Local + Nationwide`,
+        subtitle: `Local items in 15-30 mins • Nationwide items in ${daysText}`,
+        type: "mixed",
+        isScheduled: true,
+        shortText: `Split Delivery (~${maxEtaDays > 0 ? maxEtaDays : 5} Days)`,
+      };
+    }
+
+    const minMin = Math.min(
+      ...localBreakdowns.map((sb) => sb.deliveryDecision?.localEtaMinMinutes || 12),
+    );
+    const maxMin = Math.max(
+      ...localBreakdowns.map((sb) => sb.deliveryDecision?.localEtaMaxMinutes || 15),
+    );
+    return {
+      title: isExpressDelivery
+        ? "Express Delivery (1-2 hrs)"
+        : `Delivery in ${minMin}-${maxMin} mins`,
+      subtitle: `Shipment of ${cartCount} ${cartCount === 1 ? "item" : "items"}`,
+      type: "local",
+      isScheduled: false,
+      shortText: isExpressDelivery ? "1-2 Hours" : `${minMin}-${maxMin} Mins`,
+    };
+  }, [
+    sellerDeliveryPreview,
+    scheduledBreakdowns,
+    localBreakdowns,
+    isAllScheduled,
+    isPartiallyScheduled,
+    isExpressDelivery,
+    currentLocation?.time,
+    cartCount,
+  ]);
 
   const finalAmountToPay = Math.max(0, (pricingPreview?.grandTotal ?? cartTotal) - walletAmountToUse);
   const minimumOrderValue = Number(settings?.minimumOrderValue || 0);
@@ -1347,7 +1427,12 @@ const CheckoutPage = () => {
   return (
     <div className="min-h-screen bg-[#f8f9fb] pb-32 pt-4 font-sans antialiased">
       {/* Order Success Overlay */}
-      <CheckoutOrderSuccess orderId={orderId} show={showSuccess} />
+      <CheckoutOrderSuccess
+        orderId={orderId}
+        show={showSuccess}
+        estimatedDeliveryText={deliveryEtaBanner.shortText}
+        isScheduled={deliveryEtaBanner.isScheduled}
+      />
 
       {/* Premium Header */}
       <div className="bg-gradient-to-br from-[var(--brand-700)] via-[var(--brand-600)] to-[var(--brand-400)] pt-6 pb-12 md:pb-24 relative z-10 shadow-lg md:rounded-b-[4rem] rounded-b-[2rem] overflow-hidden">
@@ -1393,17 +1478,24 @@ const CheckoutPage = () => {
 
           {/* Left Column */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-6 pb-8">
-            {/* Delivery Speed Selector */}
+            {/* Delivery Speed / ETA Banner */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mt-3">
               <div className="flex items-center gap-3 mb-3">
-                <div className="h-12 w-12 rounded-full bg-brand-50 flex items-center justify-center flex-shrink-0">
-                  <Clock size={24} className="text-primary" />
+                <div className={cn(
+                  "h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0",
+                  deliveryEtaBanner.isScheduled ? "bg-indigo-50 text-indigo-600" : "bg-brand-50 text-primary"
+                )}>
+                  {deliveryEtaBanner.isScheduled ? (
+                    <Truck size={24} className="text-indigo-600" />
+                  ) : (
+                    <Clock size={24} className="text-primary" />
+                  )}
                 </div>
                 <div>
                   <h3 className="font-black text-slate-800 text-lg">
-                    {isExpressDelivery ? "Express Delivery" : "Delivery in 12-15 mins"}
+                    {deliveryEtaBanner.title}
                   </h3>
-                  <p className="text-sm text-slate-500">Shipment of {cartCount} items</p>
+                  <p className="text-sm text-slate-500">{deliveryEtaBanner.subtitle}</p>
                 </div>
               </div>
               {settings?.expressDeliveryEnabled !== false && !hasScheduled && (

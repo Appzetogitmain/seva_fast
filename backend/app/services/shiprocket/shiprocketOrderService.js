@@ -10,6 +10,7 @@ import {
   generatePickup,
   cancelOrders,
   trackByShipmentId,
+  trackByAWB,
   addPickupLocation,
   ShiprocketError,
 } from "./shiprocketService.js";
@@ -545,4 +546,132 @@ export async function syncShiprocketTracking(orderId) {
   return trackByShipmentId(order.shipmentDetails.shiprocketShipmentId);
 }
 
+/**
+ * Returns formatted tracking details (courier, AWB, EDD, status, activities)
+ * for a nationwide Shiprocket shipment.
+ */
+export async function getFormattedShiprocketTracking(orderOrId) {
+  let order = orderOrId;
+  if (typeof orderOrId === "string" || !orderOrId?.deliveryType) {
+    order = await Order.findOne({
+      $or: [
+        { orderId: String(orderOrId).trim() },
+        { _id: String(orderOrId).trim().match(/^[0-9a-fA-F]{24}$/) ? orderOrId : null },
+      ],
+    })
+      .populate("seller", "shopName name address location")
+      .lean();
+  }
+
+  if (!order) return null;
+
+  const isScheduled =
+    order.deliveryType === "scheduled" ||
+    order.shipmentDetails?.provider === "shiprocket";
+
+  if (!isScheduled) {
+    return {
+      isScheduled: false,
+      deliveryType: order.deliveryType || "instant",
+      message: "Order is fulfilled via on-demand local delivery.",
+    };
+  }
+
+  const shipmentDetails = order.shipmentDetails || {};
+  const deliveryEta = order.deliveryEta || {};
+  let trackingRaw = null;
+
+  if (shipmentDetails.shiprocketShipmentId) {
+    try {
+      trackingRaw = await trackByShipmentId(shipmentDetails.shiprocketShipmentId);
+    } catch (err) {
+      console.warn("[Shiprocket] Tracking by shipment ID failed, checking AWB:", err.message);
+    }
+  }
+
+  if (!trackingRaw && shipmentDetails.awbCode) {
+    try {
+      trackingRaw = await trackByAWB(shipmentDetails.awbCode);
+    } catch (err) {
+      console.warn("[Shiprocket] Tracking by AWB failed:", err.message);
+    }
+  }
+
+  const trackData =
+    trackingRaw?.tracking_data ||
+    trackingRaw?.response?.tracking_data ||
+    (trackingRaw?.track_status ? trackingRaw : {});
+
+  const trackItem = Array.isArray(trackData.shipment_track)
+    ? trackData.shipment_track[0]
+    : Array.isArray(trackData.shipment_data)
+      ? trackData.shipment_data[0]
+      : null;
+
+  const activities = Array.isArray(trackData.shipment_track_activities)
+    ? trackData.shipment_track_activities.map((act) => ({
+        date: act.date || act["sr-status-label-date"] || act.activity_date,
+        status: act.status || act["sr-status-label"] || act.sr_status_label,
+        activity: act.activity || act.status || act["sr-status-label"],
+        location: act.location || "",
+      }))
+    : [];
+
+  const courierName =
+    trackItem?.courier_name ||
+    shipmentDetails.courierName ||
+    deliveryEta.courierName ||
+    "Shiprocket Courier Partner";
+
+  const awbCode = trackItem?.awb_code || shipmentDetails.awbCode || null;
+
+  // Expected Delivery Date: check track item EDD, then deliveryEta, then fallback days
+  let expectedDeliveryDate =
+    trackItem?.edd ||
+    trackItem?.expected_date ||
+    deliveryEta.estimatedDeliveryDate ||
+    null;
+
+  if (!expectedDeliveryDate && deliveryEta.shiprocketEtaDays) {
+    const baseDate = order.createdAt ? new Date(order.createdAt) : new Date();
+    expectedDeliveryDate = new Date(
+      baseDate.getTime() + deliveryEta.shiprocketEtaDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
+  }
+
+  const currentStatus =
+    trackItem?.current_status ||
+    shipmentDetails.lastSyncedStatus ||
+    (order.workflowStatus === "DELIVERED" || order.status === "delivered"
+      ? "Delivered"
+      : order.workflowStatus === "OUT_FOR_DELIVERY" || order.status === "out_for_delivery"
+        ? "Out for Delivery"
+        : awbCode
+          ? "In Transit"
+          : "Processing & Packing");
+
+  const trackingUrl =
+    trackItem?.track_url ||
+    (awbCode ? `https://shiprocket.co/tracking/${awbCode}` : null);
+
+  return {
+    isScheduled: true,
+    provider: "shiprocket",
+    orderId: order.orderId,
+    courierName,
+    awbCode,
+    awbAssigned: Boolean(awbCode),
+    currentStatus,
+    expectedDeliveryDate,
+    shiprocketEtaDays: deliveryEta.shiprocketEtaDays || null,
+    origin: trackItem?.origin || order.seller?.address?.city || order.seller?.shopName || "",
+    destination: trackItem?.destination || order.address?.city || "",
+    activities,
+    trackingUrl,
+    pickupLocation: shipmentDetails.pickupLocation || null,
+    lastSyncedAt: new Date(),
+  };
+}
+
 export { buildAdhocOrderPayload };
+

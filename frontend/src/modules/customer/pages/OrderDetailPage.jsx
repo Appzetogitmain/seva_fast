@@ -30,6 +30,10 @@ import {
   Navigation2,
   Camera,
   X,
+  Calendar,
+  RefreshCw,
+  ExternalLink,
+  Copy,
 } from "lucide-react";
 import { customerApi } from "../services/customerApi";
 import { useAuth } from "@/core/context/AuthContext";
@@ -155,6 +159,9 @@ const OrderDetailPage = () => {
   const [reviewProduct, setReviewProduct] = useState(null);
   const [reviewedMap, setReviewedMap] = useState({}); // productId -> review object
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
+  const [shippingTracking, setShippingTracking] = useState(null);
+  const [loadingShippingTracking, setLoadingShippingTracking] = useState(false);
+  const [expandedActivities, setExpandedActivities] = useState(false);
   const parsedReturnWindowMinutes = parseInt(
     import.meta.env.VITE_RETURN_WINDOW_MINUTES || String(24 * 60),
     10,
@@ -225,6 +232,11 @@ const OrderDetailPage = () => {
         } catch {
           // Non-critical — silently ignore
         }
+
+        // Fetch live shipping tracking if nationwide Shiprocket order
+        if (ord?.deliveryType === "scheduled" || ord?.shipmentDetails?.provider === "shiprocket") {
+          fetchShippingTracking(ord.orderId || orderId);
+        }
       } catch (error) {
         console.error("Failed to fetch order details:", error);
         toast.error("Failed to load order details");
@@ -238,6 +250,22 @@ const OrderDetailPage = () => {
       fetchOrderDetails();
     }
   }, [orderId]);
+
+  const fetchShippingTracking = async (lookupId) => {
+    const targetId = lookupId || order?.orderId || orderId;
+    if (!targetId) return;
+    try {
+      setLoadingShippingTracking(true);
+      const res = await customerApi.getShippingTracking(targetId);
+      if (res.data?.success && res.data?.result) {
+        setShippingTracking(res.data.result);
+      }
+    } catch (err) {
+      console.warn("[OrderDetailPage] Failed to fetch shipping tracking:", err);
+    } finally {
+      setLoadingShippingTracking(false);
+    }
+  };
 
   useEffect(() => {
     if (!orderId) return undefined;
@@ -1058,90 +1086,202 @@ const OrderDetailPage = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100"
+            className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 overflow-hidden space-y-4"
           >
-            <div className="flex items-start gap-4">
-              <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                <Truck size={24} className="text-indigo-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Nationwide Shipping</p>
-                  <span className="bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                    Shiprocket
-                  </span>
+            {/* Header with Title and Refresh Button */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-2xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                  <Truck size={22} className="text-indigo-600" />
                 </div>
-                <h4 className="font-bold text-slate-900 text-base mb-2">Fulfillment Tracking</h4>
-
-                {(order.deliveryEta?.estimatedDeliveryDate || order.deliveryEta?.shiprocketEtaDays != null) && (
-                  <p className="text-xs font-semibold text-slate-600 mb-3">
-                    Estimated delivery:{" "}
-                    <span className="text-slate-900">
-                      {order.deliveryEta?.estimatedDeliveryDate
-                        ? new Date(order.deliveryEta.estimatedDeliveryDate).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                          })
-                        : `~${order.deliveryEta.shiprocketEtaDays} day${order.deliveryEta.shiprocketEtaDays === 1 ? "" : "s"}`}
-                    </span>{" "}
-                    <span className="text-slate-400">(via {order.shipmentDetails?.courierName || order.deliveryEta?.courierName || "our shipping partner"})</span>
-                  </p>
-                )}
-
-                {order.shipmentDetails?.awbCode ? (
-                  <div className="space-y-3">
-                    <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span>Courier Partner</span>
-                        <span className="font-bold text-slate-800">{order.shipmentDetails.courierName || "Standard Courier"}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span>AWB Tracking Number</span>
-                        <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800">
-                          <span>{order.shipmentDetails.awbCode}</span>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(order.shipmentDetails.awbCode);
-                              toast.success("AWB Tracking Number copied!");
-                            }}
-                            className="text-[10px] bg-slate-200/60 hover:bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded transition-all active:scale-95"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span>Shipping Status</span>
-                        <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 font-bold text-indigo-700 uppercase text-[10px]">
-                          {order.shipmentDetails.status || "Shipped"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <a
-                      href={`https://shiprocket.co/tracking/${order.shipmentDetails.awbCode}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
-                    >
-                      Track on Shiprocket
-                    </a>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Nationwide Shipping</p>
+                    <span className="bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      Shiprocket
+                    </span>
                   </div>
-                ) : (
-                  <div className="bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl p-4 text-center">
-                    <p className="text-sm font-semibold text-slate-600">Awaiting shipment details...</p>
-                    <p className="text-xs text-slate-400 mt-1">Once the seller packs and hands over the package, your tracking code will appear here.</p>
-                  </div>
-                )}
+                  <h4 className="font-black text-slate-900 text-base">Fulfillment & Tracking</h4>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => fetchShippingTracking(order?.orderId || orderId)}
+                disabled={loadingShippingTracking}
+                title="Refresh tracking status"
+                className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 transition-all active:scale-95 disabled:opacity-50"
+              >
+                <RefreshCw size={16} className={cn(loadingShippingTracking && "animate-spin text-indigo-600")} />
+              </button>
             </div>
+
+            {/* Expected Delivery Date Banner */}
+            {(() => {
+              const rawDate =
+                shippingTracking?.expectedDeliveryDate ||
+                order.deliveryEta?.estimatedDeliveryDate;
+              let dateString = null;
+              if (rawDate) {
+                const d = new Date(rawDate);
+                if (!isNaN(d.getTime())) {
+                  dateString = d.toLocaleDateString("en-IN", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "short",
+                  });
+                }
+              }
+              const daysText =
+                shippingTracking?.shiprocketEtaDays ||
+                order.deliveryEta?.shiprocketEtaDays;
+
+              const displayCourier =
+                shippingTracking?.courierName ||
+                order.shipmentDetails?.courierName ||
+                order.deliveryEta?.courierName ||
+                "Standard Shipping Partner";
+
+              return (
+                <div className="bg-gradient-to-r from-indigo-500/10 via-indigo-500/5 to-transparent border border-indigo-100 rounded-2xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-sm shadow-indigo-200">
+                      <Calendar size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
+                        Estimated Delivery Date
+                      </p>
+                      <p className="text-base font-black text-slate-900 leading-tight">
+                        {dateString ? `Arriving by ${dateString}` : (daysText ? `Arrives in ~${daysText} day${daysText === 1 ? "" : "s"}` : "4-6 Business Days")}
+                      </p>
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        Fulfilled via <span className="font-semibold text-slate-700">{displayCourier}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Shipment Meta Details (AWB, Status, Route) */}
+            {(order.shipmentDetails?.awbCode || shippingTracking?.awbCode) ? (
+              <div className="space-y-3">
+                <div className="bg-slate-50 rounded-2xl p-4 space-y-2.5 border border-slate-100">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>Courier Partner</span>
+                    <span className="font-bold text-slate-800">
+                      {shippingTracking?.courierName || order.shipmentDetails?.courierName || "Standard Courier"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>AWB Tracking Number</span>
+                    <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800">
+                      <span>{shippingTracking?.awbCode || order.shipmentDetails?.awbCode}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const code = shippingTracking?.awbCode || order.shipmentDetails?.awbCode;
+                          if (code) {
+                            navigator.clipboard.writeText(code);
+                            toast.success("AWB Tracking Number copied!");
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] bg-slate-200/80 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-lg transition-all active:scale-95"
+                      >
+                        <Copy size={11} /> Copy
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>Live Status</span>
+                    <span className="inline-flex items-center rounded-full bg-indigo-100/80 text-indigo-800 px-2.5 py-0.5 font-bold uppercase text-[10px]">
+                      {shippingTracking?.currentStatus || order.shipmentDetails?.lastSyncedStatus || "In Transit"}
+                    </span>
+                  </div>
+
+                  {(shippingTracking?.origin || shippingTracking?.destination) && (
+                    <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-200/60">
+                      <span>Transit Route</span>
+                      <span className="font-semibold text-slate-700">
+                        {shippingTracking.origin || "Store"} &rarr; {shippingTracking.destination || order.address?.city || "Destination"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Milestone Activity Timeline (if available) */}
+                {shippingTracking?.activities && shippingTracking.activities.length > 0 && (
+                  <div className="bg-slate-50/70 rounded-2xl p-4 border border-slate-100">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tracking Updates</p>
+                      {shippingTracking.activities.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedActivities((v) => !v)}
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700"
+                        >
+                          {expandedActivities ? "Show Less" : `View All (${shippingTracking.activities.length})`}
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-3 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                      {(expandedActivities
+                        ? shippingTracking.activities
+                        : shippingTracking.activities.slice(0, 2)
+                      ).map((act, i) => (
+                        <div key={i} className="flex items-start gap-3 pl-1 text-xs relative">
+                          <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 ring-4 ring-indigo-100 mt-1 shrink-0 z-10" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-slate-800 leading-tight">
+                              {act.status || act.activity}
+                            </p>
+                            {act.location && (
+                              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                Location: {act.location}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {act.date ? new Date(act.date).toLocaleString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }) : ""}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <a
+                  href={shippingTracking?.trackingUrl || `https://shiprocket.co/tracking/${order.shipmentDetails.awbCode}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98]"
+                >
+                  Track on Courier Portal <ExternalLink size={13} />
+                </a>
+              </div>
+            ) : (
+              <div className="bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl p-4 text-center">
+                <p className="text-sm font-semibold text-slate-700">Awaiting courier dispatch...</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Once the seller packs and generates the Shiprocket shipping label, your real-time AWB tracking details will appear here.
+                </p>
+              </div>
+            )}
           </motion.div>
         )}
 
-        {/* Order Progress Tracker - New Component */}
+        {/* Order Progress Tracker */}
         {!isAwaitingOnlinePayment && (
           <OrderProgressTracker
             order={order}
+            shippingTracking={shippingTracking}
             estimatedArrivalText={estimatedArrival.arrivalTimeText}
             arrivingInText={estimatedArrival.arrivingInText}
             totalDistanceText={estimatedArrival.totalDistanceText}
