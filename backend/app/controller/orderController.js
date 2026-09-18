@@ -46,7 +46,12 @@ import { sanitizeOrderForDeliveryView, sanitizeOrdersForDeliveryView } from "../
 import { sanitizeOrderForSellerView } from "../utils/sellerOrderView.js";
 import { createFinanceOrderSchema } from "../validation/financeValidation.js";
 import { placeOrderAtomic } from "../services/orderPlacementService.js";
-import { cancelShiprocketShipmentForOrder, getFormattedShiprocketTracking } from "../services/shiprocket/shiprocketOrderService.js";
+import {
+  cancelShiprocketShipmentForOrder,
+  getFormattedShiprocketTracking,
+  createShiprocketReturnShipmentForOrder,
+} from "../services/shiprocket/shiprocketOrderService.js";
+import { normalizeReturnReasonCode } from "../constants/returnReasons.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import {
   emitDeliveryBroadcastForSeller,
@@ -700,7 +705,7 @@ export const requestReturn = async (req, res) => {
   try {
     const { orderId } = req.params;
     const customerId = req.user.id;
-    const { items, reason, images, reasonDetail, conditionAssurance } = req.body || {};
+    const { items, reason, reasonCode, images, reasonDetail, conditionAssurance } = req.body || {};
 
     if (!Array.isArray(items) || items.length === 0) {
       return handleResponse(
@@ -797,6 +802,7 @@ export const requestReturn = async (req, res) => {
 
     order.returnStatus = "return_requested";
     order.returnReason = reason.trim();
+    order.returnReasonCode = normalizeReturnReasonCode(reasonCode);
     order.returnReasonDetail = reasonDetail?.trim() || "";
     order.returnConditionAssurance = Boolean(conditionAssurance);
     order.returnImages = Array.isArray(images) ? images.slice(0, 5) : [];
@@ -1479,15 +1485,13 @@ export const approveReturnRequest = async (req, res) => {
       return handleResponse(res, 404, "Order not found");
     }
 
-    const order = await Order.findOne(orderKey);
-
-    if (!order) {
+    const existing = await Order.findOne(orderKey);
+    if (!existing) {
       return handleResponse(res, 404, "Order not found");
     }
 
     const isOwnerSeller =
-      role === "seller" && order.seller?.toString() === userId;
-
+      role === "seller" && existing.seller?.toString() === userId;
     if (!isOwnerSeller) {
       return handleResponse(
         res,
@@ -1496,7 +1500,17 @@ export const approveReturnRequest = async (req, res) => {
       );
     }
 
-    if (order.returnStatus !== "return_requested") {
+    const isScheduled = existing.deliveryType === "scheduled";
+    // The Shiprocket return-shipment call below can legitimately fail (network,
+    // pincode issues, etc.) — allow a scheduled-order retry to re-enter here
+    // from "return_approved" as long as no return shipment exists yet, instead
+    // of requiring a fresh return request.
+    const isRetryableScheduledApproval =
+      isScheduled &&
+      existing.returnStatus === "return_approved" &&
+      !existing.returnShipmentDetails?.shiprocketReturnShipmentId;
+
+    if (existing.returnStatus !== "return_requested" && !isRetryableScheduledApproval) {
       return handleResponse(
         res,
         400,
@@ -1504,41 +1518,79 @@ export const approveReturnRequest = async (req, res) => {
       );
     }
 
-    if (!Array.isArray(order.returnItems) || order.returnItems.length === 0) {
+    if (!Array.isArray(existing.returnItems) || existing.returnItems.length === 0) {
       return handleResponse(res, 400, "No return items found for this order.");
     }
 
-    const refundAmount = order.returnItems.reduce(
-      (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
-      0,
-    );
+    const isFirstApproval = existing.returnStatus === "return_requested";
+    let order = existing;
 
-    const settings = await Setting.findOne({});
-    const returnCommission = settings?.returnDeliveryCommission ?? 0;
+    if (isFirstApproval) {
+      const refundAmount = existing.returnItems.reduce(
+        (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
+        0,
+      );
+      const settings = await Setting.findOne({});
+      const returnCommission = settings?.returnDeliveryCommission ?? 0;
+      const approvedItems = existing.returnItems.map((item) => ({
+        ...(item.toObject?.() ?? item),
+        status: "approved",
+      }));
 
-    order.returnItems = order.returnItems.map((item) => ({
-      ...(item.toObject?.() ?? item),
-      status: "approved",
-    }));
-    order.returnRefundAmount = refundAmount;
-    order.returnDeliveryCommission = returnCommission;
+      // Atomic status-guarded transition — if two approval requests race
+      // (double-click, retry, admin + seller at once), only one can flip
+      // "return_requested" -> "return_approved". The loser gets null back and
+      // is told the return was already processed, instead of both proceeding
+      // to create two separate Shiprocket return shipments.
+      order = await Order.findOneAndUpdate(
+        { ...orderKey, returnStatus: "return_requested" },
+        {
+          $set: {
+            returnItems: approvedItems,
+            returnRefundAmount: refundAmount,
+            returnDeliveryCommission: returnCommission,
+            returnStatus: "return_approved",
+            returnDeliveryBoy: null,
+            skippedBy: [],
+          },
+        },
+        { new: true },
+      );
 
-    // Approved — seller assigns a rider manually (same as forward orders)
-    order.returnStatus = "return_approved";
-    order.returnDeliveryBoy = null;
-    order.skippedBy = [];
+      if (!order) {
+        return handleResponse(res, 409, "This return request was already processed.");
+      }
+    }
 
-    await order.save();
+    if (isScheduled) {
+      try {
+        await createShiprocketReturnShipmentForOrder(order._id);
+        order = await Order.findById(order._id);
+      } catch (shiprocketErr) {
+        console.error(
+          `[Return] Shiprocket return shipment failed for order ${order.orderId}:`,
+          shiprocketErr.message,
+        );
+        return handleResponse(
+          res,
+          502,
+          `Return approved, but creating the Shiprocket pickup failed: ${shiprocketErr.message}. Please retry from this screen.`,
+          order,
+        );
+      }
+    }
 
-    emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_APPROVED, {
-      orderId: order.orderId,
-      customerId: order.customer,
-      userId: order.customer,
-      sellerId: order.seller,
-      data: {
-        refundAmount,
-      },
-    });
+    if (isFirstApproval) {
+      emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_APPROVED, {
+        orderId: order.orderId,
+        customerId: order.customer,
+        userId: order.customer,
+        sellerId: order.seller,
+        data: {
+          refundAmount: order.returnRefundAmount,
+        },
+      });
+    }
     emitOrderStatusUpdate(
       order.orderId,
       { returnStatus: order.returnStatus },
@@ -1758,6 +1810,14 @@ export const assignReturnDelivery = async (req, res) => {
       return handleResponse(res, 404, "Order not found");
     }
 
+    if (order.deliveryType === "scheduled") {
+      return handleResponse(
+        res,
+        400,
+        "This order was fulfilled via Shiprocket (Pan India) — its return is picked up by Shiprocket automatically, not a local delivery partner.",
+      );
+    }
+
     const isOwnerSeller = role === "seller" && order.seller?.toString() === userId;
     const isAdmin = role === "admin";
 
@@ -1931,6 +1991,14 @@ export const submitReturnSelfCollection = async (req, res) => {
       return handleResponse(res, 403, "Only the seller can mark a return as self-collected.");
     }
 
+    if (order.deliveryType === "scheduled") {
+      return handleResponse(
+        res,
+        400,
+        "This order was fulfilled via Shiprocket (Pan India) — its return ships back automatically and cannot be marked as self-collected.",
+      );
+    }
+
     if (order.returnStatus !== "return_approved") {
       return handleResponse(
         res,
@@ -1968,6 +2036,84 @@ export const submitReturnSelfCollection = async (req, res) => {
     );
 
     return handleResponse(res, 200, "Return marked as self-collected. Admin will review the product.", order);
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
+/* ===============================
+   CONFIRM SHIPROCKET RETURN RECEIPT (Seller)
+================================ */
+/**
+ * Pan India / Shiprocket returns don't have a rider or self-collect step to
+ * upload proof photos from — Shiprocket ships the item back on its own.
+ * Once it physically arrives, the seller must explicitly confirm receipt and
+ * upload photos here before QC/refund can proceed (updateReturnQcStatus
+ * requires returnPickupImages, same as every other fulfillment mode).
+ */
+export const confirmShiprocketReturnReceipt = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { id: userId, role } = req.user;
+    const { images, note } = req.body || {};
+
+    if (role !== "seller") {
+      return handleResponse(res, 403, "Only the seller can confirm return receipt.");
+    }
+
+    const orderKey = orderMatchQueryFromRouteParam(orderId);
+    if (!orderKey) return handleResponse(res, 404, "Order not found");
+
+    const order = await Order.findOne(orderKey);
+    if (!order) return handleResponse(res, 404, "Order not found");
+
+    if (order.seller?.toString() !== userId) {
+      return handleResponse(res, 403, "Only the seller can confirm return receipt.");
+    }
+
+    if (order.deliveryType !== "scheduled" || order.returnFulfillmentMode !== "shiprocket") {
+      return handleResponse(
+        res,
+        400,
+        "This action is only for Pan India returns fulfilled via Shiprocket.",
+      );
+    }
+
+    if (!["return_approved", "return_in_transit"].includes(order.returnStatus)) {
+      return handleResponse(
+        res,
+        400,
+        "Return receipt can only be confirmed while the Shiprocket pickup is in progress.",
+      );
+    }
+
+    if (!Array.isArray(images) || images.length === 0) {
+      return handleResponse(res, 400, "At least one proof image is required.");
+    }
+
+    const now = new Date();
+    order.returnPickupImages = images.slice(0, 10);
+    if (note) order.returnPickupConditionNote = String(note).trim().slice(0, 500);
+    order.returnDeliveredBackAt = now;
+    order.returnStatus = "returned";
+
+    await order.save();
+
+    emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_COMPLETED, {
+      orderId: order.orderId,
+      sellerId: order.seller,
+      customerId: order.customer,
+      data: { message: "Seller confirmed receipt of the Shiprocket return. Admin QC pending." },
+    });
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: order.returnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
+
+    return handleResponse(res, 200, "Return receipt confirmed. Admin will review the product.", order);
   } catch (error) {
     return handleResponse(res, 500, error.message);
   }

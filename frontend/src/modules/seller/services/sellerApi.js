@@ -62,6 +62,7 @@ export const sellerApi = {
     rejectReturn: (orderId, data) => axiosInstance.put(`/orders/returns/${orderId}/reject`, data),
     assignReturnDelivery: (orderId, data) => axiosInstance.put(`/orders/returns/${orderId}/assign-delivery`, data),
     submitReturnSelfCollection: (orderId, data) => axiosInstance.put(`/orders/returns/${orderId}/self-collect`, data),
+    confirmShiprocketReturnReceipt: (orderId, data) => axiosInstance.put(`/orders/returns/${orderId}/confirm-shiprocket-receipt`, data),
 
     // Delivery Boys — platform-wide pool, GPS/availability filtered near this seller
     getAvailableRiders: () => axiosInstance.get('/orders/available-riders'),

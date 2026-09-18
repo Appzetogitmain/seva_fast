@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
+import { ALL_RETURN_REASON_CODES } from "../constants/returnReasons.js";
 import {
   ALL_ORDER_PAYMENT_STATUSES,
   ALL_ORDER_SETTLEMENT_STATUSES,
@@ -480,6 +481,13 @@ const orderSchema = new mongoose.Schema(
     returnReason: {
       type: String,
     },
+    // Structured reason code alongside the free-text `returnReason` label —
+    // kept separate so existing free-text display/notifications don't break.
+    returnReasonCode: {
+      type: String,
+      enum: ALL_RETURN_REASON_CODES,
+      default: null,
+    },
     returnReasonDetail: {
       type: String,
     },
@@ -532,9 +540,19 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Delivery",
     },
+    // "shiprocket" only ever applies when deliveryType === "scheduled" — see
+    // shiprocketOrderService.createShiprocketReturnShipmentForOrder.
     returnFulfillmentMode: {
       type: String,
-      enum: ["admin_rider", "own"],
+      enum: ["admin_rider", "own", "shiprocket"],
+    },
+    // Reverse-pickup shipment for Pan India (Shiprocket) returns — mirrors
+    // `shipmentDetails` above but for the customer -> seller leg. Untyped
+    // Object for the same reason `shipmentDetails` is: fields come directly
+    // from Shiprocket's response shape.
+    returnShipmentDetails: {
+      type: Object,
+      default: null,
     },
     returnDeliveryCommission: {
       type: Number,

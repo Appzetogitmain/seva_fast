@@ -638,7 +638,7 @@ const Returns = () => {
 
                     <div className="space-y-1.5 flex flex-col h-full group">
                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest px-1">
-                        Rider Pickup
+                        Return Received Photos
                       </p>
                       <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shadow-inner flex items-center justify-center">
                         {selectedReturn.returnPickupImages?.[0] ? (
@@ -650,7 +650,7 @@ const Returns = () => {
                         ) : (
                           <div className="flex flex-col items-center gap-1.5 text-slate-400 px-3 text-center">
                             <HiOutlineInboxStack className="h-5 w-5" />
-                            <p className="text-[8px] font-bold leading-tight uppercase">Not Picked Yet</p>
+                            <p className="text-[8px] font-bold leading-tight uppercase">Not Received Yet</p>
                           </div>
                         )}
                       </div>

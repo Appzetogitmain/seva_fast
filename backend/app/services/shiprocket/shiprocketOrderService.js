@@ -6,6 +6,7 @@ import { extractIndianPincode, parseCityStatePincode, resolveDeliveryPincodeCity
 import {
   checkServiceability,
   createAdhocOrder,
+  createReturnOrder,
   assignAWB,
   generatePickup,
   cancelOrders,
@@ -518,6 +519,229 @@ export async function createShiprocketShipmentForOrder(orderId) {
   await order.save();
 
   return shipmentDetails;
+}
+
+/**
+ * Reverse-pickup payload: customer is the pickup point, seller/warehouse is
+ * the destination — the mirror image of buildAdhocOrderPayload(). Shiprocket
+ * documents this at POST /orders/create/return.
+ */
+function buildReturnOrderPayload({ order, seller, packageItems, customerAddress, sellerAddress }) {
+  const { firstName: custFirst, lastName: custLast } = splitName(order.address?.name);
+  const sellerDisplayName = String(seller?.shopName || seller?.name || "Seller").trim();
+  const { firstName: sellerFirst, lastName: sellerLast } = splitName(sellerDisplayName);
+
+  const sourceItems = Array.isArray(order.returnItems) && order.returnItems.length > 0
+    ? order.returnItems
+    : order.items || [];
+  const orderItems = sourceItems.map((item) => ({
+    name: item.name || "Item",
+    sku: String(item.product),
+    units: item.quantity,
+    selling_price: item.price,
+  }));
+
+  const pkg = resolvePackageFromOrderItems(packageItems || order.items || []);
+  const subTotal =
+    order.returnRefundAmount ||
+    orderItems.reduce((sum, item) => sum + Number(item.selling_price || 0) * Number(item.units || 0), 0);
+
+  return {
+    order_id: `RET-${order.orderId}`,
+    order_date: toShiprocketDate(new Date()),
+    channel_id: process.env.SHIPROCKET_CHANNEL_ID || undefined,
+
+    // Pickup = customer (the item is coming FROM them)
+    pickup_customer_name: custFirst,
+    pickup_last_name: custLast,
+    pickup_address: order.address?.address || "",
+    pickup_address_2: order.address?.landmark || "",
+    pickup_city: customerAddress.city || "",
+    pickup_state: customerAddress.state || "",
+    pickup_country: "India",
+    pickup_pincode: customerAddress.pincode,
+    pickup_email: "noreply@example.com",
+    pickup_phone: order.address?.phone,
+    pickup_isd_code: "91",
+
+    // Shipping/destination = seller warehouse (the item is going TO them)
+    shipping_customer_name: sellerFirst || sellerDisplayName,
+    shipping_last_name: sellerLast,
+    shipping_address: seller?.address || seller?.locality || "Store Address",
+    shipping_address_2: seller?.locality || "",
+    shipping_city: sellerAddress.city || seller?.city || "",
+    shipping_state: sellerAddress.state || seller?.state || "",
+    shipping_country: "India",
+    shipping_pincode: sellerAddress.pincode,
+    shipping_email: seller?.email || "noreply@example.com",
+    shipping_phone: seller?.phone || "9999999999",
+
+    order_items: orderItems,
+    payment_method: "PREPAID",
+    sub_total: subTotal,
+
+    length: pkg.length,
+    breadth: pkg.breadth,
+    height: pkg.height,
+    weight: pkg.weight,
+  };
+}
+
+/**
+ * Creates a Shiprocket reverse-pickup (return) shipment for a Pan India order
+ * once the seller approves the return — picks up from the customer, delivers
+ * back to the seller. Local ("instant") orders are skipped; those use the
+ * existing admin_rider / self-collect flows instead.
+ *
+ * Idempotent: if a return shipment already exists for this order, it is
+ * returned as-is rather than creating a duplicate — callers (approveReturnRequest)
+ * additionally guard this with an atomic status transition so concurrent/duplicate
+ * approval clicks can't race into calling this twice.
+ */
+export async function createShiprocketReturnShipmentForOrder(orderId) {
+  const order = await Order.findById(orderId);
+  if (!order) {
+    throw new ShiprocketError("Order not found", { statusCode: 404 });
+  }
+
+  if (order.deliveryType !== "scheduled") {
+    console.log(
+      `[Shiprocket] Skipping return shipment for non-scheduled order ${order.orderId} (deliveryType=${order.deliveryType})`,
+    );
+    return null;
+  }
+
+  if (order.returnShipmentDetails?.shiprocketReturnShipmentId) {
+    return order.returnShipmentDetails;
+  }
+
+  if (!Array.isArray(order.returnItems) || order.returnItems.length === 0) {
+    throw new ShiprocketError("No approved return items found for this order", {
+      statusCode: 400,
+    });
+  }
+
+  const seller = order.seller ? await Seller.findById(order.seller) : null;
+  if (!seller) {
+    throw new ShiprocketError("Seller not found for Shiprocket return shipment", {
+      statusCode: 400,
+    });
+  }
+
+  const customerAddress = resolveDeliveryPincodeCityState(order.address || {});
+  if (!customerAddress.pincode || customerAddress.pincode.length < 6) {
+    throw new ShiprocketError(
+      "Customer pickup pincode is required to create a return shipment",
+      { statusCode: 400 },
+    );
+  }
+
+  const sellerPincode =
+    String(seller.pincode || "").trim() || extractIndianPincode(seller.address, seller.locality);
+  if (!sellerPincode || sellerPincode.length < 6) {
+    throw new ShiprocketError(
+      `${seller.shopName || "Seller"} does not have a valid pincode configured to receive returns`,
+      { statusCode: 400 },
+    );
+  }
+  const sellerAddress = {
+    ...resolveDeliveryPincodeCityState({
+      city: seller.city,
+      state: seller.state,
+      address: seller.address,
+      landmark: seller.locality,
+    }),
+    pincode: sellerPincode,
+  };
+
+  const packageItems = await enrichOrderItemsWithProductPackage(order);
+
+  const payload = buildReturnOrderPayload({
+    order,
+    seller,
+    packageItems,
+    customerAddress,
+    sellerAddress,
+  });
+
+  let createResponse;
+  try {
+    createResponse = await createReturnOrder(payload);
+  } catch (err) {
+    await Order.findByIdAndUpdate(order._id, {
+      $set: {
+        "returnShipmentDetails.provider": "shiprocket",
+        "returnShipmentDetails.lastError": err.message,
+        "returnShipmentDetails.lastErrorAt": new Date(),
+      },
+    });
+    throw err;
+  }
+
+  const shipmentId = createResponse?.shipment_id;
+  const shiprocketReturnOrderId = createResponse?.order_id;
+
+  if (!shipmentId) {
+    throw new ShiprocketError("Shiprocket did not return a shipment_id for the return order", {
+      statusCode: 502,
+      details: createResponse,
+    });
+  }
+
+  let awbResponse = null;
+  try {
+    awbResponse = await assignAWB({ shipmentId, isReturn: true });
+  } catch (err) {
+    await Order.findByIdAndUpdate(order._id, {
+      $set: {
+        "returnShipmentDetails.provider": "shiprocket",
+        "returnShipmentDetails.shiprocketReturnOrderId": shiprocketReturnOrderId,
+        "returnShipmentDetails.shiprocketReturnShipmentId": shipmentId,
+        "returnShipmentDetails.awbAssigned": false,
+        "returnShipmentDetails.lastError": err.message,
+        "returnShipmentDetails.lastErrorAt": new Date(),
+      },
+    });
+    throw err;
+  }
+
+  const awbCode = awbResponse?.response?.data?.awb_code;
+  const courierName = awbResponse?.response?.data?.courier_name;
+
+  let pickupResponse = null;
+  try {
+    pickupResponse = await generatePickup({ shipmentIds: [shipmentId] });
+  } catch (err) {
+    console.error("[Shiprocket] return pickup generation failed:", err.message);
+  }
+
+  const returnShipmentDetails = {
+    provider: "shiprocket",
+    shiprocketReturnOrderId,
+    shiprocketReturnShipmentId: shipmentId,
+    awbCode: awbCode || null,
+    courierName: courierName || null,
+    awbAssigned: Boolean(awbCode),
+    pickupScheduled: Boolean(pickupResponse),
+    lastSyncedStatus: null,
+    lastSyncedAt: null,
+    lastError: null,
+    lastErrorAt: null,
+    createdAt: new Date(),
+  };
+
+  order.returnShipmentDetails = returnShipmentDetails;
+  order.returnFulfillmentMode = "shiprocket";
+  await order.save();
+
+  return returnShipmentDetails;
+}
+
+export async function syncShiprocketReturnTracking(orderId) {
+  const order = await Order.findById(orderId);
+  if (!order?.returnShipmentDetails?.shiprocketReturnShipmentId) return null;
+
+  return trackByShipmentId(order.returnShipmentDetails.shiprocketReturnShipmentId);
 }
 
 /**
