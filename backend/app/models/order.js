@@ -394,6 +394,14 @@ const orderSchema = new mongoose.Schema(
       enum: ["instant", "scheduled"],
       default: "instant",
     },
+    // Customer paid for expedited local delivery at checkout. Only ever true
+    // for deliveryType "instant" — meaningless for Shiprocket orders. Widens
+    // the rider-broadcast radius and shortens the search-timeout escalation
+    // (see orderWorkflowService.js) so it's a real priority, not just a fee.
+    isExpressDelivery: {
+      type: Boolean,
+      default: false,
+    },
     // Dynamic ETA snapshot captured at order-creation time (never a fixed
     // string). Local orders show a range based on nearby rider distance;
     // Shiprocket orders show the courier's quoted delivery estimate.

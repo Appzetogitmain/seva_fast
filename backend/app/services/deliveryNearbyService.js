@@ -38,8 +38,12 @@ function filterByHaversine(candidates, lat, lng, maxDistanceM) {
  * `serviceRadius` (km) of the seller store.
  * Uses MongoDB $near first; if that returns no rows, falls back to Haversine
  * (helps when geo index / $near is strict or data is borderline).
+ *
+ * `expressBonusKm` widens the search beyond the seller's normal radius for
+ * Express orders — reaching more candidate riders on the very first
+ * broadcast attempt is what actually makes Express faster, not just a label.
  */
-export async function getDeliveryPartnerIdsWithinSellerRadius(sellerId) {
+export async function getDeliveryPartnerIdsWithinSellerRadius(sellerId, { expressBonusKm = 0 } = {}) {
   if (!sellerId) return [];
 
   const seller = await Seller.findById(sellerId)
@@ -52,10 +56,11 @@ export async function getDeliveryPartnerIdsWithinSellerRadius(sellerId) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
   if (Math.abs(lat) < 1e-5 && Math.abs(lng) < 1e-5) return [];
 
-  const radiusKm = Math.min(
+  const baseRadiusKm = Math.min(
     Math.max(Number(seller.serviceRadius) || 5, 1),
     100,
   );
+  const radiusKm = Math.min(baseRadiusKm + Math.max(Number(expressBonusKm) || 0, 0), 100);
   const maxDistanceM = radiusKm * 1000;
 
   const base = buildDeliveryFilter();

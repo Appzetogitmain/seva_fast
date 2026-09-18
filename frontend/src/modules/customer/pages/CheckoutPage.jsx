@@ -190,6 +190,11 @@ const CheckoutPage = () => {
   // State management
   const [selectedTimeSlot, setSelectedTimeSlot] = useState("now");
   const [isExpressDelivery, setIsExpressDelivery] = useState(false);
+  // True once the first delivery-method preview has resolved (success or
+  // error) — used to hide the Express toggle until we actually know whether
+  // this address resolves to local or Shiprocket, instead of it flashing
+  // visible then disappearing.
+  const [hasResolvedDeliveryPreview, setHasResolvedDeliveryPreview] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState("cash");
   const [showAllCartItems, setShowAllCartItems] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -413,16 +418,32 @@ const CheckoutPage = () => {
   const isPartiallyScheduled =
     scheduledBreakdowns.length > 0 && localBreakdowns.length > 0;
 
+  // Express reaches a wider pool of riders immediately and escalates faster
+  // if nobody accepts (see orderWorkflowService.js) — so it should always be
+  // shown as a genuinely shorter window than Standard, computed from the
+  // same dynamic base rather than a fixed, unrelated "1-2 hrs" claim.
+  const computeExpressEtaWindow = (minM, maxM) => {
+    const expressMin = Math.max(8, Math.round(minM * 0.7));
+    const expressMax = Math.max(expressMin + 3, Math.round(maxM * 0.75));
+    return { expressMin, expressMax };
+  };
+
   const deliveryEtaBanner = useMemo(() => {
     if (sellerDeliveryPreview.length === 0) {
+      const fallbackMin = 12;
+      const fallbackMax = 15;
+      const { expressMin, expressMax } = computeExpressEtaWindow(fallbackMin, fallbackMax);
       return {
         title: isExpressDelivery
-          ? "Express Delivery"
-          : (currentLocation?.time || "Delivery in 12-15 mins"),
+          ? `Express Delivery in ${expressMin}-${expressMax} mins`
+          : (currentLocation?.time || `Delivery in ${fallbackMin}-${fallbackMax} mins`),
         subtitle: `Shipment of ${cartCount} ${cartCount === 1 ? "item" : "items"}`,
         type: "local",
         isScheduled: false,
-        shortText: isExpressDelivery ? "1-2 Hours" : (currentLocation?.time || "12-15 Mins"),
+        shortText: isExpressDelivery
+          ? `${expressMin}-${expressMax} Mins`
+          : (currentLocation?.time || `${fallbackMin}-${fallbackMax} Mins`),
+        expressShortText: `${expressMin}-${expressMax} Mins`,
       };
     }
 
@@ -461,14 +482,16 @@ const CheckoutPage = () => {
     const maxMin = Math.max(
       ...localBreakdowns.map((sb) => sb.deliveryDecision?.localEtaMaxMinutes || 15),
     );
+    const { expressMin, expressMax } = computeExpressEtaWindow(minMin, maxMin);
     return {
       title: isExpressDelivery
-        ? "Express Delivery (1-2 hrs)"
+        ? `Express Delivery in ${expressMin}-${expressMax} mins`
         : `Delivery in ${minMin}-${maxMin} mins`,
       subtitle: `Shipment of ${cartCount} ${cartCount === 1 ? "item" : "items"}`,
       type: "local",
       isScheduled: false,
-      shortText: isExpressDelivery ? "1-2 Hours" : `${minMin}-${maxMin} Mins`,
+      shortText: isExpressDelivery ? `${expressMin}-${expressMax} Mins` : `${minMin}-${maxMin} Mins`,
+      expressShortText: `${expressMin}-${expressMax} Mins`,
     };
   }, [
     sellerDeliveryPreview,
@@ -966,6 +989,7 @@ const CheckoutPage = () => {
       setPricingPreview(null);
       setSellerDeliveryPreview([]);
       setPreviewError("");
+      setHasResolvedDeliveryPreview(false);
       return;
     }
 
@@ -1005,6 +1029,7 @@ const CheckoutPage = () => {
         );
       } finally {
         setIsPreviewLoading(false);
+        setHasResolvedDeliveryPreview(true);
       }
     };
 
@@ -1498,7 +1523,10 @@ const CheckoutPage = () => {
                   <p className="text-sm text-slate-500">{deliveryEtaBanner.subtitle}</p>
                 </div>
               </div>
-              {settings?.expressDeliveryEnabled !== false && !hasScheduled && (
+              {settings?.expressDeliveryEnabled !== false &&
+                hasResolvedDeliveryPreview &&
+                !isPreviewLoading &&
+                !hasScheduled && (
                 <div className="flex p-1 bg-slate-100 rounded-xl">
                   <button
                     type="button"
@@ -1516,7 +1544,7 @@ const CheckoutPage = () => {
                       "flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all",
                       isExpressDelivery ? "bg-white text-primary shadow-sm" : "text-slate-400"
                     )}>
-                    Express (1-2 hrs){settings?.expressDeliveryFee ? ` • ₹${settings.expressDeliveryFee}` : ""}
+                    Express ({deliveryEtaBanner.expressShortText || "faster"}){settings?.expressDeliveryFee ? ` • ₹${settings.expressDeliveryFee}` : ""}
                   </button>
                 </div>
               )}

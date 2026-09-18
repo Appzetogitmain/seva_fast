@@ -247,10 +247,11 @@ function eventDefinition(eventType) {
       return {
         role: NOTIFICATION_ROLES.DELIVERY,
         recipientIds: (payload) => normalizeIdList(payload.deliveryIds),
-        title: () => "New Delivery Request 🛍️",
+        title: (payload) =>
+          payload.isExpress ? "⚡ Express Delivery Request" : "New Delivery Request 🛍️",
         body: (payload) =>
           payload.orderId
-            ? `New order #${payload.orderId} is available nearby.`
+            ? `${payload.isExpress ? "Express order" : "New order"} #${payload.orderId} is available nearby.`
             : "A new delivery request is available nearby.",
       };
     case NOTIFICATION_EVENTS.ORDER_READY:

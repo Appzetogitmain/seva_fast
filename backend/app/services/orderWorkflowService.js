@@ -42,6 +42,12 @@ const DELIVERY_RADIUS_MULTIPLIER = () =>
 const INITIAL_DELIVERY_RADIUS_M = () =>
   parseInt(process.env.INITIAL_DELIVERY_RADIUS_METERS || "5000", 10);
 
+// Express orders get a shorter per-attempt search window so a stalled first
+// round escalates (wider radius + re-broadcast) sooner instead of waiting
+// the full standard timeout before the system does anything about it.
+const EXPRESS_DELIVERY_TIMEOUT_MS = () =>
+  parseInt(process.env.EXPRESS_DELIVERY_TIMEOUT_MS || "30000", 10);
+
 /** Payload for `delivery:broadcast` + Notification.data — lets the app show a modal without relying on GET /available alone. */
 function deliveryBroadcastPayloadFromOrder(order, extra = {}) {
   const seller =
@@ -71,6 +77,7 @@ function deliveryBroadcastPayloadFromOrder(order, extra = {}) {
     workflowStatus: order.workflowStatus || WORKFLOW_STATUS.DELIVERY_SEARCH,
     sellerId: sid != null ? String(sid) : undefined,
     radiusMeters: meta.radiusMeters ?? INITIAL_DELIVERY_RADIUS_M(),
+    isExpress: Boolean(order.isExpressDelivery),
     preview: {
       pickup,
       drop,
@@ -186,8 +193,8 @@ export async function removeSellerTimeoutJob(orderId) {
   }
 }
 
-export async function scheduleDeliveryTimeoutJob(orderId, attempt = 1) {
-  const delay = DEFAULT_DELIVERY_TIMEOUT_MS();
+export async function scheduleDeliveryTimeoutJob(orderId, attempt = 1, delayOverrideMs = null) {
+  const delay = Number.isFinite(delayOverrideMs) ? delayOverrideMs : DEFAULT_DELIVERY_TIMEOUT_MS();
   const jobId = `order:${orderId}:delivery:${attempt}`;
   const addPromise = deliveryTimeoutQueue
     .add(
@@ -267,9 +274,12 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
   }
 
   const isScheduled = orderDoc.deliveryType === "scheduled";
-  const targetWorkflowStatus = isScheduled 
-    ? WORKFLOW_STATUS.SELLER_ACCEPTED 
+  const isExpress = Boolean(orderDoc.isExpressDelivery);
+  const targetWorkflowStatus = isScheduled
+    ? WORKFLOW_STATUS.SELLER_ACCEPTED
     : WORKFLOW_STATUS.DELIVERY_SEARCH;
+
+  const effectiveDeliveryMs = isExpress ? EXPRESS_DELIVERY_TIMEOUT_MS() : deliveryMs;
 
   const updateFields = {
     workflowStatus: targetWorkflowStatus,
@@ -278,7 +288,7 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
   };
 
   if (!isScheduled) {
-    updateFields.deliverySearchExpiresAt = new Date(now.getTime() + deliveryMs);
+    updateFields.deliverySearchExpiresAt = new Date(now.getTime() + effectiveDeliveryMs);
     updateFields.deliverySearchMeta = {
       radiusMeters: INITIAL_DELIVERY_RADIUS_M(),
       attempt: 1,
@@ -319,7 +329,7 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
   await removeSellerTimeoutJob(orderId);
 
   if (!isScheduled) {
-    await scheduleDeliveryTimeoutJob(orderId, 1);
+    await scheduleDeliveryTimeoutJob(orderId, 1, isExpress ? effectiveDeliveryMs : null);
 
     await DeliveryAssignment.create({
       orderMongoId: updated._id,
@@ -686,11 +696,12 @@ export async function processDeliveryTimeoutJob({ orderId, attempt }) {
   const maxAttempts = DELIVERY_SEARCH_MAX_ATTEMPTS();
 
   if (currentAttempt < maxAttempts) {
+    const isExpress = Boolean(order.isExpressDelivery);
     const nextRadius = Math.round(
       (meta.radiusMeters || INITIAL_DELIVERY_RADIUS_M()) *
         DELIVERY_RADIUS_MULTIPLIER(),
     );
-    const deliveryMs = DEFAULT_DELIVERY_TIMEOUT_MS();
+    const deliveryMs = isExpress ? EXPRESS_DELIVERY_TIMEOUT_MS() : DEFAULT_DELIVERY_TIMEOUT_MS();
     const nextExpiry = new Date(now.getTime() + deliveryMs);
 
     await Order.findOneAndUpdate(
@@ -711,7 +722,7 @@ export async function processDeliveryTimeoutJob({ orderId, attempt }) {
       },
     );
 
-    await scheduleDeliveryTimeoutJob(orderId, currentAttempt + 1);
+    await scheduleDeliveryTimeoutJob(orderId, currentAttempt + 1, isExpress ? deliveryMs : null);
 
     const orderRich = await Order.findOne({ orderId })
       .populate("seller", "shopName address locality city name location serviceRadius")

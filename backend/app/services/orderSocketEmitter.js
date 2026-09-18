@@ -108,12 +108,17 @@ export function emitToDelivery(deliveryId, { event, payload }) {
  * Notify only delivery partners whose live location is within the seller's
  * service radius (see Delivery model location + Seller.serviceRadius).
  */
+const EXPRESS_DELIVERY_RADIUS_BONUS_KM = () =>
+  parseFloat(process.env.EXPRESS_DELIVERY_RADIUS_BONUS_KM || "2");
+
 export async function emitDeliveryBroadcastForSeller(sellerId, payload) {
   const s = getIo();
   const sid = normalizeSellerId(sellerId);
   if (!sid) return;
 
-  const ids = await getDeliveryPartnerIdsWithinSellerRadius(sid);
+  const ids = await getDeliveryPartnerIdsWithinSellerRadius(sid, {
+    expressBonusKm: payload?.isExpress ? EXPRESS_DELIVERY_RADIUS_BONUS_KM() : 0,
+  });
   if (!ids.length) {
     if (process.env.NODE_ENV !== "production" && s) {
       s.to("delivery:online").emit("delivery:broadcast", {
@@ -138,6 +143,7 @@ export async function emitDeliveryBroadcastForSeller(sellerId, payload) {
     emitNotificationEvent(NOTIFICATION_EVENTS.NEW_DELIVERY_BROADCAST, {
       orderId: payload.orderId,
       deliveryIds: ids,
+      isExpress: Boolean(payload.isExpress),
     });
   }
 
@@ -148,13 +154,14 @@ export async function emitDeliveryBroadcastForSeller(sellerId, payload) {
         ids.map((id) => ({
           recipient: new mongoose.Types.ObjectId(id),
           recipientModel: "Delivery",
-          title: "New delivery order",
+          title: payload.isExpress ? "⚡ Express delivery order" : "New delivery order",
           message: `Order ${payload.orderId} — tap Accept on the alert or open this list.`,
           type: "order",
           data: {
             orderId: payload.orderId,
             preview: payload.preview || null,
             deliverySearchExpiresAt: payload.deliverySearchExpiresAt || null,
+            isExpress: Boolean(payload.isExpress),
           },
         })),
         { ordered: false },

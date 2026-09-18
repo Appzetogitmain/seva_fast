@@ -585,6 +585,9 @@ export async function placeOrderAtomic({
         address: normalizedAddress,
         paymentMode,
         deliveryType: isOrderScheduled ? "scheduled" : "instant",
+        // Express is a local-delivery-only concept — never meaningful once
+        // the seller/customer pair resolved to Shiprocket.
+        isExpressDelivery: !isOrderScheduled && Boolean(normalizedPayload.isExpressDelivery),
         deliveryEta: {
           method: isOrderScheduled ? "scheduled" : "instant",
           localEtaMinMinutes: decision.localEtaMinMinutes ?? null,
