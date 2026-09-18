@@ -9,7 +9,12 @@ import { motion, AnimatePresence } from "framer-motion";
  *   orderId – string order ID (last 6-8 chars shown)
  *   show    – boolean — controls visibility via AnimatePresence
  */
-const CheckoutOrderSuccess = React.memo(function CheckoutOrderSuccess({ orderId, show }) {
+const CheckoutOrderSuccess = React.memo(function CheckoutOrderSuccess({
+  orderId,
+  show,
+  estimatedDeliveryText,
+  isScheduled,
+}) {
   const shortId = orderId ? String(orderId).slice(-6).toUpperCase() : "SUCCESS";
 
   return (
