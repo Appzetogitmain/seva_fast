@@ -19,6 +19,7 @@ import {
   updateReturnQcStatus,
   assignReturnDelivery,
   submitReturnSelfCollection,
+  confirmShiprocketReturnReceipt,
   acceptReturnPickup,
   rejectReturnPickup,
   updateReturnStatus,
@@ -221,6 +222,13 @@ router.put(
   allowRoles("seller"),
   requireApprovedSeller,
   submitReturnSelfCollection,
+);
+router.put(
+  "/returns/:orderId/confirm-shiprocket-receipt",
+  verifyToken,
+  allowRoles("seller"),
+  requireApprovedSeller,
+  confirmShiprocketReturnReceipt,
 );
 
 // Delivery routes

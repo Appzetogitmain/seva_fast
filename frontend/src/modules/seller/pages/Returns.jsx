@@ -39,6 +39,10 @@ const Returns = () => {
     const [selfCollectImages, setSelfCollectImages] = useState([]);
     const [selfCollectNote, setSelfCollectNote] = useState("");
     const [submittingSelfCollect, setSubmittingSelfCollect] = useState(false);
+    const [confirmReceiptOpen, setConfirmReceiptOpen] = useState(false);
+    const [confirmReceiptImages, setConfirmReceiptImages] = useState([]);
+    const [confirmReceiptNote, setConfirmReceiptNote] = useState("");
+    const [submittingConfirmReceipt, setSubmittingConfirmReceipt] = useState(false);
     const [activeOtps, setActiveOtps] = useState({}); // { orderId: { otp, expiresAt } }
     const canManageReturns = true;
 
@@ -312,6 +316,43 @@ const Returns = () => {
             );
         } finally {
             setSubmittingSelfCollect(false);
+        }
+    };
+
+    const handleConfirmReceiptFileChange = (e) => {
+        const files = Array.from(e.target.files || []);
+        files.forEach((file) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setConfirmReceiptImages((prev) => [...prev, reader.result]);
+            };
+            reader.readAsDataURL(file);
+        });
+        e.target.value = "";
+    };
+
+    const handleSubmitConfirmReceipt = async (orderId) => {
+        if (confirmReceiptImages.length === 0) return;
+        try {
+            setSubmittingConfirmReceipt(true);
+            await sellerApi.confirmShiprocketReturnReceipt(orderId, {
+                images: confirmReceiptImages,
+                note: confirmReceiptNote,
+            });
+            showToast("Return receipt confirmed", "success");
+            setConfirmReceiptOpen(false);
+            setConfirmReceiptImages([]);
+            setConfirmReceiptNote("");
+            await fetchReturns();
+            setIsDetailsOpen(false);
+        } catch (error) {
+            console.error("Failed to confirm return receipt:", error);
+            showToast(
+                error.response?.data?.message || "Failed to confirm return receipt",
+                "error",
+            );
+        } finally {
+            setSubmittingConfirmReceipt(false);
         }
     };
 
@@ -785,7 +826,136 @@ const Returns = () => {
                                     </p>
                                 </div>
 
-                                {(selectedReturn.returnStatus === "return_approved" ||
+                                {selectedReturn.deliveryType === "scheduled" &&
+                                    ["return_approved", "return_in_transit", "returned"].includes(
+                                        selectedReturn.returnStatus,
+                                    ) && (
+                                    <div>
+                                        <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                            <HiOutlineTruck className="h-3 w-3 text-primary" /> Return Pickup
+                                            <span className="bg-indigo-50 text-indigo-700 text-[9px] px-2 py-0.5 rounded-full font-bold">
+                                                Shiprocket
+                                            </span>
+                                        </h4>
+                                        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+                                            {!selectedReturn.returnShipmentDetails?.shiprocketReturnShipmentId ? (
+                                                <div className="flex flex-col gap-2">
+                                                    <p className="text-[11px] text-slate-500 font-medium">
+                                                        {selectedReturn.returnShipmentDetails?.lastError
+                                                            ? `Creating the Shiprocket pickup failed: ${selectedReturn.returnShipmentDetails.lastError}`
+                                                            : "Setting up the Shiprocket reverse pickup..."}
+                                                    </p>
+                                                    <Button
+                                                        size="sm"
+                                                        className="flex-1"
+                                                        onClick={() => handleApprove(selectedReturn.orderId)}
+                                                    >
+                                                        Retry Shiprocket Pickup
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center justify-between text-xs text-slate-500">
+                                                        <span>Courier</span>
+                                                        <span className="font-bold text-slate-800">
+                                                            {selectedReturn.returnShipmentDetails.courierName || "Assigned courier"}
+                                                        </span>
+                                                    </div>
+                                                    {selectedReturn.returnShipmentDetails.awbCode && (
+                                                        <div className="flex items-center justify-between text-xs text-slate-500">
+                                                            <span>AWB</span>
+                                                            <span className="font-mono font-bold text-slate-800">
+                                                                {selectedReturn.returnShipmentDetails.awbCode}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center justify-between text-xs text-slate-500">
+                                                        <span>Status</span>
+                                                        <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 font-bold text-indigo-700 uppercase text-[10px]">
+                                                            {selectedReturn.returnShipmentDetails.lastSyncedStatus ||
+                                                                (selectedReturn.returnStatus === "returned" ? "Delivered" : "Picking up")}
+                                                        </span>
+                                                    </div>
+
+                                                    {selectedReturn.returnStatus !== "returned" && (
+                                                        confirmReceiptOpen ? (
+                                                            <div className="space-y-2 pt-2 border-t border-slate-200 mt-2">
+                                                                <p className="text-[11px] font-bold text-slate-600">
+                                                                    Upload Return Received Photos
+                                                                </p>
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    multiple
+                                                                    onChange={handleConfirmReceiptFileChange}
+                                                                    className="text-[11px] w-full"
+                                                                />
+                                                                {confirmReceiptImages.length > 0 && (
+                                                                    <div className="flex gap-2 flex-wrap">
+                                                                        {confirmReceiptImages.map((img, idx) => (
+                                                                            <img
+                                                                                key={idx}
+                                                                                src={img}
+                                                                                alt={`Proof ${idx + 1}`}
+                                                                                className="h-12 w-12 rounded-lg object-cover border border-slate-200"
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                                <textarea
+                                                                    value={confirmReceiptNote}
+                                                                    onChange={(e) => setConfirmReceiptNote(e.target.value)}
+                                                                    placeholder="Note (optional)"
+                                                                    rows={2}
+                                                                    className="w-full text-xs p-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-brand-200 outline-none"
+                                                                />
+                                                                <div className="flex gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        className="flex-1"
+                                                                        disabled={submittingConfirmReceipt || confirmReceiptImages.length === 0}
+                                                                        onClick={() => handleSubmitConfirmReceipt(selectedReturn.orderId)}
+                                                                    >
+                                                                        {submittingConfirmReceipt ? "Submitting..." : "Confirm Receipt"}
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        onClick={() => {
+                                                                            setConfirmReceiptOpen(false);
+                                                                            setConfirmReceiptImages([]);
+                                                                            setConfirmReceiptNote("");
+                                                                        }}
+                                                                    >
+                                                                        Cancel
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="pt-2 border-t border-slate-200 mt-2 space-y-1.5">
+                                                                <p className="text-[11px] text-slate-500 font-medium">
+                                                                    {selectedReturn.returnShipmentDetails.lastSyncedStatus === "DELIVERED"
+                                                                        ? "Shiprocket says this has arrived — confirm receipt once you have the package."
+                                                                        : "Once the package physically arrives, confirm receipt below."}
+                                                                </p>
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="w-full"
+                                                                    onClick={() => setConfirmReceiptOpen(true)}
+                                                                >
+                                                                    Confirm Receipt
+                                                                </Button>
+                                                            </div>
+                                                        )
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {selectedReturn.deliveryType !== "scheduled" &&
+                                    (selectedReturn.returnStatus === "return_approved" ||
                                     selectedReturn.returnStatus === "return_pickup_assigned" ||
                                     (selectedReturn.returnStatus === "returned" &&
                                         selectedReturn.returnFulfillmentMode === "own")) && (

@@ -152,13 +152,14 @@ export async function createAdhocOrder(payload) {
   });
 }
 
-export async function assignAWB({ shipmentId, courierId }) {
+export async function assignAWB({ shipmentId, courierId, isReturn = false }) {
   return request({
     method: "post",
     path: "/courier/assign/awb",
     data: {
       shipment_id: shipmentId,
       ...(courierId ? { courier_id: courierId } : {}),
+      ...(isReturn ? { is_return: 1 } : {}),
     },
   });
 }

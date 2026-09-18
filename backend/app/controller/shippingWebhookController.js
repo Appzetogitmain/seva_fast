@@ -30,8 +30,101 @@ function verifyWebhookSecret(req) {
   return crypto.timingSafeEqual(expectedBuf, gotBuf);
 }
 
+/** Return-status rank so a webhook replay/out-of-order delivery can never move it backwards. */
+function returnStatusRank(status) {
+  switch (status) {
+    case "return_approved":
+      return 1;
+    case "return_pickup_assigned":
+      return 2;
+    case "return_in_transit":
+      return 3;
+    case "returned":
+      return 4;
+    default:
+      return 0;
+  }
+}
+
 /**
- * Handles incoming status update webhooks from Shiprocket.
+ * Handles a webhook update for a Shiprocket REVERSE PICKUP (return) shipment.
+ * Only ever updates tracking/status fields — never triggers refund, restock,
+ * or QC here. Those stay behind the existing manual QC step
+ * (updateReturnQcStatus -> completeReturnAndRefund) exactly like local
+ * rider-fulfilled returns.
+ *
+ * Idempotent: re-delivered webhooks for a status we've already recorded are
+ * no-ops, and returnStatus can only move forward (never backwards or repeat
+ * the same "restock/notify" side effect twice).
+ */
+async function handleReturnShipmentWebhook({ order, rawStatus, awbCode }) {
+  if (order.returnShipmentDetails?.lastSyncedStatus === rawStatus) {
+    // Exact same status already recorded for this return shipment — no-op.
+    return;
+  }
+
+  const update = {
+    "returnShipmentDetails.lastSyncedStatus": rawStatus,
+    "returnShipmentDetails.lastSyncedAt": new Date(),
+  };
+  if (awbCode && !order.returnShipmentDetails?.awbCode) {
+    update["returnShipmentDetails.awbCode"] = awbCode;
+  }
+
+  // Only "in transit" is auto-applied to returnStatus. "DELIVERED" is
+  // deliberately NOT auto-advanced to "returned" here — the seller must
+  // explicitly confirm receipt and upload Return Received Photos
+  // (confirmShiprocketReturnReceipt) before QC/refund can proceed, exactly
+  // like the self-collect flow requires proof photos. The DELIVERED status
+  // is still recorded above so the seller's UI can prompt them to confirm.
+  let nextReturnStatus = null;
+  if (["PICKED UP", "IN TRANSIT", "SHIPPED", "OUT FOR PICKUP"].includes(rawStatus)) {
+    nextReturnStatus = "return_in_transit";
+  }
+
+  const isForwardMove =
+    nextReturnStatus && returnStatusRank(nextReturnStatus) > returnStatusRank(order.returnStatus);
+
+  if (isForwardMove) {
+    update.returnStatus = nextReturnStatus;
+    if (!order.returnPickedAt) {
+      update.returnPickedAt = new Date();
+    }
+  } else if (nextReturnStatus) {
+    logger.info(
+      `[Shiprocket Return Webhook] Ignoring out-of-order/duplicate status "${rawStatus}" for order ${order.orderId} (current returnStatus=${order.returnStatus})`,
+    );
+  } else if (rawStatus !== "DELIVERED") {
+    logger.warn(`[Shiprocket Return Webhook] Unmapped return status "${rawStatus}" for order ${order.orderId}`);
+  }
+
+  await Order.findByIdAndUpdate(order._id, { $set: update });
+
+  if (isForwardMove) {
+    emitOrderStatusUpdate(
+      order.orderId,
+      { returnStatus: nextReturnStatus },
+      order.customer,
+      order.seller,
+      order._id,
+    );
+  }
+
+  if (rawStatus === "DELIVERED") {
+    emitNotificationEvent(NOTIFICATION_EVENTS.RETURN_COMPLETED, {
+      orderId: order.orderId,
+      sellerId: order.seller,
+      customerId: order.customer,
+      data: {
+        message: "Shiprocket has delivered the returned item to your store. Please confirm receipt and upload photos to proceed with QC.",
+      },
+    });
+  }
+}
+
+/**
+ * Handles incoming status update webhooks from Shiprocket, for both forward
+ * (delivery) and reverse (return) shipments.
  * Mounted at: POST /api/orders/shipping/shiprocket/webhook
  */
 export async function handleShiprocketWebhook(req, res) {
@@ -41,6 +134,9 @@ export async function handleShiprocketWebhook(req, res) {
     const shiprocketOrderId = payload.order_id;
     const shipmentId = payload.shipment_id;
     const channelOrderId = payload.channel_order_id || payload.order_id;
+    const rawStatus = String(
+      payload.current_status || payload.status || payload.shipment_status || "",
+    ).trim().toUpperCase();
 
     logger.info("[Shiprocket Webhook] Received webhook call:", {
       headers: {
@@ -65,25 +161,47 @@ export async function handleShiprocketWebhook(req, res) {
       });
     }
 
-    const orClauses = [];
+    const forwardOrClauses = [];
     if (channelOrderId != null) {
-      orClauses.push({ orderId: String(channelOrderId) });
+      forwardOrClauses.push({ orderId: String(channelOrderId) });
     }
     if (shiprocketOrderId != null) {
-      orClauses.push({ "shipmentDetails.shiprocketOrderId": shiprocketOrderId });
-      orClauses.push({ "shipmentDetails.shiprocketOrderId": String(shiprocketOrderId) });
+      forwardOrClauses.push({ "shipmentDetails.shiprocketOrderId": shiprocketOrderId });
+      forwardOrClauses.push({ "shipmentDetails.shiprocketOrderId": String(shiprocketOrderId) });
     }
     if (shipmentId != null) {
-      orClauses.push({ "shipmentDetails.shiprocketShipmentId": shipmentId });
-      orClauses.push({ "shipmentDetails.shiprocketShipmentId": String(shipmentId) });
+      forwardOrClauses.push({ "shipmentDetails.shiprocketShipmentId": shipmentId });
+      forwardOrClauses.push({ "shipmentDetails.shiprocketShipmentId": String(shipmentId) });
     }
     if (awbCode) {
-      orClauses.push({ "shipmentDetails.awbCode": awbCode });
+      forwardOrClauses.push({ "shipmentDetails.awbCode": awbCode });
     }
 
-    let order = orClauses.length
-      ? await Order.findOne({ $or: orClauses })
+    let order = forwardOrClauses.length
+      ? await Order.findOne({ $or: forwardOrClauses })
       : null;
+    let isReturnShipment = false;
+
+    if (!order) {
+      // Not a forward shipment we recognize — check if it's a return (reverse
+      // pickup) shipment instead before giving up.
+      const returnOrClauses = [];
+      if (shiprocketOrderId != null) {
+        returnOrClauses.push({ "returnShipmentDetails.shiprocketReturnOrderId": shiprocketOrderId });
+        returnOrClauses.push({ "returnShipmentDetails.shiprocketReturnOrderId": String(shiprocketOrderId) });
+      }
+      if (shipmentId != null) {
+        returnOrClauses.push({ "returnShipmentDetails.shiprocketReturnShipmentId": shipmentId });
+        returnOrClauses.push({ "returnShipmentDetails.shiprocketReturnShipmentId": String(shipmentId) });
+      }
+      if (awbCode) {
+        returnOrClauses.push({ "returnShipmentDetails.awbCode": awbCode });
+      }
+      if (returnOrClauses.length) {
+        order = await Order.findOne({ $or: returnOrClauses });
+        if (order) isReturnShipment = true;
+      }
+    }
 
     if (!order) {
       logger.warn(
@@ -94,6 +212,17 @@ export async function handleShiprocketWebhook(req, res) {
         success: true,
         message: "Webhook acknowledged (order not found in local system or test event)",
       });
+    }
+
+    if (isReturnShipment) {
+      await handleReturnShipmentWebhook({ order, rawStatus, awbCode });
+      return res.status(200).json({ success: true, message: "Return webhook processed successfully" });
+    }
+
+    // Idempotency guard — skip if we've already applied this exact status to
+    // this forward shipment (webhook re-delivery is expected/common).
+    if (order.shipmentDetails?.lastSyncedStatus === rawStatus) {
+      return res.status(200).json({ success: true, message: "Webhook already processed (no change)" });
     }
 
     order.shipmentDetails = {

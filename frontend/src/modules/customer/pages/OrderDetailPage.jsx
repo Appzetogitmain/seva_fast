@@ -52,6 +52,22 @@ import {
 import { getLegacyStatusFromOrder, isOrderDelayed } from "@/shared/utils/orderStatus";
 import { formatTime } from "@shared/utils/formatDate";
 
+// Mirrors backend/app/constants/returnReasons.js — keep in sync.
+const RETURN_REASON_LABELS = {
+  ITEM_DAMAGED: "Item damaged",
+  WRONG_ITEM: "Wrong item delivered",
+  PARCEL_DAMAGED: "Parcel damaged in transit",
+  QUALITY_NOT_AS_EXPECTED: "Quality not as expected",
+  MISSING_ITEM: "Missing item(s) in the order",
+  PERFORMANCE_NOT_ADEQUATE: "Product performance not adequate",
+  SIZE_NOT_AS_EXPECTED: "Size not as expected",
+  DOES_NOT_FIT: "Does not fit",
+  NOT_AS_DESCRIBED: "Not as described",
+  ARRIVED_TOO_LATE: "Arrived too late",
+  CHANGED_MY_MIND: "Changed my mind",
+  OTHER: "Other",
+};
+
 const coordsToLatLng = (coords) => {
   if (!Array.isArray(coords) || coords.length < 2) return null;
 
@@ -811,7 +827,8 @@ const OrderDetailPage = () => {
         itemIndex: Number(idx),
         quantity: val.quantity,
       })),
-      reason: returnReason,
+      reason: RETURN_REASON_LABELS[returnReason] || returnReason,
+      reasonCode: returnReason,
       reasonDetail: returnReasonDetail,
       conditionAssurance: returnConditionAssurance,
       images: returnImages,
@@ -1801,11 +1818,9 @@ const OrderDetailPage = () => {
                   className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-slate-900/10"
                 >
                   <option value="" disabled>Select a reason...</option>
-                  <option value="Defective product">Defective product</option>
-                  <option value="Wrong item delivered">Wrong item delivered</option>
-                  <option value="Not as expected">Not as expected</option>
-                  <option value="Size issue">Size issue</option>
-                  <option value="Other">Other</option>
+                  {Object.entries(RETURN_REASON_LABELS).map(([code, label]) => (
+                    <option key={code} value={code}>{label}</option>
+                  ))}
                 </select>
               </div>
 
