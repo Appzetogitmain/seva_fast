@@ -267,6 +267,13 @@ const sellerSchema = new mongoose.Schema(
       default: {},
     },
     lastLogin: Date,
+    // True only while the seller has an active login session (set true on
+    // login, false on logout). Distinct from any work-availability toggle —
+    // used to suppress push/socket order notifications while logged out.
+    isLoggedIn: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

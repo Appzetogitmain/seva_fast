@@ -29,7 +29,7 @@ import {
   isRetryableError,
   validateIdempotencyKey,
 } from "./idempotencyService.js";
-import { buildCheckoutPricingSnapshot } from "./checkoutPricingService.js";
+import { buildCheckoutPricingSnapshot, resolveDeliveryDecisionsForCheckout } from "./checkoutPricingService.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import * as logger from "./logger.js";
@@ -352,6 +352,24 @@ export async function placeOrderAtomic({
     return { ...existingResult, duplicate: true };
   }
 
+  // Resolve the automatic local-vs-Shiprocket delivery decision BEFORE
+  // opening the DB transaction below — it can make a live Shiprocket API
+  // call taking several seconds, and holding a multi-document transaction
+  // open across that call risks hitting MongoDB's transaction time limit and
+  // widens the write-conflict window for unrelated concurrent orders. Any
+  // "undeliverable" rejection also now surfaces before any stock/coupon work
+  // begins, instead of aborting a partially-built transaction.
+  const preCheckAddress = normalizeAddress(normalizedPayload.address);
+  const { orderItemsInput: preCheckItemsInput } = await resolveOrderItemsInput({
+    payload: normalizedPayload,
+    customerId,
+    session: null,
+  });
+  const sellerDeliveryDecisions = await resolveDeliveryDecisionsForCheckout({
+    orderItems: preCheckItemsInput,
+    address: preCheckAddress,
+  });
+
   const session = await mongoose.startSession();
   try {
     session.startTransaction({
@@ -494,6 +512,7 @@ export async function placeOrderAtomic({
       membershipTier,
       isFirstOrder,
       isExpressDelivery: Boolean(normalizedPayload.isExpressDelivery),
+      precomputedDeliveryDecisions: sellerDeliveryDecisions,
     });
 
     const checkoutGroupId = await generateUniqueCheckoutGroupId({ session });
@@ -555,6 +574,7 @@ export async function placeOrderAtomic({
       const proportionateWallet = (orderGrandTotal / groupGrandTotal) * walletAmount;
 
       const isOrderScheduled = entry.items.some(item => item.deliveryType === "scheduled");
+      const decision = entry.deliveryDecision || {};
       const order = new Order({
         orderId,
         customer: customerId,
@@ -565,6 +585,15 @@ export async function placeOrderAtomic({
         address: normalizedAddress,
         paymentMode,
         deliveryType: isOrderScheduled ? "scheduled" : "instant",
+        deliveryEta: {
+          method: isOrderScheduled ? "scheduled" : "instant",
+          localEtaMinMinutes: decision.localEtaMinMinutes ?? null,
+          localEtaMaxMinutes: decision.localEtaMaxMinutes ?? null,
+          shiprocketEtaDays: decision.shiprocketEtaDays ?? null,
+          estimatedDeliveryDate: decision.estimatedDeliveryDate ?? null,
+          courierName: decision.courierName ?? null,
+          computedAt: new Date(),
+        },
         paymentStatus:
           paymentMode === "ONLINE"
             ? ORDER_PAYMENT_STATUS.CREATED

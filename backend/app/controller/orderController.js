@@ -1065,6 +1065,14 @@ export const updateOrderStatus = async (req, res) => {
       }
     }
     if (deliveryBoyId && String(order.deliveryBoy || "") !== String(deliveryBoyId)) {
+      if (order.deliveryType === "scheduled") {
+        return handleResponse(
+          res,
+          400,
+          "This order ships via Shiprocket (nationwide) — a local delivery partner cannot be assigned to it.",
+        );
+      }
+
       const effectiveStatus = String(nextStatus || order.status || "").toLowerCase();
       const canAssignAtStatus = ["packed", "out_for_delivery"].includes(effectiveStatus);
       if (!canAssignAtStatus) {
@@ -1190,6 +1198,14 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     if (selfDelivery && typeof selfDelivery === "object") {
+      if (order.deliveryType === "scheduled") {
+        return handleResponse(
+          res,
+          400,
+          "This order ships via Shiprocket (nationwide) — it cannot be marked for self/own delivery.",
+        );
+      }
+
       const effectiveStatus = String(nextStatus || order.status || "").toLowerCase();
       const canSetAtStatus = ["packed", "out_for_delivery"].includes(effectiveStatus);
       if (!canSetAtStatus) {

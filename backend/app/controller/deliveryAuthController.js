@@ -287,6 +287,7 @@ export const verifyDeliveryOTP = async (req, res) => {
 
         delivery.lastLogin = new Date();
         delivery.isOnline = true;
+        delivery.isLoggedIn = true;
         await delivery.save();
 
         await recordAuthActivity({

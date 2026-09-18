@@ -582,6 +582,7 @@ export const loginSeller = async (req, res) => {
         }
 
         seller.lastLogin = new Date();
+        seller.isLoggedIn = true;
         await seller.save();
 
         await recordAuthActivity({

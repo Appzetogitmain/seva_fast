@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ALL_PRODUCT_AVAILABILITY, PRODUCT_AVAILABILITY } from "../constants/delivery.js";
 
 const productSchema = new mongoose.Schema(
     {
@@ -54,7 +55,7 @@ const productSchema = new mongoose.Schema(
             type: String,
             trim: true,
         },
-        // Package dims (cm) — required when deliveryType is "scheduled" for Shiprocket
+        // Package dims (cm) — required when availability is "pan_india" (may ship via Shiprocket)
         packageLength: {
             type: Number,
             min: 0,
@@ -78,6 +79,15 @@ const productSchema = new mongoose.Schema(
             type: String,
             trim: true,
             default: "",
+        },
+        // Numeric usable shelf life in days — drives delivery-eligibility
+        // decisions for perishable products (null = non-perishable / no
+        // restriction). Distinct from the free-text `shelfLife` label above,
+        // which is display-only.
+        shelfLifeDays: {
+            type: Number,
+            default: null,
+            min: 0,
         },
         fssaiCode: {
             type: String,
@@ -172,10 +182,15 @@ const productSchema = new mongoose.Schema(
                 sku: String,
             }
         ],
-        deliveryType: {
+        // Seller-facing availability scope. The actual delivery method (local
+        // rider vs. Shiprocket) is decided automatically per order based on
+        // seller/customer distance and Shiprocket serviceability — see
+        // services/deliveryDecisionService.js. Sellers no longer pick a
+        // delivery method directly.
+        availability: {
             type: String,
-            enum: ["instant", "scheduled"],
-            default: "instant",
+            enum: ALL_PRODUCT_AVAILABILITY,
+            default: PRODUCT_AVAILABILITY.LOCAL_ONLY,
         },
         isFeatured: {
             type: Boolean,
@@ -204,6 +219,7 @@ productSchema.index({ subcategoryId: 1, status: 1 });
 productSchema.index({ sellerId: 1, status: 1 });
 productSchema.index({ sellerId: 1, approvalStatus: 1, createdAt: -1 });
 productSchema.index({ sellerId: 1, createdAt: -1, _id: -1 });
+productSchema.index({ availability: 1, status: 1 });
 productSchema.index({ name: "text", tags: "text" }); // For better search if regex is too slow
 
 export default mongoose.model("Product", productSchema);

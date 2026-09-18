@@ -760,6 +760,7 @@ const ProductDetailPage = () => {
                                             >
                                                 <div className="grid grid-cols-2 gap-3 mt-1">
                                                     {[
+                                                        { label: 'Delivery Coverage', value: selectedProduct.availability === 'pan_india' ? 'Pan India' : 'Local Only', emoji: '🚚' },
                                                         ...(selectedProduct.shelfLife ? [{ label: 'Shelf Life', value: selectedProduct.shelfLife, emoji: '📅' }] : []),
                                                         ...(selectedProduct.countryOfOrigin ? [{ label: 'Country of Origin', value: selectedProduct.countryOfOrigin, emoji: '🇮🇳' }] : []),
                                                         ...(selectedProduct.fssaiCode ? [{ label: 'FSSAI License', value: selectedProduct.fssaiCode, emoji: '🛡️' }] : []),

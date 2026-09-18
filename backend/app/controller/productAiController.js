@@ -101,7 +101,8 @@ const IMAGE_LISTING_SCHEMA = {
     brand: { type: "STRING" },
     weightVal: { type: "STRING" },
     weightUnit: { type: "STRING" },
-    deliveryType: { type: "STRING" },
+    availability: { type: "STRING" },
+    shelfLifeDays: { type: "STRING" },
     detectedHeaderName: { type: "STRING" },
     detectedCategoryName: { type: "STRING" },
     detectedSubcategoryName: { type: "STRING" },
@@ -158,10 +159,11 @@ Generate:
 4. brand: Detected brand name from the packaging or label.
 5. weightVal: Numeric pack weight or volume if visible (e.g., "500", "1", "250").
 6. weightUnit: "gm", "kg", "ml", "l", or "pcs".
-7. deliveryType: "instant" (for 10-20 min quick delivery) or "scheduled" (for large/heavy/nationwide items).
-8. detectedHeaderName: Exact or closest matching Main Group name from the provided list above.
-9. detectedCategoryName: Exact or closest matching Category name from the provided list above.
-10. detectedSubcategoryName: Exact or closest matching Subcategory name from the provided list above.
+7. availability: "local_only" (short shelf-life/heavy/bulky items only worth delivering nearby, e.g. fresh produce, dairy, ready-to-eat food) or "pan_india" (shelf-stable, easily shippable items, e.g. packaged/dry goods, cosmetics, electronics).
+8. shelfLifeDays: Estimated usable shelf life in days as a plain number (e.g. "2" for fresh milk, "365" for packaged biscuits). Leave empty if not perishable/not applicable.
+9. detectedHeaderName: Exact or closest matching Main Group name from the provided list above.
+10. detectedCategoryName: Exact or closest matching Category name from the provided list above.
+11. detectedSubcategoryName: Exact or closest matching Subcategory name from the provided list above.
 `;
 
     const visionResult = await analyzeImageStructuredJson({
@@ -221,7 +223,11 @@ Generate:
       brand: visionResult.brand || "",
       weightVal: visionResult.weightVal || "",
       weightUnit: visionResult.weightUnit || "kg",
-      deliveryType: visionResult.deliveryType || "instant",
+      availability: visionResult.availability === "pan_india" ? "pan_india" : "local_only",
+      shelfLifeDays: (() => {
+        const n = parseInt(visionResult.shelfLifeDays, 10);
+        return Number.isFinite(n) && n >= 0 ? String(n) : "";
+      })(),
       header: matchedHeaderId,
       category: matchedCategoryId,
       subcategory: matchedSubcategoryId,

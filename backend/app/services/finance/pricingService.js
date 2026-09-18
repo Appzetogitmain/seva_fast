@@ -594,7 +594,7 @@ export async function hydrateOrderItems(
     .filter(Boolean);
 
   const productQuery = Product.find({ _id: { $in: productIds } })
-    .select("_id name salePrice price costPrice mainImage headerId sellerId status approvalStatus variants deliveryType weight packageLength packageBreadth packageHeight isReturnable returnWindowDays")
+    .select("_id name salePrice price costPrice mainImage headerId sellerId status approvalStatus variants availability shelfLifeDays weight packageLength packageBreadth packageHeight isReturnable returnWindowDays")
     .lean();
   if (session) productQuery.session(session);
   const products = await productQuery;
@@ -656,7 +656,12 @@ export async function hydrateOrderItems(
       sellerId: String(product.sellerId),
       variantSku: rawVariantSku || "",
       variantName: resolvedVariant ? String(resolvedVariant?.name || "").trim() : "",
-      deliveryType: product.deliveryType || "instant",
+      // deliveryType is resolved later (per seller-group, from real distance +
+      // Shiprocket serviceability) in checkoutPricingService — see
+      // deliveryDecisionService.js. Left null here on purpose.
+      deliveryType: null,
+      availability: product.availability || "local_only",
+      shelfLifeDays: product.shelfLifeDays ?? null,
       weight: product.weight || "",
       packageLength: product.packageLength ?? null,
       packageBreadth: product.packageBreadth ?? null,

@@ -146,6 +146,7 @@ export const previewCheckoutFinance = async (req, res) => {
       sellerId: entry.sellerId,
       distanceKm: entry.distanceKm,
       breakdown: entry.breakdown,
+      deliveryDecision: entry.deliveryDecision,
     }));
 
     const distanceDebug = String(process.env.FINANCE_DEBUG_DISTANCE || "").toLowerCase() === "true"

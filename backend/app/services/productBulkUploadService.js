@@ -22,7 +22,8 @@ const TEMPLATE_HEADERS = [
   "category",
   "subcategory",
   "weight",
-  "deliveryType",
+  "availability",
+  "shelfLifeDays",
   "packageLength",
   "packageBreadth",
   "packageHeight",
@@ -61,7 +62,8 @@ const SAMPLE_ROWS = [
     category: "Dairy",
     subcategory: "Milk",
     weight: "1 kg",
-    deliveryType: "instant",
+    availability: "local_only",
+    shelfLifeDays: 2,
     packageLength: "",
     packageBreadth: "",
     packageHeight: "",
@@ -98,7 +100,8 @@ const SAMPLE_ROWS = [
     category: "Men",
     subcategory: "T-Shirts",
     weight: "0.3 kg",
-    deliveryType: "scheduled",
+    availability: "pan_india",
+    shelfLifeDays: "",
     packageLength: 30,
     packageBreadth: 25,
     packageHeight: 5,
@@ -364,8 +367,10 @@ function normalizeRowHeaders(row) {
       saleprice: "salePrice",
       lowstock: "lowStockAlert",
       lowstockalert: "lowStockAlert",
-      delivery: "deliveryType",
-      deliverytype: "deliveryType",
+      delivery: "availability",
+      deliverytype: "availability",
+      shelflife: "shelfLifeDays",
+      shelflifedays: "shelfLifeDays",
       packagelength: "packageLength",
       packagebreadth: "packageBreadth",
       packageheight: "packageHeight",
@@ -455,12 +460,12 @@ function parseVariants(row, productName, rowIndexForSku) {
   return parseVariantsFromColumns(row, productName, rowIndexForSku);
 }
 
-function validateScheduledFields(productData) {
-  const deliveryType = String(productData.deliveryType || "instant").toLowerCase();
-  if (deliveryType !== "scheduled") return null;
+function validatePanIndiaFields(productData) {
+  const availability = String(productData.availability || "local_only").toLowerCase();
+  if (availability !== "pan_india") return null;
 
   if (!parseWeightKgFromString(productData.weight)) {
-    return "Weight is missing. It is required for scheduled nationwide delivery products.";
+    return "Weight is missing. It is required for Pan India (nationwide) delivery products.";
   }
 
   const length = parsePositiveNumber(productData.packageLength);
@@ -468,7 +473,7 @@ function validateScheduledFields(productData) {
   const height = parsePositiveNumber(productData.packageHeight);
 
   if (!length || !breadth || !height) {
-    return "Package dimensions (length, breadth, and height in cm) are missing or invalid. They are required for scheduled delivery.";
+    return "Package dimensions (length, breadth, and height in cm) are missing or invalid. They are required for Pan India delivery.";
   }
 
   productData.packageLength = length;
@@ -487,8 +492,9 @@ export function buildBulkTemplateBuffer() {
     ["2. Required columns: name, price, stock, category"],
     ["3. header is optional but recommended when category names repeat."],
     ["4. category / subcategory must match exact names from your catalog Groups."],
-    ["5. deliveryType: instant OR scheduled"],
-    ["6. For scheduled delivery: weight + packageLength + packageBreadth + packageHeight (cm) are required."],
+    ["5. availability: local_only OR pan_india"],
+    ["6. For pan_india delivery: weight + packageLength + packageBreadth + packageHeight (cm) are required."],
+    ["6b. shelfLifeDays: usable shelf life in days (numbers only). Leave blank if not perishable."],
     ["7. mainImage: optional public image URL (https://...)"],
     ["8. tags: comma-separated (e.g. milk,dairy)"],
     ["9. sku: leave blank to auto-generate"],
@@ -621,15 +627,18 @@ export async function bulkCreateProductsFromRows(rows, { sellerId }) {
         continue;
       }
 
-      let deliveryType = cellStr(row, "deliveryType").toLowerCase() || "instant";
-      if (deliveryType !== "instant" && deliveryType !== "scheduled") {
+      let availability = cellStr(row, "availability").toLowerCase() || "local_only";
+      if (availability !== "local_only" && availability !== "pan_india") {
         errors.push({
           row: excelRow,
           name,
-          message: 'Delivery Type is invalid. Please enter either "instant" or "scheduled".',
+          message: 'Availability is invalid. Please enter either "local_only" or "pan_india".',
         });
         continue;
       }
+
+      const shelfLifeDaysRaw = cellNum(row, "shelfLifeDays", null);
+      const shelfLifeDays = shelfLifeDaysRaw !== null && shelfLifeDaysRaw >= 0 ? shelfLifeDaysRaw : null;
 
       let status = cellStr(row, "status").toLowerCase() || "active";
       if (status !== "active" && status !== "inactive") {
@@ -660,7 +669,8 @@ export async function bulkCreateProductsFromRows(rows, { sellerId }) {
         categoryId: resolved.categoryId,
         subcategoryId: resolved.subcategoryId,
         weight: cellStr(row, "weight"),
-        deliveryType,
+        availability,
+        shelfLifeDays,
         packageLength: cellNum(row, "packageLength", null),
         packageBreadth: cellNum(row, "packageBreadth", null),
         packageHeight: cellNum(row, "packageHeight", null),
@@ -680,7 +690,7 @@ export async function bulkCreateProductsFromRows(rows, { sellerId }) {
         );
       }
 
-      const packageError = validateScheduledFields(productData);
+      const packageError = validatePanIndiaFields(productData);
       if (packageError) {
         errors.push({ row: excelRow, name, message: packageError });
         continue;

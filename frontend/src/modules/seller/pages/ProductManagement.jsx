@@ -227,9 +227,10 @@ const ProductManagement = () => {
     packageLength: "",
     packageBreadth: "",
     packageHeight: "",
-    deliveryType: "instant",
+    availability: "local_only",
     brand: "",
     shelfLife: "",
+    shelfLifeDays: "",
     fssaiCode: "",
     countryOfOrigin: "India",
     mainImage: null,
@@ -361,10 +362,10 @@ const ProductManagement = () => {
         toast.error("Variant stock cannot be negative");
         return;
       }
-      if (formData.deliveryType === "scheduled") {
+      if (formData.availability === "pan_india") {
         const parsedWeight = parseFloat(formData.weightVal);
         if (!formData.weightVal || Number.isNaN(parsedWeight) || parsedWeight <= 0) {
-          toast.error("Please provide a valid product weight for scheduled nationwide delivery.");
+          toast.error("Please provide a valid product weight for Pan India delivery.");
           return;
         }
         const length = parseFloat(formData.packageLength);
@@ -375,7 +376,7 @@ const ProductManagement = () => {
           Number.isNaN(length) || Number.isNaN(breadth) || Number.isNaN(height) ||
           length <= 0 || breadth <= 0 || height <= 0
         ) {
-          toast.error("Please provide package length, breadth and height (cm) for Shiprocket shipping.");
+          toast.error("Please provide package length, breadth and height (cm) for Pan India shipping.");
           return;
         }
       }
@@ -405,8 +406,11 @@ const ProductManagement = () => {
       data.append("status", formData.status);
       data.append("brand", formData.brand);
       data.append("weight", formData.weight);
-      data.append("deliveryType", formData.deliveryType || "instant");
-      if (formData.deliveryType === "scheduled") {
+      data.append("availability", formData.availability || "local_only");
+      if (formData.shelfLifeDays !== "" && formData.shelfLifeDays != null) {
+        data.append("shelfLifeDays", formData.shelfLifeDays);
+      }
+      if (formData.availability === "pan_india") {
         data.append("packageLength", formData.packageLength);
         data.append("packageBreadth", formData.packageBreadth);
         data.append("packageHeight", formData.packageHeight);
@@ -522,9 +526,10 @@ const ProductManagement = () => {
         packageLength: item.packageLength != null && item.packageLength !== "" ? String(item.packageLength) : "",
         packageBreadth: item.packageBreadth != null && item.packageBreadth !== "" ? String(item.packageBreadth) : "",
         packageHeight: item.packageHeight != null && item.packageHeight !== "" ? String(item.packageHeight) : "",
-        deliveryType: item.deliveryType || "instant",
+        availability: item.availability || "local_only",
         brand: item.brand || "",
         shelfLife: item.shelfLife || "",
+        shelfLifeDays: item.shelfLifeDays != null ? String(item.shelfLifeDays) : "",
         fssaiCode: item.fssaiCode || "",
         countryOfOrigin: item.countryOfOrigin || "India",
         isReturnable: item.isReturnable ?? true,
@@ -565,7 +570,9 @@ const ProductManagement = () => {
         packageLength: "",
         packageBreadth: "",
         packageHeight: "",
-        deliveryType: "instant",
+        availability: "local_only",
+        shelfLife: "",
+        shelfLifeDays: "",
         brand: "",
         isReturnable: true,
         returnWindowDays: 1,
@@ -1225,22 +1232,22 @@ const ProductManagement = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1.5 flex flex-col">
                           <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
-                            Delivery Type <span className="text-rose-500">*</span>
+                            Product Availability <span className="text-rose-500">*</span>
                           </label>
                           <select
-                            value={formData.deliveryType || "instant"}
+                            value={formData.availability || "local_only"}
                             onChange={(e) =>
-                              setFormData({ ...formData, deliveryType: e.target.value })
+                              setFormData({ ...formData, availability: e.target.value })
                             }
                             className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-bold outline-none cursor-pointer focus:ring-2 focus:ring-primary/5 transition-all"
                           >
-                            <option value="instant">Instant (Local Rider)</option>
-                            <option value="scheduled">Scheduled (Nationwide Shipping)</option>
+                            <option value="local_only">Local Only (nearby customers)</option>
+                            <option value="pan_india">Pan India (ships nationwide)</option>
                           </select>
                         </div>
                         <div className="space-y-1.5 flex flex-col">
                           <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
-                            Weight {formData.deliveryType === "scheduled" && <span className="text-rose-500">*</span>}
+                            Weight {formData.availability === "pan_india" && <span className="text-rose-500">*</span>}
                           </label>
                           <div className="flex gap-2">
                             <input
@@ -1280,13 +1287,13 @@ const ProductManagement = () => {
                         </div>
                       </div>
 
-                      {formData.deliveryType === "scheduled" && (
+                      {formData.availability === "pan_india" && (
                         <div className="space-y-2 pt-2">
                           <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
                             Package Size (cm) <span className="text-rose-500">*</span>
                           </label>
                           <p className="text-[11px] text-slate-500 font-medium ml-1">
-                            Required for Shiprocket delivery rate &amp; AWB calculation.
+                            Required for Shiprocket delivery rate &amp; AWB calculation when this ships nationwide.
                           </p>
                           <div className="grid grid-cols-3 gap-3">
                             <div className="space-y-1 flex flex-col">
@@ -1356,6 +1363,27 @@ const ProductManagement = () => {
                           </div>
                           <div className="space-y-1.5 flex flex-col">
                             <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                              Usable Shelf Life (Days)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={formData.shelfLifeDays || ""}
+                              onChange={(e) =>
+                                setFormData({ ...formData, shelfLifeDays: e.target.value })
+                              }
+                              className="w-full px-4 py-2.5 bg-slate-100 border-none rounded-xl text-sm font-semibold outline-none ring-primary/5 focus:ring-2 transition-all"
+                              placeholder="e.g. 2 (leave blank if not perishable)"
+                            />
+                            <p className="text-[11px] text-slate-500 font-medium ml-1">
+                              For perishable products only — restricts Pan India visibility to customers Shiprocket can reach in time.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-1.5 flex flex-col">
+                            <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
                               FSSAI License / Code
                             </label>
                             <input
@@ -1367,8 +1395,6 @@ const ProductManagement = () => {
                               placeholder="e.g. 10012011000001"
                             />
                           </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-1.5 flex flex-col">
                             <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
                               Country of Origin

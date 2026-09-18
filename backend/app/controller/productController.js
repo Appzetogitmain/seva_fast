@@ -29,6 +29,7 @@ import { getAdminIds } from "../utils/adminIds.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { notifyPendingDemandsForRestock } from "../services/productDemandService.js";
+import { buildPanIndiaListingFilter, isPanIndiaEligibleForListing } from "../services/productAvailabilityService.js";
 
 function buildProductListKey(queryParams) {
   const sorted = Object.keys(queryParams)
@@ -87,17 +88,19 @@ function parseWeightKgFromString(weightStr) {
 }
 
 /**
- * For scheduled (Shiprocket) products, weight + package L/B/H (cm) are required.
+ * Pan-India products may ship via Shiprocket (decided automatically per order
+ * from distance), so weight + package L/B/H (cm) are required up front —
+ * local-only products don't need them for Shiprocket rate/AWB calculation.
  * Coerces numeric package fields onto productData when valid.
  */
-function validateAndNormalizeScheduledPackageFields(productData = {}) {
-  const deliveryType = String(productData.deliveryType || "instant").toLowerCase();
-  if (deliveryType !== "scheduled") {
+function validatePanIndiaPackageFields(productData = {}) {
+  const availability = String(productData.availability || "local_only").toLowerCase();
+  if (availability !== "pan_india") {
     return null;
   }
 
   if (!parseWeightKgFromString(productData.weight)) {
-    return "Weight is required for scheduled nationwide delivery products";
+    return "Weight is required for Pan India (nationwide) delivery products";
   }
 
   const length = parsePositiveNumber(productData.packageLength);
@@ -105,13 +108,25 @@ function validateAndNormalizeScheduledPackageFields(productData = {}) {
   const height = parsePositiveNumber(productData.packageHeight);
 
   if (!length || !breadth || !height) {
-    return "Package length, breadth and height (cm) are required for scheduled nationwide delivery";
+    return "Package length, breadth and height (cm) are required for Pan India delivery";
   }
 
   productData.packageLength = length;
   productData.packageBreadth = breadth;
   productData.packageHeight = height;
   return null;
+}
+
+/** Coerces shelfLifeDays to a non-negative number, or null when blank/invalid. */
+function normalizeShelfLifeDays(productData = {}) {
+  if (!Object.prototype.hasOwnProperty.call(productData, "shelfLifeDays")) return;
+  const raw = productData.shelfLifeDays;
+  if (raw === "" || raw === null || raw === undefined) {
+    productData.shelfLifeDays = null;
+    return;
+  }
+  const n = Number(raw);
+  productData.shelfLifeDays = Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 function parseJsonIfString(value) {
@@ -440,21 +455,21 @@ export const getProducts = async (req, res) => {
       if (requestedSellerIds.length > 0) {
         query.$or = [
           { sellerId: { $in: finalSellerIds } },
-          { sellerId: { $in: requestedSellerIds }, deliveryType: "scheduled" }
+          { sellerId: { $in: requestedSellerIds }, ...buildPanIndiaListingFilter() }
         ];
       } else {
         if (finalSellerIds.length > 0) {
           query.$or = [
             { sellerId: { $in: finalSellerIds } },
-            { deliveryType: "scheduled" }
+            buildPanIndiaListingFilter()
           ];
         } else {
-          query.deliveryType = "scheduled";
+          Object.assign(query, buildPanIndiaListingFilter());
         }
       }
     } else {
       if (enforceRadius) {
-        query.deliveryType = "scheduled";
+        Object.assign(query, buildPanIndiaListingFilter());
       }
     }
 
@@ -527,7 +542,7 @@ export const getProducts = async (req, res) => {
       const [rawProducts, total] = await Promise.all([
         Product.find(finalQuery)
           .select(
-            "name slug description sku price salePrice stock brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
+            "name slug description sku price salePrice stock brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants availability shelfLifeDays createdAt",
           )
           // No .populate() — names resolved via cache-backed entityNameCache
           .sort(sortQuery)
@@ -686,7 +701,7 @@ export const getSellerProducts = async (req, res) => {
     ] = await Promise.all([
       Product.find(query)
         .select(
-          "name slug description sku price salePrice costPrice stock lowStockAlert brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
+          "name slug description sku price salePrice costPrice stock lowStockAlert brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants availability shelfLifeDays createdAt",
         )
         .populate("headerId", "name")
         .populate("categoryId", "name")
@@ -923,7 +938,8 @@ export const createProduct = async (req, res) => {
     const stockError = validateNonNegativeStockFields(productData);
     if (stockError) return handleResponse(res, 400, stockError);
 
-    const packageError = validateAndNormalizeScheduledPackageFields(productData);
+    normalizeShelfLifeDays(productData);
+    const packageError = validatePanIndiaPackageFields(productData);
     if (packageError) return handleResponse(res, 400, packageError);
 
     let moderationUpdate = {};
@@ -1135,11 +1151,12 @@ export const updateProduct = async (req, res) => {
     const stockError = validateNonNegativeStockFields(productData);
     if (stockError) return handleResponse(res, 400, stockError);
 
-    const packageError = validateAndNormalizeScheduledPackageFields({
-      deliveryType:
-        productData.deliveryType !== undefined
-          ? productData.deliveryType
-          : product.deliveryType,
+    normalizeShelfLifeDays(productData);
+    const packageError = validatePanIndiaPackageFields({
+      availability:
+        productData.availability !== undefined
+          ? productData.availability
+          : product.availability,
       weight:
         productData.weight !== undefined ? productData.weight : product.weight,
       packageLength:
@@ -1348,7 +1365,7 @@ export const getProductById = async (req, res) => {
       async () =>
         Product.findById(id)
           .select(
-            "name slug description sku price salePrice stock lowStockAlert brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
+            "name slug description sku price salePrice stock lowStockAlert brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants availability shelfLifeDays createdAt",
           )
           .populate("headerId", "name")
           .populate("categoryId", "name")
@@ -1371,8 +1388,8 @@ export const getProductById = async (req, res) => {
 
     if (enforceRadius) {
       const sellerIdForProduct = String(product?.sellerId?._id || product?.sellerId);
-      const isScheduled = product.deliveryType === "scheduled";
-      if (!isScheduled && (!nearbySellerSet || !nearbySellerSet.has(sellerIdForProduct))) {
+      const isPanIndiaEligible = isPanIndiaEligibleForListing(product);
+      if (!isPanIndiaEligible && (!nearbySellerSet || !nearbySellerSet.has(sellerIdForProduct))) {
         // Return product but mark as out of delivery radius
         // This prevents 404 errors on direct links and allows frontend to show a clear "Not Deliverable" message
         product.isOutOfRadius = true;
@@ -1493,7 +1510,7 @@ export const getModerationProducts = async (req, res) => {
       await Promise.all([
         Product.find(moderatedQuery)
           .select(
-            "name slug description sku price salePrice stock lowStockAlert brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants deliveryType createdAt",
+            "name slug description sku price salePrice stock lowStockAlert brand weight packageLength packageBreadth packageHeight mainImage galleryImages headerId categoryId subcategoryId sellerId status approvalStatus approvalRequestedAt approvalReviewedAt approvalReviewedBy approvalNote lastSubmittedByRole isFeatured variants availability shelfLifeDays createdAt",
           )
           .populate("headerId", "name")
           .populate("categoryId", "name")

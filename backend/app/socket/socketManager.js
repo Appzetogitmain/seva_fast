@@ -4,6 +4,8 @@
 import { verifySocketToken } from "./socketAuth.js";
 import mongoose from "mongoose";
 import Ticket from "../models/ticket.js";
+import Seller from "../models/seller.js";
+import Delivery from "../models/delivery.js";
 
 let _io = null;
 
@@ -29,10 +31,29 @@ export const initSocket = (io) => {
     next();
   });
 
-  io.on("connection", (socket) => {
+  io.on("connection", async (socket) => {
     const { id: userId, role } = socket.user || {};
     if (!userId) {
       return;
+    }
+
+    // A JWT stays valid until it expires even after the user logs out (no
+    // server-side token blacklist), so a stale token could otherwise reopen
+    // a socket and keep receiving order pushes post-logout. Gate seller and
+    // delivery connections on the explicit isLoggedIn session flag (set on
+    // login, cleared on logout) — fail open on a DB error so a transient
+    // outage doesn't silently cut off legitimately logged-in users.
+    if (role === "seller" || role === "delivery") {
+      try {
+        const Model = role === "delivery" ? Delivery : Seller;
+        const doc = await Model.findById(userId).select("isLoggedIn").lean();
+        if (!doc || doc.isLoggedIn !== true) {
+          socket.disconnect(true);
+          return;
+        }
+      } catch (err) {
+        console.warn("[socket] isLoggedIn check failed, allowing connection:", err.message);
+      }
     }
 
     if (role === "delivery") {
@@ -130,6 +151,23 @@ export const initSocket = (io) => {
 export const getIO = () => {
   if (!_io) throw new Error("Socket.IO not initialized");
   return _io;
+};
+
+/**
+ * Force-disconnects any live socket(s) for a seller/delivery user — called on
+ * logout so an already-open app stops receiving order pushes/sounds
+ * immediately, instead of waiting for a future reconnect to be rejected.
+ */
+export const disconnectUserSockets = (role, userId) => {
+  if (!_io || !userId) return;
+  const room =
+    role === "delivery" ? `delivery:${userId}` : role === "seller" ? `seller:${userId}` : null;
+  if (!room) return;
+  try {
+    _io.in(room).disconnectSockets(true);
+  } catch (err) {
+    console.warn("[socket] disconnectUserSockets failed:", err.message);
+  }
 };
 
 export const notifyDeliveryPartners = (orderData) => {

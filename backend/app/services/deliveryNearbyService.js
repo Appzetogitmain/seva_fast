@@ -10,7 +10,10 @@ const HAVERSINE_FALLBACK_LIMIT = () =>
   parseInt(process.env.DELIVERY_BROADCAST_HAVERSINE_LIMIT || "2000", 10);
 
 function buildDeliveryFilter() {
-  const q = { isOnline: true };
+  // isOnline = "accepting orders" toggle; isLoggedIn = has an active login
+  // session right now. A logged-out rider should never be broadcast to,
+  // even if isOnline was left true from their last session.
+  const q = { isOnline: true, isLoggedIn: true };
   if (requireVerifiedForBroadcast()) {
     q.isVerified = true;
   }

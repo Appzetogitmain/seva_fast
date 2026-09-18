@@ -2,7 +2,7 @@ import Order from "../../models/order.js";
 import Seller from "../../models/seller.js";
 import Customer from "../../models/customer.js";
 import Product from "../../models/product.js";
-import { extractIndianPincode, parseCityStatePincode } from "../../utils/pincode.js";
+import { extractIndianPincode, parseCityStatePincode, resolveDeliveryPincodeCityState } from "../../utils/pincode.js";
 import {
   checkServiceability,
   createAdhocOrder,
@@ -250,19 +250,7 @@ export async function ensureSellerPickupLocation(seller) {
 
 function resolveOrderDeliveryAddress(order = {}) {
   const addr = order.address || {};
-  const parsedCity = parseCityStatePincode(addr.city);
-
-  const pincode =
-    String(addr.pincode || "").trim() ||
-    parsedCity.pincode ||
-    extractIndianPincode(addr.address, addr.landmark);
-
-  const city = (parsedCity.city && String(addr.city || "").includes(","))
-    ? parsedCity.city
-    : String(addr.city || "").trim() || parsedCity.city;
-  const state = String(addr.state || "").trim() || parsedCity.state;
-
-  return { pincode, city, state, raw: addr };
+  return { ...resolveDeliveryPincodeCityState(addr), raw: addr };
 }
 
 function normalizeCourierOptions(serviceabilityResponse) {

@@ -8,6 +8,7 @@ import {
   normalizeAuthRole,
   recordAuthActivity,
 } from "../services/authActivityService.js";
+import { disconnectUserSockets } from "../socket/socketManager.js";
 
 function isDatabaseUnavailableError(error) {
   const message = String(error?.message || "").toLowerCase();
@@ -48,6 +49,19 @@ export const recordLogoutActivity = async (req, res) => {
     }
 
     const user = await resolveUserForLogout(role, userId);
+
+    // Clear the session flag that gates order push/socket notifications —
+    // distinct from any work-availability toggle (e.g. delivery's isOnline),
+    // which is left untouched here.
+    if (role === "seller") {
+      await Seller.updateOne({ _id: userId }, { $set: { isLoggedIn: false } });
+    } else if (role === "delivery") {
+      await Delivery.updateOne({ _id: userId }, { $set: { isLoggedIn: false } });
+    }
+    if (role === "seller" || role === "delivery") {
+      disconnectUserSockets(role, userId);
+    }
+
     await recordAuthActivity({
       role,
       action: "logout",

@@ -264,6 +264,18 @@ export const AuthProvider = ({ children }) => {
             }
         }
 
+        // Immediately kill any live order-socket connection so a seller/delivery
+        // app that stays open post-logout stops receiving order pushes/sounds
+        // right away, instead of waiting for the page reload below.
+        if (currentRole === 'seller' || currentRole === 'delivery') {
+            try {
+                const { disconnectOrderSocket } = await import('@core/services/orderSocket');
+                disconnectOrderSocket();
+            } catch (error) {
+                console.warn('Failed to disconnect order socket during logout:', error);
+            }
+        }
+
         try {
             const { removeStoredFcmToken } = await import('@core/firebase/pushClient');
             await removeStoredFcmToken({ role: currentRole });

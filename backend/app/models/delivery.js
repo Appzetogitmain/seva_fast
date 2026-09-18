@@ -125,9 +125,18 @@ const deliverySchema = new mongoose.Schema(
 
 
 
+        // Work-availability toggle ("accepting orders right now"), set by the
+        // rider from their dashboard — independent of session state.
         isOnline: {
             type: Boolean,
             default: true,
+        },
+        // True only while the rider has an active login session (set true on
+        // login, false on logout). Used to suppress push/socket order
+        // notifications while logged out, regardless of isOnline above.
+        isLoggedIn: {
+            type: Boolean,
+            default: false,
         },
         location: {
             type: {

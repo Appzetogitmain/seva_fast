@@ -386,10 +386,25 @@ const orderSchema = new mongoose.Schema(
     selfDeliveryMarkedAt: {
       type: Date,
     },
+    // Computed automatically at checkout from seller/customer distance,
+    // product availability and Shiprocket serviceability — see
+    // services/deliveryDecisionService.js. No longer a seller/product choice.
     deliveryType: {
       type: String,
       enum: ["instant", "scheduled"],
       default: "instant",
+    },
+    // Dynamic ETA snapshot captured at order-creation time (never a fixed
+    // string). Local orders show a range based on nearby rider distance;
+    // Shiprocket orders show the courier's quoted delivery estimate.
+    deliveryEta: {
+      method: { type: String, enum: ["instant", "scheduled"], default: "instant" },
+      localEtaMinMinutes: { type: Number, default: null },
+      localEtaMaxMinutes: { type: Number, default: null },
+      shiprocketEtaDays: { type: Number, default: null },
+      estimatedDeliveryDate: { type: Date, default: null },
+      courierName: { type: String, default: null },
+      computedAt: { type: Date, default: null },
     },
     shipmentDetails: {
       type: Object,

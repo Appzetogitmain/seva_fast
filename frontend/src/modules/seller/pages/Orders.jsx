@@ -1489,7 +1489,7 @@ const Orders = () => {
                                                     </div>
                                                 )}
 
-                                                {selectedOrder.status.toLowerCase() !== 'pending' && selectedOrder.status.toLowerCase() !== 'cancelled' && (
+                                                {selectedOrder.deliveryType !== 'scheduled' && selectedOrder.status.toLowerCase() !== 'pending' && selectedOrder.status.toLowerCase() !== 'cancelled' && (
                                                     <div>
                                                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                                                             <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner
@@ -1589,7 +1589,7 @@ const Orders = () => {
                                                     </div>
                                                 )}
 
-                                                {selectedOrder.status.toLowerCase() === "confirmed" && (
+                                                {selectedOrder.deliveryType !== 'scheduled' && selectedOrder.status.toLowerCase() === "confirmed" && (
                                                     <div>
                                                         <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                                                             <HiOutlineTruck className="h-3 w-3 text-primary" /> Delivery Partner

@@ -206,7 +206,14 @@ const CheckoutPage = () => {
   });
   const [orderId, setOrderId] = useState(null);
   const [pricingPreview, setPricingPreview] = useState(null);
+  // Per-seller delivery method/ETA, resolved automatically server-side from
+  // distance + Shiprocket serviceability — see deliveryDecisionService.js.
+  const [sellerDeliveryPreview, setSellerDeliveryPreview] = useState([]);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  // Set when the automatic delivery-method decision rejects this cart for
+  // the current address (out of local radius + not Pan India eligible,
+  // pincode not serviceable, or shelf life too short for the shipping ETA).
+  const [previewError, setPreviewError] = useState("");
   const postOrderNavigateRef = useRef(null);
   const previewDebounceRef = useRef(null);
   const [currentAddress, setCurrentAddress] = useState(() =>
@@ -386,9 +393,13 @@ const CheckoutPage = () => {
     }
   }, [useWallet, user?.walletBalance, pricingPreview?.grandTotal]);
 
-  const hasInstant = cart.some((item) => (item.deliveryType || "instant") === "instant");
-  const hasScheduled = cart.some((item) => item.deliveryType === "scheduled");
-  const hasMixedCart = hasInstant && hasScheduled;
+  // Delivery method is now decided automatically server-side per seller
+  // (distance to customer + Shiprocket serviceability) — see
+  // deliveryDecisionService.js. hasScheduled reflects whether any seller in
+  // this checkout resolved to nationwide Shiprocket shipping.
+  const hasScheduled = sellerDeliveryPreview.some(
+    (sb) => sb.deliveryDecision?.method === "scheduled",
+  );
 
   const finalAmountToPay = Math.max(0, (pricingPreview?.grandTotal ?? cartTotal) - walletAmountToUse);
   const minimumOrderValue = Number(settings?.minimumOrderValue || 0);
@@ -398,13 +409,11 @@ const CheckoutPage = () => {
   const isBelowMinimumOrder =
     minimumOrderValue > 0 && checkoutSubtotal < minimumOrderValue;
   const slideToPayText =
-    hasMixedCart
-      ? "Cannot checkout mixed cart"
-      : finalAmountToPay === 0
-        ? "Pay via Wallet"
-        : selectedPayment === "online"
-          ? "Slide to Pay"
-          : "Slide to Place Order";
+    finalAmountToPay === 0
+      ? "Pay via Wallet"
+      : selectedPayment === "online"
+        ? "Slide to Pay"
+        : "Slide to Place Order";
 
   const buildAddressForOrder = () => {
     if (savedRecipient) {
@@ -875,6 +884,8 @@ const CheckoutPage = () => {
   useEffect(() => {
     if (!isAuthenticated || cart.length === 0) {
       setPricingPreview(null);
+      setSellerDeliveryPreview([]);
+      setPreviewError("");
       return;
     }
 
@@ -902,9 +913,16 @@ const CheckoutPage = () => {
         const res = await customerApi.checkoutPreview(buildPreviewPayload());
         if (res.data?.success) {
           setPricingPreview(res.data.result?.breakdown ?? null);
+          setSellerDeliveryPreview(res.data.result?.sellerBreakdowns ?? []);
+          setPreviewError("");
         }
       } catch (error) {
         console.error("Checkout preview failed", error);
+        setSellerDeliveryPreview([]);
+        setPreviewError(
+          error.response?.data?.message ||
+            "Could not confirm delivery for this address. Please try again.",
+        );
       } finally {
         setIsPreviewLoading(false);
       }
@@ -1388,7 +1406,7 @@ const CheckoutPage = () => {
                   <p className="text-sm text-slate-500">Shipment of {cartCount} items</p>
                 </div>
               </div>
-              {settings?.expressDeliveryEnabled !== false && !hasMixedCart && !hasScheduled && (
+              {settings?.expressDeliveryEnabled !== false && !hasScheduled && (
                 <div className="flex p-1 bg-slate-100 rounded-xl">
                   <button
                     type="button"
@@ -1472,16 +1490,36 @@ const CheckoutPage = () => {
               onApplyManualCode={handleApplyManualCode}
             />
 
-            {hasMixedCart && (
+            {previewError ? (
               <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-red-600 font-bold">
                   <AlertCircle className="h-5 w-5" />
-                  Mixed Cart Detected
+                  Delivery Not Available
                 </div>
-                <p className="text-sm text-red-600">
-                  You cannot checkout with both instant (local) and scheduled (global) items at the same time. Please checkout separately.
-                </p>
+                <p className="text-sm text-red-600">{previewError}</p>
               </div>
+            ) : (
+              sellerDeliveryPreview.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-2">
+                  {sellerDeliveryPreview.map((sb) => {
+                    const decision = sb.deliveryDecision;
+                    if (!decision) return null;
+                    const isLocal = decision.method !== "scheduled";
+                    const etaText = isLocal
+                      ? decision.localEtaMinMinutes != null
+                        ? `Arrives in ${decision.localEtaMinMinutes}-${decision.localEtaMaxMinutes} min`
+                        : "Local delivery"
+                      : decision.shiprocketEtaDays != null
+                        ? `Ships nationwide — arrives in ~${decision.shiprocketEtaDays} day${decision.shiprocketEtaDays === 1 ? "" : "s"}`
+                        : "Ships nationwide via Shiprocket";
+                    return (
+                      <p key={sb.sellerId} className="text-sm font-semibold text-slate-700">
+                        {etaText}
+                      </p>
+                    );
+                  })}
+                </div>
+              )
             )}
 
             {/* Pricing Breakdown */}
@@ -1520,7 +1558,7 @@ const CheckoutPage = () => {
                 amount={finalAmountToPay}
                 onSuccess={handlePlaceOrder}
                 isLoading={isPlacingOrder || isPreviewLoading}
-                disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder || hasMixedCart}
+                disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder || Boolean(previewError)}
                 text={slideToPayText}
               />
               <p className="text-center text-[10px] text-slate-400 font-bold mt-4 uppercase tracking-[0.1em]">
@@ -1540,7 +1578,7 @@ const CheckoutPage = () => {
             amount={finalAmountToPay}
             onSuccess={handlePlaceOrder}
             isLoading={isPlacingOrder || isPreviewLoading}
-            disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder || hasMixedCart}
+            disabled={isPlacingOrder || isPreviewLoading || isBelowMinimumOrder || Boolean(previewError)}
             text={slideToPayText}
           />
         </div>

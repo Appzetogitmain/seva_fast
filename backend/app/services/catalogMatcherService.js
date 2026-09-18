@@ -55,7 +55,7 @@ export async function matchShoppingItemWithCatalog(item, options = {}) {
       { brand: fullRegex },
     ]
   })
-    .select("name brand price salePrice stock variants mainImage galleryImages thumbnail sellerId deliveryType")
+    .select("name brand price salePrice stock variants mainImage galleryImages thumbnail sellerId availability shelfLifeDays")
     .limit(6)
     .lean();
 
@@ -65,7 +65,7 @@ export async function matchShoppingItemWithCatalog(item, options = {}) {
         ...baseFilter,
         $and: regexOr,
       })
-        .select("name brand price salePrice stock variants mainImage galleryImages thumbnail sellerId deliveryType")
+        .select("name brand price salePrice stock variants mainImage galleryImages thumbnail sellerId availability shelfLifeDays")
         .limit(6)
         .lean();
     }

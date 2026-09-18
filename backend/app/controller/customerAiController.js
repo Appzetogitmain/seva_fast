@@ -14,6 +14,7 @@ import Category from "../models/category.js";
 import Plan from "../models/plan.js";
 import Review from "../models/review.js";
 import { getNearbySellerIdsForCustomer } from "../services/customerVisibilityService.js";
+import { isPanIndiaEligibleForListing } from "../services/productAvailabilityService.js";
 import { matchShoppingItemWithCatalog } from "../services/catalogMatcherService.js";
 import { applyOutputGuardrail } from "../services/chatbot/outputGuardrail.js";
 import { trackChatTurn } from "../services/chatbot/chatTrackingService.js";
@@ -386,8 +387,8 @@ export const handleChat = async (req, res) => {
           const nearbySellerIds = await getNearbySellerIdsForCustomer(lat, lng);
           const nearbySellerSet = new Set(nearbySellerIds.map(String));
           const sellerIdForProduct = String(prod.sellerId?._id || prod.sellerId);
-          const isScheduled = prod.deliveryType === "scheduled";
-          if (!isScheduled && !nearbySellerSet.has(sellerIdForProduct)) {
+          const isPanIndiaEligible = isPanIndiaEligibleForListing(prod);
+          if (!isPanIndiaEligible && !nearbySellerSet.has(sellerIdForProduct)) {
             isDeliverable = false;
           }
         }

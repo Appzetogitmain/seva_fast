@@ -1,6 +1,8 @@
 import Notification from "./notification.model.js";
 import PushToken from "./token.model.js";
 import NotificationPreference from "./preference.model.js";
+import Seller from "../../models/seller.js";
+import Delivery from "../../models/delivery.js";
 import {
   notificationQueue,
   notificationDeadQueue,
@@ -113,6 +115,34 @@ export async function deliverNotificationById(notificationId) {
   const notification = await Notification.findById(notificationId);
   if (!notification) {
     return;
+  }
+
+  // Sellers/delivery partners who are currently logged out should not
+  // receive any push/sound for order notifications — the Notification doc
+  // above is still recorded so it shows up in their in-app list once they
+  // log back in, but the push itself is suppressed here.
+  const role = String(notification.role || "").toLowerCase();
+  if (role === "seller" || role === "delivery") {
+    const Model = role === "delivery" ? Delivery : Seller;
+    const account = await Model.findById(notification.userId).select("isLoggedIn").lean();
+    if (!account || account.isLoggedIn !== true) {
+      await Notification.updateOne(
+        { _id: notification._id },
+        {
+          $set: {
+            status: "sent",
+            failureReason: "Recipient is logged out — push suppressed",
+            deliveryStats: { attempted: 0, sent: 0, failed: 0, invalidTokens: 0 },
+          },
+        },
+      );
+      incrementCounter("notifications_total", {
+        status: "sent",
+        eventType: notification.type,
+        role: notification.role,
+      });
+      return;
+    }
   }
 
   const preference = await NotificationPreference.findOne({

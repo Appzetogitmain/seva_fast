@@ -603,7 +603,16 @@ const OrderDetailPage = () => {
     }
 
     if (!Number.isFinite(minutes) || minutes <= 0) {
-      minutes = status === "confirmed" ? 12 : 8;
+      // Before a live route exists, fall back to the dynamic estimate
+      // computed at order time from nearby rider distance (see
+      // localEtaService.js) rather than a fixed number.
+      const dynamicMin = Number(order?.deliveryEta?.localEtaMinMinutes);
+      const dynamicMax = Number(order?.deliveryEta?.localEtaMaxMinutes);
+      if (Number.isFinite(dynamicMin) && Number.isFinite(dynamicMax)) {
+        minutes = (dynamicMin + dynamicMax) / 2;
+      } else {
+        minutes = status === "confirmed" ? 12 : 8;
+      }
     }
 
     const arrivalMs = clockTick + minutes * 60 * 1000;
@@ -1063,6 +1072,21 @@ const OrderDetailPage = () => {
                   </span>
                 </div>
                 <h4 className="font-bold text-slate-900 text-base mb-2">Fulfillment Tracking</h4>
+
+                {(order.deliveryEta?.estimatedDeliveryDate || order.deliveryEta?.shiprocketEtaDays != null) && (
+                  <p className="text-xs font-semibold text-slate-600 mb-3">
+                    Estimated delivery:{" "}
+                    <span className="text-slate-900">
+                      {order.deliveryEta?.estimatedDeliveryDate
+                        ? new Date(order.deliveryEta.estimatedDeliveryDate).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                          })
+                        : `~${order.deliveryEta.shiprocketEtaDays} day${order.deliveryEta.shiprocketEtaDays === 1 ? "" : "s"}`}
+                    </span>{" "}
+                    <span className="text-slate-400">(via {order.shipmentDetails?.courierName || order.deliveryEta?.courierName || "our shipping partner"})</span>
+                  </p>
+                )}
 
                 {order.shipmentDetails?.awbCode ? (
                   <div className="space-y-3">

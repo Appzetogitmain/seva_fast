@@ -1,6 +1,4 @@
-import Seller from "../models/seller.js";
 import Category from "../models/category.js";
-import { distanceMeters } from "../utils/geoUtils.js";
 import { HANDLING_FEE_STRATEGY } from "../constants/finance.js";
 import {
   calculateHandlingFee,
@@ -9,15 +7,7 @@ import {
   recalculateLogisticsEarnings,
 } from "./finance/pricingService.js";
 import { getOrCreateFinanceSettings } from "./finance/financeSettingsService.js";
-
-function normalizeLocation(location = null) {
-  const lat = Number(location?.lat);
-  const lng = Number(location?.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return null;
-  }
-  return { lat, lng };
-}
+import { resolveSellerDeliveryDecision } from "./deliveryDecisionService.js";
 
 export function groupHydratedItemsBySeller(hydratedItems = []) {
   const grouped = new Map();
@@ -36,40 +26,24 @@ export function groupHydratedItemsBySeller(hydratedItems = []) {
   return grouped;
 }
 
-async function computeDistanceKmForSeller({ sellerId, addressLocation, isScheduled = false, session = null }) {
-  const normalizedLocation = normalizeLocation(addressLocation);
-  if (!normalizedLocation) return 0;
-
-  const query = Seller.findById(sellerId).select("location serviceRadius shopName").lean();
-  if (session) query.session(session);
-  const seller = await query;
-  if (!seller) {
-    const err = new Error("Seller not found");
-    err.statusCode = 404;
+/**
+ * Resolves the delivery method (local vs. Shiprocket), distance and ETA for
+ * one seller's items automatically — sellers/products no longer choose this
+ * directly. See deliveryDecisionService.js for the full decision logic.
+ */
+async function resolveDeliveryDecisionForSeller({ sellerId, address, sellerItems, session = null }) {
+  try {
+    return await resolveSellerDeliveryDecision({
+      sellerId,
+      customerLocation: address?.location,
+      address,
+      items: sellerItems,
+      session,
+    });
+  } catch (err) {
+    if (!err.statusCode) err.statusCode = 400;
     throw err;
   }
-  const coords = seller?.location?.coordinates;
-  if (!Array.isArray(coords) || coords.length < 2) return 0;
-
-  const [sellerLng, sellerLat] = coords;
-  const distanceInMeters = distanceMeters(
-    normalizedLocation.lat,
-    normalizedLocation.lng,
-    Number(sellerLat),
-    Number(sellerLng),
-  );
-  const distanceKm = Number((distanceInMeters / 1000).toFixed(3));
-  
-  if (!isScheduled) {
-    const radius = Number(seller.serviceRadius || 5);
-    if (distanceKm > radius) {
-      const err = new Error(`${seller.shopName || "Store"} does not deliver to your current location (Distance: ${distanceKm}km, Service Radius: ${radius}km)`);
-      err.statusCode = 400;
-      throw err;
-    }
-  }
-
-  return distanceKm;
 }
 
 function sumField(rows, field) {
@@ -284,6 +258,39 @@ function applyGlobalHandlingFeeToSellerBreakdowns(
   }
 }
 
+/**
+ * Resolves the automatic delivery-method decision (local vs. Shiprocket) for
+ * every seller in a cart — this is the part of checkout that makes a live
+ * Shiprocket API call, which can take several seconds. Callers that place
+ * orders inside a DB transaction MUST call this BEFORE starting the
+ * transaction (see orderPlacementService.js) and pass the result into
+ * buildCheckoutPricingSnapshot as `precomputedDeliveryDecisions` — holding a
+ * multi-document transaction open across a slow external HTTP call risks
+ * hitting MongoDB's transaction lifetime limit and widens the write-conflict
+ * window for unrelated concurrent orders on the same seller/products.
+ */
+export async function resolveDeliveryDecisionsForCheckout({ orderItems = [], address = {} }) {
+  const hydratedItems = await hydrateOrderItems(orderItems, {
+    session: null,
+    enforceServerPricing: true,
+  });
+  if (!hydratedItems.length) {
+    const err = new Error("Cannot checkout with empty cart");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const itemsBySeller = groupHydratedItemsBySeller(hydratedItems);
+  const decisions = new Map();
+  for (const [sellerId, sellerItems] of itemsBySeller.entries()) {
+    decisions.set(
+      sellerId,
+      await resolveDeliveryDecisionForSeller({ sellerId, address, sellerItems, session: null }),
+    );
+  }
+  return decisions;
+}
+
 export async function buildCheckoutPricingSnapshot({
   orderItems = [],
   address = {},
@@ -296,6 +303,10 @@ export async function buildCheckoutPricingSnapshot({
   membershipTier = "none",
   isFirstOrder = false,
   isExpressDelivery = false,
+  // Optional Map<sellerId, decision> from resolveDeliveryDecisionsForCheckout(),
+  // pre-resolved outside any DB transaction. Falls back to resolving live
+  // (unchanged behavior) for any seller missing from the map.
+  precomputedDeliveryDecisions = null,
 }) {
   const hydratedItems = await hydrateOrderItems(orderItems, {
     session,
@@ -306,15 +317,6 @@ export async function buildCheckoutPricingSnapshot({
     err.statusCode = 400;
     throw err;
   }
-
-  const hasInstant = hydratedItems.some(item => (item.deliveryType || "instant") === "instant");
-  const hasScheduled = hydratedItems.some(item => item.deliveryType === "scheduled");
-  if (hasInstant && hasScheduled) {
-    const err = new Error("Cannot checkout with both instant local and scheduled nationwide delivery items. Please check out separately.");
-    err.statusCode = 400;
-    throw err;
-  }
-  const isScheduled = hasScheduled;
 
   const itemsBySeller = groupHydratedItemsBySeller(hydratedItems);
   const sellerIds = Array.from(itemsBySeller.keys()).sort((a, b) => a.localeCompare(b));
@@ -337,12 +339,20 @@ export async function buildCheckoutPricingSnapshot({
 
   for (const sellerId of sellerIds) {
     const sellerItems = itemsBySeller.get(sellerId) || [];
-    const distanceKm = await computeDistanceKmForSeller({
-      sellerId,
-      addressLocation: address?.location,
-      isScheduled,
-      session,
-    });
+    const decision = precomputedDeliveryDecisions?.has(sellerId)
+      ? precomputedDeliveryDecisions.get(sellerId)
+      : await resolveDeliveryDecisionForSeller({
+          sellerId,
+          address,
+          sellerItems,
+          session,
+        });
+    // Carry the resolved method onto each item so generateOrderPaymentBreakdown's
+    // existing `deliveryType === "scheduled"` branching keeps working unchanged.
+    for (const item of sellerItems) {
+      item.deliveryType = decision.method;
+    }
+    const distanceKm = decision.distanceKm;
     // Distribute discount proportionally by seller subtotal
     const sellerRatio = totalSubtotal > 0 ? (sellerSubtotals.get(sellerId) || 0) / totalSubtotal : 1 / sellerIds.length;
     const sellerDiscount = round2(discountTotal * sellerRatio);
@@ -368,6 +378,7 @@ export async function buildCheckoutPricingSnapshot({
     }
 
     sellerBreakdownEntries.push({
+      deliveryDecision: decision,
       sellerId,
       distanceKm,
       items: sellerItems,
