@@ -659,25 +659,102 @@ const ContentManager = () => {
                                                     className="w-full p-2.5 bg-slate-50 rounded-xl text-xs font-bold border-none outline-none"
                                                     placeholder="Subtitle (optional)"
                                                 />
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <select
-                                                        value={item.linkType || 'none'}
-                                                        onChange={(e) => updateBannerItem(idx, { linkType: e.target.value })}
-                                                        className="w-full p-2.5 bg-slate-50 rounded-xl text-xs font-black outline-none"
-                                                    >
-                                                        <option value="none">No link</option>
-                                                        <option value="header">Header</option>
-                                                        <option value="category">Category</option>
-                                                        <option value="subcategory">Subcategory</option>
-                                                        <option value="product">Product</option>
-                                                        <option value="url">External URL</option>
-                                                    </select>
-                                                    <input
-                                                        value={item.linkValue || ''}
-                                                        onChange={(e) => updateBannerItem(idx, { linkValue: e.target.value })}
-                                                        className="w-full p-2.5 bg-slate-50 rounded-xl text-xs font-bold border-none outline-none"
-                                                        placeholder={item.linkType === 'url' ? "https://..." : "Slug / ID"}
-                                                    />
+                                                <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                                            On Click Action / URL:
+                                                        </span>
+                                                        {item.linkType && item.linkType !== "none" && (
+                                                            <span className="text-[9px] font-bold text-primary">Active Link</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                                                Destination Type
+                                                            </label>
+                                                            <select
+                                                                value={item.linkType || 'none'}
+                                                                onChange={(e) => {
+                                                                    const newType = e.target.value;
+                                                                    let defaultVal = '';
+                                                                    if (newType === 'header' && headerCategories.length) {
+                                                                        defaultVal = headerCategories[0]._id;
+                                                                    } else if (newType === 'category' && availableCategories.length) {
+                                                                        defaultVal = availableCategories[0]._id;
+                                                                    }
+                                                                    updateBannerItem(idx, { linkType: newType, linkValue: defaultVal });
+                                                                }}
+                                                                className="w-full p-2.5 bg-white rounded-xl text-xs font-bold border border-slate-200 outline-none focus:border-primary"
+                                                            >
+                                                                <option value="none">No Action (None)</option>
+                                                                <option value="url">Website URL / Page Path</option>
+                                                                <option value="category">Category Page</option>
+                                                                <option value="header">Header Category</option>
+                                                                <option value="product">Product Page</option>
+                                                                <option value="subcategory">Subcategory Page</option>
+                                                            </select>
+                                                        </div>
+
+                                                        {item.linkType && item.linkType !== 'none' && (
+                                                            <div>
+                                                                <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                                                    {item.linkType === 'url'
+                                                                        ? 'Page Path or URL'
+                                                                        : item.linkType === 'category'
+                                                                        ? 'Select Category'
+                                                                        : item.linkType === 'header'
+                                                                        ? 'Select Header'
+                                                                        : 'ID / Slug / Path'}
+                                                                </label>
+                                                                {item.linkType === 'category' ? (
+                                                                    <select
+                                                                        value={item.linkValue || ''}
+                                                                        onChange={(e) => updateBannerItem(idx, { linkValue: e.target.value })}
+                                                                        className="w-full p-2.5 bg-white rounded-xl text-xs font-bold border border-slate-200 outline-none focus:border-primary"
+                                                                    >
+                                                                        <option value="">-- Choose Category --</option>
+                                                                        {availableCategories.map((c) => (
+                                                                            <option key={c._id} value={c._id}>
+                                                                                {c.name}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                ) : item.linkType === 'header' ? (
+                                                                    <select
+                                                                        value={item.linkValue || ''}
+                                                                        onChange={(e) => updateBannerItem(idx, { linkValue: e.target.value })}
+                                                                        className="w-full p-2.5 bg-white rounded-xl text-xs font-bold border border-slate-200 outline-none focus:border-primary"
+                                                                    >
+                                                                        <option value="">-- Choose Header --</option>
+                                                                        {headerCategories.map((h) => (
+                                                                            <option key={h._id} value={h._id}>
+                                                                                {h.name}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                ) : (
+                                                                    <input
+                                                                        value={item.linkValue || ''}
+                                                                        onChange={(e) => updateBannerItem(idx, { linkValue: e.target.value })}
+                                                                        className="w-full p-2.5 bg-white rounded-xl text-xs font-bold border border-slate-200 outline-none focus:border-primary"
+                                                                        placeholder={
+                                                                            item.linkType === 'url'
+                                                                                ? "e.g. /offers, /plans, or https://..."
+                                                                                : item.linkType === 'product'
+                                                                                ? "e.g. product_id or /product/..."
+                                                                                : "Slug / ID"
+                                                                        }
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {item.linkType === 'url' && (
+                                                        <p className="text-[10px] text-slate-400">
+                                                            Tip: Enter internal page paths (e.g. <code className="text-slate-600 bg-slate-100 px-1 py-0.5 rounded">/offers</code>, <code className="text-slate-600 bg-slate-100 px-1 py-0.5 rounded">/plans</code>, <code className="text-slate-600 bg-slate-100 px-1 py-0.5 rounded">/category/id</code>) or full external URLs.
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                             {formData.bannerItems.length > 1 && (

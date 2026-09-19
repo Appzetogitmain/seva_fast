@@ -1,8 +1,10 @@
 import React, { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { ExternalLink, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PlatformBannerSlider = ({ ads = [] }) => {
+  const navigate = useNavigate();
   if (!ads || ads.length === 0) return null;
 
   const [isMuted, setIsMuted] = useState(true);
@@ -43,7 +45,15 @@ const PlatformBannerSlider = ({ ads = [] }) => {
           {duplicatedAds.map((adItem, idx) => {
             const handleAdClick = () => {
               if (adItem?.targetUrl) {
-                window.open(adItem.targetUrl, "_blank", "noopener,noreferrer");
+                const target = adItem.targetUrl.trim();
+                if (/^https?:\/\//i.test(target)) {
+                  window.open(target, "_blank", "noopener,noreferrer");
+                } else if (/^www\./i.test(target)) {
+                  window.open(`https://${target}`, "_blank", "noopener,noreferrer");
+                } else {
+                  const targetPath = target.startsWith("/") ? target : `/${target}`;
+                  navigate(targetPath);
+                }
               }
             };
 

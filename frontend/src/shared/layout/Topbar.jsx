@@ -171,7 +171,7 @@ const Topbar = ({ onMenuClick }) => {
         requestSignOut();
     };
 
-    if (isMobileSearchOpen) {
+    if (isMobileSearchOpen && !isAdmin) {
         return (
             <header className={cn(
                 "bg-white/70 backdrop-blur-xl border-b border-gray-100/50 flex items-center px-4 h-14 shadow-[0_4px_30px_rgba(0,0,0,0.02)] transition-all duration-300",
@@ -190,7 +190,7 @@ const Topbar = ({ onMenuClick }) => {
                     <input
                         type="text"
                         autoFocus
-                        placeholder={isSeller ? "Search products..." : "Search anything..."}
+                        placeholder={isSeller ? "Search products..." : "Search..."}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-9 pr-3 py-2 bg-gray-100/50 border border-transparent rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary/20 outline-none"
@@ -229,26 +229,30 @@ const Topbar = ({ onMenuClick }) => {
                     )}
                 </div>
 
-                {/* Mobile Search Button */}
-                <button
-                    onClick={() => setIsMobileSearchOpen(true)}
-                    className="p-2 bg-gray-100/50 rounded-xl text-gray-500 hover:text-primary md:hidden ml-auto mr-2"
-                >
-                    <HiOutlineSearch className="h-5 w-5" />
-                </button>
+                {!isAdmin && isSeller && (
+                    <>
+                        {/* Mobile Search Button */}
+                        <button
+                            onClick={() => setIsMobileSearchOpen(true)}
+                            className="p-2 bg-gray-100/50 rounded-xl text-gray-500 hover:text-primary md:hidden ml-auto mr-2"
+                        >
+                            <HiOutlineSearch className="h-5 w-5" />
+                        </button>
 
-                {/* Desktop Search Input */}
-                <form onSubmit={handleSearchSubmit} className="relative hidden md:flex flex-1 md:w-[400px] group">
-                    <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-all duration-300" />
-                    <input
-                        type="text"
-                        placeholder={isSeller ? "Search products..." : "Search anything..."}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
-                        className="w-full pl-9 pr-3 py-2 bg-gray-100/50 border border-transparent rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary/20 transition-all duration-500 outline-none"
-                    />
-                </form>
+                        {/* Desktop Search Input */}
+                        <form onSubmit={handleSearchSubmit} className="relative hidden md:flex flex-1 md:w-[400px] group">
+                            <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-all duration-300" />
+                            <input
+                                type="text"
+                                placeholder="Search products..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
+                                className="w-full pl-9 pr-3 py-2 bg-gray-100/50 border border-transparent rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-primary/10 focus:border-primary/20 transition-all duration-500 outline-none"
+                            />
+                        </form>
+                    </>
+                )}
             </div>
 
             <div className="flex items-center space-x-4">

@@ -236,27 +236,34 @@ export async function deliverNotificationById(notificationId) {
     orderAlert: isOrderAlertType,
   };
 
-  const dispatchPromises = [];
+  // Tokens carry no device id, so we can't tell whether a user's web and app tokens
+  // are the same phone. Prefer the app token to avoid the same push showing twice;
+  // web tokens are only used when the user has no app token, or every app token failed.
+  const sendToTokens = (tokenDocs, platform) => {
+    const uniqueDocs = [];
+    const seen = new Set();
+    for (const doc of tokenDocs) {
+      if (!doc.token || seen.has(doc.token)) continue;
+      seen.add(doc.token);
+      uniqueDocs.push(doc);
+    }
+    return sendFCM(
+      uniqueDocs.map((t) => t.token),
+      sendPayload,
+      { ...baseOptions, platform },
+    ).then((res) => ({ ...res, tokenDocs: uniqueDocs }));
+  };
 
-  if (webTokens.length > 0) {
-    dispatchPromises.push(
-      sendFCM(
-        webTokens.map((t) => t.token),
-        sendPayload,
-        { ...baseOptions, platform: "web" },
-      ).then((res) => ({ ...res, tokenDocs: webTokens })),
-    );
-  }
-
-  if (appTokens.length > 0) {
-    dispatchPromises.push(
-      sendFCM(
-        appTokens.map((t) => t.token),
-        sendPayload,
-        { ...baseOptions, platform: "app" },
-      ).then((res) => ({ ...res, tokenDocs: appTokens })),
-    );
-  }
+  const dispatch = async () => {
+    if (appTokens.length === 0) {
+      return webTokens.length > 0 ? [await sendToTokens(webTokens, "web")] : [];
+    }
+    const appResult = await sendToTokens(appTokens, "app");
+    if (Number(appResult.successCount || 0) === 0 && webTokens.length > 0) {
+      return [appResult, await sendToTokens(webTokens, "web")];
+    }
+    return [appResult];
+  };
 
   let aggregatedResponse = {
     successCount: 0,
@@ -267,7 +274,7 @@ export async function deliverNotificationById(notificationId) {
 
   try {
     const results = await Promise.race([
-      Promise.all(dispatchPromises),
+      dispatch(),
       new Promise((_, reject) =>
         setTimeout(
           () => reject(new Error("FCM send timeout")),
@@ -300,7 +307,7 @@ export async function deliverNotificationById(notificationId) {
     throw error;
   }
 
-  const attempted = Number(tokens.length || 0);
+  const attempted = Number(aggregatedResponse.tokensOrdered.length || 0);
   const sent = Number(aggregatedResponse.successCount || 0);
   const failed = Number(aggregatedResponse.failureCount || 0);
   const responses = aggregatedResponse.responses || [];

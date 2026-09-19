@@ -339,7 +339,7 @@ const Home = () => {
           const matchedKey = Object.keys(CATEGORY_METADATA).find(k => k.toLowerCase() === normalized || normalized.includes(k.toLowerCase()));
           const meta = (matchedKey && CATEGORY_METADATA[matchedKey]) || CATEGORY_METADATA[catName] || { icon: SpaIcon, theme: DEFAULT_CATEGORY_THEME, banner: { title: catName.toUpperCase(), subtitle: "TOP PICKS", floatingElements: "sparkles" } };
           const IconComp = (cat.iconId && ICON_COMPONENTS[cat.iconId]) || meta.icon || SpaIcon;
-          return { ...cat, id: cat._id, icon: IconComp, theme: meta.theme, banner: { ...meta.banner, textColor: "text-white" } };
+          return { ...cat, id: cat._id, icon: cat.image || IconComp, theme: meta.theme, banner: { ...meta.banner, textColor: "text-white" } };
         });
         nextHomeData.formattedHeaders = formattedHeaders;
         const allHeaderFromAdmin = formattedHeaders.find((h) => (h.slug?.toLowerCase() === "all") || (h.name?.toLowerCase() === "all"));

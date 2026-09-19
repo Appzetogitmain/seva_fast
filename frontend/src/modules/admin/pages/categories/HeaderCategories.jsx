@@ -205,6 +205,14 @@ const HeaderCategories = () => {
     }
   };
 
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleNameChange = (value) => {
     setFormData((prev) => ({
       ...prev,
@@ -288,6 +296,9 @@ const HeaderCategories = () => {
         data.append("image", imageFile);
       } else if (previewUrl && !previewUrl.startsWith("blob:")) {
         data.append("image", previewUrl);
+      } else {
+        // Explicitly clear image when removed
+        data.append("image", "");
       }
 
       if (editingItem) {
@@ -518,7 +529,13 @@ const HeaderCategories = () => {
                     </td>
                     <td className="py-3 px-4">
                       <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center border border-gray-200">
-                        {cat.iconId && iconComponents[cat.iconId] ? (
+                        {cat.image ? (
+                          <img
+                            src={cat.image}
+                            alt={cat.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : cat.iconId && iconComponents[cat.iconId] ? (
                           <div className="w-6 h-6 text-brand-600 flex items-center justify-center">
                             {(() => {
                               const IconComp = iconComponents[cat.iconId];
@@ -531,12 +548,6 @@ const HeaderCategories = () => {
                             dangerouslySetInnerHTML={{
                               __html: getIconSvg(cat.iconId),
                             }}
-                          />
-                        ) : cat.image ? (
-                          <img
-                            src={cat.image}
-                            alt={cat.name}
-                            className="w-full h-full object-cover"
                           />
                         ) : (
                           <Image className="w-5 h-5 text-gray-400" />
@@ -561,20 +572,36 @@ const HeaderCategories = () => {
                         {cat.status}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 text-right space-x-2">
-                      <button
-                        onClick={() => openEditModal(cat)}
-                        className="p-1 text-gray-500 hover:text-brand-600 transition-colors">
-                        <Edit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setDeleteTarget(cat);
-                          setIsDeleteModalOpen(true);
-                        }}
-                        className="p-1 text-gray-500 hover:text-red-600 transition-colors">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-5 h-5 rounded-full border border-gray-200 inline-block shadow-xs"
+                          style={{
+                            backgroundColor: cat.headerColor || "#FF1E1E",
+                          }}
+                          title={`Background: ${cat.headerColor || "#FF1E1E"}`}
+                        />
+                        <span className="text-xs text-gray-500 font-mono">
+                          {cat.headerColor || "#FF1E1E"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openEditModal(cat)}
+                          className="p-1 hover:bg-gray-100 rounded text-gray-600 hover:text-brand-600">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeleteTarget(cat);
+                            setIsDeleteModalOpen(true);
+                          }}
+                          className="p-1 hover:bg-gray-100 rounded text-gray-600 hover:text-red-600">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -616,10 +643,11 @@ const HeaderCategories = () => {
               onClick={(e) => e.stopPropagation()}
               className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
               <div className="p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-                <h2 className="text-lg font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-800">
                   {editingItem ? "Edit Header Category" : "Add Header Category"}
                 </h2>
                 <button
+                  type="button"
                   onClick={() => setIsAddModalOpen(false)}
                   className="text-gray-400 hover:text-gray-600">
                   <X className="w-6 h-6" />
@@ -634,7 +662,7 @@ const HeaderCategories = () => {
               >
                 {/* Icon/Image Selection */}
                 <div className="flex flex-col items-center gap-4">
-                  <div className="flex gap-4">
+                  <div className="flex items-center justify-center gap-4">
                     {/* SVG Icon Display */}
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-24 h-24 rounded-full bg-linear-to-br from-brand-50 to-purple-50 border-2 border-brand-200 flex items-center justify-center">
@@ -656,37 +684,64 @@ const HeaderCategories = () => {
                           <Sparkles className="w-10 h-10 text-brand-300" />
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsIconSelectorOpen(true)}
-                        className="px-3 py-1.5 text-sm bg-black text-primary-foreground rounded-lg hover:bg-brand-700 transition-colors">
-                        {formData.iconId ? 'Change Icon' : 'Select Icon'}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setIsIconSelectorOpen(true)}
+                          className="px-2.5 py-1 text-xs font-semibold bg-black text-primary-foreground rounded-lg hover:bg-brand-700 transition-colors cursor-pointer">
+                          {formData.iconId ? 'Change Icon' : 'Select Icon'}
+                        </button>
+                        {formData.iconId && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData((prev) => ({ ...prev, iconId: "" }))}
+                            className="text-xs text-rose-500 hover:text-rose-700 font-medium hover:underline cursor-pointer"
+                            title="Clear icon"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* OR Divider */}
                     <div className="flex items-center">
-                      <span className="text-gray-400 font-medium">OR</span>
+                      <span className="text-gray-400 font-medium text-xs">OR</span>
                     </div>
 
                     {/* Image Upload */}
                     <div className="flex flex-col items-center gap-2">
-                      <div
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-24 h-24 rounded-full bg-gray-50 border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-brand-500 overflow-hidden transition-colors">
-                        {previewUrl ? (
-                          <img
-                            src={previewUrl}
-                            alt="Preview"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="text-center">
-                            <Upload className="w-8 h-8 text-gray-400 mx-auto" />
-                            <span className="text-xs text-gray-500 mt-1">
-                              Upload
-                            </span>
-                          </div>
+                      <div className="relative group">
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-24 h-24 rounded-full bg-gray-50 border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-brand-500 overflow-hidden transition-colors">
+                          {previewUrl ? (
+                            <img
+                              src={previewUrl}
+                              alt="Preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-center">
+                              <Upload className="w-8 h-8 text-gray-400 mx-auto" />
+                              <span className="text-xs text-gray-500 mt-1">
+                                Upload
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {previewUrl && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveImage();
+                            }}
+                            className="absolute -top-1 -right-1 p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-md transition-all hover:scale-110 cursor-pointer z-10"
+                            title="Remove photo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         )}
                       </div>
                       <input
@@ -696,11 +751,28 @@ const HeaderCategories = () => {
                         onChange={handleImageChange}
                         accept="image/*"
                       />
-                      <span className="text-xs text-gray-500">Custom Image</span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2.5 py-1 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg transition-colors cursor-pointer"
+                        >
+                          {previewUrl ? "Change Photo" : "Upload Photo"}
+                        </button>
+                        {previewUrl && (
+                          <button
+                            type="button"
+                            onClick={handleRemoveImage}
+                            className="text-xs text-rose-500 hover:text-rose-700 font-medium hover:underline cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 text-center">
-                    Choose an SVG icon or upload a custom image
+                    Choose an SVG icon or upload a custom photo. If photo is uploaded, it will be used as category image.
                   </p>
                 </div>
 

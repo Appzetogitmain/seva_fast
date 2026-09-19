@@ -235,11 +235,17 @@ const ProfilePage = () => {
     };
 
     const referralCode = user?.referralCode || '';
+    const isLocalHost = /^(localhost|127\.|192\.168\.)/.test(window.location.hostname);
+    const siteOrigin = isLocalHost ? 'https://sevafast.in' : window.location.origin;
     const siteReferUrl = referralCode
-        ? `${window.location.origin}/signup?ref=${referralCode}`
-        : window.location.origin;
+        ? `${siteOrigin}/signup?ref=${encodeURIComponent(referralCode)}`
+        : siteOrigin;
     const defaultPlayStoreLink = 'https://play.google.com/store/apps/details?id=com.sevafast.user';
-    const appReferUrl = settings?.playStoreLink || defaultPlayStoreLink;
+    const basePlayStoreLink = settings?.playStoreLink || defaultPlayStoreLink;
+    // Play Install Referrer: the app reads "ref=<CODE>" on first launch after install.
+    const appReferUrl = referralCode
+        ? `${basePlayStoreLink}${basePlayStoreLink.includes('?') ? '&' : '?'}referrer=${encodeURIComponent(`ref=${referralCode}`)}`
+        : basePlayStoreLink;
     const cardReferUrl = siteReferUrl;
     const referrerName = getReferrerDisplayName(user?.referredBy);
     const logoUrl = settings?.logoUrl || '/seva-fast-logo.png';
@@ -429,10 +435,15 @@ const ProfilePage = () => {
                                 {referrerName ? <p className="truncate">Referred By: {referrerName}</p> : null}
                                 <p className="truncate">{user?.name || 'Customer'}</p>
                                 <p className="truncate">+91 {formatIndiaPhone(user?.phone) || '—'}</p>
-                                <p className="truncate">user ref id: {referralCode || 'N/A'}</p>
+                                <p className="truncate flex items-center gap-1">
+                                    <span>user ref id:</span>
+                                    <span className="font-mono font-black text-slate-900 bg-amber-200/80 px-1.5 py-0.5 rounded text-[11px] sm:text-[12px] tracking-wider">
+                                        {referralCode || 'N/A'}
+                                    </span>
+                                </p>
                             </div>
 
-                            <div className="mt-auto flex items-end justify-between gap-1.5 pt-2.5">
+                            <div className="mt-auto flex items-end justify-between gap-2 pt-2.5">
                                 <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
                                     <span className="text-base leading-none sm:text-xl shrink-0" aria-hidden>🛍️</span>
                                     <div className="min-w-0 text-[8px] font-semibold leading-tight text-slate-700 sm:text-[9px]">
@@ -448,14 +459,14 @@ const ProfilePage = () => {
                                             navigator.clipboard.writeText(referralCode);
                                             toast.success('Referral code copied to clipboard!');
                                         }}
-                                        className="inline-flex shrink-0 items-center gap-1 rounded-md bg-[#2f6fed]/10 px-1.5 py-1 text-[8px] font-black uppercase tracking-wider text-[#2f6fed] ring-1 ring-[#2f6fed]/25"
-                                        title="Copy referral code"
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-1.5 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-400/40 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                        title="Click to copy referral code"
                                     >
-                                        <Share2 size={9} className="shrink-0" />
-                                        <span className="font-mono tracking-wider text-slate-800 normal-case font-bold">
+                                        <Share2 size={12} className="shrink-0 text-blue-200" />
+                                        <span className="font-mono tracking-widest text-white normal-case font-black text-xs sm:text-sm drop-shadow-sm">
                                             {referralCode}
                                         </span>
-                                        <Copy size={9} className="shrink-0 text-slate-500" />
+                                        <Copy size={12} className="shrink-0 text-blue-200" />
                                     </button>
                                 ) : null}
                             </div>

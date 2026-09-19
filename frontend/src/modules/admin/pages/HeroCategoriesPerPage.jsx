@@ -114,7 +114,15 @@ export default function HeroCategoriesPerPage() {
       const catIds = result.categoryIds || [];
       setFormBanners(
         items.length
-          ? items.map((b) => ({ ...b, isUploading: false }))
+          ? items.map((b) => ({
+              imageUrl: b.imageUrl || "",
+              title: b.title || "",
+              subtitle: b.subtitle || "",
+              linkType: b.linkType || (b.linkValue ? "url" : "none"),
+              linkValue: b.linkValue || "",
+              status: b.status || "active",
+              isUploading: false,
+            }))
           : [emptyBannerItem()]
       );
       setFormCategoryIds(Array.isArray(catIds) ? catIds : []);
@@ -343,24 +351,24 @@ export default function HeroCategoriesPerPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Hero banners
+                  Hero banners (Top Carousel)
                 </label>
                 <button
                   type="button"
                   onClick={addBannerItem}
-                  className="flex items-center gap-1 text-[10px] font-bold text-primary"
+                  className="flex items-center gap-1 text-[10px] font-bold text-primary hover:opacity-80"
                 >
                   <HiOutlinePlus className="h-3 w-3" />
                   Add banner
                 </button>
               </div>
-              <div className="space-y-3 max-h-48 overflow-y-auto">
+              <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
                 {formBanners.map((item, idx) => (
-                  <Card key={idx} className="p-3 bg-white border-slate-100">
+                  <Card key={idx} className="p-3.5 bg-slate-50/50 border border-slate-200 rounded-xl">
                     <div className="flex items-start gap-3">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-3">
-                          <div className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                      <div className="flex-1 space-y-2.5">
+                        <div className="flex items-start gap-3">
+                          <div className="w-20 h-20 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
                             {item.imageUrl ? (
                               <img
                                 src={item.imageUrl}
@@ -368,43 +376,149 @@ export default function HeroCategoriesPerPage() {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <HiOutlinePhoto className="h-6 w-6 text-slate-300" />
+                              <HiOutlinePhoto className="h-7 w-7 text-slate-300" />
                             )}
                           </div>
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              id={`hero-banner-file-${idx}`}
-                              onChange={(e) => handleBannerFileChange(idx, e.target.files?.[0])}
-                            />
-                            <label
-                              htmlFor={`hero-banner-file-${idx}`}
-                              className="inline-block px-2 py-1 rounded-lg bg-slate-100 text-[10px] font-bold text-slate-600 cursor-pointer hover:bg-slate-200"
-                            >
-                              {item.isUploading ? "Uploading…" : item.imageUrl ? "Change" : "Upload"}
-                            </label>
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                id={`hero-banner-file-${idx}`}
+                                onChange={(e) => handleBannerFileChange(idx, e.target.files?.[0])}
+                              />
+                              <label
+                                htmlFor={`hero-banner-file-${idx}`}
+                                className="inline-block px-2.5 py-1 rounded-lg bg-slate-900 text-[10px] font-bold text-white cursor-pointer hover:bg-slate-800 transition-colors shadow-sm"
+                              >
+                                {item.isUploading ? "Uploading…" : item.imageUrl ? "Change Image" : "Choose Image"}
+                              </label>
+                              {item.imageUrl && (
+                                <span className="text-[10px] text-emerald-600 font-bold">Image ready</span>
+                              )}
+                            </div>
                             <input
                               value={item.title || ""}
                               onChange={(e) => updateBannerItem(idx, { title: e.target.value })}
-                              className="w-full p-2 bg-slate-50 rounded-xl text-xs font-bold border-none outline-none"
+                              className="w-full p-2 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:border-primary"
                               placeholder="Title (optional)"
                             />
                             <input
                               value={item.subtitle || ""}
                               onChange={(e) => updateBannerItem(idx, { subtitle: e.target.value })}
-                              className="w-full p-2 bg-slate-50 rounded-xl text-xs font-bold border-none outline-none"
+                              className="w-full p-2 bg-white rounded-lg text-xs font-bold border border-slate-200 outline-none focus:border-primary"
                               placeholder="Subtitle (optional)"
                             />
                           </div>
                         </div>
+
+                        {/* Link / URL Destination Configuration */}
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                              On Click Navigate To:
+                            </span>
+                            {item.linkType !== "none" && (
+                              <span className="text-[9px] font-bold text-primary">Active Link</span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                Link Destination Type
+                              </label>
+                              <select
+                                value={item.linkType || "none"}
+                                onChange={(e) => {
+                                  const newType = e.target.value;
+                                  let defaultVal = "";
+                                  if (newType === "header" && headers.length) {
+                                    defaultVal = headers[0]._id;
+                                  } else if (newType === "category" && allCategories.length) {
+                                    defaultVal = allCategories[0]._id;
+                                  }
+                                  updateBannerItem(idx, { linkType: newType, linkValue: defaultVal });
+                                }}
+                                className="w-full p-2 bg-slate-50 rounded-lg text-xs font-bold border border-slate-200 outline-none focus:border-primary"
+                              >
+                                <option value="none">No Action (None)</option>
+                                <option value="url">Website URL / Page Path</option>
+                                <option value="category">Category Page</option>
+                                <option value="header">Header Category</option>
+                                <option value="product">Product Page</option>
+                                <option value="subcategory">Subcategory Page</option>
+                              </select>
+                            </div>
+
+                            {item.linkType !== "none" && (
+                              <div>
+                                <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                  {item.linkType === "url"
+                                    ? "Page Path or External URL"
+                                    : item.linkType === "category"
+                                    ? "Select Category"
+                                    : item.linkType === "header"
+                                    ? "Select Header"
+                                    : "ID / Slug / Path"}
+                                </label>
+                                {item.linkType === "category" ? (
+                                  <select
+                                    value={item.linkValue || ""}
+                                    onChange={(e) => updateBannerItem(idx, { linkValue: e.target.value })}
+                                    className="w-full p-2 bg-slate-50 rounded-lg text-xs font-bold border border-slate-200 outline-none focus:border-primary"
+                                  >
+                                    <option value="">-- Choose Category --</option>
+                                    {allCategories.map((c) => (
+                                      <option key={c._id} value={c._id}>
+                                        {c.name} {c.headerName ? `(${c.headerName})` : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : item.linkType === "header" ? (
+                                  <select
+                                    value={item.linkValue || ""}
+                                    onChange={(e) => updateBannerItem(idx, { linkValue: e.target.value })}
+                                    className="w-full p-2 bg-slate-50 rounded-lg text-xs font-bold border border-slate-200 outline-none focus:border-primary"
+                                  >
+                                    <option value="">-- Choose Header --</option>
+                                    {headers.map((h) => (
+                                      <option key={h._id} value={h._id}>
+                                        {h.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    value={item.linkValue || ""}
+                                    onChange={(e) => updateBannerItem(idx, { linkValue: e.target.value })}
+                                    className="w-full p-2 bg-slate-50 rounded-lg text-xs font-bold border border-slate-200 outline-none focus:border-primary"
+                                    placeholder={
+                                      item.linkType === "url"
+                                        ? "e.g. /offers, /plans, or https://..."
+                                        : item.linkType === "product"
+                                        ? "e.g. product_id or /product/..."
+                                        : "Slug or ID"
+                                    }
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {item.linkType === "url" && (
+                            <p className="text-[10px] text-slate-400">
+                              Tip: Enter relative paths like <code className="text-slate-600 bg-slate-100 px-1 py-0.5 rounded">/offers</code>, <code className="text-slate-600 bg-slate-100 px-1 py-0.5 rounded">/plans</code>, <code className="text-slate-600 bg-slate-100 px-1 py-0.5 rounded">/categories</code>, or full external URLs starting with <code className="text-slate-600 bg-slate-100 px-1 py-0.5 rounded">https://</code>.
+                            </p>
+                          )}
+                        </div>
                       </div>
+
                       {formBanners.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeBannerItem(idx)}
-                          className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                          className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                          title="Remove banner"
                         >
                           <HiOutlineXMark className="w-4 h-4" />
                         </button>
