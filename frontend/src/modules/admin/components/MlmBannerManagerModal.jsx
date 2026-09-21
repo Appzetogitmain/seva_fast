@@ -313,6 +313,9 @@ const MlmBannerManagerModal = ({ isOpen, onClose }) => {
                     className="w-full text-xs font-normal px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-orange-500"
                   />
                 </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  📐 Recommended Size: <strong>1200 × 520 px</strong> (Keep text & logo centered so it doesn't crop on mobile app).
+                </p>
               </div>
             </div>
 

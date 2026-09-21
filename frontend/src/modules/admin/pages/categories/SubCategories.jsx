@@ -543,6 +543,15 @@ const SubCategories = () => {
                   />
                 </div>
 
+                <div className="p-2.5 bg-blue-50/90 border border-blue-100 rounded-xl text-center space-y-0.5">
+                  <p className="text-[11px] font-extrabold text-blue-900">
+                    Recommended: <span className="text-blue-700 font-black">500 × 500 px (1:1 Ratio)</span>
+                  </p>
+                  <p className="text-[10px] text-blue-800 leading-tight">
+                    Keep the icon centered so it looks clean and is not cut in App or Web circular badges.
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">
                     Parent Category (Level 2)

@@ -718,7 +718,7 @@ const CategoryManagement = () => {
                             className="w-full max-w-3xl relative z-10 bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col lg:flex-row"
                         >
                             <div className="lg:w-1/3 bg-slate-50 p-6 border-r border-slate-100 flex flex-col justify-between">
-                                <div className="space-y-6">
+                                <div className="space-y-4">
                                     <div
                                         onClick={() => fileInputRef.current?.click()}
                                         className="aspect-square w-full rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/50 flex flex-col items-center justify-center p-2 text-center border-2 border-dashed border-slate-200 group cursor-pointer hover:border-primary/50 transition-colors overflow-hidden"
@@ -739,6 +739,19 @@ const CategoryManagement = () => {
                                             onChange={handleImageChange}
                                         />
                                     </div>
+
+                                    {/* Image Size Recommendation Notice */}
+                                    <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-2xl text-left space-y-1">
+                                        <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-[10px] uppercase tracking-wider">
+                                            <Image className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                            <span>Image Size Guide</span>
+                                        </div>
+                                        <p className="text-[10px] text-amber-950 font-medium leading-relaxed">
+                                            • <strong>Size:</strong> 500 × 500 px (1:1 Ratio)<br />
+                                            • <strong>Tip:</strong> Use transparent PNG or clean background with subject centered so nothing is cut in circular cards or app grid views.
+                                        </p>
+                                    </div>
+
                                     <div className="p-4 bg-slate-900 rounded-2xl text-white">
                                         <div className="flex flex-col items-center text-center">
                                             <Badge variant="primary" className="text-[7px] font-bold mb-1 uppercase tracking-widest">{formData.type}</Badge>

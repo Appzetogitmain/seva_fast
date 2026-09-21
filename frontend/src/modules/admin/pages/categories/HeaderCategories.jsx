@@ -771,9 +771,14 @@ const HeaderCategories = () => {
                       </div>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 text-center">
-                    Choose an SVG icon or upload a custom photo. If photo is uploaded, it will be used as category image.
-                  </p>
+                  <div className="p-2.5 bg-blue-50/90 border border-blue-100 rounded-xl text-left space-y-1">
+                    <p className="text-[11px] font-extrabold text-blue-900">
+                      📐 Recommended Size: <span className="text-blue-700 font-black">500 × 500 px (1:1 Ratio)</span>
+                    </p>
+                    <p className="text-[10px] text-blue-800 leading-tight">
+                      Use transparent PNG or clean background with icon centered so it does not get cropped in App & Web views.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Header Color Picker */}

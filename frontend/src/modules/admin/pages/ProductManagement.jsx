@@ -1145,6 +1145,24 @@ const ProductManagement = () => {
 
                                     {modalTab === 'media' && (
                                         <div className="ds-section-spacing animate-in fade-in slide-in-from-right-2 duration-300">
+                                            {/* Size Recommendation Guide */}
+                                            <div className="p-3.5 bg-blue-50/80 border border-blue-200/80 rounded-2xl flex items-start gap-3">
+                                                <div className="p-2 bg-blue-100/90 rounded-xl text-blue-700 shrink-0 mt-0.5">
+                                                    <HiOutlinePhoto className="h-5 w-5" />
+                                                </div>
+                                                <div className="text-xs text-blue-950 space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-extrabold text-[11px] text-blue-900 uppercase tracking-wider">Product Image Size Recommendation</span>
+                                                        <span className="px-2 py-0.5 rounded-md bg-blue-200/80 text-blue-900 text-[10px] font-black">800 × 800 px (1:1 Square)</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-blue-800/90 leading-relaxed">
+                                                        • <strong>Ratio:</strong> 1:1 Square (Min: 500 × 500 px, Max: 1200 × 1200 px).<br />
+                                                        • <strong>Avoid Cropping:</strong> Keep the product centered with 10–15% padding around margins so it displays without cropping on Web and Mobile App cards.<br />
+                                                        • <strong>Format:</strong> Clean white or transparent background (PNG, JPG, WebP up to 5MB).
+                                                    </p>
+                                                </div>
+                                            </div>
+
                                             <div className="space-y-3">
                                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Main Cover Photo</label>
                                                 <div className="flex flex-col md:flex-row items-start gap-6">

@@ -587,6 +587,23 @@ const ContentManager = () => {
                     {/* Type-specific config */}
                     {formData.displayType === 'banners' && (
                         <div className="space-y-4">
+                            {/* Banner Size Recommendation Notice */}
+                            <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-2xl flex items-start gap-3">
+                                <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shrink-0 mt-0.5">
+                                    <HiOutlinePhoto className="h-5 w-5" />
+                                </div>
+                                <div className="text-xs text-amber-950 space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-black text-[11px] text-amber-900 uppercase tracking-wider">Banner & Carousel Size Recommendation</span>
+                                        <span className="px-2 py-0.5 rounded-md bg-amber-200/80 text-amber-900 text-[10px] font-black">1200 × 520 px (~2.3:1 Ratio)</span>
+                                    </div>
+                                    <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                                        • <strong>Mobile & App Safe Zone:</strong> Keep key text, offers, and main graphics in the <strong>center 70–80% area</strong> with padding around edges so nothing is cut on App or Web screens.<br />
+                                        • <strong>Alternative 16:9:</strong> 1200 × 675 px (Min: 800 × 350 px) • Formats: PNG, JPG, WebP up to 5MB.
+                                    </p>
+                                </div>
+                            </div>
+
                             <div className="flex items-center justify-between">
                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                     Banner Items

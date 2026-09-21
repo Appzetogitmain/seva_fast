@@ -717,17 +717,18 @@ export default function AdminChatbotWidget() {
               <Shield size={22} />
             </div>
             <h4 className="text-sm font-bold text-slate-800">Hello! I'm Seva Admin AI</h4>
-            <p className="text-xs text-slate-500 mt-1 max-w-[280px]">
-              Ask me to explain how any panel section works, or to check live orders and approvals.
+            <p className="text-xs text-slate-500 mt-1 max-w-[300px]">
+              Ask me about image/banner sizes, where to edit homepage sections, panel navigation, or live orders.
             </p>
 
             <div className="w-full mt-4 space-y-1.5">
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-left pl-1">You can ask:</p>
               {[
+                "What are the recommended image & banner sizes? 📐",
+                "Where do I edit homepage banners & sections? 🎨",
                 "Show today's orders & revenue 📊",
                 "How many sellers are pending approval? 🕓",
-                "How do I approve a seller? ✅",
-                "How is a return request processed? 🔄",
+                "Where do I configure delivery fees & taxes? 💳",
               ].map((suggestion, i) => (
                 <button
                   key={i}
