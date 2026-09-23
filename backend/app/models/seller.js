@@ -91,6 +91,7 @@ const sellerSchema = new mongoose.Schema(
     aadhaarNumber: { type: String, trim: true },
     gstinNumber: { type: String, trim: true, uppercase: true },
     udyamNumber: { type: String, trim: true },
+    kycSubmittedAt: { type: Date },
 
     bankDetails: {
       accountHolderName: { type: String, trim: true },

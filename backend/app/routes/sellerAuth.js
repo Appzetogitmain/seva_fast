@@ -13,6 +13,7 @@ import {
 import {
     getSellerProfile,
     updateSellerProfile,
+    submitSellerKyc,
     requestWithdrawal,
     getNearbySellers,
     getSellerCodCashSummary,
@@ -109,6 +110,14 @@ router.post(
     verifyToken,
     allowRoles("seller"),
     acceptSellerCertificate
+);
+
+router.post(
+    "/kyc",
+    verifyToken,
+    allowRoles("seller"),
+    upload.any(),
+    submitSellerKyc
 );
 
 // Analytics & Financials

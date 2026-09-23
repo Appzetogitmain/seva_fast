@@ -37,6 +37,7 @@ export const sellerApi = {
     getWalletSummary: () => axiosInstance.get('/seller/wallet/summary'),
     getProfile: () => axiosInstance.get('/seller/profile'),
     updateProfile: (data) => axiosInstance.put('/seller/profile', data),
+    submitKyc: (formData) => axiosInstance.post('/seller/kyc', formData),
     acceptCertificate: () => axiosInstance.post('/seller/accept-certificate'),
     getCodCashSummary: () => axiosInstance.get('/seller/cod/summary'),
     payCodCashToAdmin: (data) => axiosInstance.post('/seller/cod/pay', data),

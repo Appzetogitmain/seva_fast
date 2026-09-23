@@ -129,10 +129,6 @@ export const signupSeller = async (req, res) => {
             whatsappNumber,
             businessType,
             sellerType,
-            panNumber,
-            aadhaarNumber,
-            gstinNumber,
-            udyamNumber,
             bankDetails,
             businessInfo
         } = req.body || {};
@@ -215,42 +211,6 @@ export const signupSeller = async (req, res) => {
             ifscCode,
         };
 
-        // 2. KYC Details Format Validation (Step 4)
-        const cleanPan = panNumber ? String(panNumber).trim().toUpperCase() : "";
-        const cleanAadhaar = aadhaarNumber ? String(aadhaarNumber).trim() : "";
-        const cleanGstin = gstinNumber ? String(gstinNumber).trim().toUpperCase() : "";
-        const cleanUdyam = udyamNumber ? String(udyamNumber).trim().toUpperCase() : "";
-
-        if (!cleanPan && !cleanAadhaar) {
-            return handleResponse(res, 400, "Either PAN Number or Aadhaar Number is compulsory.");
-        }
-
-        if (cleanPan) {
-            if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
-                return handleResponse(res, 400, "Please enter a valid 10-character PAN Number (e.g. ABCDE1234F).");
-            }
-        }
-
-        if (cleanAadhaar) {
-            if (!/^\d{12}$/.test(cleanAadhaar)) {
-                return handleResponse(res, 400, "Aadhaar Number must be exactly 12 digits.");
-            }
-        }
-
-        if (cleanGstin) {
-            if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(cleanGstin) && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{3}$/.test(cleanGstin)) {
-                return handleResponse(res, 400, "Please enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5).");
-            }
-        }
-
-        if (cleanUdyam) {
-            const isUdyam = /^UDYAM-[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(cleanUdyam) || /^UDYAM[A-Z]{2}\d{5,10}$/i.test(cleanUdyam) || /^[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(cleanUdyam);
-            const isShopAct = /^[A-Z0-9\/-]{3,25}$/i.test(cleanUdyam);
-            if (!isUdyam && !isShopAct) {
-                return handleResponse(res, 400, "Please enter a valid Udyam (e.g. UDYAM-XX-00-0000000) or Shop Act Registration number.");
-            }
-        }
-
         const normalizedEmail = String(email).trim().toLowerCase();
         const normalizedPhone = normalizeIndian10DigitPhone(phone);
         if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
@@ -312,22 +272,10 @@ export const signupSeller = async (req, res) => {
             return handleResponse(res, 400, "Seller with this email or phone already exists");
         }
 
+        // KYC numbers and documents are no longer collected during signup;
+        // sellers submit these after onboarding from their dashboard for verification.
         const parsedDocuments = parseDocumentsPayload(documents);
         const sellerDocuments = resolveSellerDocuments(augmentedBody, parsedDocuments);
-        const missingRequiredDocuments = getMissingRequiredSellerDocuments(
-            sellerDocuments || {}
-        );
-
-        if (missingRequiredDocuments.length > 0) {
-            const readableMissing = missingRequiredDocuments
-                .map((field) => SELLER_DOCUMENT_FIELDS[field] || field)
-                .join(", ");
-            return handleResponse(
-                res,
-                400,
-                `All required documents must be uploaded: ${readableMissing}`
-            );
-        }
 
         const sellerData = {
             name,
@@ -340,10 +288,6 @@ export const signupSeller = async (req, res) => {
             sellerType,
             category,
             description,
-            panNumber: cleanPan,
-            aadhaarNumber: cleanAadhaar,
-            gstinNumber: cleanGstin,
-            udyamNumber: cleanUdyam,
             bankDetails: parsedBankDetails,
             businessInfo: parsedBusinessInfo,
             address,

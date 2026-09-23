@@ -337,6 +337,112 @@ export const updateSellerProfile = async (req, res) => {
   }
 };
 
+/* ===============================
+   SELLER KYC SUBMISSION (post-onboarding)
+================================ */
+const SELLER_KYC_DOCUMENT_FIELDS = [
+  "tradeLicense",
+  "gstCertificate",
+  "idProof",
+  "panCard",
+  "addressProof",
+  "cancelledCheque",
+];
+
+export const submitSellerKyc = async (req, res) => {
+  try {
+    const sellerId = req.user?.id;
+    if (!sellerId) {
+      return handleResponse(res, 401, "Unauthorized");
+    }
+
+    const seller = await Seller.findById(sellerId);
+    if (!seller) {
+      return handleResponse(res, 404, "Seller not found");
+    }
+
+    const { panNumber, aadhaarNumber, gstinNumber, udyamNumber } = req.body || {};
+
+    const cleanPan = panNumber ? String(panNumber).trim().toUpperCase() : "";
+    const cleanAadhaar = aadhaarNumber ? String(aadhaarNumber).trim() : "";
+    const cleanGstin = gstinNumber ? String(gstinNumber).trim().toUpperCase() : "";
+    const cleanUdyam = udyamNumber ? String(udyamNumber).trim().toUpperCase() : "";
+
+    if (!cleanPan && !cleanAadhaar) {
+      return handleResponse(res, 400, "Either PAN Number or Aadhaar Number is compulsory.");
+    }
+    if (cleanPan && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+      return handleResponse(res, 400, "Please enter a valid 10-character PAN Number (e.g. ABCDE1234F).");
+    }
+    if (cleanAadhaar && !/^\d{12}$/.test(cleanAadhaar)) {
+      return handleResponse(res, 400, "Aadhaar Number must be exactly 12 digits.");
+    }
+    if (
+      cleanGstin &&
+      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(cleanGstin) &&
+      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{3}$/.test(cleanGstin)
+    ) {
+      return handleResponse(res, 400, "Please enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5).");
+    }
+    if (cleanUdyam) {
+      const isUdyam =
+        /^UDYAM-[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(cleanUdyam) ||
+        /^UDYAM[A-Z]{2}\d{5,10}$/i.test(cleanUdyam) ||
+        /^[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(cleanUdyam);
+      const isShopAct = /^[A-Z0-9\/-]{3,25}$/i.test(cleanUdyam);
+      if (!isUdyam && !isShopAct) {
+        return handleResponse(res, 400, "Please enter a valid Udyam (e.g. UDYAM-XX-00-0000000) or Shop Act Registration number.");
+      }
+    }
+
+    // Upload any submitted documents (multer memory storage, same mechanism as signup)
+    const { uploadToCloudinary } = await import("../services/mediaService.js");
+    const documentFiles = req.files || [];
+    const uploadedDocs = {};
+
+    if (Array.isArray(documentFiles) && documentFiles.length > 0) {
+      for (const file of documentFiles) {
+        try {
+          const fieldName = file.fieldname;
+          if (fieldName && SELLER_KYC_DOCUMENT_FIELDS.includes(fieldName)) {
+            const url = await uploadToCloudinary(file.buffer, "docs", {
+              mimeType: file.mimetype,
+            });
+            uploadedDocs[fieldName] = url;
+          }
+        } catch (err) {
+          console.error("Failed to upload KYC document to Cloudinary", err);
+        }
+      }
+    }
+
+    seller.panNumber = cleanPan || seller.panNumber;
+    seller.aadhaarNumber = cleanAadhaar || seller.aadhaarNumber;
+    seller.gstinNumber = cleanGstin || seller.gstinNumber;
+    seller.udyamNumber = cleanUdyam || seller.udyamNumber;
+
+    if (Object.keys(uploadedDocs).length > 0) {
+      seller.documents = { ...(seller.documents || {}), ...uploadedDocs };
+      seller.markModified("documents");
+    }
+
+    seller.kycSubmittedAt = new Date();
+
+    await seller.save();
+
+    return handleResponse(res, 200, "KYC details submitted for verification", {
+      panNumber: seller.panNumber,
+      aadhaarNumber: seller.aadhaarNumber,
+      gstinNumber: seller.gstinNumber,
+      udyamNumber: seller.udyamNumber,
+      documents: seller.documents,
+      kycSubmittedAt: seller.kycSubmittedAt,
+    });
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
 function roundCurrency(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }

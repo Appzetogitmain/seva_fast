@@ -22,6 +22,7 @@ import {
   ArrowRight,
   Camera,
   Image as ImageIcon,
+  Upload,
 } from "lucide-react";
 import { sellerApi } from "../services/sellerApi";
 import { toast } from "sonner";
@@ -31,6 +32,46 @@ import MapPicker from "../../../shared/components/MapPicker";
 import AuthorisedSellerCertificateView from "@shared/components/AuthorisedSellerCertificateView";
 import { HiOutlineXMark } from "react-icons/hi2";
 import verifiedSeal from "@/assets/verified-seal.png";
+
+const isValidPAN = (val) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(String(val || "").trim().toUpperCase());
+const isValidAadhaar = (val) => /^\d{12}$/.test(String(val || "").trim());
+const isValidGSTIN = (val) => {
+  const v = String(val || "").trim().toUpperCase();
+  return !v || (/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(v) || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{3}$/.test(v));
+};
+const isValidUdyam = (val) => {
+  const v = String(val || "").trim().toUpperCase();
+  if (!v) return true;
+  const isUdyam = /^UDYAM-[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(v) || /^UDYAM[A-Z]{2}\d{5,10}$/i.test(v) || /^[A-Z]{2}-\d{1,3}-\d{4,9}$/i.test(v);
+  const isShopAct = /^[A-Z0-9\/-]{3,25}$/i.test(v);
+  return isUdyam || isShopAct;
+};
+
+const KYC_REQUIRED_DOCUMENT_CONFIG = [
+  { id: "addressProof", label: "Address Proof" },
+  { id: "cancelledCheque", label: "Cancelled Cheque" },
+  { id: "tradeLicense", label: "Trade License" },
+];
+
+const KYC_OPTIONAL_DOCUMENT_CONFIG = [
+  { id: "gstCertificate", label: "GST Certificate (Optional)" },
+];
+
+const createInitialKycData = () => ({
+  panNumber: "",
+  aadhaarNumber: "",
+  gstinNumber: "",
+  udyamNumber: "",
+});
+
+const createInitialKycDocs = () => ({
+  tradeLicense: null,
+  gstCertificate: null,
+  idProof: null,
+  panCard: null,
+  addressProof: null,
+  cancelledCheque: null,
+});
 
 const SellerProfile = () => {
   const navigate = useNavigate();
@@ -43,6 +84,10 @@ const SellerProfile = () => {
   const [isEditingRadius, setIsEditingRadius] = useState(false);
   const [radiusDraft, setRadiusDraft] = useState(5);
   const [isSavingRadius, setIsSavingRadius] = useState(false);
+  const [isKycModalOpen, setIsKycModalOpen] = useState(false);
+  const [isKycSaving, setIsKycSaving] = useState(false);
+  const [kycData, setKycData] = useState(createInitialKycData);
+  const [kycDocs, setKycDocs] = useState(createInitialKycDocs);
   const [formData, setFormData] = useState({
     name: "",
     shopName: "",
@@ -181,6 +226,78 @@ const SellerProfile = () => {
       toast.success(newVal ? "Now accepting photo orders" : "No longer accepting photo orders");
     } catch (error) {
       toast.error("Failed to update photo order setting");
+    }
+  };
+
+  const openKycModal = () => {
+    setKycData({
+      panNumber: profile?.panNumber || "",
+      aadhaarNumber: profile?.aadhaarNumber || "",
+      gstinNumber: profile?.gstinNumber || "",
+      udyamNumber: profile?.udyamNumber || "",
+    });
+    setKycDocs(createInitialKycDocs());
+    setIsKycModalOpen(true);
+  };
+
+  const handleKycFieldChange = (e) => {
+    const { name, value } = e.target;
+    if (name === "panNumber") {
+      setKycData((prev) => ({ ...prev, panNumber: value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10) }));
+    } else if (name === "aadhaarNumber") {
+      setKycData((prev) => ({ ...prev, aadhaarNumber: value.replace(/\D/g, "").slice(0, 12) }));
+    } else if (name === "gstinNumber") {
+      setKycData((prev) => ({ ...prev, gstinNumber: value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 15) }));
+    } else if (name === "udyamNumber") {
+      setKycData((prev) => ({ ...prev, udyamNumber: value.replace(/[^a-zA-Z0-9\/-]/g, "").toUpperCase().slice(0, 25) }));
+    }
+  };
+
+  const handleKycDocChange = (e, docName) => {
+    setKycDocs((prev) => ({ ...prev, [docName]: e.target.files[0] }));
+  };
+
+  const handleKycSubmit = async (e) => {
+    e.preventDefault();
+    if (!kycData.panNumber && !kycData.aadhaarNumber) {
+      toast.error("Either PAN Number or Aadhaar Number is compulsory.");
+      return;
+    }
+    if (kycData.panNumber && !isValidPAN(kycData.panNumber)) {
+      toast.error("Please enter a valid 10-character PAN Number (e.g. ABCDE1234F).");
+      return;
+    }
+    if (kycData.aadhaarNumber && !isValidAadhaar(kycData.aadhaarNumber)) {
+      toast.error("Aadhaar Number must be exactly 12 digits.");
+      return;
+    }
+    if (kycData.gstinNumber && !isValidGSTIN(kycData.gstinNumber)) {
+      toast.error("Please enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5).");
+      return;
+    }
+    if (kycData.udyamNumber && !isValidUdyam(kycData.udyamNumber)) {
+      toast.error("Please enter a valid Udyam (e.g. UDYAM-XX-00-0000000) or Shop Act Registration number.");
+      return;
+    }
+
+    setIsKycSaving(true);
+    try {
+      const payload = new FormData();
+      Object.entries(kycData).forEach(([key, value]) => {
+        if (value) payload.append(key, value);
+      });
+      Object.entries(kycDocs).forEach(([key, file]) => {
+        if (file) payload.append(key, file);
+      });
+
+      await sellerApi.submitKyc(payload);
+      toast.success("KYC details submitted for verification");
+      setIsKycModalOpen(false);
+      fetchProfile();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to submit KYC details");
+    } finally {
+      setIsKycSaving(false);
     }
   };
 
@@ -723,6 +840,57 @@ const SellerProfile = () => {
             </div>
           </Card>
 
+          {/* Seller KYC Submission Card */}
+          <Card className="p-5 sm:p-6 border-none shadow-sm rounded-2xl bg-white ring-1 ring-slate-200/80">
+            <div className="flex items-center gap-3 mb-4 border-b border-slate-100 pb-3.5">
+              <div className="h-9 w-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 border border-brand-100">
+                <ShieldCheck size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                  KYC Verification
+                </h4>
+                <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                  Submit numbers &amp; documents for review
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5">
+              {(profile?.panNumber || profile?.aadhaarNumber) ? (
+                <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <CheckCircle size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-900 leading-snug">
+                      KYC Details Submitted
+                    </p>
+                    <span className="text-[10px] text-slate-500 font-semibold">
+                      {profile?.kycSubmittedAt
+                        ? `Last updated ${new Date(profile.kycSubmittedAt).toLocaleDateString()}`
+                        : "Awaiting admin verification"}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-center">
+                  <p className="text-xs font-medium text-amber-800 leading-relaxed">
+                    You haven't submitted your KYC numbers &amp; documents yet.
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={openKycModal}
+                className="w-full py-2.5 px-4 bg-slate-900 hover:bg-black active:scale-[0.98] text-white font-black tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer">
+                <Upload size={15} />
+                <span>{(profile?.panNumber || profile?.aadhaarNumber) ? "Update KYC Details" : "Submit KYC Details"}</span>
+              </button>
+            </div>
+          </Card>
+
           {/* Official KYC Document Card */}
           <Card className="p-5 sm:p-6 border-none shadow-sm rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 text-white relative overflow-hidden ring-1 ring-emerald-500/20">
             <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -831,6 +999,115 @@ const SellerProfile = () => {
                 showPrintButton={true}
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* KYC Submission Modal */}
+      {isKycModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-md">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full flex flex-col max-h-[95vh] overflow-hidden">
+            <div className="bg-slate-900 px-4 sm:px-6 py-3.5 sm:py-4 text-white flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-sm sm:text-lg">Submit KYC Details</h3>
+              <button
+                type="button"
+                onClick={() => setIsKycModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-white/20 text-white transition"
+              >
+                <HiOutlineXMark className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+            </div>
+            <form onSubmit={handleKycSubmit} className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <input
+                  type="text"
+                  name="panNumber"
+                  maxLength={10}
+                  placeholder="PAN (e.g. ABCDE1234F)"
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none uppercase focus:bg-white focus:border-slate-400"
+                  value={kycData.panNumber}
+                  onChange={handleKycFieldChange}
+                />
+                <input
+                  type="text"
+                  name="aadhaarNumber"
+                  inputMode="numeric"
+                  maxLength={12}
+                  placeholder="Aadhaar (12 digits)"
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-400"
+                  value={kycData.aadhaarNumber}
+                  onChange={handleKycFieldChange}
+                />
+                <input
+                  type="text"
+                  name="gstinNumber"
+                  maxLength={15}
+                  placeholder="GSTIN (Optional)"
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none uppercase focus:bg-white focus:border-slate-400"
+                  value={kycData.gstinNumber}
+                  onChange={handleKycFieldChange}
+                />
+                <input
+                  type="text"
+                  name="udyamNumber"
+                  maxLength={25}
+                  placeholder="Udyam / Shop Act (Optional)"
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none uppercase focus:bg-white focus:border-slate-400"
+                  value={kycData.udyamNumber}
+                  onChange={handleKycFieldChange}
+                />
+              </div>
+
+              <p className="text-xs font-black text-slate-600 uppercase tracking-widest pt-2">
+                Verification Documents
+              </p>
+              <div className="space-y-2.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                    PAN / Aadhaar Card
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="w-full text-xs"
+                    onChange={(e) => handleKycDocChange(e, kycData.panNumber ? "panCard" : "idProof")}
+                  />
+                </div>
+                {KYC_REQUIRED_DOCUMENT_CONFIG.map((doc) => (
+                  <div key={doc.id}>
+                    <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                      {doc.label}
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="w-full text-xs"
+                      onChange={(e) => handleKycDocChange(e, doc.id)}
+                    />
+                  </div>
+                ))}
+                {KYC_OPTIONAL_DOCUMENT_CONFIG.map((doc) => (
+                  <div key={doc.id}>
+                    <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                      {doc.label}
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="w-full text-xs"
+                      onChange={(e) => handleKycDocChange(e, doc.id)}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isKycSaving}
+                className="w-full py-3 px-4 bg-slate-900 hover:bg-black active:scale-[0.98] text-white font-black tracking-wider text-xs uppercase rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50">
+                {isKycSaving ? "Submitting..." : "Submit for Verification"}
+              </button>
+            </form>
           </div>
         </div>
       )}
