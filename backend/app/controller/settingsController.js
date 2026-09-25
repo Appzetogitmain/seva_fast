@@ -86,6 +86,7 @@ const ALLOWED_KEYS = [
   "firstOrderDiscountPercent",
   "firstOrderFreeDelivery",
   "welcomeScratchCardEnabled",
+  "showQuickCategoriesSection",
   "deliveryFeeSlabs",
   "deliveryFeeBaseWeightKg",
   "deliveryFeeExtraFeePerKg",
@@ -212,6 +213,7 @@ const updateSettingsSchema = Joi.object({
   "firstOrderDiscountPercent": Joi.number().min(0).max(100),
   "firstOrderFreeDelivery": Joi.boolean(),
   "welcomeScratchCardEnabled": Joi.boolean(),
+  "showQuickCategoriesSection": Joi.boolean(),
   deliveryFeeSlabs: Joi.array().items(
     Joi.object({
       minKm: Joi.number().min(0).required(),
@@ -275,7 +277,7 @@ export const getPublicSettings = async (req, res) => {
       async () => {
         const existing = await Setting.findOne(filter)
           .select(
-            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo createdAt updatedAt",
+            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled showQuickCategoriesSection deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo createdAt updatedAt",
           )
           .lean();
         return existing || null;
@@ -293,6 +295,7 @@ export const getPublicSettings = async (req, res) => {
     settings.firstOrderDiscountPercent = settings.firstOrderDiscountPercent ?? 10;
     settings.firstOrderFreeDelivery = settings.firstOrderFreeDelivery ?? true;
     settings.welcomeScratchCardEnabled = settings.welcomeScratchCardEnabled ?? true;
+    settings.showQuickCategoriesSection = settings.showQuickCategoriesSection ?? true;
     settings.mlmPromo = settings.mlmPromo || {
       enabled: true,
       badgeText: "SEVAFAST MLM",

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInViewAnimation } from "@/core/hooks/useInViewAnimation";
+import { useSettings } from "@/core/context/SettingsContext";
 import { Sparkles, Heart, Snowflake, ChevronLeft, ChevronRight, Camera } from "lucide-react";
 
 // MUI Icons (shared with admin & icon selector)
@@ -205,6 +206,7 @@ const Home = () => {
   const { currentLocation } = useLocation();
   const navigate = useNavigate();
   const { cartCount } = useCart();
+  const { settings } = useSettings();
   const quickCatsRef = useRef(null);
   const cachedHomePageData = getCachedHomePageData(currentLocation);
 
@@ -542,7 +544,9 @@ const Home = () => {
 
           <PromoMarquee />
           <div className="px-4 lg:px-8 max-w-7xl mx-auto">
-            <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => navigate(`/category/${id}`)} />
+            {settings?.showQuickCategoriesSection !== false && (
+              <QuickCategorySlider categories={effectiveQuickCategories} onCategoryClick={(id) => navigate(`/category/${id}`)} />
+            )}
             <LowestPriceSection products={lowestPriceProducts} onSeeAll={() => navigate("/category/all")} />
             
             {/* MLM Multi-Level Marketing Promotional Banner */}
