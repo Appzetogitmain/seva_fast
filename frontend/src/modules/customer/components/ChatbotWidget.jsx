@@ -438,15 +438,15 @@ export default function ChatbotWidget() {
 
         setTimeout(() => {
           if (!speechStarted && !streamIntervalRef.current && isOpenRef.current && speechSeqRef.current === mySpeechSeq) {
-            startWordStreaming(35);
+            startWordStreaming(55);
           }
         }, 800);
       } catch (err) {
         console.error("Speech synthesis error:", err);
-        startWordStreaming(35);
+        startWordStreaming(55);
       }
     } else {
-      startWordStreaming(25);
+      startWordStreaming(55);
     }
   };
 

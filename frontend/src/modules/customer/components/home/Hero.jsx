@@ -75,7 +75,7 @@ const Hero = () => {
 
                 {/* Left Side: MAXIMIZED Banner Carousel */}
                 <div className="relative w-full flex justify-start animate-in fade-in slide-in-from-left-8 duration-700 z-20">
-                    <div className="relative w-full aspect-video md:h-[600px] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl group border-[3px] md:border-[6px] border-white/10 backdrop-blur-sm bg-white/5">
+                    <div className="relative w-full aspect-video rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl group border-[3px] md:border-[6px] border-white/10 backdrop-blur-sm bg-white/5">
 
                         {banners.map((banner, index) => (
                             <div
