@@ -428,6 +428,10 @@ const settingSchema = new mongoose.Schema(
             type: Boolean,
             default: true,
         },
+        showQuickCategoriesSection: {
+            type: Boolean,
+            default: true,
+        },
 
         // MLM Promotional Section Configuration
         mlmPromo: {
