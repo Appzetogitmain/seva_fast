@@ -22,6 +22,9 @@ const RISK_VARIANT = { NONE: 'gray', LOW: 'info', MEDIUM: 'warning', HIGH: 'erro
 const INTEREST_VARIANT = { NONE: 'gray', LOW: 'gray', MEDIUM: 'info', HIGH: 'success' };
 const ROLE_LABEL = { user: 'Customer', seller: 'Seller', delivery: 'Delivery Boy', admin: 'Admin', 'sub-admin': 'Sub-Admin', anonymous: 'Anonymous' };
 
+const TOPIC_LABEL = { subscription: 'Subscription', services: 'Services' };
+const FLAG_LABEL = { abusive_language: 'Abusive language' };
+
 const DURATION_OPTIONS = [
     { value: '1h', label: '1 Hour' },
     { value: '24h', label: '24 Hours' },
@@ -34,7 +37,7 @@ const ChatbotAnalytics = () => {
     const [overview, setOverview] = useState(null);
 
     const [sessions, setSessions] = useState([]);
-    const [sessionFilters, setSessionFilters] = useState({ role: '', riskLevel: '', interestLevel: '', search: '' });
+    const [sessionFilters, setSessionFilters] = useState({ role: '', riskLevel: '', interestLevel: '', topic: '', search: '' });
     const [sessionPage, setSessionPage] = useState(1);
     const [sessionTotal, setSessionTotal] = useState(0);
 
@@ -44,7 +47,7 @@ const ChatbotAnalytics = () => {
     const [flaggedTotal, setFlaggedTotal] = useState(0);
 
     const [detail, setDetail] = useState({ open: false, data: null, loading: false });
-    const [accessModal, setAccessModal] = useState({ open: false, role: '', userId: '', name: '', mode: 'temporary', duration: '24h', reason: '' });
+    const [accessModal, setAccessModal] = useState({ open: false, role: '', userId: '', name: '', flagId: null, mode: 'temporary', duration: '24h', reason: '' });
 
     const pageSize = 20;
 
@@ -67,6 +70,7 @@ const ChatbotAnalytics = () => {
             if (sessionFilters.role) params.role = sessionFilters.role;
             if (sessionFilters.riskLevel) params.riskLevel = sessionFilters.riskLevel;
             if (sessionFilters.interestLevel) params.interestLevel = sessionFilters.interestLevel;
+            if (sessionFilters.topic) params.topic = sessionFilters.topic;
             if (sessionFilters.search.trim()) params.search = sessionFilters.search.trim();
             const res = await adminApi.getChatbotSessions(params);
             if (res.data.success) {
@@ -145,12 +149,12 @@ const ChatbotAnalytics = () => {
         }
     };
 
-    const openAccessModal = (role, userId, name) => {
-        setAccessModal({ open: true, role, userId, name, mode: 'temporary', duration: '24h', reason: '' });
+    const openAccessModal = (role, userId, name, flagId = null) => {
+        setAccessModal({ open: true, role, userId, name, flagId, mode: 'temporary', duration: '24h', reason: '' });
     };
 
     const submitAccessAction = async (enable) => {
-        const { role, userId, mode, duration, reason } = accessModal;
+        const { role, userId, flagId, mode, duration, reason } = accessModal;
         if (!enable && !reason.trim()) {
             toast.error('Please provide a reason');
             return;
@@ -161,9 +165,11 @@ const ChatbotAnalytics = () => {
                 toast.success('Chatbot access re-enabled');
             } else {
                 await adminApi.disableChatbotAccess(role, userId, { mode, duration, reason });
+                // Blocking from the flagged queue resolves that flag.
+                if (flagId) await adminApi.reviewChatbotFlagged(flagId, { reviewStatus: 'actioned', reviewNote: reason });
                 toast.success('Chatbot access disabled');
             }
-            setAccessModal({ open: false, role: '', userId: '', name: '', mode: 'temporary', duration: '24h', reason: '' });
+            setAccessModal({ open: false, role: '', userId: '', name: '', flagId: null, mode: 'temporary', duration: '24h', reason: '' });
             if (tab === 'sessions') loadSessions(sessionPage);
             if (tab === 'flagged') loadFlagged(flaggedPage);
         } catch (err) {
@@ -436,6 +442,10 @@ const SessionsTab = ({ loading, sessions, filters, setFilters, page, total, page
                 <option value="">Any Interest</option>
                 {['NONE', 'LOW', 'MEDIUM', 'HIGH'].map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
+            <select value={filters.topic} onChange={(e) => setFilters((p) => ({ ...p, topic: e.target.value }))} className="px-3 py-2.5 bg-white ring-1 ring-slate-200 rounded-2xl text-xs font-semibold outline-none">
+                <option value="">Looking For: Anything</option>
+                {Object.entries(TOPIC_LABEL).map(([k, v]) => <option key={k} value={k}>Looking For: {v}</option>)}
+            </select>
         </div>
 
         <Card className="border-none shadow-2xl ring-1 ring-slate-100 overflow-hidden bg-white rounded-xl">
@@ -445,6 +455,7 @@ const SessionsTab = ({ loading, sessions, filters, setFilters, page, total, page
                         <tr className="bg-slate-50/50 border-b border-slate-100">
                             <th className="ds-table-header-cell pl-8 py-5">Identity</th>
                             <th className="ds-table-header-cell">Intent</th>
+                            <th className="ds-table-header-cell">Looking For</th>
                             <th className="ds-table-header-cell">Interest</th>
                             <th className="ds-table-header-cell">Risk</th>
                             <th className="ds-table-header-cell">Messages</th>
@@ -454,9 +465,9 @@ const SessionsTab = ({ loading, sessions, filters, setFilters, page, total, page
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {loading ? (
-                            <tr><td colSpan="7" className="py-16 text-center"><RotateCw className="h-8 w-8 animate-spin mx-auto text-brand-500" /></td></tr>
+                            <tr><td colSpan="8" className="py-16 text-center"><RotateCw className="h-8 w-8 animate-spin mx-auto text-brand-500" /></td></tr>
                         ) : sessions.length === 0 ? (
-                            <tr><td colSpan="7" className="py-16 text-center text-sm text-slate-400">No conversations found.</td></tr>
+                            <tr><td colSpan="8" className="py-16 text-center text-sm text-slate-400">No conversations found.</td></tr>
                         ) : (
                             sessions.map((s) => (
                                 <tr key={s.sessionId} className="group hover:bg-slate-50/40 transition-all cursor-pointer" onClick={() => onOpenDetail(s.sessionId)}>
@@ -465,6 +476,13 @@ const SessionsTab = ({ loading, sessions, filters, setFilters, page, total, page
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{ROLE_LABEL[s.role] || s.role}</p>
                                     </td>
                                     <td className="px-6 py-5 text-sm text-slate-600 max-w-[200px] truncate">{s.intent || '—'}</td>
+                                    <td className="px-6 py-5">
+                                        <div className="flex flex-wrap gap-1">
+                                            {(s.topics || []).length > 0
+                                                ? s.topics.map((t) => <Badge key={t} variant="info">{TOPIC_LABEL[t] || t}</Badge>)
+                                                : <span className="text-sm text-slate-400">—</span>}
+                                        </div>
+                                    </td>
                                     <td className="px-6 py-5"><Badge variant={INTEREST_VARIANT[s.interest?.level] || 'gray'}>{s.interest?.level || 'NONE'}</Badge></td>
                                     <td className="px-6 py-5"><Badge variant={RISK_VARIANT[s.moderation?.riskLevel] || 'gray'}>{s.moderation?.riskLevel || 'NONE'}</Badge></td>
                                     <td className="px-6 py-5 text-sm font-semibold text-slate-500">{s.messageCount}</td>
@@ -537,8 +555,11 @@ const FlaggedTab = ({ loading, flagged, filters, setFilters, page, total, pageSi
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{ROLE_LABEL[f.role] || f.role}</p>
                                     </td>
                                     <td className="px-6 py-5"><Badge variant={RISK_VARIANT[f.riskLevel] || 'gray'}>{f.riskLevel}</Badge></td>
-                                    <td className="px-6 py-5 text-xs text-slate-500 max-w-[180px] truncate">{(f.flags || []).join(', ') || '—'}</td>
-                                    <td className="px-6 py-5 text-sm text-slate-600 max-w-[220px] truncate">{f.reason || '—'}</td>
+                                    <td className="px-6 py-5 text-xs text-slate-500 max-w-[180px] truncate">{(f.flags || []).map((flag) => FLAG_LABEL[flag] || flag).join(', ') || '—'}</td>
+                                    <td className="px-6 py-5 text-sm text-slate-600 max-w-[260px]">
+                                        <p className="truncate">{f.reason || '—'}</p>
+                                        {f.snippet && <p className="text-xs text-slate-400 truncate mt-0.5" title={f.snippet}>{f.snippet}</p>}
+                                    </td>
                                     <td className="px-6 py-5 text-sm text-slate-500">{new Date(f.createdAt).toLocaleString()}</td>
                                     <td className="px-6 py-5 text-right pr-8 space-x-2">
                                         {f.reviewStatus === 'open' && (
@@ -547,8 +568,10 @@ const FlaggedTab = ({ loading, flagged, filters, setFilters, page, total, pageSi
                                                 <button onClick={() => onReview(f._id, 'dismissed')} className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest">Dismiss</button>
                                             </>
                                         )}
-                                        {f.userRef && (
-                                            <button onClick={() => onOpenAccess(f.role, f.userRef, f.identityName)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-[10px] font-black hover:bg-red-600 hover:text-white transition-all uppercase tracking-widest">Manage Access</button>
+                                        {f.userRef ? (
+                                            <button onClick={() => onOpenAccess(f.role, f.userRef, f.identityName, f.reviewStatus === 'open' ? f._id : null)} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-[10px] font-black hover:bg-red-600 hover:text-white transition-all uppercase tracking-widest">Block User</button>
+                                        ) : (
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest" title="Guest chats have no account to block">Guest - cannot block</span>
                                         )}
                                     </td>
                                 </tr>
@@ -601,11 +624,20 @@ const SessionDetailView = ({ data }) => (
             </div>
         </div>
 
+        {data.topics?.length > 0 && (
+            <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Looking For</p>
+                <div className="flex flex-wrap gap-2">
+                    {data.topics.map((t) => <Badge key={t} variant="info">{TOPIC_LABEL[t] || t}</Badge>)}
+                </div>
+            </div>
+        )}
+
         {data.moderation?.flags?.length > 0 && (
             <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Flags</p>
                 <div className="flex flex-wrap gap-2">
-                    {data.moderation.flags.map((f) => <Badge key={f} variant="error">{f}</Badge>)}
+                    {data.moderation.flags.map((f) => <Badge key={f} variant="error">{FLAG_LABEL[f] || f}</Badge>)}
                 </div>
                 {data.moderation.reason && <p className="text-xs text-slate-500 mt-2">{data.moderation.reason}</p>}
             </div>

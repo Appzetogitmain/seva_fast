@@ -2,7 +2,8 @@ import ChatSession from "../../models/chatbot/chatSession.js";
 import ChatMessage, { isRawMessageRetentionEnabled } from "../../models/chatbot/chatMessage.js";
 import ChatbotUserStats from "../../models/chatbot/chatbotUserStats.js";
 import ChatbotModeration from "../../models/chatbot/chatbotModeration.js";
-import { classifySessionIfDue } from "./chatClassificationService.js";
+import { classifySessionIfDue, recordModerationEvent } from "./chatClassificationService.js";
+import { detectAbusiveWords, detectTopics } from "./chatSignals.js";
 
 const CLASSIFY_EVERY_N_MESSAGES = parseInt(process.env.CHATBOT_CLASSIFY_EVERY_N_MESSAGES || "4", 10);
 
@@ -53,8 +54,9 @@ export async function trackChatTurn({ sessionId, role, userRef = null, anonymous
 
     const isNewSession = session.messageCount === 1;
 
+    const lastUserText = extractText(messages?.[messages.length - 1]?.parts || []);
+
     if (isRawMessageRetentionEnabled()) {
-      const lastUserText = extractText(messages?.[messages.length - 1]?.parts || []);
       const rows = [
         lastUserText ? { sessionId, role: "user", text: lastUserText } : null,
         replyText ? { sessionId, role: "model", text: replyText } : null,
@@ -85,6 +87,38 @@ export async function trackChatTurn({ sessionId, role, userRef = null, anonymous
         snippet: "[redacted before storage]",
       });
       await ChatbotUserStats.updateOne(statsFilter, { $inc: { highRiskCount: 1 } });
+    }
+
+    // Keyword signals run on every user message, so a single abusive message or a
+    // one-line subscription query is caught without waiting for the LLM pass.
+    const topics = detectTopics(lastUserText);
+    if (topics.length > 0) {
+      await ChatSession.updateOne({ sessionId }, { $addToSet: { topics: { $each: topics } } });
+    }
+
+    const abusiveWords = detectAbusiveWords(lastUserText);
+    if (abusiveWords.length > 0) {
+      const reason = "User used abusive language.";
+      await ChatSession.updateOne(
+        { sessionId },
+        {
+          $addToSet: { "moderation.flags": "abusive_language" },
+          ...(session.moderation?.riskLevel === "HIGH"
+            ? {}
+            : { $set: { "moderation.riskLevel": "MEDIUM", "moderation.reason": reason } }),
+        },
+      );
+      const created = await recordModerationEvent({
+        sessionId,
+        role,
+        userRef,
+        anonymousId,
+        riskLevel: "MEDIUM",
+        flags: ["abusive_language"],
+        reason,
+        snippet: `User: ${lastUserText.slice(0, 300)}`,
+      });
+      if (created) await ChatbotUserStats.updateOne(statsFilter, { $inc: { mediumRiskCount: 1 } });
     }
 
     const dueForClassification =

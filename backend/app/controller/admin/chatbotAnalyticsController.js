@@ -21,8 +21,8 @@ export const getOverview = async (req, res) => {
 export const listSessions = async (req, res) => {
   try {
     const { page, limit } = getPagination(req, { defaultLimit: 25, maxLimit: 100 });
-    const { role, riskLevel, interestLevel, from, to, search } = req.query;
-    const data = await getChatbotSessions({ role, riskLevel, interestLevel, from, to, search, page, limit });
+    const { role, riskLevel, interestLevel, topic, from, to, search } = req.query;
+    const data = await getChatbotSessions({ role, riskLevel, interestLevel, topic, from, to, search, page, limit });
     return handleResponse(res, 200, "Chatbot sessions fetched", data);
   } catch (error) {
     return handleResponse(res, 500, error.message);

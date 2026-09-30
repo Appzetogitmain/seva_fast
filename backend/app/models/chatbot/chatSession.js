@@ -61,6 +61,10 @@ const chatSessionSchema = new mongoose.Schema(
       reason: { type: String, default: "" },
     },
 
+    // What the user is looking for ("subscription", "services") — set per message by
+    // keyword detection and by the classification pass; drives the admin filter.
+    topics: { type: [String], default: [] },
+
     lastClassifiedAt: { type: Date, default: null },
     lastClassifiedMessageCount: { type: Number, default: 0 },
 
@@ -75,6 +79,7 @@ const chatSessionSchema = new mongoose.Schema(
 chatSessionSchema.index({ role: 1, createdAt: -1 });
 chatSessionSchema.index({ "moderation.riskLevel": 1, createdAt: -1 });
 chatSessionSchema.index({ "interest.level": 1, createdAt: -1 });
+chatSessionSchema.index({ topics: 1, lastMessageAt: -1 });
 chatSessionSchema.index({ retainUntil: 1 }, { expireAfterSeconds: 0 });
 
 export default mongoose.model("ChatSession", chatSessionSchema);

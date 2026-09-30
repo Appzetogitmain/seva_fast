@@ -74,8 +74,20 @@ export async function getChatbotOverview({ from, to } = {}) {
   };
 }
 
-export async function getChatbotSessions({ role, riskLevel, interestLevel, from, to, search, page = 1, limit = 25 }) {
+// Sessions classified before `topics` existed are matched on their AI summary/intent instead.
+const TOPIC_FALLBACK_REGEX = {
+  subscription: "subscription|subscribe|membership|\\bplans?\\b|premium",
+  services: "\\bservices?\\b|plumber|electrician|carpenter|technician|repair|cleaning|salon",
+};
+
+export async function getChatbotSessions({ role, riskLevel, interestLevel, topic, from, to, search, page = 1, limit = 25 }) {
   const filter = {};
+  if (TOPIC_FALLBACK_REGEX[topic]) {
+    const rx = { $regex: TOPIC_FALLBACK_REGEX[topic], $options: "i" };
+    filter.$and = [
+      { $or: [{ topics: topic }, { summary: rx }, { intent: rx }, { "interest.category": rx }] },
+    ];
+  }
   if (role) filter.role = role;
   if (riskLevel) filter["moderation.riskLevel"] = riskLevel;
   if (interestLevel) filter["interest.level"] = interestLevel;
