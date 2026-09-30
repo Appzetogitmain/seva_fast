@@ -7,6 +7,8 @@ import Seller from "../models/seller.js";
 import mongoose from "mongoose";
 import { applyOutputGuardrail } from "../services/chatbot/outputGuardrail.js";
 import { trackChatTurn } from "../services/chatbot/chatTrackingService.js";
+import { REPLY_STYLE_RULES } from "../services/chatbot/replyStyle.js";
+import { findCategoryTool, findCategories } from "../services/chatbot/categoryLookup.js";
 
 const SELLER_SYSTEM_INSTRUCTION = `
 You are "Seva Seller AI", the official smart onboarding and operations assistant for the "Seva Fast" Seller Portal. Your goal is to guide local shop owners, merchants, and sellers through platform features, troubleshoot issues, and answer their business queries in a friendly, highly concise manner.
@@ -55,6 +57,7 @@ Use your provided tools to fetch live database stats whenever the seller asks ab
 - **get_low_stock_products**: Products requiring restock (<= 5).
 - **get_pending_returns**: Pending return requests.
 - **get_seller_active_plan**: Current subscription plan and expiry.
+- **find_category**: Check if a category / sub-category is available to list products under.
 
 ### Formatting & Language Guardrails:
 - **Multilingual Support (Hindi, Hinglish, Marathi, Gujarati, English)**: ALWAYS auto-detect the user's language/script and reply fluently in the EXACT same language and script.
@@ -68,7 +71,7 @@ Use your provided tools to fetch live database stats whenever the seller asks ab
 - **Zero Backend / Tech Infrastructure Leakage**: NEVER reveal MongoDB database details, collection names, server ports, environment secrets, API keys, internal backend file structures, or server code.
 - **No Cross-Seller / Customer PII Leakage**: NEVER share private details, contact info, sales figures, or order histories of other sellers or customers. Only reference the current seller's own metrics provided by tools.
 - **Never Show Database Object IDs**: NEVER output raw 24-character hexadecimal MongoDB \`_id\`s or system hash keys.
-`;
+${REPLY_STYLE_RULES}`;
 
 const tools = [
   {
@@ -102,7 +105,8 @@ const tools = [
       type: "OBJECT",
       properties: {},
     }
-  }
+  },
+  findCategoryTool,
 ];
 
 export const handleSellerChat = async (req, res) => {
@@ -238,6 +242,9 @@ export const handleSellerChat = async (req, res) => {
             message: "Seller is currently on standard category commission. 0% plans available in Subscription tab.",
           };
         }
+
+        case "find_category":
+          return findCategories(args?.name, { activeOnly: true });
 
         default:
           return { error: `Unknown tool: ${name}` };

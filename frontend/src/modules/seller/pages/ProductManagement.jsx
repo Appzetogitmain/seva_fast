@@ -24,6 +24,7 @@ import {
   HiOutlineCloudArrowUp,
 } from "react-icons/hi2";
 import Modal from "@shared/components/ui/Modal";
+import AiImageGenerator from "@shared/components/AiImageGenerator";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -1556,6 +1557,14 @@ const ProductManagement = () => {
                               </div>
                             )}
                           </div>
+                          <AiImageGenerator
+                            generate={sellerApi.generateAiImage}
+                            target="product"
+                            defaultPrompt={formData.name}
+                            onUse={({ file, dataUrl }) =>
+                              setFormData((prev) => ({ ...prev, mainImage: dataUrl, mainImageFile: file }))
+                            }
+                          />
                         </div>
                       </div>
 

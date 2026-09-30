@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { adminApi } from "../../services/adminApi";
 import { toast } from "sonner";
 import IconSelector from "@shared/components/IconSelector";
+import AiImageGenerator from "@shared/components/AiImageGenerator";
 import Pagination from "@shared/components/ui/Pagination";
 import { getIconSvg } from "@shared/constants/categoryIcons";
 import { useLockBodyScroll, preventBackdropScroll } from "@/shared/hooks/useLockBodyScroll";
@@ -769,6 +770,16 @@ const HeaderCategories = () => {
                           </button>
                         )}
                       </div>
+                      <AiImageGenerator
+                        generate={adminApi.generateAiImage}
+                        target="category"
+                        size={500}
+                        defaultPrompt={formData.name}
+                        onUse={({ file, dataUrl }) => {
+                          setImageFile(file);
+                          setPreviewUrl(dataUrl);
+                        }}
+                      />
                     </div>
                   </div>
                   <div className="p-2.5 bg-blue-50/90 border border-blue-100 rounded-xl text-left space-y-1">

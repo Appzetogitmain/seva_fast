@@ -24,6 +24,7 @@ import {
 } from 'react-icons/hi2';
 import Modal from '@shared/components/ui/Modal';
 import Pagination from '@shared/components/ui/Pagination';
+import AiImageGenerator from '@shared/components/AiImageGenerator';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Rocket } from 'lucide-react';
@@ -1181,6 +1182,14 @@ const ProductManagement = () => {
                                                             </div>
                                                         )}
                                                     </div>
+                                                    <AiImageGenerator
+                                                        generate={adminApi.generateAiImage}
+                                                        target="product"
+                                                        defaultPrompt={formData.name}
+                                                        onUse={({ file, dataUrl }) =>
+                                                            setFormData((prev) => ({ ...prev, mainImage: dataUrl, mainImageFile: file }))
+                                                        }
+                                                    />
                                                 </div>
                                             </div>
 

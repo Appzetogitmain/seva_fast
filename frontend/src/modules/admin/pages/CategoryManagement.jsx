@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { adminApi } from '../services/adminApi';
 import { toast } from 'sonner';
+import AiImageGenerator from '@shared/components/AiImageGenerator';
 import { useAuth } from '@core/context/AuthContext';
 
 const CategoryManagement = () => {
@@ -739,6 +740,18 @@ const CategoryManagement = () => {
                                             onChange={handleImageChange}
                                         />
                                     </div>
+
+                                    <AiImageGenerator
+                                        generate={adminApi.generateAiImage}
+                                        target="category"
+                                        size={500}
+                                        defaultPrompt={formData.name}
+                                        className="w-full justify-center"
+                                        onUse={({ file, dataUrl }) => {
+                                            setImageFile(file);
+                                            setPreviewUrl(dataUrl);
+                                        }}
+                                    />
 
                                     {/* Image Size Recommendation Notice */}
                                     <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-2xl text-left space-y-1">

@@ -87,6 +87,7 @@ export const adminApi = {
 
     // AI Assistant
     aiChat: (data) => axiosInstance.post('/admin/ai/chat', data),
+    generateAiImage: (data) => axiosInstance.post('/admin/ai/generate-image', data, { timeout: 90000 }),
 
     // WhatsApp campaigns
     getWhatsAppConfigStatus: () => axiosInstance.get('/admin/whatsapp/config-status'),

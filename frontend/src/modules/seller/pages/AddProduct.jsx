@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { sellerApi } from "../services/sellerApi";
+import AiImageGenerator from "@shared/components/AiImageGenerator";
 import { Sparkles, Camera, UploadCloud, Check, Loader2 } from "lucide-react";
 
 // Camera photos routinely come in at 3-10MB; the AI endpoint sends this as a
@@ -1333,6 +1334,14 @@ const AddProduct = () => {
                       We show this image on the search page and the main
                       store listing. Make sure it is clear and bright.
                     </p>
+                    <AiImageGenerator
+                      generate={sellerApi.generateAiImage}
+                      target="product"
+                      defaultPrompt={formData.name}
+                      onUse={({ file, dataUrl }) =>
+                        setFormData((prev) => ({ ...prev, mainImage: dataUrl, mainImageFile: file }))
+                      }
+                    />
 
                   </div>
                 </div>

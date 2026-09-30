@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { adminApi } from "../../services/adminApi";
 import { toast } from "sonner";
+import AiImageGenerator from "@shared/components/AiImageGenerator";
 
 const makeSlug = (value) =>
   String(value || "")
@@ -495,7 +496,7 @@ const Level2Categories = () => {
 
               <div className="p-6 space-y-4">
                 {/* Image Upload */}
-                <div className="flex justify-center">
+                <div className="flex flex-col items-center gap-2">
                   <div
                     onClick={() => fileInputRef.current?.click()}
                     className="w-24 h-24 rounded-full bg-gray-50 border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-brand-500 overflow-hidden transition-colors">
@@ -520,6 +521,16 @@ const Level2Categories = () => {
                     className="hidden"
                     onChange={handleImageChange}
                     accept="image/*"
+                  />
+                  <AiImageGenerator
+                    generate={adminApi.generateAiImage}
+                    target="category"
+                    size={500}
+                    defaultPrompt={formData.name}
+                    onUse={({ file, dataUrl }) => {
+                      setImageFile(file);
+                      setPreviewUrl(dataUrl);
+                    }}
                   />
                 </div>
 

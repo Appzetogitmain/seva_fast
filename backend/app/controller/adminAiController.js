@@ -9,6 +9,8 @@ import Ticket from "../models/ticket.js";
 import Wallet from "../models/wallet.js";
 import { applyOutputGuardrail } from "../services/chatbot/outputGuardrail.js";
 import { trackChatTurn } from "../services/chatbot/chatTrackingService.js";
+import { REPLY_STYLE_RULES } from "../services/chatbot/replyStyle.js";
+import { findCategoryTool, findCategories } from "../services/chatbot/categoryLookup.js";
 
 const ADMIN_SYSTEM_INSTRUCTION_BASE = `
 You are "Seva Admin AI", the official smart and multilingual operations assistant built into the Admin & Sub-Admin panel of "Seva Fast". Your job is to help admins and sub-admins instantly understand what's happening on the platform right now, and to clearly explain EXACTLY HOW and WHERE to operate or edit every section, page, banner, product, category, and setting in the panel — so they never have to dig through the panel manually or stay confused about any feature.
@@ -166,9 +168,10 @@ Use your tools to fetch REAL, live data whenever the user asks about current pla
 - **get_support_tickets_summary**: Open/high-priority support ticket counts and recent samples.
 - **get_wallet_overview**: Platform admin wallet balance and totals.
 - **get_subadmins_list**: List of sub-admin accounts and the exact panel permissions each one has been granted.
+- **find_category**: Check if a category / sub-category exists (by name) and which parent it sits under.
 
 ### How To Answer:
-- If the user asks about ANY page, feature, or section they can't find or want to edit, explain the exact navigation path (e.g. **Sidebar → Marketing Tools → Create Sections**), direct URL (\`/admin/experience-studio\`), and the exact steps to edit it.
+- If the user asks where/how to find or edit a page, feature, or section, give the one navigation path (e.g. **Sidebar → Marketing Tools → Create Sections**) and only the steps needed.
 - If the user asks about image/banner sizes or how to prevent cropping/cutting, provide the exact dimension numbers, aspect ratios, and safe-zone padding advice from above.
 - If the user asks for live numbers/status, call the right tool and answer using ONLY the tool's real result.
 - If a sub-admin lacks permission for a section they're asking about, tell them plainly that they don't currently have access to that section and to contact the admin to request it.
@@ -254,6 +257,7 @@ const tools = [
     description: "Fetch the list of sub-admin accounts and exactly which panel sections each one is permitted to access.",
     parameters: { type: "OBJECT", properties: {} },
   },
+  findCategoryTool,
 ];
 
 // Maps each tool to the exact permission label sub-admins are granted
@@ -268,6 +272,7 @@ const TOOL_PERMISSION = {
   get_support_tickets_summary: "Customer Support",
   get_wallet_overview: "Wallet",
   get_subadmins_list: "Sub-Admins",
+  find_category: "Categories",
 };
 
 const ORDER_STATUS_LABELS = {
@@ -309,7 +314,7 @@ export const handleAdminChat = async (req, res) => {
       ? `\n### Current User Context:\nYou are speaking with a SUB-ADMIN named "${admin.name}". They can ONLY access these panel sections: ${allowedPermissions.length > 0 ? allowedPermissions.join(", ") : "(none assigned yet)"}. If they ask about live data or a "how to" for a section outside this list, tell them clearly that section is not enabled for their account and to ask the main admin to grant access — do not fabricate data for it.\n`
       : `\n### Current User Context:\nYou are speaking with the main ADMIN named "${admin.name}", who has full access to every panel section.\n`;
 
-    const systemInstruction = ADMIN_SYSTEM_INSTRUCTION_BASE + roleContext;
+    const systemInstruction = ADMIN_SYSTEM_INSTRUCTION_BASE + roleContext + REPLY_STYLE_RULES;
 
     const formattedHistory = history.map((msg) => ({
       role: msg.role === "user" ? "user" : "model",
@@ -507,6 +512,10 @@ export const handleAdminChat = async (req, res) => {
             ? subAdmins.map((s) => ({ name: s.name, email: s.email, permissions: s.allowedPermissions || [] }))
             : "No sub-admin accounts created yet.",
         };
+      }
+
+      if (name === "find_category") {
+        return findCategories(args.name);
       }
 
       return { error: `Unknown tool: ${name}` };

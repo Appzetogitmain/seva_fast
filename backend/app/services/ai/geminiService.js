@@ -5,6 +5,7 @@ dotenv.config();
 
 const apiKey = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
+const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
 
 let client = null;
 
@@ -142,6 +143,56 @@ export async function analyzeImageForSearch({
     if (err instanceof AiServiceError) throw err;
     throw new AiServiceError(err.message || "Gemini image analysis failed", "AI_ERROR", err);
   }
+}
+
+/**
+ * Text-to-image. Returns the first generated image as base64; throws
+ * NO_IMAGE when the model answers with text only (e.g. a blocked prompt).
+ */
+export async function generateImage({
+  prompt,
+  aspectRatio = "1:1",
+  timeoutMs = 60000,
+}) {
+  let response;
+  let timeoutHandle;
+  try {
+    const ai = getClient();
+    response = await Promise.race([
+      ai.models.generateContent({
+        model: IMAGE_MODEL,
+        contents: prompt,
+        config: {
+          responseModalities: ["IMAGE"],
+          imageConfig: { aspectRatio },
+        },
+      }),
+      new Promise((_, reject) => {
+        timeoutHandle = setTimeout(
+          () => reject(new AiServiceError("Gemini image request timed out", "TIMEOUT")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } catch (err) {
+    if (err instanceof AiServiceError) throw err;
+    const status = err?.status || err?.response?.status;
+    const code =
+      status === 429 ? "RATE_LIMITED" : status >= 500 ? "UPSTREAM_ERROR" : "AI_ERROR";
+    throw new AiServiceError(err.message || "Gemini image generation failed", code, err);
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+
+  const parts = response?.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find((p) => p.inlineData?.data);
+  if (!imagePart) {
+    throw new AiServiceError("Gemini returned no image", "NO_IMAGE");
+  }
+  return {
+    data: imagePart.inlineData.data,
+    mimeType: imagePart.inlineData.mimeType || "image/png",
+  };
 }
 
 export async function analyzeImageStructuredJson({

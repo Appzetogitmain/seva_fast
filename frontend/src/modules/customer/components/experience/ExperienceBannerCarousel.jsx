@@ -12,6 +12,11 @@ import { isMobileOrWebView } from "@/core/utils/deviceUtils";
 
 const BANNER_CHUNK_SIZE = 20;
 
+// Banners are never cropped: the image keeps its own aspect ratio and the
+// slide height follows it, so only resize (c_limit) — no c_fill / fixed height.
+const BANNER_TRANSFORM = "f_auto,q_auto,c_limit";
+const BANNER_SRCSET_WIDTHS = [{ w: 480 }, { w: 828 }, { w: 1280 }, { w: 1920 }];
+
 const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap = 0, edgeToEdge = false }) => {
   const navigate = useNavigate();
   if (!items || !items.length) return null;
@@ -123,7 +128,12 @@ const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap 
   const getBannerOptimizedSrc = React.useCallback((url) => {
     if (!url) return url;
     if (!isCloudinaryUrl(url)) return url;
-    return applyCloudinaryTransform(url, "f_auto,q_auto,c_fill,g_auto,w_824,h_380");
+    return applyCloudinaryTransform(url, `${BANNER_TRANSFORM},w_1280`);
+  }, []);
+
+  const getBannerBackdropSrc = React.useCallback((url) => {
+    if (!isCloudinaryUrl(url)) return url;
+    return applyCloudinaryTransform(url, "f_auto,q_auto:low,c_limit,w_64");
   }, []);
 
   return (
@@ -155,7 +165,7 @@ const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap 
               key={idx}
               className={cn(
                 "relative shrink-0 overflow-hidden bg-slate-100 flex items-center justify-center box-border select-none",
-                fullWidth ? "h-[190px] sm:h-[240px] md:h-[300px] lg:h-[380px] xl:h-[420px] rounded-none px-0" : "h-[190px] sm:h-[240px] md:h-[300px] lg:h-[380px] xl:h-[420px] px-4 md:px-8",
+                fullWidth ? "rounded-none px-0" : "px-4 md:px-8",
                 hasLink && "cursor-pointer"
               )}
               style={{ width: `${100 / totalItems}%` }}
@@ -175,33 +185,41 @@ const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap 
               }
             >
               {fullWidth ? (
-                <img
-                  src={getBannerOptimizedSrc(banner.imageUrl)}
-                  srcSet={
-                    isCloudinaryUrl(banner.imageUrl)
-                      ? buildCloudinarySrcSet(banner.imageUrl, [
-                          { w: 412, h: 190 },
-                          { w: 824, h: 380 },
-                          { w: 1248, h: 570 },
-                        ])
-                      : undefined
-                  }
-                  sizes="100vw"
-                  alt={banner.title || section?.title || "Banner"}
-                  className={cn(
-                    "w-full h-full object-cover object-center pointer-events-none transition-transform duration-300",
-                    hasLink && "hover:scale-[1.01]"
-                  )}
-                  width={412}
-                  height={190}
-                  loading={idx === 0 ? "eager" : "lazy"}
-                  fetchPriority={idx === 0 ? "high" : "low"}
-                  decoding="async"
-                />
+                <>
+                  {/* Blurred copy fills the sides when the height cap below
+                      kicks in on very wide screens (image is never cropped). */}
+                  <img
+                    src={getBannerBackdropSrc(banner.imageUrl)}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 pointer-events-none"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <img
+                    src={getBannerOptimizedSrc(banner.imageUrl)}
+                    srcSet={
+                      isCloudinaryUrl(banner.imageUrl)
+                        ? buildCloudinarySrcSet(banner.imageUrl, BANNER_SRCSET_WIDTHS, BANNER_TRANSFORM)
+                        : undefined
+                    }
+                    sizes="100vw"
+                    alt={banner.title || section?.title || "Banner"}
+                    className={cn(
+                      "relative w-full h-auto object-contain object-center pointer-events-none transition-transform duration-300 lg:max-h-[calc(100vh-190px)]",
+                      hasLink && "hover:scale-[1.01]"
+                    )}
+                    width={1200}
+                    height={520}
+                    loading={idx === 0 ? "eager" : "lazy"}
+                    fetchPriority={idx === 0 ? "high" : "low"}
+                    decoding="async"
+                  />
+                </>
               ) : (
                 <div
                   className={cn(
-                    "h-full w-full max-w-[560px] overflow-hidden rounded-3xl bg-slate-100 shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-all duration-300",
+                    "w-full max-w-[560px] overflow-hidden rounded-3xl bg-slate-100 shadow-[0_12px_30px_rgba(15,23,42,0.08)] transition-all duration-300",
                     hasLink && "hover:shadow-[0_16px_36px_rgba(15,23,42,0.14)] hover:scale-[1.01]"
                   )}
                 >
@@ -209,17 +227,14 @@ const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap 
                     src={getBannerOptimizedSrc(banner.imageUrl)}
                     srcSet={
                       isCloudinaryUrl(banner.imageUrl)
-                        ? buildCloudinarySrcSet(banner.imageUrl, [
-                            { w: 560, h: 190 },
-                            { w: 1120, h: 380 },
-                          ])
+                        ? buildCloudinarySrcSet(banner.imageUrl, [{ w: 560 }, { w: 1120 }], BANNER_TRANSFORM)
                         : undefined
                     }
                     sizes="(max-width: 768px) 100vw, 560px"
                     alt={banner.title || section?.title || "Banner"}
-                    className="w-full h-full object-cover object-center pointer-events-none"
-                    width={560}
-                    height={190}
+                    className="block w-full h-auto pointer-events-none"
+                    width={1200}
+                    height={520}
                     loading={idx === 0 ? "eager" : "lazy"}
                     fetchPriority={idx === 0 ? "high" : "low"}
                     decoding="async"

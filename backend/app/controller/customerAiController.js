@@ -18,6 +18,8 @@ import { isPanIndiaEligibleForListing } from "../services/productAvailabilitySer
 import { matchShoppingItemWithCatalog } from "../services/catalogMatcherService.js";
 import { applyOutputGuardrail } from "../services/chatbot/outputGuardrail.js";
 import { trackChatTurn } from "../services/chatbot/chatTrackingService.js";
+import { REPLY_STYLE_RULES } from "../services/chatbot/replyStyle.js";
+import { findCategoryTool, findCategories } from "../services/chatbot/categoryLookup.js";
 
 const CUSTOMER_SYSTEM_INSTRUCTION = `
 You are "Seva AI", the official smart and multilingual assistant for "Seva Fast" - India's premier hyper-local quick-commerce, home services & community referral platform.
@@ -83,7 +85,7 @@ You are "Seva AI", the official smart and multilingual assistant for "Seva Fast"
 - **Zero User PII / Cross-Data Leakage**: NEVER expose phone numbers, emails, full addresses, or order history of other customers or sellers.
 - **Never Show Database Object IDs**: NEVER output raw 24-character hexadecimal MongoDB \`_id\`s, seller IDs, or database tokens. Only mention friendly names, prices, and status.
 - **No Fabrications**: Always use provided tools for live data. Do not make up fake coupons, delivery statuses, or false prices.
-`;
+${REPLY_STYLE_RULES}`;
 
 const tools = [
   {
@@ -150,6 +152,7 @@ const tools = [
       properties: {},
     },
   },
+  findCategoryTool,
   {
     name: "add_to_cart",
     description: "Use this tool to add a product to the user's cart after verifying stock availability. First, you MUST search for the product using search_products if you don't already have the product_id. Specify the requested quantity if specified by user.",
@@ -371,6 +374,10 @@ export const handleChat = async (req, res) => {
           .select("name image")
           .lean();
         return { categories: categories.map(c => c.name) };
+      }
+
+      if (name === "find_category") {
+        return findCategories(args.name, { activeOnly: true });
       }
 
       if (name === "add_to_cart") {

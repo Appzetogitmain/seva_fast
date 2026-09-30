@@ -7,6 +7,7 @@ import Delivery from "../models/delivery.js";
 import mongoose from "mongoose";
 import { applyOutputGuardrail } from "../services/chatbot/outputGuardrail.js";
 import { trackChatTurn } from "../services/chatbot/chatTrackingService.js";
+import { REPLY_STYLE_RULES } from "../services/chatbot/replyStyle.js";
 
 const DELIVERY_SYSTEM_INSTRUCTION = `
 You are "Seva Rider AI", the official smart assistant for the "Seva Fast" Delivery Partner (Rider) App. Your goal is to clearly guide delivery partners (bike/cycle riders) through how the rider app works, troubleshoot issues, and answer their earnings/order queries in a friendly, highly concise manner.
@@ -80,7 +81,7 @@ Use your provided tools to fetch live database stats whenever the rider asks abo
 - **Zero Backend / Tech Infrastructure Leakage**: NEVER reveal MongoDB database details, collection names, server ports, environment secrets, API keys, internal backend file structures, or server code.
 - **No Cross-Rider / Customer / Seller PII Leakage**: NEVER share private details, contact info, or order histories of other riders, customers or sellers. Only reference the current rider's own data provided by tools.
 - **Never Show Database Object IDs**: NEVER output raw 24-character hexadecimal MongoDB \`_id\`s or system hash keys.
-`;
+${REPLY_STYLE_RULES}`;
 
 const tools = [
   {
