@@ -53,10 +53,52 @@ const toSizedImage = (base64, mimeType, size, fileName) =>
     img.src = `data:${mimeType};base64,${base64}`;
   });
 
+// The reference photo travels in a JSON body capped at 1MB server-side, so
+// downscale + re-encode it first. Works for both freshly picked photos
+// (data: URLs) and already-saved ones (remote URLs).
+const REFERENCE_MAX_DIMENSION = 1024;
+
+const toReferencePayload = async (src) => {
+  const blob = await (await fetch(src)).blob();
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Could not read the reference photo"));
+      el.src = objectUrl;
+    });
+    const scale = Math.min(1, REFERENCE_MAX_DIMENSION / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas is not supported on this device");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return {
+      referenceImageBase64: canvas.toDataURL("image/jpeg", 0.82).replace(/^data:(.*,)?/, ""),
+      referenceMimeType: "image/jpeg",
+    };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
+
+const REFERENCE_PRESETS = [
+  { label: "Different angle", prompt: "Show the same product from a different angle on a clean white background." },
+  { label: "Close-up", prompt: "Close-up shot showing the material and details of the same product." },
+  { label: "In use", prompt: "Lifestyle photo of the same product being used or worn in a natural setting." },
+  { label: "Back view", prompt: "Show the back side of the same product on a clean white background." },
+];
+
 /**
  * "Generate with AI" button + prompt dialog.
  * - generate: api call, e.g. adminApi.generateAiImage / sellerApi.generateAiImage
  * - target: "category" | "product" (picks the image style on the server)
+ * - referenceImage: optional photo (data URL or remote URL). When given, the
+ *   user can generate a new shot of that same item instead of prompt-only.
  * - onUse({ file, dataUrl }): called when the user accepts the image
  */
 const AiImageGenerator = ({
@@ -64,6 +106,7 @@ const AiImageGenerator = ({
   target = "product",
   defaultPrompt = "",
   size = 800,
+  referenceImage,
   onUse,
   label = "Generate with AI",
   className,
@@ -72,11 +115,19 @@ const AiImageGenerator = ({
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState(null);
+  const [useReference, setUseReference] = useState(false);
 
   const open = () => {
-    setPrompt(defaultPrompt || "");
+    const withReference = Boolean(referenceImage);
+    setUseReference(withReference);
+    setPrompt(withReference ? REFERENCE_PRESETS[0].prompt : defaultPrompt || "");
     setResult(null);
     setIsOpen(true);
+  };
+
+  const toggleReference = (checked) => {
+    setUseReference(checked);
+    setPrompt(checked ? REFERENCE_PRESETS[0].prompt : defaultPrompt || "");
   };
 
   const close = () => {
@@ -86,13 +137,15 @@ const AiImageGenerator = ({
 
   const handleGenerate = async () => {
     const cleanPrompt = prompt.trim();
-    if (cleanPrompt.length < 3) {
+    const withReference = useReference && Boolean(referenceImage);
+    if (!withReference && cleanPrompt.length < 3) {
       toast.error("Please describe the image you want");
       return;
     }
     setIsGenerating(true);
     try {
-      const res = await generate({ prompt: cleanPrompt, target });
+      const reference = withReference ? await toReferencePayload(referenceImage) : {};
+      const res = await generate({ prompt: cleanPrompt, target, ...reference });
       const data = res.data.result || res.data.data || {};
       if (!data.imageBase64) throw new Error("No image returned");
       const sized = await toSizedImage(
@@ -152,10 +205,54 @@ const AiImageGenerator = ({
                 </button>
               </div>
 
-              <div className="p-5 space-y-4">
+              <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                {referenceImage && (
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 p-2 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useReference}
+                        disabled={isGenerating}
+                        onChange={(e) => toggleReference(e.target.checked)}
+                        className="w-4 h-4 accent-violet-600"
+                      />
+                      <img
+                        src={referenceImage}
+                        alt="Reference"
+                        className="w-10 h-10 rounded-md object-cover border border-gray-200"
+                      />
+                      <span className="text-xs text-gray-700">
+                        <span className="font-semibold block">Use main photo as reference</span>
+                        New image will show the same product. Untick to generate from the prompt only.
+                      </span>
+                    </label>
+                    {useReference && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {REFERENCE_PRESETS.map((preset) => (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            disabled={isGenerating}
+                            onClick={() => setPrompt(preset.prompt)}
+                            className={cn(
+                              "px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors",
+                              prompt === preset.prompt
+                                ? "bg-violet-600 border-violet-600 text-white"
+                                : "bg-white border-gray-300 text-gray-700 hover:border-violet-400",
+                            )}>
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-gray-700">
-                    Describe the image
+                    {useReference && referenceImage
+                      ? "How should the new photo look?"
+                      : "Describe the image"}
                   </label>
                   <textarea
                     value={prompt}

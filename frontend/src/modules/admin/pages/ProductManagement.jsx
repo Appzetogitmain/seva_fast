@@ -1196,6 +1196,23 @@ const ProductManagement = () => {
                                             <div className="space-y-3 pt-2">
                                                 <div className="flex items-center justify-between gap-4">
                                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Gallery Photos</label>
+                                                    {(formData.galleryImages || []).length < 5 && (
+                                                        <AiImageGenerator
+                                                            generate={adminApi.generateAiImage}
+                                                            target="product"
+                                                            label="Add photo with AI"
+                                                            className="ml-auto"
+                                                            defaultPrompt={formData.name}
+                                                            referenceImage={formData.mainImage}
+                                                            onUse={({ file, dataUrl }) =>
+                                                                setFormData((prev) => ({
+                                                                    ...prev,
+                                                                    galleryImages: [...(prev.galleryImages || []), dataUrl],
+                                                                    galleryFiles: [...(prev.galleryFiles || []), file],
+                                                                }))
+                                                            }
+                                                        />
+                                                    )}
                                                     <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest cursor-pointer hover:-translate-y-0.5 transition-all">
                                                         <HiOutlinePhoto className="h-4 w-4" />
                                                         <span>Add Photos</span>

@@ -391,6 +391,13 @@ const ProductManagement = () => {
         return;
       }
 
+      // The cover was removed but not replaced — the server would silently
+      // keep the old one, so ask for a new cover instead.
+      if (editingItem?.mainImage && !formData.mainImage) {
+        toast.error("Please upload or generate a new main cover photo before saving.");
+        return;
+      }
+
       const data = new FormData();
       data.append("name", formData.name);
       data.append("slug", formData.slug);
@@ -480,6 +487,23 @@ const ProductManagement = () => {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const removeGalleryImageAt = (index) => {
+    setFormData((prev) => {
+      const images = prev.galleryImages || [];
+      const files = prev.galleryFiles || [];
+      // New File objects are always appended after existing remote URLs.
+      const existingCount = Math.max(0, images.length - files.length);
+      return {
+        ...prev,
+        galleryImages: images.filter((_, i) => i !== index),
+        galleryFiles:
+          index >= existingCount
+            ? files.filter((_, i) => i !== index - existingCount)
+            : files,
+      };
+    });
   };
 
   const exportProducts = () => {
@@ -1549,7 +1573,21 @@ const ProductManagement = () => {
                               onChange={(e) => handleImageUpload(e, "main")}
                             />
                             {formData.mainImage ? (
-                              <img src={formData.mainImage} alt="Main Preview" className="w-full h-full object-cover" />
+                              <>
+                                <img src={formData.mainImage} alt="Main Preview" className="w-full h-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setFormData((prev) => ({ ...prev, mainImage: null, mainImageFile: null }));
+                                  }}
+                                  className="absolute top-2 right-2 p-1.5 bg-white text-rose-500 rounded-full shadow-md hover:bg-rose-50 transition-colors z-20"
+                                  title="Remove cover photo"
+                                >
+                                  <HiOutlineTrash className="h-4 w-4" />
+                                </button>
+                              </>
                             ) : (
                               <div className="flex flex-col items-center">
                                 <HiOutlinePhoto className="h-10 w-10 text-slate-200" />
@@ -1569,15 +1607,41 @@ const ProductManagement = () => {
                       </div>
 
                       <div className="space-y-3">
-                        <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
-                          Gallery Photos
-                        </label>
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                          <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                            Gallery Photos
+                          </label>
+                          {(formData.galleryImages || []).length < 4 && (
+                            <AiImageGenerator
+                              generate={sellerApi.generateAiImage}
+                              target="product"
+                              label="Add photo with AI"
+                              defaultPrompt={formData.name}
+                              referenceImage={formData.mainImage}
+                              onUse={({ file, dataUrl }) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  galleryImages: [...(prev.galleryImages || []), dataUrl],
+                                  galleryFiles: [...(prev.galleryFiles || []), file],
+                                }))
+                              }
+                            />
+                          )}
+                        </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {(formData.galleryImages || []).slice(0, 4).map((img, idx) => (
+                          {(formData.galleryImages || []).map((img, idx) => (
                             <div
                               key={`${img}-${idx}`}
                               className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden relative">
                               <img src={img} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => removeGalleryImageAt(idx)}
+                                className="absolute top-2 right-2 p-1.5 bg-white text-rose-500 rounded-full shadow-md hover:bg-rose-50 transition-colors z-20"
+                                title="Remove photo"
+                              >
+                                <HiOutlineTrash className="h-4 w-4" />
+                              </button>
                             </div>
                           ))}
                           {Array.from({ length: Math.max(0, 4 - (formData.galleryImages || []).length) }).map((_, idx) => (
@@ -1597,7 +1661,7 @@ const ProductManagement = () => {
                           ))}
                         </div>
                         <p className="text-[10px] text-slate-500 font-medium">
-                          Existing gallery images are shown here. Uploading new images will append them to the gallery.
+                          Use the bin icon to remove a photo. Changes apply when you save the product.
                         </p>
                       </div>
                     </div>

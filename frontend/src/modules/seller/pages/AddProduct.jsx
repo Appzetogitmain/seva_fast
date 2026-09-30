@@ -1349,9 +1349,27 @@ const AddProduct = () => {
 
               {/* Gallery Section */}
               <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
-                  Gallery Photos (Max 5)
-                </label>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
+                    Gallery Photos (Max 5)
+                  </label>
+                  {(formData.galleryImages || []).length < 5 && (
+                    <AiImageGenerator
+                      generate={sellerApi.generateAiImage}
+                      target="product"
+                      label="Add photo with AI"
+                      defaultPrompt={formData.name}
+                      referenceImage={formData.mainImage}
+                      onUse={({ file, dataUrl }) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          galleryImages: [...(prev.galleryImages || []), dataUrl],
+                          galleryFiles: [...(prev.galleryFiles || []), file],
+                        }))
+                      }
+                    />
+                  )}
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <div
