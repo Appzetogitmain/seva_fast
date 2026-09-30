@@ -17,6 +17,7 @@ import {
     startForegroundPushListener
 } from '@core/firebase/pushClient';
 import { formatDate } from '@shared/utils/formatDate';
+import { buildAppReferUrl, buildPlayStoreReferUrl } from '../utils/referralLinks';
 import { CustomPhotoOrderModal } from '../components/shared/CustomPhotoOrderModal';
 import { CustomerNotificationsModal } from '../components/shared/CustomerNotificationsModal';
 
@@ -240,12 +241,9 @@ const ProfilePage = () => {
     const siteReferUrl = referralCode
         ? `${siteOrigin}/signup?ref=${encodeURIComponent(referralCode)}`
         : siteOrigin;
-    const defaultPlayStoreLink = 'https://play.google.com/store/apps/details?id=com.sevafast.user';
-    const basePlayStoreLink = settings?.playStoreLink || defaultPlayStoreLink;
-    // Play Install Referrer: the app reads "ref=<CODE>" on first launch after install.
     const appReferUrl = referralCode
-        ? `${basePlayStoreLink}${basePlayStoreLink.includes('?') ? '&' : '?'}referrer=${encodeURIComponent(`ref=${referralCode}`)}`
-        : basePlayStoreLink;
+        ? buildAppReferUrl(siteOrigin, referralCode)
+        : buildPlayStoreReferUrl(settings?.playStoreLink);
     const cardReferUrl = siteReferUrl;
     const referrerName = getReferrerDisplayName(user?.referredBy);
     const logoUrl = settings?.logoUrl || '/seva-fast-logo.png';

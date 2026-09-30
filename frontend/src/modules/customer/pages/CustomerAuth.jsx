@@ -24,6 +24,7 @@ import {
 import { toast } from 'sonner';
 import { customerApi } from '../services/customerApi';
 import { isValidIndianPhone } from '../utils/phoneValidation';
+import { buildPlayStoreReferUrl } from '../utils/referralLinks';
 import BgImage from '@/assets/image.png';
 import PlanCard from '@/shared/components/ui/PlanCard';
 
@@ -132,6 +133,35 @@ const CustomerAuth = () => {
             setReferralCode(clean);
         }
     }, [urlReferral]);
+
+    // "App refer" links land here with install=1. If the app is installed Android opens it
+    // directly (App Link); if we are still in a browser, send the visitor to the Play Store
+    // with the code as install referrer so the app can apply it on first launch.
+    useEffect(() => {
+        if (searchParams.get('install') !== '1' || !urlReferral) return;
+        if (window.Flutter || !/Android/i.test(navigator.userAgent)) return;
+        const clean = urlReferral.trim().toUpperCase();
+        const redirectKey = `seva_install_redirect_${clean}`;
+        if (sessionStorage.getItem(redirectKey)) return;
+        sessionStorage.setItem(redirectKey, '1');
+        window.location.href = buildPlayStoreReferUrl(settings?.playStoreLink, clean);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Lets the Flutter wrapper push a referral code (deep link / install referrer) into
+    // an already loaded page: window.SevaFastApplyReferral('CODE')
+    useEffect(() => {
+        window.SevaFastApplyReferral = (code) => {
+            const clean = String(code || '').trim().toUpperCase();
+            if (!clean) return false;
+            sessionStorage.setItem('seva_referral_code', clean);
+            setReferralCode(clean);
+            return true;
+        };
+        return () => {
+            delete window.SevaFastApplyReferral;
+        };
+    }, []);
 
     const [formData, setFormData] = useState(() => {
         const draft = getStoredCustomerDraft();
