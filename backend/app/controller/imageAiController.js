@@ -31,6 +31,16 @@ const IMAGE_STYLE = {
 const COMMON_RULES =
   "Square 1:1 composition. Do NOT add any text, captions, watermarks, logos, borders, or price tags to the image.";
 
+// Reference mode: a second photo of the SAME item (for the gallery), so the
+// product itself must not be redesigned.
+const REFERENCE_STYLE =
+  "The attached photo shows a product. Create a NEW professional e-commerce photo of the EXACT same product — keep its design, colours, pattern, material, shape and any branding identical. Only change how it is shown (angle, framing, background or setting) as described below. Product fully visible and centered with some margin, sharp focus, realistic lighting.";
+const DEFAULT_REFERENCE_CHANGE = "Show the same product from a different angle on a clean white background.";
+
+const REFERENCE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+// The panel downsizes the reference before sending; the JSON body limit is 1MB.
+const MAX_REFERENCE_BYTES = 700 * 1024;
+
 const MAX_PROMPT_LENGTH = 500;
 
 /**
@@ -40,10 +50,18 @@ const MAX_PROMPT_LENGTH = 500;
  */
 export const generateCatalogImage = async (req, res) => {
   try {
-    const { prompt, target } = req.body || {};
+    const { prompt, target, referenceImageBase64, referenceMimeType } = req.body || {};
     const cleanPrompt = typeof prompt === "string" ? prompt.trim() : "";
+    const hasReference = typeof referenceImageBase64 === "string" && referenceImageBase64.length > 0;
 
-    if (cleanPrompt.length < 3) {
+    if (hasReference) {
+      if (!REFERENCE_MIME_TYPES.includes(referenceMimeType)) {
+        return handleResponse(res, 400, "Reference image must be a JPG, PNG or WebP");
+      }
+      if (Buffer.byteLength(referenceImageBase64, "base64") > MAX_REFERENCE_BYTES) {
+        return handleResponse(res, 413, "Reference image is too large");
+      }
+    } else if (cleanPrompt.length < 3) {
       return handleResponse(res, 400, "Please describe the image you want");
     }
     if (cleanPrompt.length > MAX_PROMPT_LENGTH) {
@@ -52,9 +70,14 @@ export const generateCatalogImage = async (req, res) => {
 
     const style = IMAGE_STYLE[target] || IMAGE_STYLE.product;
 
-    const image = await generateImage({
-      prompt: `${style} ${COMMON_RULES}\n\nSubject: ${cleanPrompt}`,
-    });
+    const image = await generateImage(
+      hasReference
+        ? {
+            prompt: `${REFERENCE_STYLE} ${COMMON_RULES}\n\nWhat to change: ${cleanPrompt || DEFAULT_REFERENCE_CHANGE}`,
+            referenceImage: { data: referenceImageBase64, mimeType: referenceMimeType },
+          }
+        : { prompt: `${style} ${COMMON_RULES}\n\nSubject: ${cleanPrompt}` },
+    );
 
     return handleResponse(res, 200, "Image generated", {
       imageBase64: image.data,

@@ -152,16 +152,30 @@ export async function analyzeImageForSearch({
 export async function generateImage({
   prompt,
   aspectRatio = "1:1",
+  referenceImage,
   timeoutMs = 60000,
 }) {
   let response;
   let timeoutHandle;
   try {
     const ai = getClient();
+    // With a reference photo the model edits/re-shoots that same subject
+    // instead of inventing one from the text alone.
+    const contents = referenceImage
+      ? [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              { inlineData: { data: referenceImage.data, mimeType: referenceImage.mimeType } },
+            ],
+          },
+        ]
+      : prompt;
     response = await Promise.race([
       ai.models.generateContent({
         model: IMAGE_MODEL,
-        contents: prompt,
+        contents,
         config: {
           responseModalities: ["IMAGE"],
           imageConfig: { aspectRatio },
