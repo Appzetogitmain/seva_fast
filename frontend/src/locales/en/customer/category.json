@@ -1,0 +1,8 @@
+{
+  "showing_one": "Showing {{count}} item",
+  "showing_other": "Showing {{count}} items",
+  "ourService": "Our service",
+  "notAvailable": "{{app}} is not available in your area yet. We're expanding fast!",
+  "tryRefreshing": "Try Refreshing",
+  "noProducts": "No products found in this subcategory."
+}

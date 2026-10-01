@@ -1,10 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Facebook, Twitter, Instagram, Youtube, Mail, Phone } from 'lucide-react';
 import Logo from '@/assets/Logo.png';
 import { useSettings } from '@core/context/SettingsContext';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
+    const { t } = useTranslation('customer');
     const { settings } = useSettings();
     const logoUrl = settings?.logoUrl || Logo;
     const primaryColor = settings?.primaryColor || 'var(--primary)';
@@ -33,7 +35,7 @@ const Footer = () => {
                             <img src={logoUrl} alt={`${settings?.appName || 'SevaFast'} Logo`} loading="lazy" className="h-12 md:h-16 w-auto object-contain" />
                         </div>
                         <p className="text-sm leading-relaxed md:text-base md:leading-loose text-white/90 md:max-w-xs transition-opacity hover:opacity-100 font-medium">
-                            Your daily dose of fresh, organic, and healthy products delivered straight to your door. Freshness guaranteed.
+                            {t('footer.tagline')}
                         </p>
                         <div className="flex gap-4">
                             {settings?.facebook && <a href={settings.facebook} target="_blank" rel="noopener noreferrer" className="p-2 bg-white/10 text-white rounded-full transition-all group active:scale-95 hover:opacity-90"><Facebook size={18} /></a>}
@@ -46,37 +48,37 @@ const Footer = () => {
                     {/* Quick Links */}
                     <div className="md:pt-4">
                         <h3 className="text-white font-bold text-lg mb-4 md:text-xl md:font-black md:uppercase md:tracking-widest md:mb-8 flex items-center gap-2">
-                            <span className="h-1 w-4 hidden md:block" style={{ backgroundColor: primaryColor }}></span> Quick Links
+                            <span className="h-1 w-4 hidden md:block" style={{ backgroundColor: primaryColor }}></span> {t('footer.quickLinks')}
                         </h3>
                         <ul className="space-y-2 md:space-y-4">
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Home</a></li>
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>About Us</a></li>
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Shop</a></li>
-                            <li><Link to="/professionals" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Services near you</Link></li>
-                            <li><Link to="/seller/auth?mode=signup" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Become a Seller</Link></li>
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Blogs</a></li>
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Contact</a></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('nav.home')}</a></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('profile.menu.about')}</a></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.shop')}</a></li>
+                            <li><Link to="/professionals" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.servicesNear')}</Link></li>
+                            <li><Link to="/seller/auth?mode=signup" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.becomeSeller')}</Link></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.blogs')}</a></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.contact')}</a></li>
                         </ul>
                     </div>
 
                     {/* Categories */}
                     <div className="md:pt-4">
                         <h3 className="text-white font-bold text-lg mb-4 md:text-xl md:font-black md:uppercase md:tracking-widest md:mb-8 flex items-center gap-2">
-                            <span className="h-1 w-4 hidden md:block" style={{ backgroundColor: primaryColor }}></span> Categories
+                            <span className="h-1 w-4 hidden md:block" style={{ backgroundColor: primaryColor }}></span> {t('nav.categories')}
                         </h3>
                         <ul className="space-y-2 md:space-y-4">
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Fruits & Vegetables</a></li>
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Dairy Products</a></li>
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Meat & Fish</a></li>
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Bakery & Snacks</a></li>
-                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>Beverages</a></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.fruitsVeg')}</a></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.dairy')}</a></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.meatFish')}</a></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.bakery')}</a></li>
+                            <li><a href="#" className="hover:text-brand-300 transition-colors md:text-base md:font-semibold flex items-center group text-white"><span className="hidden md:block w-0 h-px bg-white group-hover:w-4 group-hover:mr-2 transition-all"></span>{t('footer.beverages')}</a></li>
                         </ul>
                     </div>
 
                     {/* Contact Info */}
                     <div className="md:pt-4">
                         <h3 className="text-white font-bold text-lg mb-4 md:text-xl md:font-black md:uppercase md:tracking-widest md:mb-8 flex items-center gap-2">
-                            <span className="h-1 w-4 hidden md:block" style={{ backgroundColor: primaryColor }}></span> Contact Us
+                            <span className="h-1 w-4 hidden md:block" style={{ backgroundColor: primaryColor }}></span> {t('footer.contactUs')}
                         </h3>
                         <ul className="space-y-4 md:space-y-6">
                             <li className="flex items-center gap-3 md:gap-5 group">
@@ -94,10 +96,10 @@ const Footer = () => {
                 </div>
 
                 <div className="border-t border-white/10 mt-12 pt-8 text-center text-sm md:flex md:justify-between md:text-left md:mt-24 md:pt-12">
-                    <p className="md:text-base text-white/60">&copy; {new Date().getFullYear()} {settings?.appName || 'SevaFast'}. All rights reserved.</p>
+                    <p className="md:text-base text-white/60">&copy; {new Date().getFullYear()} {settings?.appName || 'SevaFast'}. {t('footer.rights')}</p>
                     <div className="flex gap-6 justify-center md:justify-end mt-4 md:mt-0 md:gap-12">
-                        <Link to="/privacy" className="hover:text-brand-300 md:text-base text-white/60 transition-all">Privacy Policy</Link>
-                        <Link to="/terms" className="hover:text-brand-300 md:text-base text-white/60 transition-all">Terms of Service</Link>
+                        <Link to="/privacy" className="hover:text-brand-300 md:text-base text-white/60 transition-all">{t('profile.menu.privacy')}</Link>
+                        <Link to="/terms" className="hover:text-brand-300 md:text-base text-white/60 transition-all">{t('footer.terms')}</Link>
                     </div>
                 </div>
             </div>

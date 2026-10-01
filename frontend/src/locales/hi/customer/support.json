@@ -1,0 +1,25 @@
+{
+  "ticketRaised": "टिकट सफलतापूर्वक बन गया",
+  "ticketFailed": "टिकट नहीं बन सका",
+  "instant": "तुरंत सहायता",
+  "raiseTicket": "टिकट बनाएं",
+  "formalRequest": "औपचारिक अनुरोध",
+  "notAvailable": "उपलब्ध नहीं",
+  "phoneCopied": "फ़ोन नंबर कॉपी हो गया!",
+  "copyFailed": "कॉपी नहीं हुआ, नंबर: {{phone}}",
+  "emailUs": "ईमेल करें",
+  "faq": "अक्सर पूछे जाने वाले सवाल",
+  "noFaq": "अभी कोई सवाल-जवाब उपलब्ध नहीं।",
+  "describe": "अपनी समस्या विस्तार से बताएं",
+  "subject": "विषय",
+  "subjectPlaceholder": "समस्या किस बारे में है?",
+  "priority": {
+    "low": "कम",
+    "medium": "मध्यम",
+    "high": "ज़्यादा"
+  },
+  "description": "विवरण",
+  "descriptionPlaceholder": "कृपया समस्या साफ़-साफ़ बताएं...",
+  "submitting": "भेजा जा रहा है...",
+  "submit": "टिकट भेजें"
+}

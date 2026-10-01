@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Shield } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettings } from '@core/context/SettingsContext';
@@ -12,11 +13,12 @@ import {
 import { formatDate } from '@shared/utils/formatDate';
 
 const PrivacyPage = () => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { settings } = useSettings();
     const audience = normalizeLegalAudience(searchParams.get('for') || searchParams.get('audience'));
-    const audienceLabel = getLegalAudienceLabel(audience);
+    const audienceLabel = t(`legal.audience.${audience}`, { defaultValue: getLegalAudienceLabel(audience) });
     const appName = settings?.appName || 'App';
     const companyName = settings?.companyName || appName;
     const adminPrivacy = getLegalContent(settings, audience, 'privacy');
@@ -31,7 +33,7 @@ const PrivacyPage = () => {
                 >
                     <ChevronLeft size={24} className="text-slate-600" />
                 </button>
-                <h1 className="text-lg font-black text-slate-800">Privacy Policy</h1>
+                <h1 className="text-lg font-black text-slate-800">{t('profile.menu.privacy')}</h1>
             </div>
 
             <div className="p-5 max-w-3xl mx-auto space-y-6">
@@ -43,7 +45,7 @@ const PrivacyPage = () => {
                         <div>
                             <h2 className="text-xl font-bold text-slate-800">{audienceLabel} Privacy Policy</h2>
                             <p className="text-xs text-slate-500 font-medium">
-                                {updatedAt ? `Last updated: ${updatedAt}` : `Published by ${companyName}`}
+                                {updatedAt ? t('legal.lastUpdated', { date: updatedAt }) : t('legal.publishedBy', { name: companyName })}
                             </p>
                         </div>
                     </div>
@@ -65,10 +67,10 @@ const PrivacyPage = () => {
                         ) : (
                             <>
                                 <p>
-                                    At {appName}, we take {audienceLabel.toLowerCase()} privacy seriously. This Privacy Policy explains how we collect, use, and protect your personal information.
+                                    {t('legal.privacyIntro', { app: appName, audience: audienceLabel })}
                                 </p>
                                 <p className="text-slate-400 italic">
-                                    A detailed {audienceLabel.toLowerCase()} privacy policy has not been published by the admin yet. Please check back later or contact support.
+                                    {t('legal.privacyMissing', { audience: audienceLabel })}
                                 </p>
                             </>
                         )}

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ArrowUpRight, ArrowDownLeft, ReceiptIndianRupee } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
 import { formatDate, formatTime } from '@shared/utils/formatDate';
 
 const OrderTransactionsPage = () => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -35,16 +37,16 @@ const OrderTransactionsPage = () => {
                 >
                     <ChevronLeft size={22} className="text-slate-800" />
                 </button>
-                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Order Transactions</h1>
+                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">{t('profile.menu.transactions')}</h1>
             </div>
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20">
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
                         <div>
-                            <h3 className="text-base font-semibold text-slate-800">Transaction History</h3>
+                            <h3 className="text-base font-semibold text-slate-800">{t('wallet.history')}</h3>
                             <p className="text-[11px] text-slate-500">
-                                Based on your recent orders
+                                {t('transactions.basedOn')}
                             </p>
                         </div>
                         <ReceiptIndianRupee className="h-5 w-5 text-slate-400" />
@@ -52,15 +54,15 @@ const OrderTransactionsPage = () => {
 
                     {loading ? (
                         <div className="py-10 flex items-center justify-center text-xs text-slate-400 font-semibold">
-                            Loading transactions...
+                            {t('transactions.loading')}
                         </div>
                     ) : orders.length === 0 ? (
                         <div className="py-10 flex flex-col items-center justify-center text-center px-6">
                             <p className="text-sm font-semibold text-slate-500 mb-1">
-                                No transactions yet
+                                {t('transactions.emptyTitle')}
                             </p>
                             <p className="text-[11px] text-slate-400">
-                                Place an order to see your payment history here.
+                                {t('transactions.emptyMessage')}
                             </p>
                         </div>
                     ) : (
@@ -91,11 +93,11 @@ const OrderTransactionsPage = () => {
                                             </div>
                                             <div>
                                                 <h4 className="font-semibold text-slate-800 text-sm">
-                                                    {isRefund ? 'Refund' : 'Order Payment'}
+                                                    {isRefund ? t('transactions.refund') : t('transactions.orderPayment')}
                                                 </h4>
                                                 <p className="text-[11px] text-slate-500">
                                                     #{order.orderId || order._id?.slice(-8)} •{' '}
-                                                    {order.paymentMethod || 'Online'}
+                                                    {order.paymentMethod || t('transactions.online')}
                                                 </p>
                                                 {createdAt && (
                                                     <p className="text-[11px] text-slate-500 mt-0.5">

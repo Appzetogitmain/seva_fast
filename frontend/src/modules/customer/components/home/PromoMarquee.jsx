@@ -1,13 +1,16 @@
 import React, { useMemo } from "react";
-import { buildMarqueeMessages } from "../../constants/homeConstants";
+import { useTranslation } from 'react-i18next';
 import { useSettings } from "@core/context/SettingsContext";
 
 const PromoMarquee = () => {
   const { settings } = useSettings();
-  const marqueeMessages = useMemo(
-    () => buildMarqueeMessages(settings?.minimumOrderValue),
-    [settings?.minimumOrderValue],
-  );
+  const { t } = useTranslation('customer');
+  const minimumOrderValue = Number(settings?.minimumOrderValue || 0);
+  const marqueeMessages = useMemo(() => {
+    const messages = [t('home.marquee.delivery'), t('home.marquee.saveBig')];
+    if (minimumOrderValue > 0) messages.splice(1, 0, t('home.marquee.minOrder', { amount: minimumOrderValue }));
+    return messages;
+  }, [minimumOrderValue, t]);
 
   return (
     <div className="w-full mt-1.5 mb-3 md:mt-0 md:mb-4">

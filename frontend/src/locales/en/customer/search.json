@@ -1,0 +1,22 @@
+{
+  "placeholder": "Search items, categories (e.g. Mango, Doodh)...",
+  "results": "Search Results",
+  "found_one": "{{count}} found",
+  "found_other": "{{count}} found",
+  "filters": "Filters",
+  "price": "Price",
+  "under": "Under ₹{{amount}}",
+  "over": "Over ₹{{amount}}",
+  "rating": "Rating",
+  "brand": "Brand",
+  "clearAll": "Clear All",
+  "noExact": "No exact product found for",
+  "noExactMessage": "We couldn't find an exact match for this item in our store right now. Check out the similar products below:",
+  "tryVoiceAgain": "Try Voice Search Again",
+  "similar": "Similar Products",
+  "availableInStore": "Available in store",
+  "recent": "Recently Searched",
+  "clearHistory": "Clear History",
+  "trending": "Trending Searches",
+  "lowestPrice": "Lowest Price Ever!"
+}

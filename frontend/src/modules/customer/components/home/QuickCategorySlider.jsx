@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import { useTranslation } from 'react-i18next';
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { QUICK_CATEGORY_PALETTES } from "../../constants/homeConstants";
@@ -6,6 +7,7 @@ import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
 import QuickCategoriesBg from "@/assets/Catagorysection_bg.png";
 
 const QuickCategorySlider = ({ categories, onCategoryClick }) => {
+  const { t } = useTranslation('customer');
   const scrollRef = useRef(null);
 
   const scroll = (direction) => {
@@ -30,7 +32,7 @@ const QuickCategorySlider = ({ categories, onCategoryClick }) => {
 
         <div className="relative z-10 px-4 pt-2.5 pb-0.5 md:px-8 md:pt-4">
           <h2 className="text-center text-[17px] md:text-[20px] font-bold tracking-tight text-[#132018] leading-none">
-            Quick categories
+            {t('home.quickCategories')}
           </h2>
         </div>
 

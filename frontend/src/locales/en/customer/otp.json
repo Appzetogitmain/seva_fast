@@ -1,0 +1,11 @@
+{
+  "confirmed": "Delivery Confirmed!",
+  "confirmedSub": "Your order has been successfully delivered",
+  "nearby": "Delivery Partner Nearby",
+  "nearbySub": "Within 0-300 meters of your location",
+  "title": "Delivery OTP",
+  "share": "Share this code with your delivery partner",
+  "expiringSoon": "Expiring Soon",
+  "validFor": "Valid For",
+  "note": "🔒 This OTP is valid for 10 minutes and will be hidden when you switch apps"
+}

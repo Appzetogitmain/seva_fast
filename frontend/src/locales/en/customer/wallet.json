@@ -1,0 +1,7 @@
+{
+  "balance": "Available Balance",
+  "refundsNote": "Return refunds are credited here",
+  "history": "Transaction History",
+  "emptyTitle": "No wallet payments yet",
+  "emptyMessage": "Orders paid using wallet will appear here."
+}

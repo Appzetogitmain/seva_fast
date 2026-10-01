@@ -1,0 +1,57 @@
+{
+  "all": "All",
+  "photoOrder": "Photo Order",
+  "photoOrderTitle": "Send Custom Photo Order",
+  "marquee": {
+    "delivery": "24/7 Delivery",
+    "saveBig": "Save Big on Essentials!",
+    "minOrder": "Minimum Order ₹{{amount}}"
+  },
+  "footerLine1": "India's last",
+  "footerLine2": "minute app",
+  "lowestPrice": "Lowest Price",
+  "ever": "ever",
+  "lowestPriceSub": "Unbeatable Savings • Updated hourly",
+  "trendingNow": "Trending right now",
+  "itemsCount_one": "{{count}} item",
+  "itemsCount_other": "{{count}} items",
+  "lookingForItems": "Looking for the best items in this category...",
+  "localServices": {
+    "title": "Local Service Providers",
+    "heading": "Find Trusted Local Service Providers",
+    "sub": "Search, Compare & Hire Best Local Experts",
+    "searchNow": "Search Now",
+    "viewMore": "View More"
+  },
+  "sponsored": "Sponsored",
+  "visit": "Visit",
+  "mute": "Mute",
+  "unmute": "Unmute",
+  "quickCategories": "Quick categories",
+  "mlm": {
+    "alt": "MLM Promotion",
+    "badge": "SEVAFAST MLM",
+    "title": "JOIN SEVAFAST MULTI LEVEL MARKETING",
+    "subtitle": "Earn More, Refer More, Grow Your Network!",
+    "cta": "JOIN NOW",
+    "steps": [
+      {
+        "title": "Register Free",
+        "subtitle": "Instant Activation"
+      },
+      {
+        "title": "Refer Your Friends",
+        "subtitle": "Share Referral Code"
+      },
+      {
+        "title": "They Shop, You Earn",
+        "subtitle": "Direct & Team Commissions"
+      },
+      {
+        "title": "Unlimited Income",
+        "subtitle": "Multi-Level Growth"
+      }
+    ]
+  },
+  "clickToView": "Click to view"
+}

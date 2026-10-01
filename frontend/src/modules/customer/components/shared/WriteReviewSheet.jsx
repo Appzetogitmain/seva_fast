@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from "framer-motion";
 import { Star, X, Upload, CheckCircle, Video, Image as ImageIcon, Loader2 } from "lucide-react";
 import imageCompression from "browser-image-compression";
@@ -6,6 +7,7 @@ import { customerApi } from "../../services/customerApi";
 import { toast } from "sonner";
 
 const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
+  const { t } = useTranslation('customer');
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -26,7 +28,7 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (imageFiles.length + files.length > 3) {
-      toast.error("You can upload a maximum of 3 images.");
+      toast.error(t('review.errors.maxImages'));
       return;
     }
 
@@ -35,7 +37,7 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
 
     for (const file of files) {
       if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} is too large. Max 10MB allowed.`);
+        toast.error(t('review.errors.imageTooLarge', { name: file.name }));
         continue;
       }
       try {
@@ -49,7 +51,7 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
         newImagePreviews.push(URL.createObjectURL(compressedFile));
       } catch (error) {
         console.error("Error compressing image", error);
-        toast.error(`Could not compress ${file.name}`);
+        toast.error(t('review.errors.compress', { name: file.name }));
       }
     }
 
@@ -62,7 +64,7 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      toast.error("Video is too large. Max 5MB allowed.");
+      toast.error(t('review.errors.videoTooLarge'));
       return;
     }
 
@@ -82,11 +84,11 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
 
   const handleSubmit = async () => {
     if (rating === 0) {
-      toast.error("Please select a rating.");
+      toast.error(t('review.errors.rating'));
       return;
     }
     if (!comment.trim()) {
-      toast.error("Please write a comment.");
+      toast.error(t('review.errors.comment'));
       return;
     }
 
@@ -120,11 +122,11 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
       const res = await customerApi.submitReview(reviewPayload);
       const submittedReview = res.data?.result || reviewPayload;
 
-      toast.success("Review submitted! Waiting for approval.");
+      toast.success(t('review.submitted'));
       onClose(submittedReview); // pass review back so parent can update reviewedMap
     } catch (error) {
       console.error(error);
-      toast.error(error.response?.data?.message || "Failed to submit review");
+      toast.error(error.response?.data?.message || t('review.errors.submitFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -144,7 +146,7 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
         className="fixed bottom-0 left-0 right-0 z-[101] bg-white rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl"
       >
         <div className="flex-shrink-0 flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="text-lg font-black text-gray-900">Write a Review</h2>
+          <h2 className="text-lg font-black text-gray-900">{t('pdp.writeReview')}</h2>
           <button 
             onClick={onClose}
             className="p-2 bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 transition-colors"
@@ -162,7 +164,7 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
             </div>
             <div>
               <p className="font-bold text-gray-900 text-sm line-clamp-2">{product.name}</p>
-              <p className="text-xs text-gray-500 mt-1 font-medium">How was your experience?</p>
+              <p className="text-xs text-gray-500 mt-1 font-medium">{t('review.experience')}</p>
             </div>
           </div>
 
@@ -186,28 +188,28 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
               ))}
             </div>
             <p className="text-sm font-bold text-gray-500 mt-3 h-5">
-              {rating === 1 && "Terrible 😠"}
-              {rating === 2 && "Bad 😞"}
-              {rating === 3 && "Okay 😐"}
-              {rating === 4 && "Good 🙂"}
-              {rating === 5 && "Excellent! 😍"}
+              {rating === 1 && t('review.ratings.1')}
+              {rating === 2 && t('review.ratings.2')}
+              {rating === 3 && t('review.ratings.3')}
+              {rating === 4 && t('review.ratings.4')}
+              {rating === 5 && t('review.ratings.5')}
             </p>
           </div>
 
           {/* Comment */}
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-1">Your Review</label>
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-1">{t('review.yourReview')}</label>
             <textarea 
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="What did you like or dislike about this product?"
+              placeholder={t('review.placeholder')}
               className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none h-32 transition-all"
             />
           </div>
 
           {/* Media Upload */}
           <div className="space-y-3">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-1">Add Photos/Video</label>
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400 ml-1">{t('review.addMedia')}</label>
             
             <div className="flex flex-wrap gap-3">
               {/* Upload Buttons */}
@@ -250,7 +252,7 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
               {/* Previews */}
               {imagePreviews.map((preview, index) => (
                 <div key={index} className="relative w-20 h-20 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-                  <img src={preview} alt="upload" className="w-full h-full object-cover" />
+                  <img src={preview} alt={t('review.upload')} className="w-full h-full object-cover" />
                   <button 
                     onClick={() => removeImage(index)}
                     className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full backdrop-blur-md hover:bg-red-500 transition-colors"
@@ -275,7 +277,7 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
                 </div>
               )}
             </div>
-            <p className="text-[10px] font-semibold text-gray-400 ml-1">Max 3 photos and 1 video. Videos max 5MB.</p>
+            <p className="text-[10px] font-semibold text-gray-400 ml-1">{t('review.mediaHint')}</p>
           </div>
         </div>
 
@@ -286,9 +288,9 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
             className="w-full py-4 bg-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-brand-200 hover:bg-[var(--brand-400)] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
-              <><Loader2 size={18} className="animate-spin" /> Submitting...</>
+              <><Loader2 size={18} className="animate-spin" /> {t('review.submitting')}</>
             ) : (
-              "Submit Review"
+              t('review.submit')
             )}
           </button>
         </div>

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { Heart, Plus, Minus, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWishlist } from "../../context/WishlistContext";
@@ -20,6 +21,7 @@ import { useAuth } from "@core/context/AuthContext";
 
 const ProductCard = React.memo(
   ({ product, badge, className, compact = false, neutralBg = false }) => {
+    const { t } = useTranslation('customer');
     const { toggleWishlist: toggleWishlistGlobal, isInWishlist } =
       useWishlist();
     const { cart, addToCart, updateQuantity, removeFromCart } = useCart();
@@ -112,15 +114,15 @@ const ProductCard = React.memo(
       if (product.discount) return product.discount;
       if (isFirstOrder && firstOrderDiscount > 0) {
         if (existingDiscountPercent > 0) {
-          return `${existingDiscountPercent}% + ${firstOrderDiscount}% EXTRA OFF`;
+          return t('product.extraOff', { percent: existingDiscountPercent, extra: firstOrderDiscount });
         }
-        return `${firstOrderDiscount}% OFF`;
+        return t('product.percentOff', { percent: firstOrderDiscount });
       }
       if (existingDiscountPercent > 0) {
-        return `${existingDiscountPercent}% OFF`;
+        return t('product.percentOff', { percent: existingDiscountPercent });
       }
       return null;
-    }, [badge, product.discount, isFirstOrder, firstOrderDiscount, existingDiscountPercent]);
+    }, [badge, product.discount, isFirstOrder, firstOrderDiscount, existingDiscountPercent, t]);
 
     const cartKey = `${productId}::${requiresVariantSelection ? defaultVariantSku : ""}`;
 
@@ -169,7 +171,7 @@ const ProductCard = React.memo(
       e.stopPropagation();
 
       if (!user) {
-        showToast("Please login to get notified", "error");
+        showToast(t('product.loginToNotify'), "error");
         navigate("/customer/auth");
         return;
       }
@@ -180,13 +182,13 @@ const ProductCard = React.memo(
           productId: product.id || product._id,
           variantSku: defaultVariantSku || "",
         });
-        showToast("We will notify you when it's back in stock!", "success");
+        showToast(t('product.notifySuccess'), "success");
       } catch (error) {
-        showToast(error.response?.data?.message || "Failed to register request", "error");
+        showToast(error.response?.data?.message || t('product.notifyFailed'), "error");
       } finally {
         setIsDemanding(false);
       }
-    }, [user, navigate, product, defaultVariantSku, showToast]);
+    }, [user, navigate, product, defaultVariantSku, showToast, t]);
 
     const handleAddToCart = React.useCallback(
       (e) => {
@@ -406,7 +408,7 @@ const ProductCard = React.memo(
                       ? "px-2 py-1 text-[9px]"
                       : "px-2 py-1.5 text-[10px] sm:px-4 sm:py-2 sm:text-[11px] md:text-xs md:px-5 md:py-2.5",
                   )}>
-                  {isDemanding ? "..." : "NOTIFY ME"}
+                  {isDemanding ? "..." : t('product.notifyMe')}
                 </button>
               ) : quantity > 0 ? (
                 <div
@@ -445,7 +447,7 @@ const ProductCard = React.memo(
                       ? "px-2.5 py-1 text-[10px]"
                       : "px-3.5 py-1.5 text-[11px] sm:px-7 sm:py-2 sm:text-[13px] md:text-sm md:px-8 md:py-2.5",
                   )}>
-                  ADD
+                  {t('product.add')}
                 </button>
               )}
             </div>

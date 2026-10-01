@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from 'react-i18next';
 import { X, Send, Phone, FileText, IndianRupee, Paperclip, Loader2, Download } from "lucide-react";
 import axiosInstance from "@core/api/axios";
 import { useAuth } from "@core/context/AuthContext";
@@ -8,6 +9,7 @@ import { formatTime } from "@shared/utils/formatDate";
 import { FaWhatsapp } from "react-icons/fa";
 
 export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
+    const { t } = useTranslation('customer');
     const { user, token } = useAuth();
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
@@ -28,7 +30,7 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
                 const res = await axiosInstance.get(`/photo-orders/${order._id}/chat`);
                 setMessages(res.data.result || res.data.results || []);
             } catch (err) {
-                toast.error("Failed to load chat messages");
+                toast.error(t('photoChat.loadFailed'));
                 setIsLoading(false);
             }
         };
@@ -89,7 +91,7 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
                 });
             }
         } catch (err) {
-            toast.error("Failed to send message");
+            toast.error(t('photoChat.sendFailed'));
             setNewMessage(textToSend); // restore on error
         }
     };
@@ -125,7 +127,7 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
                 }
             }
         } catch (err) {
-            toast.error("Failed to upload image");
+            toast.error(t('photoChat.uploadFailed'));
         } finally {
             setIsUploading(false);
             if (fileInputRef.current) {
@@ -147,7 +149,7 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
             document.body.removeChild(a);
             window.URL.revokeObjectURL(blobUrl);
         } catch (err) {
-            toast.error("Failed to download image");
+            toast.error(t('photoChat.downloadFailed'));
         }
     };
 
@@ -158,8 +160,8 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
             {/* Header */}
             <div className="bg-white px-4 py-3 border-b border-slate-200 flex items-center justify-between shadow-sm z-10">
                 <div>
-                    <h3 className="font-bold text-slate-800">{order?.seller?.shopName || "Seller"}</h3>
-                    <p className="text-xs text-slate-500 font-medium">Order #{order?._id?.slice(-6)}</p>
+                    <h3 className="font-bold text-slate-800">{order?.seller?.shopName || t('orders.seller')}</h3>
+                    <p className="text-xs text-slate-500 font-medium">{t('orders.orderNumber', { id: order?._id?.slice(-6) })}</p>
                 </div>
                 <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
                     <X size={20} />
@@ -170,17 +172,17 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
                 {/* Initial Context Message */}
                 <div className="flex flex-col items-center mb-6">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-100 px-2.5 py-1 rounded-full">Your Request</span>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-100 px-2.5 py-1 rounded-full">{t('photoChat.yourRequest')}</span>
                     <div className="mt-3 bg-white p-3 rounded-xl border border-slate-200 shadow-sm w-full text-sm text-slate-700">
                         {order?.photoUrl && (
-                            <img src={order.photoUrl} alt="Order" className="w-full h-32 object-cover rounded-lg mb-2" />
+                            <img src={order.photoUrl} alt={t('orders.order')} className="w-full h-32 object-cover rounded-lg mb-2" />
                         )}
                         {order?.notes && <p className="whitespace-pre-wrap">{order.notes}</p>}
                     </div>
                 </div>
 
                 {isLoading ? (
-                    <div className="text-center py-4 text-slate-400 text-sm">Loading messages...</div>
+                    <div className="text-center py-4 text-slate-400 text-sm">{t('photoChat.loading')}</div>
                 ) : (
                     messages.map((msg) => {
                         const isMe = msg.senderRole === "customer" || (user && (msg.senderId === user._id || msg.senderId === user.id));
@@ -192,11 +194,11 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
                                     <div className="bg-white border-2 border-indigo-100 rounded-xl p-4 w-11/12 shadow-sm text-center relative overflow-hidden">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
                                         <div className="flex justify-center mb-2"><FileText size={24} className="text-indigo-500" /></div>
-                                        <div className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">Seller Quote</div>
+                                        <div className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">{t('photoChat.sellerQuote')}</div>
                                         <p className="text-sm text-slate-700 mb-3">{msg.text}</p>
                                         {msg.estimatedPrice && (
                                             <div className="inline-flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm">
-                                                Estimated Price: <IndianRupee size={14} /> {msg.estimatedPrice}
+                                                {t('photoChat.estimatedPrice')} <IndianRupee size={14} /> {msg.estimatedPrice}
                                             </div>
                                         )}
                                     </div>
@@ -210,15 +212,15 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
                                     <div className="bg-white border-2 border-emerald-100 rounded-xl p-4 w-11/12 shadow-sm text-center relative overflow-hidden">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
                                         <div className="flex justify-center mb-2"><Phone size={24} className="text-emerald-500" /></div>
-                                        <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">Seller Contact Info</div>
-                                        <p className="text-xs text-slate-500 mb-4">The seller has shared their contact information with you.</p>
+                                        <div className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">{t('photoChat.contactInfo')}</div>
+                                        <p className="text-xs text-slate-500 mb-4">{t('photoChat.contactShared')}</p>
                                         
                                         <div className="flex gap-2 justify-center">
                                             <a 
                                                 href={`tel:${msg.sellerContactPhone}`}
                                                 className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-sm font-semibold transition-colors border border-emerald-200"
                                             >
-                                                <Phone size={16} /> Call
+                                                <Phone size={16} /> {t('photoChat.call')}
                                             </a>
                                             <a 
                                                 href={`https://wa.me/91${msg.sellerContactPhone}`}
@@ -239,11 +241,11 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
                                 <div key={msg._id || msg.createdAt} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                                     <div className={`max-w-[80%] rounded-2xl p-1.5 shadow-sm ${isMe ? "bg-indigo-600 rounded-br-none" : "bg-white border border-slate-200 rounded-bl-none"}`}>
                                         <div className="relative group">
-                                            <img src={msg.imageUrl} alt="Chat Attachment" className="w-full h-auto max-h-64 object-cover rounded-xl pointer-events-none" />
+                                            <img src={msg.imageUrl} alt={t('photoChat.attachment')} className="w-full h-auto max-h-64 object-cover rounded-xl pointer-events-none" />
                                             <button 
                                                 onClick={() => handleDownload(msg.imageUrl)}
                                                 className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
-                                                title="Download Photo"
+                                                title={t('photoChat.downloadPhoto')}
                                             >
                                                 <Download size={16} />
                                             </button>
@@ -295,7 +297,7 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
                         className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full transition-colors disabled:opacity-50"
-                        title="Attach Photo"
+                        title={t('photoChat.attachPhoto')}
                     >
                         {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
                     </button>
@@ -303,7 +305,7 @@ export const PhotoOrderChatSheet = ({ isOpen, onClose, order }) => {
                         type="text"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type a message..."
+                        placeholder={t('photoChat.typeMessage')}
                         className="flex-1 bg-slate-100 border-none focus:ring-0 rounded-full px-4 py-2.5 text-sm outline-none"
                     />
                     <button 

@@ -1,0 +1,16 @@
+{
+  "search": "खोजें",
+  "searchPhrases": [
+    "ब्रेड",
+    "दूध",
+    "चॉकलेट",
+    "अंडे",
+    "चिप्स"
+  ],
+  "notifications": "सूचनाएं",
+  "deliveryIn": "{{time}} में डिलीवरी",
+  "voiceSearch": "आवाज़ से खोजें",
+  "openCart": "कार्ट खोलें",
+  "detectingLocation": "लोकेशन पता की जा रही है...",
+  "searchProducts": "प्रोडक्ट खोजें..."
+}

@@ -1,0 +1,27 @@
+{
+  "experience": "How was your experience?",
+  "ratings": {
+    "1": "Terrible 😠",
+    "2": "Bad 😞",
+    "3": "Okay 😐",
+    "4": "Good 🙂",
+    "5": "Excellent! 😍"
+  },
+  "yourReview": "Your Review",
+  "placeholder": "What did you like or dislike about this product?",
+  "addMedia": "Add Photos/Video",
+  "upload": "upload",
+  "mediaHint": "Max 3 photos and 1 video. Videos max 5MB.",
+  "submitting": "Submitting...",
+  "submit": "Submit Review",
+  "submitted": "Review submitted! Waiting for approval.",
+  "errors": {
+    "maxImages": "You can upload a maximum of 3 images.",
+    "imageTooLarge": "{{name}} is too large. Max 10MB allowed.",
+    "compress": "Could not compress {{name}}",
+    "videoTooLarge": "Video is too large. Max 5MB allowed.",
+    "rating": "Please select a rating.",
+    "comment": "Please write a comment.",
+    "submitFailed": "Failed to submit review"
+  }
+}

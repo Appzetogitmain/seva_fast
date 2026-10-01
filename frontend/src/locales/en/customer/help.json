@@ -1,0 +1,16 @@
+{
+  "missing": "Items missing or incorrect",
+  "missingSub": "Get a refund or replacement",
+  "quality": "Item quality issue",
+  "qualitySub": "Report damaged or expired items",
+  "delay": "Delivery delay",
+  "delaySub": "Track your order status",
+  "noPhone": "Support phone number is not available right now. Please use Chat or Raise a Ticket.",
+  "numberCopied": "Support number {{phone}} copied!",
+  "callAt": "Call support at: {{phone}}",
+  "title": "Need Help?",
+  "subtitle": "Select an issue with your order",
+  "raiseTicket": "Raise a Ticket",
+  "chatUs": "Chat Us",
+  "callUs": "Call Us"
+}

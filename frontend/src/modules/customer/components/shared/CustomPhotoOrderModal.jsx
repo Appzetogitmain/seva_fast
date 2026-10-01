@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Camera, X, ChevronDown, Sparkles, Crop, ZoomIn, ZoomOut,
     Check, MessageSquare, ChevronRight, History, Upload,
@@ -62,6 +63,7 @@ const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 
 /* ════════════════════════════════════════════════════════════ */
 
 export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
+    const { t } = useTranslation('customer');
     const { isAuthenticated, user } = useAuth();
     const { currentLocation } = useLocation();
     const navigate = useNavigate();
@@ -121,7 +123,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
         if (e.target.files && e.target.files[0]) {
             const selectedFile = e.target.files[0];
             if (selectedFile.size > 25 * 1024 * 1024) {
-                toast.error("Photo size bahut badi hai! Kripya choti photo upload karein.");
+                toast.error(t('photoOrder.errors.tooLarge'));
                 return;
             }
             
@@ -171,12 +173,12 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                     setFile(compressed);
                     setFilePreview(URL.createObjectURL(compressed));
                     setIsCropping(false);
-                    toast.success("Photo cropped successfully!");
+                    toast.success(t('photoOrder.cropped'));
                 }
             }, 'image/jpeg', 0.85);
         } catch (err) {
             console.error("Crop error:", err);
-            toast.error("Failed to crop image");
+            toast.error(t('photoOrder.errors.cropFailed'));
             setIsCropping(false);
         }
     };
@@ -185,15 +187,15 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     /* ─── submit ─── */
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!isAuthenticated || !user) { toast.error("Please login first to send photo order!"); onClose(); navigate('/login'); return; }
-        if (!file && !notes.trim()) return toast.error("Please provide an image or write an enquiry");
-        if (!selectedSellerId) return toast.error("Please select a seller");
+        if (!isAuthenticated || !user) { toast.error(t('photoOrder.errors.loginFirst')); onClose(); navigate('/login'); return; }
+        if (!file && !notes.trim()) return toast.error(t('photoOrder.errors.needContent'));
+        if (!selectedSellerId) return toast.error(t('photoOrder.errors.selectSeller'));
 
         try {
             setIsSubmitting(true);
             let photoUrl = "";
             if (file) {
-                if (file.size > 10 * 1024 * 1024) { toast.error("Photo size bahut badi hai (Max 10MB)!"); setIsSubmitting(false); return; }
+                if (file.size > 10 * 1024 * 1024) { toast.error(t('photoOrder.errors.max10')); setIsSubmitting(false); return; }
                 setIsUploading(true);
                 const formData = new FormData();
                 formData.append('file', file);
@@ -202,17 +204,17 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                 setIsUploading(false);
             }
             await axiosInstance.post('/photo-orders', { sellerId: selectedSellerId, photoUrl, notes, city });
-            toast.success("Enquiry/Order sent to seller!");
+            toast.success(t('photoOrder.sent'));
             setIsSubmitting(false); setIsUploading(false); onClose();
             setFile(null); setOriginalFile(null); setFilePreview(''); setCity(''); setSelectedSellerId(''); setNotes('');
             navigate('/orders?tab=photo');
         } catch (error) {
             setIsUploading(false); setIsSubmitting(false);
             const status = error.response?.status;
-            if (status === 401 || status === 403) { toast.error("Please login first!"); onClose(); navigate('/login'); }
+            if (status === 401 || status === 403) { toast.error(t('photoOrder.errors.loginFirstShort')); onClose(); navigate('/login'); }
             else if (error.response?.data?.message?.includes("file size") || error.response?.data?.message?.includes("File too large")) {
-                toast.error("Photo size bahut badi hai! Kripya choti photo select karein.");
-            } else { toast.error(error.response?.data?.message || "Order bhejne me samasya aayi. Kripya punah prayas karein."); }
+                toast.error(t('photoOrder.errors.tooLarge'));
+            } else { toast.error(error.response?.data?.message || t('photoOrder.errors.sendFailed')); }
         }
     };
 
@@ -231,8 +233,8 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                                 <Crop size={16} className="text-white" />
                             </div>
                             <div>
-                                <p className="font-bold text-sm text-white">Crop & Adjust</p>
-                                <p className="text-[10px] text-slate-400">Drag to reposition • Zoom to resize</p>
+                                <p className="font-bold text-sm text-white">{t('photoOrder.cropTitle')}</p>
+                                <p className="text-[10px] text-slate-400">{t('photoOrder.cropSub')}</p>
                             </div>
                         </div>
                         <button onClick={handleCancelCrop} className="p-2 hover:bg-white/10 rounded-full text-slate-400 transition-colors">
@@ -245,7 +247,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                         onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
                         onTouchStart={handleMouseDown} onTouchMove={handleMouseMove} onTouchEnd={handleMouseUp}
                     >
-                        <img ref={cropImgRef} src={rawImageSrc} alt="Crop target"
+                        <img ref={cropImgRef} src={rawImageSrc} alt={t('photoOrder.cropTitle')}
                             style={{ transform: `translate(${cropOffset.x}px, ${cropOffset.y}px) scale(${zoom})`, maxWidth: 'none', maxHeight: 'none', userSelect: 'none', pointerEvents: 'none' }}
                             className="transition-transform duration-75"
                         />
@@ -266,11 +268,11 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                         <div className="flex gap-3">
                             <button type="button" onClick={handleCancelCrop}
                                 className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-sm transition-colors">
-                                Cancel
+                                {t('common:actions.cancel')}
                             </button>
                             <button type="button" onClick={handleApplyCrop}
                                 className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg transition-all">
-                                <Check size={16} /> Apply Crop
+                                <Check size={16} /> {t('photoOrder.applyCrop')}
                             </button>
                         </div>
                     </div>
@@ -296,8 +298,8 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                                 <Camera size={20} className="text-white" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-white text-base tracking-tight">Custom Photo Order</h3>
-                                <p className="text-[11px] text-indigo-200 font-medium">Send enquiry with photo to any seller</p>
+                                <h3 className="font-bold text-white text-base tracking-tight">{t('profile.menu.photoOrder')}</h3>
+                                <p className="text-[11px] text-indigo-200 font-medium">{t('photoOrder.subtitle')}</p>
                             </div>
                         </div>
                         <button onClick={onClose}
@@ -316,8 +318,8 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                         <History size={17} />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-bold text-slate-800 leading-tight">Track Previous Orders</p>
-                        <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">View replies, quotes & chat with sellers</p>
+                        <p className="text-[13px] font-bold text-slate-800 leading-tight">{t('photoOrder.trackPrevious')}</p>
+                        <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">{t('photoOrder.trackPreviousSub')}</p>
                     </div>
                     <div className="flex items-center gap-1 text-amber-600">
                         <span className="text-[11px] font-bold hidden sm:inline">View</span>
@@ -333,7 +335,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                         <div className="flex items-center justify-between">
                             <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                                 <MapPin size={12} className="text-indigo-500" />
-                                Your City
+                                {t('photoOrder.city')}
                             </label>
                             {(currentLocation?.city || currentLocation?.name) && (
                                 <button
@@ -353,7 +355,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                         </div>
                         <input
                             type="text"
-                            placeholder="Type your city to find sellers..."
+                            placeholder={t('photoOrder.cityPlaceholder')}
                             value={city}
                             onChange={(e) => setCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
@@ -365,7 +367,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                         <div className="space-y-1.5 relative">
                             <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                                 <Store size={12} className="text-indigo-500" />
-                                Select Seller
+                                {t('photoOrder.selectSeller')}
                             </label>
                             <button
                                 type="button"
@@ -377,7 +379,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                                 <span className="truncate">
                                     {selectedSeller
                                         ? `${selectedSeller.name} — ${selectedSeller.shopName || 'Store'}`
-                                        : '— Choose a seller —'}
+                                        : t('photoOrder.chooseSeller')}
                                 </span>
                                 <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 shrink-0 ml-2 ${isOpenDropdown ? 'rotate-180' : ''}`} />
                             </button>
@@ -386,12 +388,12 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                                 <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-1 duration-150">
                                     <div onClick={() => { setSelectedSellerId(''); setIsOpenDropdown(false); }}
                                         className="px-4 py-2.5 hover:bg-slate-50 text-xs font-medium text-slate-400 cursor-pointer transition-colors">
-                                        — Choose a seller —
+                                        {t('photoOrder.chooseSeller')}
                                     </div>
                                     {sellers.length === 0 ? (
                                         <div className="px-4 py-4 text-center">
                                             <Store size={20} className="text-slate-300 mx-auto mb-1.5" />
-                                            <p className="text-xs font-semibold text-slate-400">No sellers found in this city</p>
+                                            <p className="text-xs font-semibold text-slate-400">{t('photoOrder.noSellers')}</p>
                                         </div>
                                     ) : (
                                         sellers.map(s => (
@@ -423,21 +425,21 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                     <div className="space-y-1.5">
                         <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                             <ImagePlus size={12} className="text-indigo-500" />
-                            Upload Photo <span className="normal-case font-medium text-slate-400">(Optional)</span>
+                            {t('photoOrder.uploadPhoto')} <span className="normal-case font-medium text-slate-400">{t('photoOrder.optional')}</span>
                         </label>
 
                         {filePreview ? (
                             <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
                                 <div className="flex items-center gap-3 p-3">
                                     <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 shrink-0 shadow-sm">
-                                        <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
+                                        <img src={filePreview} alt={t('photoOrder.preview')} className="w-full h-full object-cover" />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-semibold text-slate-800 truncate">{file?.name}</p>
                                         <div className="flex items-center gap-1.5 mt-1">
                                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                            <span className="text-[11px] text-emerald-600 font-semibold">Ready to Send</span>
+                                            <span className="text-[11px] text-emerald-600 font-semibold">{t('photoOrder.ready')}</span>
                                         </div>
                                         <p className="text-[10px] text-slate-400 mt-0.5">
                                             {file ? `${(file.size / 1024).toFixed(0)} KB` : ''}
@@ -472,10 +474,10 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                                     <Upload size={22} />
                                 </div>
                                 <p className="text-sm font-semibold text-slate-700 group-hover:text-indigo-700 transition-colors">
-                                    Tap to select or capture
+                                    {t('photoOrder.tapToSelect')}
                                 </p>
                                 <p className="text-[11px] text-slate-400 mt-0.5">
-                                    JPG, PNG, WEBP • Max 25 MB • Crop & zoom included
+                                    {t('photoOrder.fileHint')}
                                 </p>
                                 <input
                                     type="file"
@@ -491,14 +493,14 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                     <div className="space-y-1.5">
                         <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                             <FileText size={12} className="text-indigo-500" />
-                            Enquiry / Notes
+                            {t('photoOrder.notes')}
                             <span className="normal-case font-medium text-slate-400">
                                 {file ? '(Optional)' : '(Required if no photo)'}
                             </span>
                         </label>
                         <textarea
                             rows="3"
-                            placeholder="Describe your requirements, list items, or special instructions..."
+                            placeholder={t('photoOrder.notesPlaceholder')}
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all resize-none"
@@ -516,7 +518,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                         ) : (
                             <Send size={16} />
                         )}
-                        {isUploading ? "Uploading Photo..." : isSubmitting ? "Sending..." : "Send Request to Seller"}
+                        {isUploading ? t('photoOrder.uploading') : isSubmitting ? t('photoOrder.sending') : t('photoOrder.send')}
                     </button>
                 </form>
             </div>

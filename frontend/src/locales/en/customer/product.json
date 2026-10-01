@@ -1,0 +1,9 @@
+{
+  "percentOff": "{{percent}}% OFF",
+  "extraOff": "{{percent}}% + {{extra}}% EXTRA OFF",
+  "loginToNotify": "Please login to get notified",
+  "notifySuccess": "We will notify you when it's back in stock!",
+  "notifyFailed": "Failed to register request",
+  "notifyMe": "NOTIFY ME",
+  "add": "ADD"
+}

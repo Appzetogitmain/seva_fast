@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapPin, Loader2, Navigation } from 'lucide-react';
 import { useLocation } from '../../context/LocationContext';
 
@@ -6,6 +7,7 @@ import { useLocation } from '../../context/LocationContext';
 // address for this device. Actively asks the customer to allow location
 // access instead of silently falling back to the default location.
 const LocationPermissionCard = () => {
+    const { t } = useTranslation('customer');
     const {
         showLocationPermission,
         requestLocationPermission,
@@ -21,9 +23,9 @@ const LocationPermissionCard = () => {
                 <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                     <MapPin size={30} className="text-primary" />
                 </div>
-                <h2 className="text-lg font-bold text-slate-900 mb-2">Enable Your Location</h2>
+                <h2 className="text-lg font-bold text-slate-900 mb-2">{t('permission.title')}</h2>
                 <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-                    Allow location access so we can show your exact delivery address, accurate delivery times and nearby products on Home.
+                    {t('permission.message')}
                 </p>
                 <button
                     type="button"
@@ -36,7 +38,7 @@ const LocationPermissionCard = () => {
                     ) : (
                         <Navigation size={16} />
                     )}
-                    {isFetchingLocation ? 'Detecting your location...' : 'Allow Location Access'}
+                    {isFetchingLocation ? t('permission.detecting') : t('permission.allow')}
                 </button>
                 <button
                     type="button"
@@ -44,7 +46,7 @@ const LocationPermissionCard = () => {
                     disabled={isFetchingLocation}
                     className="w-full py-2.5 text-slate-500 font-medium text-xs hover:text-slate-700 transition-colors disabled:opacity-50"
                 >
-                    Not now, use default location
+                    {t('permission.notNow')}
                 </button>
             </div>
         </div>

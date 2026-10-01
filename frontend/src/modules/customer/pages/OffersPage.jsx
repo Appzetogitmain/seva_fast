@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useTranslation } from 'react-i18next';
 import { Tag, Sparkles, Clock, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { customerApi } from "../services/customerApi";
 
 const OffersPage = () => {
+  const { t } = useTranslation('customer');
   const [legacyOffers, setLegacyOffers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -51,16 +53,16 @@ const OffersPage = () => {
         className="mb-10 text-left"
       >
         <h1 className="text-3xl md:text-5xl font-black tracking-tight text-primary mb-3">
-          Best Offers for You
+          {t('offers.title')}
         </h1>
         <p className="text-gray-500 text-lg font-medium">
-          Grab these exclusive deals before they expire!
+          {t('offers.subtitle')}
         </p>
       </motion.div>
 
       {isLoading && (
         <div className="mt-12 text-center text-slate-400 text-sm font-bold">
-          Loading offers...
+          {t('offers.loading')}
         </div>
       )}
 
@@ -68,7 +70,7 @@ const OffersPage = () => {
       {!isLoading && sortedLegacyOffers.length > 0 && (
         <div className="mt-14">
           <h3 className="text-xl font-black text-slate-800 mb-4">
-            Coupon deals
+            {t('offers.couponDeals')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sortedLegacyOffers.map((offer) => (
@@ -94,11 +96,11 @@ const OffersPage = () => {
                   <div className="flex items-center justify-between mt-auto">
                     <div className="flex flex-col items-end gap-2">
                       <div className="bg-black/20 px-4 py-2 rounded-xl font-mono font-bold tracking-widest text-lg">
-                        {offer.code || "AUTO-APPLIED"}
+                        {offer.code || t('offers.autoApplied')}
                       </div>
                       {offer.appliesOnOrderNumber && (
                         <span className="text-xs font-bold text-white/80">
-                          Applies on order #{offer.appliesOnOrderNumber}
+                          {t('offers.appliesOnOrder', { number: offer.appliesOnOrderNumber })}
                         </span>
                       )}
                     </div>
@@ -118,10 +120,10 @@ const OffersPage = () => {
         sortedLegacyOffers.length === 0 && (
           <div className="mt-16 p-8 bg-slate-100 rounded-[2.5rem] border border-slate-200 text-center">
             <h3 className="text-2xl font-bold text-slate-800 mb-4">
-              No active offers right now
+              {t('offers.emptyTitle')}
             </h3>
             <p className="text-slate-500 mb-4 max-w-md mx-auto">
-              Check back soon. Our team is curating fresh deals for you.
+              {t('offers.emptyMessage')}
             </p>
           </div>
         )}

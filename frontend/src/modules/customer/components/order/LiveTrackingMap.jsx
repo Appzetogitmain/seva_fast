@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, memo } from "react";
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from "framer-motion";
 import { GoogleMap, useJsApiLoader, Marker, Polyline } from "@react-google-maps/api";
 import {
@@ -58,6 +59,7 @@ const LiveTrackingMap = memo(({
   routePolyline,
   onOpenInMaps,
 }) => {
+  const { t } = useTranslation('customer');
   const mapRef = useRef(null);
   const [mapInstance, setMapInstance] = useState(null);
   const normStatus = status?.toLowerCase() || "";
@@ -238,11 +240,10 @@ const LiveTrackingMap = memo(({
           <Clock size={28} />
         </div>
         <h3 className="text-lg font-black text-slate-800 text-center">
-          Order cancelled
+          {t('tracking.mapCancelledTitle')}
         </h3>
         <p className="text-sm text-slate-500 text-center max-w-sm font-medium">
-          This order is closed. If payment was reserved, any applicable refund
-          follows your store policy.
+          {t('tracking.mapCancelledMessage')}
         </p>
       </div>
     );
@@ -258,11 +259,10 @@ const LiveTrackingMap = memo(({
           <Clock size={30} className="text-white" />
         </motion.div>
         <h3 className="text-lg font-black text-gray-800 text-center">
-          Waiting for seller to accept
+          {t('tracking.waitingSeller')}
         </h3>
         <p className="text-sm text-gray-500 text-center max-w-sm font-medium">
-          The store has up to 60 seconds to confirm. If they don&apos;t, your
-          order will be cancelled automatically.
+          {t('tracking.waitingSellerMessage')}
         </p>
       </div>
     );
@@ -299,10 +299,10 @@ const LiveTrackingMap = memo(({
         {/* Text */}
         <div className="relative z-10 text-center px-6">
           <h3 className="text-lg font-black text-gray-800">
-            Searching for delivery partner{dots}
+            {t('tracking.searching')}{dots}
           </h3>
           <p className="text-sm text-gray-500 mt-1 font-medium">
-            Hang tight! We're finding the best rider near you.
+            {t('tracking.searchingMessage')}
           </p>
         </div>
 
@@ -314,10 +314,10 @@ const LiveTrackingMap = memo(({
           <div className="h-2 w-2 bg-brand-500 rounded-full animate-pulse" />
           <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">
             {["packed", "PICKUP_READY", "pickup_ready"].includes(status)
-              ? "Order Packed · Assigning Rider"
+              ? t('tracking.packedAssigning')
               : status === "confirmed"
-                ? "Order Confirmed · Assigning Rider"
-                : "Order Placed · Finding Rider"}
+                ? t('tracking.confirmedAssigning')
+                : t('tracking.placedFinding')}
           </span>
         </motion.div>
       </div>
@@ -340,7 +340,7 @@ const LiveTrackingMap = memo(({
   if (loadError) {
     return (
       <div className="relative w-full h-[350px] bg-rose-50 rounded-b-[2rem] flex items-center justify-center text-xs text-rose-700 px-4">
-        Map failed to load. Check the API key and billing.
+        {t('tracking.mapFailed')}
       </div>
     );
   }
@@ -373,7 +373,7 @@ const LiveTrackingMap = memo(({
         {riderLocation && (
           <Marker
             position={riderLocation}
-            title="Delivery Partner"
+            title={t('orderDetail.deliveryPartner')}
             icon={riderMarkerIcon}
           />
         )}
@@ -382,7 +382,7 @@ const LiveTrackingMap = memo(({
         {shouldShowStoreMarker && (
           <Marker
             position={sellerLocation}
-            title="Store Location"
+            title={t('orderDetail.storeLocation')}
             icon={storeMarkerIcon}
           />
         )}
@@ -391,7 +391,7 @@ const LiveTrackingMap = memo(({
         {shouldShowCustomerMarker && (
           <Marker
             position={destinationLocation}
-            title="Your Location"
+            title={t('tracking.yourLocation')}
             icon={customerMarkerIcon}
           />
         )}
@@ -431,7 +431,7 @@ const LiveTrackingMap = memo(({
           </div>
           <div>
             <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Arriving in
+              {t('tracking.arrivingIn')}
             </p>
             <h2 className="text-xl font-black text-gray-900 leading-none">
               {eta}
@@ -448,7 +448,7 @@ const LiveTrackingMap = memo(({
           }}
         >
           <MapPin size={14} className="text-primary" />
-          Open in Maps
+          {t('tracking.openInMaps')}
         </button>
       </div>
 
@@ -464,8 +464,8 @@ const LiveTrackingMap = memo(({
                 {String(riderName || "D").trim().charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-gray-900 text-xs truncate">{riderName || "Delivery Partner"}</h3>
-                <p className="text-[10px] text-gray-500">On the way</p>
+                <h3 className="font-bold text-gray-900 text-xs truncate">{riderName || t('orderDetail.deliveryPartner')}</h3>
+                <p className="text-[10px] text-gray-500">{t('tracking.onTheWay')}</p>
               </div>
               <div className="flex items-center gap-1.5">
                 <a 
@@ -483,14 +483,14 @@ const LiveTrackingMap = memo(({
       {/* Location status indicator */}
       {!riderLocation && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 bg-amber-50/95 text-amber-900 text-xs px-3 py-2 rounded-lg border border-amber-200 shadow-sm">
-          Waiting for rider location...
+          {t('tracking.waitingRiderLocation')}
         </div>
       )}
 
       {/* Route cache indicator */}
       {routePolyline && (
         <div className="absolute bottom-2 right-2 bg-white/95 backdrop-blur px-2 py-1 rounded-md text-[10px] text-slate-600 font-bold border border-slate-200 shadow-sm">
-          Route cached • Reduced API cost
+          {t('tracking.routeCached')}
         </div>
       )}
     </div>

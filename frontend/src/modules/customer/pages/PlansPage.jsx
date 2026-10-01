@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -30,6 +31,7 @@ const normalizePlanId = (value) => {
 };
 
 const PlansPage = () => {
+    const { t } = useTranslation('customer');
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(true);
     const [processingPlanId, setProcessingPlanId] = useState(null);
@@ -89,7 +91,7 @@ const PlansPage = () => {
             const res = await customerApi.getPlans({ forceRefresh: true });
             setPlans(res.data.results || res.data.result || []);
         } catch (error) {
-            toast.error("Failed to load plans");
+            toast.error(t('auth.plans.loadFailed'));
         } finally {
             setLoading(false);
         }
@@ -129,13 +131,13 @@ const PlansPage = () => {
         try {
             const isLoaded = await loadRazorpayScript();
             if (!isLoaded) {
-                toast.error("Razorpay SDK failed to load. Are you online?");
+                toast.error(t('plans.errors.sdk'));
                 return;
             }
 
             const planId = String(plan._id || plan.id || "").trim();
             if (!planId) {
-                toast.error("Invalid plan selected. Please refresh and try again.");
+                toast.error(t('plans.errors.invalidPlan'));
                 return;
             }
 
@@ -147,7 +149,7 @@ const PlansPage = () => {
             const payload = initRes.data?.result || {};
             
             if (payload.isFree) {
-                toast.success("Free plan activated successfully!");
+                toast.success(t('plans.freeActivated'));
                 if (refreshUser) {
                     await refreshUser();
                 }
@@ -159,7 +161,7 @@ const PlansPage = () => {
             const razorpayKey = payload.razorpayKey || import.meta.env.VITE_RAZORPAY_KEY_ID;
 
             if (!payload.success || !orderId || !razorpayKey) {
-                toast.error(payload.message || initRes.data?.message || "Failed to activate plan. Please try again.");
+                toast.error(payload.message || initRes.data?.message || t('plans.errors.activateFailed'));
                 return;
             }
 
@@ -170,7 +172,7 @@ const PlansPage = () => {
                 amount,
                 currency,
                 name: "Seva Fast",
-                description: `Subscription: ${plan.name}`,
+                description: t('plans.subscriptionOf', { name: plan.name }),
                 order_id: orderId,
                 handler: async function (response) {
                     try {
@@ -183,16 +185,16 @@ const PlansPage = () => {
                         });
                         
                         if (verifyRes.data.result) {
-                            toast.success("Plan activated successfully!");
+                            toast.success(t('plans.activated'));
                             if (refreshUser) {
                                 await refreshUser();
                             }
                             fetchPlans();
                         } else {
-                            toast.error("Payment verification failed");
+                            toast.error(t('checkout.errors.paymentVerify'));
                         }
                     } catch (err) {
-                        toast.error(err?.response?.data?.message || "Failed to verify payment");
+                        toast.error(err?.response?.data?.message || t('plans.errors.verifyFailed'));
                     } finally {
                         unlockPageScroll();
                         setSelectedPlan(null);
@@ -217,7 +219,7 @@ const PlansPage = () => {
             
             const rzp = new window.Razorpay(options);
             rzp.on('payment.failed', function (response) {
-                toast.error(response.error.description || "Payment failed");
+                toast.error(response.error.description || t('plans.errors.paymentFailed'));
                 unlockPageScroll();
                 setSelectedPlan(null);
                 setReferralModalOpen(false);
@@ -229,8 +231,8 @@ const PlansPage = () => {
             const message =
                 error?.response?.data?.message ||
                 (error?.response?.status === 404
-                    ? "Plan subscription API not found. Please restart the backend server."
-                    : "Failed to initiate payment");
+                    ? t('plans.errors.apiMissing')
+                    : t('checkout.errors.paymentInit'));
             toast.error(message);
         } finally {
             setProcessingPlanId(null);
@@ -284,10 +286,10 @@ const PlansPage = () => {
                     </button>
                     <div>
                         <h1 className="text-xl font-black text-slate-900 tracking-tight">
-                            {hasAnyActivePlan ? "My Subscription" : "Subscription Plans"}
+                            {hasAnyActivePlan ? t('profile.menu.subscription') : t('plans.title')}
                         </h1>
                         <p className="text-xs font-bold text-slate-400">
-                            {hasAnyActivePlan ? "Your active plan details" : "Choose a plan to continue"}
+                            {hasAnyActivePlan ? t('plans.activeSub') : t('plans.chooseSub')}
                         </p>
                     </div>
                 </div>
@@ -297,11 +299,11 @@ const PlansPage = () => {
                 {loading ? (
                     <div className="py-20 flex flex-col items-center justify-center text-slate-400 font-bold uppercase tracking-widest text-sm">
                         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin mb-4"></div>
-                        Loading Plans...
+                        {t('auth.plans.loading')}
                     </div>
                 ) : plans.length === 0 ? (
                     <div className="py-20 text-center font-bold text-slate-400 uppercase tracking-widest text-sm">
-                        No active plans available
+                        {t('auth.plans.empty')}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -329,7 +331,7 @@ const PlansPage = () => {
                                         {isActivePlan && planExpiry && (
                                             <div className="absolute top-4 right-4">
                                                 <div className="bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-[9px] font-bold text-slate-500 uppercase shadow-sm border border-slate-100">
-                                                    Valid till: {formatDate(planExpiry)}
+                                                    {t('plans.validTill', { date: formatDate(planExpiry) })}
                                                 </div>
                                             </div>
                                         )}
@@ -363,9 +365,9 @@ const PlansPage = () => {
                             </button>
                             
                             <div className="mb-6">
-                                <h3 className="text-xl font-black text-slate-900 tracking-tight">Referral & Sponsor Details</h3>
+                                <h3 className="text-xl font-black text-slate-900 tracking-tight">{t('plans.referralTitle')}</h3>
                                 <p className="text-sm font-medium text-slate-500 mt-1 mb-3">
-                                    <strong>{selectedPlan?.name}</strong> plan activation.
+                                    <Trans t={t} i18nKey="plans.activationOf" values={{ name: selectedPlan?.name }} components={{ b: <strong /> }} />
                                 </p>
                                 {referralCode ? (
                                     <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-3 flex items-start gap-3">
@@ -373,9 +375,9 @@ const PlansPage = () => {
                                             <span className="text-emerald-700 text-xs font-black">✓</span>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-bold text-emerald-900/70 uppercase tracking-widest mb-0.5">Referral Code Applied</p>
+                                            <p className="text-[10px] font-bold text-emerald-900/70 uppercase tracking-widest mb-0.5">{t('plans.codeApplied')}</p>
                                             <p className="text-xs font-black text-emerald-900 leading-tight">
-                                                Code: <span className="font-mono tracking-wider">{referralCode}</span>
+                                                {t('plans.code')} <span className="font-mono tracking-wider">{referralCode}</span>
                                             </p>
                                         </div>
                                     </div>
@@ -385,20 +387,20 @@ const PlansPage = () => {
                                             <span className="text-amber-600 text-xs font-black">!</span>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-bold text-amber-900/60 uppercase tracking-widest mb-0.5">No Referral Code?</p>
+                                            <p className="text-[10px] font-bold text-amber-900/60 uppercase tracking-widest mb-0.5">{t('plans.noCode')}</p>
                                             <p className="text-xs font-bold text-amber-900 leading-tight">
-                                                No worries! Click{' '}
+                                                {t('plans.noWorriesBefore')}{' '}
                                                 <button
                                                     type="button"
                                                     onClick={() => {
                                                         setReferralCode(DEFAULT_REFERRAL_CODE);
-                                                        toast.success('SEVAFAST code applied!');
+                                                        toast.success(t('plans.defaultApplied', { code: DEFAULT_REFERRAL_CODE }));
                                                     }}
                                                     className="font-black text-amber-700 tracking-wider hover:underline"
                                                 >
                                                     SEVAFAST
                                                 </button>{' '}
-                                                to enjoy platform support benefits.
+                                                {t('plans.noWorriesAfter')}
                                             </p>
                                         </div>
                                     </div>
@@ -409,7 +411,7 @@ const PlansPage = () => {
                                 type="text"
                                 value={referralCode}
                                 onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                                placeholder="REFERRAL CODE (optional)"
+                                placeholder={t('plans.codePlaceholder')}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-slate-800 placeholder:text-slate-400 outline-none focus:border-slate-800 focus:ring-4 focus:ring-slate-100 transition-all uppercase tracking-widest mb-6"
                             />
 
@@ -418,7 +420,7 @@ const PlansPage = () => {
                                 onClick={() => initiateRazorpay()}
                                 className="w-full py-4 bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-slate-200 transition-all active:scale-95 flex items-center justify-center gap-2"
                             >
-                                Activate Plan (₹{selectedPlan?.price})
+                                {t('plans.activate', { price: selectedPlan?.price })}
                             </button>
                         </motion.div>
                     </motion.div>

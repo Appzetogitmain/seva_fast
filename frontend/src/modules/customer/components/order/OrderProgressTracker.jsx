@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { motion } from "framer-motion";
 import { CheckCircle, Circle, Clock, Truck, Home, XCircle, Package, Calendar } from "lucide-react";
 import { getLegacyStatusFromOrder } from "@/shared/utils/orderStatus";
@@ -6,17 +7,17 @@ import { getLegacyStatusFromOrder } from "@/shared/utils/orderStatus";
 const LOCAL_STEPS = [
   {
     id: "confirmed",
-    label: "Order Confirmed",
+    labelKey: 'tracking.orderConfirmed',
     icon: CheckCircle,
   },
   {
     id: "out_for_delivery",
-    label: "Out for delivery",
+    labelKey: 'tracking.outForDelivery',
     icon: Truck,
   },
   {
     id: "delivered",
-    label: "Delivered",
+    labelKey: 'tracking.delivered',
     icon: Home,
   },
 ];
@@ -24,27 +25,27 @@ const LOCAL_STEPS = [
 const SCHEDULED_STEPS = [
   {
     id: "confirmed",
-    label: "Order Confirmed",
+    labelKey: 'tracking.orderConfirmed',
     icon: CheckCircle,
   },
   {
     id: "packed",
-    label: "Packed & Pickup Scheduled",
+    labelKey: 'tracking.packedPickup',
     icon: Package,
   },
   {
     id: "in_transit",
-    label: "In Transit with Courier",
+    labelKey: 'tracking.inTransitCourier',
     icon: Truck,
   },
   {
     id: "out_for_delivery",
-    label: "Out for Delivery",
+    labelKey: 'tracking.outForDelivery',
     icon: Truck,
   },
   {
     id: "delivered",
-    label: "Delivered",
+    labelKey: 'tracking.delivered',
     icon: Home,
   },
 ];
@@ -56,6 +57,7 @@ const OrderProgressTracker = ({
   totalDistanceText = "—",
   shippingTracking = null,
 }) => {
+  const { t } = useTranslation('customer');
   const status = getLegacyStatusFromOrder(order);
   const workflowStatus = String(order?.workflowStatus || "").toUpperCase();
   const isScheduled = order?.deliveryType === "scheduled" || order?.shipmentDetails?.provider === "shiprocket";
@@ -144,9 +146,9 @@ const OrderProgressTracker = ({
             <XCircle size={24} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-rose-900 leading-tight">Order Cancelled</h3>
+            <h3 className="text-sm font-bold text-rose-900 leading-tight">{t('tracking.cancelledTitle')}</h3>
             <p className="text-xs text-rose-600 mt-0.5 leading-snug">
-              {order?.cancelReason || order?.cancelledReason || "This order has been cancelled."}
+              {order?.cancelReason || order?.cancelledReason || t('tracking.cancelledMessage')}
             </p>
           </div>
         </div>
@@ -225,13 +227,13 @@ const OrderProgressTracker = ({
                           : "text-slate-400"
                     }`}
                   >
-                    {step.label}
+                    {t(step.labelKey)}
                   </p>
                   {isActive && (
                     <p className="text-xs text-amber-600 font-medium mt-0.5">
                       {isScheduled && step.id === "in_transit"
-                        ? `With ${shippingTracking?.courierName || order?.shipmentDetails?.courierName || "Courier Partner"}`
-                        : "In progress..."}
+                        ? t('tracking.withCourier', { courier: shippingTracking?.courierName || order?.shipmentDetails?.courierName || t('orderDetail.courierPartner') })
+                        : t('tracking.inProgress')}
                     </p>
                   )}
                 </div>
@@ -269,10 +271,10 @@ const OrderProgressTracker = ({
               </div>
               <div>
                 <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider leading-none mb-1">
-                  Expected Delivery Date
+                  {t('tracking.expectedDate')}
                 </p>
                 <p className="text-sm font-black text-slate-900 leading-none">
-                  {formattedEdd || (etaDays ? `In ~${etaDays} days` : "4-6 business days")}
+                  {formattedEdd || (etaDays ? t('tracking.inDays', { count: etaDays }) : t('orderDetail.businessDays'))}
                 </p>
               </div>
             </div>
@@ -295,18 +297,18 @@ const OrderProgressTracker = ({
               </div>
               <div>
                 <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider leading-none mb-1">
-                  Estimated Time
+                  {t('tracking.estimatedTime')}
                 </p>
                 <p className="text-sm font-black text-amber-900 leading-none">{estimatedArrivalText}</p>
               </div>
             </div>
             <div className="text-right flex flex-col items-end gap-1">
               <div>
-                <p className="text-[10px] text-amber-600 font-semibold leading-none mb-1">Arriving in</p>
+                <p className="text-[10px] text-amber-600 font-semibold leading-none mb-1">{t('tracking.arrivingIn')}</p>
                 <p className="text-lg font-black text-amber-900 leading-none">{arrivingInText}</p>
               </div>
               <div className="inline-flex items-center rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold text-amber-700 ring-1 ring-amber-200">
-                Total distance: {totalDistanceText}
+                {t('tracking.totalDistance', { distance: totalDistanceText })}
               </div>
             </div>
           </div>

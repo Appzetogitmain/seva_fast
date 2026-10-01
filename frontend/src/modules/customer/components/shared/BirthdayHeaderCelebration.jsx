@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from "react";
+import { useTranslation } from 'react-i18next';
 import confetti from "canvas-confetti";
 import { motion } from "framer-motion";
 import { useAuth } from "@core/context/AuthContext";
@@ -42,6 +43,7 @@ function fireHeaderConfetti() {
 }
 
 const BirthdayHeaderCelebration = ({ variant = "global" }) => {
+  const { t } = useTranslation('customer');
   const { user, isAuthenticated } = useAuth();
   const isBirthday = useMemo(
     () => isAuthenticated && isBirthdayToday(user?.dateOfBirth),
@@ -92,7 +94,7 @@ const BirthdayHeaderCelebration = ({ variant = "global" }) => {
           transition={{ type: "spring", stiffness: 260, damping: 22 }}
           className="absolute left-1/2 top-14 sm:top-16 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/50 bg-white/95 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-700 shadow-[0_8px_24px_rgba(0,0,0,0.12)] sm:px-4 sm:text-[11px]"
         >
-          🎂 Happy Birthday, {firstName}!
+          {t('birthday.wish', { name: firstName })}
         </motion.div>
       </div>
     );

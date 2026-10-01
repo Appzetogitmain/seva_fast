@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ScrollText } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettings } from '@core/context/SettingsContext';
@@ -12,11 +13,12 @@ import {
 import { formatDate } from '@shared/utils/formatDate';
 
 const TermsPage = () => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { settings } = useSettings();
     const audience = normalizeLegalAudience(searchParams.get('for') || searchParams.get('audience'));
-    const audienceLabel = getLegalAudienceLabel(audience);
+    const audienceLabel = t(`legal.audience.${audience}`, { defaultValue: getLegalAudienceLabel(audience) });
     const appName = settings?.appName || 'App';
     const companyName = settings?.companyName || appName;
     const adminTerms = getLegalContent(settings, audience, 'terms');
@@ -31,7 +33,7 @@ const TermsPage = () => {
                 >
                     <ChevronLeft size={24} className="text-slate-600" />
                 </button>
-                <h1 className="text-lg font-black text-slate-800">Terms & Conditions</h1>
+                <h1 className="text-lg font-black text-slate-800">{t('profile.menu.terms')}</h1>
             </div>
 
             <div className="p-5 max-w-3xl mx-auto space-y-6">
@@ -43,7 +45,7 @@ const TermsPage = () => {
                         <div>
                             <h2 className="text-xl font-bold text-slate-800">{audienceLabel} Terms of Use</h2>
                             <p className="text-xs text-slate-500 font-medium">
-                                {updatedAt ? `Last updated: ${updatedAt}` : `Published by ${companyName}`}
+                                {updatedAt ? t('legal.lastUpdated', { date: updatedAt }) : t('legal.publishedBy', { name: companyName })}
                             </p>
                         </div>
                     </div>
@@ -65,10 +67,10 @@ const TermsPage = () => {
                         ) : (
                             <>
                                 <p>
-                                    Welcome to {appName}. By accessing or using our {audienceLabel.toLowerCase()} services, you agree to be bound by these Terms and Conditions.
+                                    {t('legal.termsIntro', { app: appName, audience: audienceLabel })}
                                 </p>
                                 <p className="text-slate-400 italic">
-                                    Detailed {audienceLabel.toLowerCase()} terms have not been published by the admin yet. Please check back later or contact support.
+                                    {t('legal.termsMissing', { audience: audienceLabel })}
                                 </p>
                             </>
                         )}

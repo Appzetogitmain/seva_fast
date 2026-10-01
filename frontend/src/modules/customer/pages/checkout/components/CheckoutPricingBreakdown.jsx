@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { Clipboard, Tag, Wallet } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -24,6 +25,7 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
   discountAmount,
   isOnlinePayment = false,
 }) {
+  const { t } = useTranslation('customer');
   const deliveryFee = pricingPreview?.deliveryFeeCharged || 0;
   const handlingFee = pricingPreview?.handlingFeeCharged || 0;
   const taxAmount = pricingPreview?.taxTotal || 0;
@@ -37,14 +39,14 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
             <Clipboard size={16} className="text-primary" />
           </div>
           <h3 className="font-[1000] text-slate-800 text-base tracking-tight uppercase">
-            Order Summary
+            {t('checkout.pricing.summary')}
           </h3>
         </div>
 
         <div className="space-y-2.5">
           <div className="flex justify-between items-center px-2">
             <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">
-              Item Total
+              {t('checkout.pricing.itemTotal')}
             </span>
             <span className="font-black text-slate-800 text-sm">
               ₹{pricingPreview?.productSubtotal ?? cartTotal}
@@ -52,7 +54,7 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
           </div>
           <div className="flex justify-between items-center px-2">
             <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">
-              Delivery Fee
+              {t('checkout.pricing.deliveryFee')}
             </span>
             <span className="font-black text-slate-800 text-sm">₹{deliveryFee}</span>
           </div>
@@ -61,9 +63,9 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
             typeof pricingPreview.distanceKmRounded === "number" && (
               <div className="px-2 -mt-1.5 flex items-center justify-between text-[11px] font-semibold text-slate-400">
                 <span>
-                  Distance: {pricingPreview.distanceKmActual.toFixed(2)} km
+                  {t('checkout.pricing.distance', { km: pricingPreview.distanceKmActual.toFixed(2) })}
                   {pricingPreview.distanceKmRounded
-                    ? ` (billed ${pricingPreview.distanceKmRounded.toFixed(2)} km)`
+                    ? ` ${t('checkout.pricing.billed', { km: pricingPreview.distanceKmRounded.toFixed(2) })}`
                     : ""}
                 </span>
                 <span className="uppercase tracking-wider">
@@ -75,13 +77,13 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
             )}
           <div className="flex justify-between items-center px-2">
             <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">
-              Handling Fee
+              {t('checkout.pricing.handlingFee')}
             </span>
             <span className="font-black text-slate-800 text-sm">₹{handlingFee}</span>
           </div>
           <div className="flex justify-between items-center px-2">
             <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">
-              Tax
+              {t('checkout.pricing.tax')}
             </span>
             <span className="font-black text-slate-800 text-sm">₹{taxAmount}</span>
           </div>
@@ -93,7 +95,7 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
               className="flex justify-between items-center px-3 py-1.5 bg-brand-50 rounded-lg border border-brand-100">
               <span className="text-primary font-black text-xs flex items-center gap-2 uppercase tracking-wider">
                 <Tag size={14} />
-                Coupon Reserved
+                {t('checkout.pricing.couponReserved')}
               </span>
               <span className="font-black text-primary text-sm">-₹{discountAmount}</span>
             </motion.div>
@@ -106,7 +108,7 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
               className="flex justify-between items-center px-3 py-1.5 bg-amber-50 rounded-lg border border-amber-100">
               <span className="text-amber-600 font-black text-xs flex items-center gap-2 uppercase tracking-wider">
                 <Tag size={14} />
-                New Customer Discount
+                {t('checkout.pricing.newCustomer')}
               </span>
               <span className="font-black text-amber-600 text-sm">
                 -₹{pricingPreview.firstOrderDiscountAmount}
@@ -121,7 +123,7 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
               className="flex justify-between items-center px-3 py-1.5 bg-amber-50 rounded-lg border border-amber-100">
               <span className="text-amber-600 font-black text-xs flex items-center gap-2 uppercase tracking-wider">
                 <Tag size={14} />
-                Free Delivery
+                {t('checkout.pricing.freeDelivery')}
               </span>
               <span className="font-black text-amber-600 text-sm line-through opacity-60">
                 ₹{pricingPreview.deliveryFeeBase}
@@ -136,7 +138,7 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
               className="flex justify-between items-center px-3 py-1.5 bg-green-50 rounded-lg border border-green-100 mt-1.5">
               <span className="text-green-600 font-black text-xs flex items-center gap-2 uppercase tracking-wider">
                 <Wallet size={14} />
-                Plan Cashback ({pricingPreview.cashbackPercentage}%)
+                {t('checkout.pricing.cashback', { percent: pricingPreview.cashbackPercentage })}
               </span>
               <span className="font-black text-green-600 text-sm">+₹{pricingPreview.estimatedCashback}</span>
             </motion.div>
@@ -149,7 +151,7 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
               className="flex justify-between items-center px-3 py-1.5 bg-brand-50 rounded-lg border border-brand-100 mb-1">
               <span className="text-primary font-black text-[11px] flex items-center gap-2 uppercase tracking-tight">
                 <Wallet size={14} />
-                Wallet Applied
+                {t('checkout.pricing.walletApplied')}
               </span>
               <span className="font-black text-primary text-sm">-₹{walletAmountToUse}</span>
             </motion.div>
@@ -159,18 +161,18 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
             <div className="flex justify-between items-center">
               <div className="flex flex-col">
                 <span className="font-[1000] text-slate-800 text-base uppercase tracking-tight">
-                  {finalAmountToPay === 0 ? "Fully Covered" : "Total Payable"}
+                  {finalAmountToPay === 0 ? t('checkout.pricing.fullyCovered') : t('checkout.pricing.totalPayable')}
                 </span>
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
                   {finalAmountToPay === 0
-                    ? "Paid via Wallet"
+                    ? t('checkout.pricing.paidWallet')
                     : isOnlinePayment
-                      ? "Secured by Razorpay"
-                      : "Safe & Secure Payment"}
+                      ? t('checkout.securedRazorpay')
+                      : t('checkout.pricing.safePayment')}
                 </span>
               </div>
               <span className="font-[1000] text-primary text-2xl tracking-tighter italic">
-                {isPreviewLoading ? "Calculating..." : `₹${Number(finalAmountToPay.toFixed(2))}`}
+                {isPreviewLoading ? t('checkout.pricing.calculating') : `₹${Number(finalAmountToPay.toFixed(2))}`}
               </span>
             </div>
           </div>

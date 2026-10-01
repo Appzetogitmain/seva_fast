@@ -1,0 +1,24 @@
+{
+  "pending": "प्रलंबित",
+  "confirmed": "निश्चित",
+  "packed": "पॅक झाले",
+  "out_for_delivery": "डिलिव्हरीसाठी निघाले",
+  "delivered": "डिलिव्हर झाले",
+  "cancelled": "रद्द",
+  "delayed": "उशीर होत आहे",
+  "return_requested": "परतीची विनंती",
+  "return_approved": "परती मंजूर",
+  "return_pickup_assigned": "पिकअप नेमले",
+  "return_pickup_verified": "पिकअप पडताळले",
+  "returned": "परत केले",
+  "qc_passed": "परती तपासणी उत्तीर्ण",
+  "qc_failed": "परती तपासणी अयशस्वी",
+  "refund_completed": "परत केले आणि परतावा दिला",
+  "photo": {
+    "Pending": "प्रलंबित",
+    "Accepted": "स्वीकारले",
+    "Rejected": "नाकारले",
+    "Completed": "पूर्ण झाले",
+    "Cancelled": "रद्द"
+  }
+}

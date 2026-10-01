@@ -1,0 +1,15 @@
+{
+  "title": "Select delivery location",
+  "searchPlaceholder": "Search for area, street name..",
+  "minChars": "Type at least 4 characters",
+  "searching": "Searching with Google...",
+  "noResults": "No locations found",
+  "searchUnavailable": "Google search is temporarily unavailable",
+  "detecting": "Detecting...",
+  "useCurrent": "Use current location",
+  "addNew": "Add new address",
+  "saved": "Your saved addresses",
+  "youAreHere": "You are here",
+  "phone": "Phone number: {{phone}}",
+  "resolveFailed": "Could not get this location. Please try another."
+}

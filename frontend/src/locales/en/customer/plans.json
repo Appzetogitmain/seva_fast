@@ -1,0 +1,27 @@
+{
+  "title": "Subscription Plans",
+  "activeSub": "Your active plan details",
+  "chooseSub": "Choose a plan to continue",
+  "validTill": "Valid till: {{date}}",
+  "referralTitle": "Referral & Sponsor Details",
+  "activationOf": "<b>{{name}}</b> plan activation.",
+  "codeApplied": "Referral Code Applied",
+  "code": "Code:",
+  "noCode": "No Referral Code?",
+  "noWorriesBefore": "No worries! Click",
+  "noWorriesAfter": "to enjoy platform support benefits.",
+  "defaultApplied": "{{code}} code applied!",
+  "codePlaceholder": "REFERRAL CODE (optional)",
+  "activate": "Activate Plan (₹{{price}})",
+  "subscriptionOf": "Subscription: {{name}}",
+  "freeActivated": "Free plan activated successfully!",
+  "activated": "Plan activated successfully!",
+  "errors": {
+    "sdk": "Razorpay SDK failed to load. Are you online?",
+    "invalidPlan": "Invalid plan selected. Please refresh and try again.",
+    "activateFailed": "Failed to activate plan. Please try again.",
+    "verifyFailed": "Failed to verify payment",
+    "paymentFailed": "Payment failed",
+    "apiMissing": "Plan subscription API not found. Please restart the backend server."
+  }
+}

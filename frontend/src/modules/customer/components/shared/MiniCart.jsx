@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
@@ -7,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 
 const MiniCart = () => {
+    const { t } = useTranslation('customer');
     const { cart, cartCount, cartTotal } = useCart();
     const location = useLocation();
 
@@ -69,7 +71,7 @@ const MiniCart = () => {
                             {/* Text Section */}
                             <div className="flex-1 flex flex-col justify-center min-w-0">
                                 <h4 className="text-[13px] font-black leading-tight truncate">₹{cartTotal}</h4>
-                                <p className="text-[10px] opacity-90 font-bold leading-tight uppercase tracking-wider">{cartCount} {cartCount === 1 ? 'item' : 'items'} • View Cart</p>
+                                <p className="text-[10px] opacity-90 font-bold leading-tight uppercase tracking-wider">{t('cart.itemsCount', { count: cartCount })} • {t('cart.viewCart')}</p>
                             </div>
 
                             {/* Arrow Icon in circle */}

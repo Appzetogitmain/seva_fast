@@ -1,0 +1,21 @@
+{
+  "loadFailed": "Failed to fetch local service professionals",
+  "locationCaptured": "Location captured! Showing nearby professionals.",
+  "locationFailed": "Failed to fetch location. Defaulting to Indore citywide search.",
+  "title": "Verified Local Professionals",
+  "subtitle": "Locate plumbers, electricians, painters, and household service experts directly in your operational area.",
+  "register": "Register / Manage Profile",
+  "searchPlaceholder": "Search by keywords (e.g. plumber, repair, paint)...",
+  "nearMe": "Near Me",
+  "find": "Find",
+  "allCategories": "All Categories",
+  "searching": "Searching Local Directory...",
+  "emptyTitle": "No Professionals Found",
+  "emptyMessage": "Try modifying your filters, selecting a different city, or toggling \"Near Me\" search distance parameters.",
+  "featured": "Featured Services",
+  "free": "FREE",
+  "more": "+{{count}} more",
+  "viewCatalog": "View Catalog",
+  "catalog": "Available Catalog Services",
+  "noCatalog": "No service catalog items available."
+}

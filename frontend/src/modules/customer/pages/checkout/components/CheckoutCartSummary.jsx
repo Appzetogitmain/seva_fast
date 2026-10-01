@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { Plus, Minus } from "lucide-react";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
 import { effectiveUnitPrice, getAvailableStock } from "../../../utils/productPricing";
@@ -21,6 +22,7 @@ const CheckoutCartSummary = React.memo(function CheckoutCartSummary({
   onRemoveFromCart,
   onMoveToWishlist,
 }) {
+  const { t } = useTranslation('customer');
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
       {cart.map((item) => {
@@ -50,7 +52,7 @@ const CheckoutCartSummary = React.memo(function CheckoutCartSummary({
               <button
                 onClick={() => onMoveToWishlist(item)}
                 className="text-xs text-slate-500 underline hover:text-primary transition-colors">
-                Move to wishlist
+                {t('checkout.summary.moveToWishlist')}
               </button>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -89,7 +91,7 @@ const CheckoutCartSummary = React.memo(function CheckoutCartSummary({
                 return (
                   <div className="text-right leading-tight flex flex-col items-end">
                     {isOutOfStock ? (
-                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded uppercase tracking-wider mb-1 border border-red-200">Out of Stock</span>
+                      <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded uppercase tracking-wider mb-1 border border-red-200">{t('checkout.summary.outOfStock')}</span>
                     ) : (
                       <>
                         {isMaxStock && (

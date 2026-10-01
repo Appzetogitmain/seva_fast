@@ -1,0 +1,8 @@
+{
+  "title": "Your order has been delivered!",
+  "messageMany": "How was it? Rate your products to help other customers.",
+  "messageOne": "How was {{name}}? Rate it to help other customers.",
+  "yourOrder": "your order",
+  "rateNow": "Rate Now",
+  "later": "Maybe later"
+}

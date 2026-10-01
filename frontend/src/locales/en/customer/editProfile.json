@@ -1,0 +1,22 @@
+{
+  "chooseImage": "Please choose an image file",
+  "imageTooLarge": "Image must be smaller than 5MB",
+  "photoUploaded": "Photo uploaded. Save changes to apply it.",
+  "photoFailed": "Failed to upload photo",
+  "updated": "Profile updated successfully!",
+  "updateFailed": "Failed to update profile",
+  "uploading": "Uploading...",
+  "changePhoto": "Change Photo",
+  "namePlaceholder": "Enter your name",
+  "phone": "Phone Number",
+  "phonePlaceholder": "Enter phone number",
+  "email": "Email Address",
+  "emailPlaceholder": "Enter email address",
+  "dob": "Date of Birth",
+  "locked": "Locked",
+  "dobLockedNote": "Date of birth cannot be modified once set. Please contact support if you need to update it.",
+  "dobNote": "We use this to send you a birthday wish once every year. Note: Once saved, DOB cannot be changed.",
+  "bio": "Bio",
+  "bioPlaceholder": "Tell us about yourself...",
+  "saving": "Saving..."
+}

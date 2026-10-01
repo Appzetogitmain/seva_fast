@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import ProductCard from "../../../components/shared/ProductCard";
 
 /**
@@ -13,12 +14,13 @@ const CheckoutWishlistSection = React.memo(function CheckoutWishlistSection({
   wishlist,
   sectionRef,
 }) {
+  const { t } = useTranslation('customer');
   const visibleItems = wishlist.filter((item) => item.name);
   if (visibleItems.length === 0) return null;
 
   return (
     <div ref={sectionRef} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-      <h3 className="font-black text-slate-800 text-lg mb-4">Your wishlist</h3>
+      <h3 className="font-black text-slate-800 text-lg mb-4">{t('checkout.yourWishlist')}</h3>
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar -mx-4 px-4 snap-x">
         {visibleItems.map((item) => (
           <div

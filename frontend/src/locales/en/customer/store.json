@@ -1,0 +1,19 @@
+{
+  "kicker": "Shop by store",
+  "titleA": "Curated Aisles,",
+  "titleB": "Just for You",
+  "intro": "Jump straight into themed collections – from <b>Summer Coolers</b> to <b>Breakfast Essentials</b>. Every store is hand–picked by our team.",
+  "exploring": "Currently exploring: {{title}}",
+  "loadingStores": "Loading stores...",
+  "curated": "Curated store",
+  "categoriesCount": "{{count}}+ categories",
+  "featured": "Featured Store",
+  "exploreAll": "Explore all hand–picked items under this theme. Perfect for quick shopping with zero search.",
+  "tapBlock": "Tap a block on the right to see products instantly",
+  "noCategories": "No categories linked to this store yet.",
+  "allProducts": "All products in this store",
+  "comingSoon": "Stores coming soon",
+  "scroll": "Scroll sideways to explore everything under this curated aisle.",
+  "loadingProducts": "Loading products...",
+  "noProducts": "No products linked to this store yet."
+}

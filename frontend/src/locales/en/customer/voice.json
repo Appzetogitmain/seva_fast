@@ -1,0 +1,14 @@
+{
+  "unsupported": "Voice Search Unsupported",
+  "unsupportedSub": "Your browser does not support Web Speech API. Please try using Google Chrome.",
+  "listening": "Listening... Speak product name",
+  "trySaying": "Try saying \"Mango\", \"Doodh\", or \"Fresh Milk\"",
+  "speakAgain": "Tap to Speak Again",
+  "searchFor": "Search \"{{query}}\"",
+  "errors": {
+    "permission": "Microphone permission denied. Please allow mic access in browser settings.",
+    "noSpeech": "No speech detected. Please try speaking again.",
+    "generic": "Voice recognition error. Please try again.",
+    "start": "Could not start microphone. Please try again."
+  }
+}

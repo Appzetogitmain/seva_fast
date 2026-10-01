@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Sparkles, Clock, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -15,6 +16,7 @@ const CheckoutOrderSuccess = React.memo(function CheckoutOrderSuccess({
   estimatedDeliveryText,
   isScheduled,
 }) {
+  const { t } = useTranslation('customer');
   const shortId = orderId ? String(orderId).slice(-6).toUpperCase() : "SUCCESS";
 
   return (
@@ -48,11 +50,11 @@ const CheckoutOrderSuccess = React.memo(function CheckoutOrderSuccess({
             {/* Heading & Badge */}
             <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full text-emerald-400 text-xs font-black uppercase tracking-wider mb-3">
               <Sparkles size={12} />
-              <span>Payment & Order Confirmed</span>
+              <span>{t('checkout.success.confirmed')}</span>
             </div>
 
             <h2 className="text-2xl font-black text-white tracking-tight mb-1">
-              Order Placed!
+              {t('checkout.success.placed')}
             </h2>
 
             <p className="text-sm font-mono font-bold text-amber-400 mb-4 tracking-wider">
@@ -70,17 +72,17 @@ const CheckoutOrderSuccess = React.memo(function CheckoutOrderSuccess({
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed border-t border-slate-700/40 pt-2">
                 {isScheduled
-                  ? "Your order will be packed by the seller and shipped via Shiprocket nationwide courier."
-                  : "Waiting for the nearest store to accept. You can live track your order status in real-time."}
+                  ? t('checkout.success.scheduledNote')
+                  : t('checkout.success.localNote')}
               </p>
             </div>
 
             {/* Animated Redirect Progress Bar */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                <span>Redirecting to order...</span>
+                <span>{t('checkout.success.redirecting')}</span>
                 <span className="flex items-center gap-0.5 text-emerald-400">
-                  Live View <ArrowRight size={10} />
+                  {t('checkout.success.liveView')} <ArrowRight size={10} />
                 </span>
               </div>
               <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700/40">

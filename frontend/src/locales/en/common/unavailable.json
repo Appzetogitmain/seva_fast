@@ -1,0 +1,7 @@
+{
+  "service": "Service",
+  "unavailable": "Unavailable",
+  "description": "Ah! We haven't reached your neighborhood yet.",
+  "checkAgain": "Check Again",
+  "backHome": "Back to Home"
+}

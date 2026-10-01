@@ -1,0 +1,7 @@
+{
+  "itemsCount_one": "{{count}} आइटम",
+  "itemsCount_other": "{{count}} आइटम",
+  "viewCart": "कार्ट देखें",
+  "outOfStock": "यह प्रोडक्ट अभी स्टॉक में नहीं है",
+  "maxStock": "उपलब्ध स्टॉक से ज़्यादा नहीं जोड़ सकते (स्टॉक में {{count}})"
+}

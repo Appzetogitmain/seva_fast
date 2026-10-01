@@ -1,10 +1,12 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from "react-router-dom";
 import ProductCard from "../components/shared/ProductCard";
 import { useWishlist } from "../context/WishlistContext";
 import { ChevronLeft, Heart, Trash2 } from "lucide-react";
 
 const WishlistPage = () => {
+  const { t } = useTranslation('customer');
   const navigate = useNavigate();
   const {
     wishlist,
@@ -39,10 +41,10 @@ const WishlistPage = () => {
           </button>
           <div>
             <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
-              My Wishlist
+              {t('wishlist.title')}
             </h1>
             <p className="text-xs text-slate-500">
-              {wishlist.length} {wishlist.length === 1 ? "item" : "items"} saved
+              {t('wishlist.savedCount', { count: wishlist.length })}
             </p>
           </div>
         </div>
@@ -50,7 +52,7 @@ const WishlistPage = () => {
           <button
             onClick={clearWishlist}
             className="flex items-center gap-1.5 text-slate-600 text-xs font-semibold hover:bg-slate-200 px-3 py-2 rounded-lg transition-colors">
-            <Trash2 size={14} /> Clear
+            <Trash2 size={14} /> {t('wishlist.clear')}
           </button>
         )}
       </div>
@@ -72,15 +74,15 @@ const WishlistPage = () => {
               <Heart size={26} className="text-slate-500" strokeWidth={1.8} />
             </div>
             <h2 className="text-lg font-semibold text-slate-800 mb-1">
-              No items in wishlist
+              {t('wishlist.emptyTitle')}
             </h2>
             <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto">
-              Start saving your favorite items to see them here later.
+              {t('wishlist.emptyMessage')}
             </p>
             <Link
               to="/categories"
               className="px-6 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-800 transition-colors">
-              Explore Products
+              {t('wishlist.explore')}
             </Link>
           </div>
         )}

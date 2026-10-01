@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Package, ChevronRight, Clock, CheckCircle, Loader2, ChevronLeft } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
-import { getOrderStatusLabel, getLegacyStatusFromOrder, isOrderDelayed } from '@/shared/utils/orderStatus';
+import { getOrderStatusLabel, getOrderStatusKey, getLegacyStatusFromOrder, isOrderDelayed } from '@/shared/utils/orderStatus';
 import { applyCloudinaryTransform } from '@/core/utils/imageUtils';
 import { formatDate, formatTime } from '@shared/utils/formatDate';
 import { getOrderSocket, onOrderStatusUpdate, onPhotoOrderMessage, onPhotoOrderStatusAlert } from '@/core/services/orderSocket';
@@ -11,6 +12,7 @@ import { MessageCircle } from 'lucide-react';
 import axiosInstance from "@core/api/axios";
 
 const OrdersPage = () => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [orders, setOrders] = useState([]);
@@ -73,7 +75,7 @@ const OrdersPage = () => {
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white shadow-sm border border-slate-100">
                     <Loader2 className="animate-spin text-brand-600" size={22} />
-                    <span className="text-sm font-medium text-slate-600">Loading your orders…</span>
+                    <span className="text-sm font-medium text-slate-600">{t('orders.loading')}</span>
                 </div>
             </div>
         );
@@ -88,7 +90,7 @@ const OrdersPage = () => {
                 >
                     <ChevronLeft size={22} className="text-slate-800" />
                 </button>
-                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">My Orders</h1>
+                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">{t('orders.title')}</h1>
             </div>
             
             {/* Tabs */}
@@ -101,7 +103,7 @@ const OrdersPage = () => {
                             : 'border-transparent text-slate-500 hover:text-slate-700'
                     }`}
                 >
-                    🛒 Standard Orders
+                    {t('orders.standardTab')}
                 </button>
                 <button
                     onClick={() => setActiveTab('photo')}
@@ -111,7 +113,7 @@ const OrdersPage = () => {
                             : 'border-transparent text-slate-500 hover:text-slate-700'
                     }`}
                 >
-                    📷 Photo Orders
+                    {t('orders.photoTab')}
                 </button>
             </div>
 
@@ -120,12 +122,12 @@ const OrdersPage = () => {
                     orders.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
                             <Package size={56} className="text-slate-300 mb-4" />
-                            <h3 className="text-base font-semibold text-slate-900 mb-1">No orders yet</h3>
+                            <h3 className="text-base font-semibold text-slate-900 mb-1">{t('orders.emptyTitle')}</h3>
                             <p className="text-slate-500 text-sm mb-6 max-w-[260px]">
-                                When you place an order, it will appear here so you can track it easily.
+                                {t('orders.emptyMessage')}
                             </p>
                             <Link to="/" className="bg-primary hover:bg-[#0a6d19] text-white px-7 py-2.5 rounded-full font-semibold text-sm shadow-sm transition-colors">
-                                Start Shopping
+                                {t('checkout.startShopping')}
                             </Link>
                         </div>
                     ) : (
@@ -144,7 +146,7 @@ const OrdersPage = () => {
                                                 {order.items[0]?.image ? (
                                                     <img
                                                         src={applyCloudinaryTransform(order.items[0].image)}
-                                                        alt={order.items[0]?.name || 'Order thumbnail'}
+                                                        alt={order.items[0]?.name || t('orders.thumbnail')}
                                                         loading="lazy"
                                                         className="w-full h-full object-cover"
                                                     />
@@ -154,7 +156,7 @@ const OrdersPage = () => {
                                             </div>
                                             <div className="min-w-0">
                                                 <h3 className="font-semibold text-slate-900 text-sm tracking-tight leading-snug">
-                                                    Order #{order.orderId.slice(-6)}
+                                                    {t('orders.orderNumber', { id: order.orderId.slice(-6) })}
                                                 </h3>
                                                 <p className="mt-0.5 text-[11px] text-slate-500 font-medium leading-tight">
                                                     {new Date(order.createdAt).toLocaleDateString('en-IN', {
@@ -192,11 +194,11 @@ const OrdersPage = () => {
                                                             }`}
                                                     />
                                                 </span>
-                                                <span>{getOrderStatusLabel(order).toUpperCase()}</span>
+                                                <span>{t(`orderStatus.${getOrderStatusKey(order)}`, { defaultValue: getOrderStatusLabel(order) }).toUpperCase()}</span>
                                             </span>
                                             <span className="inline-flex items-center text-[10px] font-medium text-slate-400">
                                                 <span className="h-1 w-1 rounded-full bg-slate-300 mr-1" />
-                                                Tap to view details
+                                                {t('orders.tapToView')}
                                             </span>
                                         </div>
                                     </div>
@@ -206,7 +208,7 @@ const OrdersPage = () => {
                                             {order.items.map((i) => i.name).join(', ')}
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="text-[11px] font-medium text-slate-400">Total</span>
+                                            <span className="text-[11px] font-medium text-slate-400">{t('orders.total')}</span>
                                             <span className="text-sm font-semibold text-slate-900">
                                                 ₹{order.pricing.total}
                                             </span>
@@ -223,9 +225,9 @@ const OrdersPage = () => {
                     photoOrders.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
                             <Package size={56} className="text-slate-300 mb-4" />
-                            <h3 className="text-base font-semibold text-slate-900 mb-1">No custom orders</h3>
+                            <h3 className="text-base font-semibold text-slate-900 mb-1">{t('orders.noPhotoTitle')}</h3>
                             <p className="text-slate-500 text-sm mb-6 max-w-[260px]">
-                                You haven't placed any photo/custom orders yet.
+                                {t('orders.noPhotoMessage')}
                             </p>
                         </div>
                     ) : (
@@ -238,7 +240,7 @@ const OrdersPage = () => {
                                     <div className="flex items-center gap-3">
                                         <div className="h-12 w-12 rounded-xl overflow-hidden bg-slate-50 border border-slate-200">
                                             {order.photoUrl ? (
-                                                <img src={order.photoUrl} alt="Order" className="w-full h-full object-cover" />
+                                                <img src={order.photoUrl} alt={t('orders.order')} className="w-full h-full object-cover" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-slate-400">
                                                     📷
@@ -247,7 +249,7 @@ const OrdersPage = () => {
                                         </div>
                                         <div>
                                             <h3 className="font-semibold text-slate-900 text-sm">
-                                                {order.seller?.shopName || 'Seller'}
+                                                {order.seller?.shopName || t('orders.seller')}
                                             </h3>
                                             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                                                 {formatDate(order.createdAt)}
@@ -260,7 +262,7 @@ const OrdersPage = () => {
                                         order.status === 'Rejected' ? 'bg-red-50 text-red-600' :
                                         'bg-blue-50 text-blue-600'
                                     }`}>
-                                        {order.status}
+                                        {t(`orderStatus.photo.${order.status}`, { defaultValue: order.status })}
                                     </span>
                                 </div>
                                 
@@ -274,7 +276,7 @@ const OrdersPage = () => {
                                     onClick={() => setSelectedPhotoOrder(order)}
                                     className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-lg text-sm flex items-center justify-center gap-2 transition-colors border border-indigo-200"
                                 >
-                                    <MessageCircle size={16} /> Open Chat
+                                    <MessageCircle size={16} /> {t('orders.openChat')}
                                 </button>
                             </div>
                         ))

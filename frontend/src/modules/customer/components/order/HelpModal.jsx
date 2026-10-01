@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, MessageCircle, Phone, ChevronRight, AlertCircle, PackageX, Truck, PlusCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,20 +7,21 @@ import { useSettings } from '@core/context/SettingsContext';
 import { toast } from 'sonner';
 
 const HelpModal = ({ isOpen, onClose }) => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const { settings } = useSettings();
     const supportPhone = settings?.supportPhone || '';
 
     const issues = [
-        { icon: PackageX, label: 'Items missing or incorrect', sub: 'Get a refund or replacement' },
-        { icon: AlertCircle, label: 'Item quality issue', sub: 'Report damaged or expired items' },
-        { icon: Truck, label: 'Delivery delay', sub: 'Track your order status' },
+        { icon: PackageX, label: t('help.missing'), sub: t('help.missingSub') },
+        { icon: AlertCircle, label: t('help.quality'), sub: t('help.qualitySub') },
+        { icon: Truck, label: t('help.delay'), sub: t('help.delaySub') },
     ];
 
     const handleCall = (e) => {
         if (!supportPhone) {
             e.preventDefault();
-            toast.error('Support phone number is not available right now. Please use Chat or Raise a Ticket.');
+            toast.error(t('help.noPhone'));
             return;
         }
 
@@ -28,8 +30,8 @@ const HelpModal = ({ isOpen, onClose }) => {
             window.location.href = `tel:${supportPhone}`;
         } else {
             navigator.clipboard?.writeText(supportPhone)
-                .then(() => toast.success(`Support number ${supportPhone} copied!`))
-                .catch(() => toast.info(`Call support at: ${supportPhone}`));
+                .then(() => toast.success(t('help.numberCopied', { phone: supportPhone })))
+                .catch(() => toast.info(t('help.callAt', { phone: supportPhone })));
         }
     };
 
@@ -61,8 +63,8 @@ const HelpModal = ({ isOpen, onClose }) => {
                             <div className="p-6">
                                 <div className="flex items-center justify-between mb-6">
                                     <div>
-                                        <h2 className="text-xl font-black text-slate-800">Need Help?</h2>
-                                        <p className="text-sm text-slate-500 font-medium">Select an issue with your order</p>
+                                        <h2 className="text-xl font-black text-slate-800">{t('help.title')}</h2>
+                                        <p className="text-sm text-slate-500 font-medium">{t('help.subtitle')}</p>
                                     </div>
                                     <button onClick={onClose} className="p-2 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors">
                                         <X size={20} className="text-slate-500" />
@@ -96,21 +98,21 @@ const HelpModal = ({ isOpen, onClose }) => {
                                         onClick={onClose}
                                         className="col-span-2 py-3.5 rounded-xl border-2 border-primary text-primary font-bold flex items-center justify-center gap-2 hover:bg-brand-50 transition-colors shadow-lg shadow-brand-50"
                                     >
-                                        <PlusCircle size={18} /> Raise a Ticket
+                                        <PlusCircle size={18} /> {t('help.raiseTicket')}
                                     </Link>
                                     <Link
                                         to="/chat"
                                         onClick={onClose}
                                         className="py-3.5 rounded-xl bg-slate-900 text-white font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors"
                                     >
-                                        <MessageCircle size={18} /> Chat Us
+                                        <MessageCircle size={18} /> {t('help.chatUs')}
                                     </Link>
                                     <a
                                         href={supportPhone ? `tel:${supportPhone}` : "#"}
                                         onClick={handleCall}
                                         className="py-3.5 rounded-xl border border-slate-200 text-slate-700 font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer"
                                     >
-                                        <Phone size={18} /> Call Us
+                                        <Phone size={18} /> {t('help.callUs')}
                                     </a>
                                 </div>
                             </div>

@@ -1,4 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Plus, Home, Briefcase, MapPin, Trash2, Edit2, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +20,7 @@ import { useLocation } from '../context/LocationContext';
 import { normalizePhoneNumber, isValidIndianPhone } from '../utils/phoneValidation';
 
 const AddressesPage = () => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const { refreshAddresses } = useLocation();
@@ -127,7 +129,7 @@ const AddressesPage = () => {
 
     const handleUseCurrentLocation = () => {
         if (!navigator.geolocation) {
-            toast.error("Geolocation is not supported by your browser");
+            toast.error(t('addresses.errors.noGeo'));
             return;
         }
         setIsGeoLocating(true);
@@ -152,16 +154,16 @@ const AddressesPage = () => {
                     state: state,
                     pincode: pincode
                 }));
-                toast.success("Location fetched successfully");
+                toast.success(t('addresses.locationFetched'));
             } catch (err) {
                 console.error(err);
-                toast.error("Failed to fetch address from location");
+                toast.error(t('addresses.errors.reverseGeo'));
             } finally {
                 setIsGeoLocating(false);
             }
         }, (err) => {
             console.error(err);
-            toast.error("Permission denied or unable to fetch location");
+            toast.error(t('addresses.errors.permission'));
             setIsGeoLocating(false);
         });
     };
@@ -175,18 +177,18 @@ const AddressesPage = () => {
         const pincode = addForm.pincode?.trim();
         const phone = normalizePhoneNumber(addForm.phone);
 
-        if (!name) return toast.error('Please enter your full name');
-        if (!isValidIndianPhone(phone)) return toast.error('Please enter a valid 10-digit mobile number starting with 6-9');
-        if (!address) return toast.error('Please enter the address');
-        if (!city) return toast.error('Please enter the city');
-        if (!state) return toast.error('Please enter the state');
-        if (!pincode || !/^\d{6}$/.test(pincode)) return toast.error('Please enter a valid 6-digit pincode');
+        if (!name) return toast.error(t('addresses.errors.name'));
+        if (!isValidIndianPhone(phone)) return toast.error(t('auth.errors.invalidPhone'));
+        if (!address) return toast.error(t('addresses.errors.address'));
+        if (!city) return toast.error(t('addresses.errors.city'));
+        if (!state) return toast.error(t('addresses.errors.state'));
+        if (!pincode || !/^\d{6}$/.test(pincode)) return toast.error(t('addresses.errors.pincode'));
 
         const isDuplicate = rawAddresses.some(a => 
             a.fullAddress?.toLowerCase() === address.toLowerCase() && 
             (a.label || 'home').toLowerCase() === addForm.type.toLowerCase()
         );
-        if (isDuplicate) return toast.error('This address is already saved under this label');
+        if (isDuplicate) return toast.error(t('addresses.errors.duplicate'));
 
         const newAddr = {
             label: addForm.type.toLowerCase(),
@@ -211,7 +213,7 @@ const AddressesPage = () => {
                 }
             } catch (e) {
                 console.warn("Geocoding failed, but continuing to save the address:", e);
-                toast.warning('Address saved, but location coordinates could not be pinpointed.');
+                toast.warning(t('addresses.savedNoCoords'));
             }
 
             await customerApi.updateProfile({
@@ -219,13 +221,13 @@ const AddressesPage = () => {
                 ...(phone && { phone }),
                 addresses: [...rawAddresses, newAddr]
             });
-            toast.success('Address saved successfully');
+            toast.success(t('addresses.saved'));
             setIsAddOpen(false);
             setLoading(true);
             await fetchAddresses();
             await refreshAddresses?.();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to save address');
+            toast.error(err.response?.data?.message || t('addresses.errors.saveFailed'));
         } finally {
             setSaving(false);
         }
@@ -268,12 +270,12 @@ const AddressesPage = () => {
         const state = editForm.state?.trim();
         const pincode = editForm.pincode?.trim();
 
-        if (!name) return toast.error('Please enter your full name');
-        if (!isValidIndianPhone(phone)) return toast.error('Please enter a valid 10-digit mobile number starting with 6-9');
-        if (!address) return toast.error('Please enter the address');
-        if (!city) return toast.error('Please enter the city');
-        if (!state) return toast.error('Please enter the state');
-        if (!pincode || !/^\d{6}$/.test(pincode)) return toast.error('Please enter a valid 6-digit pincode');
+        if (!name) return toast.error(t('addresses.errors.name'));
+        if (!isValidIndianPhone(phone)) return toast.error(t('auth.errors.invalidPhone'));
+        if (!address) return toast.error(t('addresses.errors.address'));
+        if (!city) return toast.error(t('addresses.errors.city'));
+        if (!state) return toast.error(t('addresses.errors.state'));
+        if (!pincode || !/^\d{6}$/.test(pincode)) return toast.error(t('addresses.errors.pincode'));
 
         const idx = addresses.findIndex(a => (a.id === selectedAddress.id) || (a.address === selectedAddress.address && a.type === selectedAddress.type));
         if (idx < 0) {
@@ -308,7 +310,7 @@ const AddressesPage = () => {
             }
         } catch (e) {
             console.warn("Geocoding failed, but continuing to update the address:", e);
-            toast.warning('Address updated, but location coordinates could not be pinpointed.');
+            toast.warning(t('addresses.updatedNoCoords'));
         }
 
         const updatedAddresses = rawAddresses.map((raw, i) => (i === idx ? updatedRaw : raw));
@@ -319,14 +321,14 @@ const AddressesPage = () => {
                 ...(phone && { phone }),
                 addresses: updatedAddresses
             });
-            toast.success('Address updated successfully');
+            toast.success(t('addresses.updated'));
             setIsEditOpen(false);
             setSelectedAddress(null);
             setLoading(true);
             await fetchAddresses();
             await refreshAddresses?.();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to update address');
+            toast.error(err.response?.data?.message || t('addresses.errors.updateFailed'));
         } finally {
             setUpdating(false);
         }
@@ -350,14 +352,14 @@ const AddressesPage = () => {
         setDeleting(true);
         try {
             await customerApi.updateProfile({ addresses: updatedAddresses });
-            toast.success('Address deleted successfully');
+            toast.success(t('addresses.deleted'));
             setIsDeleteOpen(false);
             setSelectedAddress(null);
             setLoading(true);
             await fetchAddresses();
             await refreshAddresses?.();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to delete address');
+            toast.error(err.response?.data?.message || t('addresses.errors.deleteFailed'));
         } finally {
             setDeleting(false);
         }
@@ -373,12 +375,12 @@ const AddressesPage = () => {
 
         try {
             await customerApi.updateProfile({ addresses: updatedAddresses });
-            toast.success('Default address updated');
+            toast.success(t('addresses.defaultUpdated'));
             setLoading(true);
             await fetchAddresses();
             await refreshAddresses?.();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to set default address');
+            toast.error(err.response?.data?.message || t('addresses.errors.defaultFailed'));
         }
     };
 
@@ -391,7 +393,7 @@ const AddressesPage = () => {
                 >
                     <ChevronLeft size={22} className="text-slate-800" />
                 </button>
-                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Saved Addresses</h1>
+                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">{t('profile.menu.addresses')}</h1>
             </div>
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-4">
@@ -403,26 +405,26 @@ const AddressesPage = () => {
                     <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
                         <Plus size={18} strokeWidth={2.5} />
                     </div>
-                    <span className="font-semibold text-sm">Add New Address</span>
+                    <span className="font-semibold text-sm">{t('checkout.addNewAddress')}</span>
                 </button>
 
                 {/* Address List */}
                 <div className="space-y-4">
                     {loading ? (
                         <div className="bg-white rounded-xl p-6 border border-slate-200 text-center">
-                            <p className="text-slate-500 font-medium">Loading addresses...</p>
+                            <p className="text-slate-500 font-medium">{t('addresses.loading')}</p>
                         </div>
                     ) : addresses.length === 0 ? (
                         <div className="bg-white rounded-xl p-6 border border-slate-200 text-center">
                             <MapPin size={30} className="mx-auto text-slate-300 mb-3" />
-                            <p className="text-slate-700 font-semibold mb-1">No saved addresses</p>
-                            <p className="text-slate-500 text-sm">Add your first delivery address above</p>
+                            <p className="text-slate-700 font-semibold mb-1">{t('addresses.emptyTitle')}</p>
+                            <p className="text-slate-500 text-sm">{t('addresses.emptyMessage')}</p>
                         </div>
                     ) : addresses.map((addr) => (
                         <div key={addr.id} className="bg-white rounded-xl p-4 border border-slate-200 relative overflow-hidden">
                             {addr.isDefault && (
                                 <div className="absolute top-0 right-0 bg-slate-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-bl-lg uppercase tracking-wide">
-                                    Default
+                                    {t('addresses.default')}
                                 </div>
                             )}
 
@@ -432,12 +434,12 @@ const AddressesPage = () => {
                                 </div>
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <h3 className="text-sm font-semibold text-slate-800">{addr.type}</h3>
+                                        <h3 className="text-sm font-semibold text-slate-800">{t(`addresses.types.${String(addr.type || '').toLowerCase()}`, { defaultValue: addr.type })}</h3>
                                     </div>
                                     <p className="text-slate-800 font-medium text-sm mb-1">{addr.name}</p>
                                     <p className="text-slate-500 text-xs leading-relaxed mb-1">{addr.address}</p>
                                     <p className="text-slate-500 text-xs mb-2">{[addr.city, addr.state, addr.pincode].filter(Boolean).join(', ')}</p>
-                                    <p className="text-slate-700 font-medium text-xs">Phone: {addr.phone}</p>
+                                    <p className="text-slate-700 font-medium text-xs">{t('checkout.phone', { phone: addr.phone })}</p>
                                 </div>
                             </div>
 
@@ -447,14 +449,14 @@ const AddressesPage = () => {
                                         onClick={() => handleSetDefault(addr)}
                                         className="flex-1 min-w-[30%] py-2 rounded-lg bg-primary/10 text-primary font-semibold text-xs hover:bg-primary/20 transition-colors flex items-center justify-center gap-1.5"
                                     >
-                                        Set as Default
+                                        {t('addresses.setDefault')}
                                     </button>
                                 )}
                                 <button
                                     onClick={() => handleEdit(addr)}
                                     className="flex-1 min-w-[25%] py-2 rounded-lg bg-slate-100 text-slate-700 font-medium text-xs hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5"
                                 >
-                                    <Edit2 size={14} /> Edit
+                                    <Edit2 size={14} /> {t('common:actions.edit')}
                                 </button>
                                 <button
                                     onClick={() => handleDelete(addr)}
@@ -472,9 +474,9 @@ const AddressesPage = () => {
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle>Add New Address</DialogTitle>
+                        <DialogTitle>{t('checkout.addNewAddress')}</DialogTitle>
                         <DialogDescription>
-                            Enter your delivery details below.
+                            {t('addresses.addSub')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
@@ -490,56 +492,56 @@ const AddressesPage = () => {
                             ) : (
                                 <MapPin size={16} className="text-indigo-600" />
                             )}
-                            {isGeoLocating ? "Fetching Location..." : "Use Current Location"}
+                            {isGeoLocating ? t('addresses.fetchingLocation') : t('addresses.useCurrent')}
                         </Button>
 
                         <div className="grid gap-2">
-                            <Label>Address Type</Label>
+                            <Label>{t('addresses.type')}</Label>
                             <div className="flex gap-2">
-                                <Button type="button" variant="outline" className={`flex-1 ${addForm.type === 'home' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setAddForm(f => ({ ...f, type: 'home' }))}>Home</Button>
-                                <Button type="button" variant="outline" className={`flex-1 ${addForm.type === 'work' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setAddForm(f => ({ ...f, type: 'work' }))}>Work</Button>
-                                <Button type="button" variant="outline" className={`flex-1 ${addForm.type === 'other' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setAddForm(f => ({ ...f, type: 'other' }))}>Other</Button>
+                                <Button type="button" variant="outline" className={`flex-1 ${addForm.type === 'home' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setAddForm(f => ({ ...f, type: 'home' }))}>{t('addresses.types.home')}</Button>
+                                <Button type="button" variant="outline" className={`flex-1 ${addForm.type === 'work' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setAddForm(f => ({ ...f, type: 'work' }))}>{t('addresses.types.work')}</Button>
+                                <Button type="button" variant="outline" className={`flex-1 ${addForm.type === 'other' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setAddForm(f => ({ ...f, type: 'other' }))}>{t('addresses.types.other')}</Button>
                             </div>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="name">Full Name</Label>
-                            <Input id="name" placeholder="John Doe" value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))} />
+                            <Label htmlFor="name">{t('auth.fullName')}</Label>
+                            <Input id="name" placeholder={t('addresses.namePlaceholder')} value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))} />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="phone">Phone Number</Label>
+                            <Label htmlFor="phone">{t('editProfile.phone')}</Label>
                             <Input id="phone" placeholder="+91 98765 43210" value={addForm.phone} onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))} />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="address">Address</Label>
-                            <Textarea id="address" placeholder="Flat No, Building, Street" value={addForm.address} onChange={e => setAddForm(f => ({ ...f, address: e.target.value }))} />
+                            <Label htmlFor="address">{t('addresses.address')}</Label>
+                            <Textarea id="address" placeholder={t('addresses.addressPlaceholder')} value={addForm.address} onChange={e => setAddForm(f => ({ ...f, address: e.target.value }))} />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="landmark">Nearest Landmark (optional)</Label>
+                            <Label htmlFor="landmark">{t('addresses.landmark')}</Label>
                             <Input
                                 id="landmark"
-                                placeholder="Near City Mall, Opp. Temple"
+                                placeholder={t('addresses.landmarkPlaceholder')}
                                 value={addForm.landmark}
                                 onChange={e => setAddForm(f => ({ ...f, landmark: e.target.value }))}
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="city">City</Label>
+                                <Label htmlFor="city">{t('addresses.city')}</Label>
                                 <Input id="city" placeholder="New Delhi" value={addForm.city} onChange={e => setAddForm(f => ({ ...f, city: e.target.value }))} />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="state">State</Label>
+                                <Label htmlFor="state">{t('addresses.state')}</Label>
                                 <Input id="state" placeholder="Delhi" value={addForm.state} onChange={e => setAddForm(f => ({ ...f, state: e.target.value }))} />
                             </div>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="pincode">Pincode</Label>
+                            <Label htmlFor="pincode">{t('addresses.pincode')}</Label>
                             <Input id="pincode" placeholder="110075" value={addForm.pincode} onChange={e => setAddForm(f => ({ ...f, pincode: e.target.value }))} />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAddOpen(false)} disabled={saving}>Cancel</Button>
-                        <Button className="bg-primary hover:bg-[#0b721b]" onClick={handleSaveNewAddress} disabled={saving}>{saving ? 'Saving...' : 'Save Address'}</Button>
+                        <Button variant="outline" onClick={() => setIsAddOpen(false)} disabled={saving}>{t('common:actions.cancel')}</Button>
+                        <Button className="bg-primary hover:bg-[#0b721b]" onClick={handleSaveNewAddress} disabled={saving}>{saving ? t('addresses.saving') : t('checkout.address.save')}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -548,59 +550,59 @@ const AddressesPage = () => {
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle>Edit Address</DialogTitle>
+                        <DialogTitle>{t('addresses.editTitle')}</DialogTitle>
                         <DialogDescription>
-                            Update your delivery details.
+                            {t('addresses.editSub')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label>Address Type</Label>
+                            <Label>{t('addresses.type')}</Label>
                             <div className="flex gap-2">
-                                <Button type="button" variant="outline" className={`flex-1 ${editForm.type === 'home' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setEditForm(f => ({ ...f, type: 'home' }))}>Home</Button>
-                                <Button type="button" variant="outline" className={`flex-1 ${editForm.type === 'work' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setEditForm(f => ({ ...f, type: 'work' }))}>Work</Button>
-                                <Button type="button" variant="outline" className={`flex-1 ${editForm.type === 'other' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setEditForm(f => ({ ...f, type: 'other' }))}>Other</Button>
+                                <Button type="button" variant="outline" className={`flex-1 ${editForm.type === 'home' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setEditForm(f => ({ ...f, type: 'home' }))}>{t('addresses.types.home')}</Button>
+                                <Button type="button" variant="outline" className={`flex-1 ${editForm.type === 'work' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setEditForm(f => ({ ...f, type: 'work' }))}>{t('addresses.types.work')}</Button>
+                                <Button type="button" variant="outline" className={`flex-1 ${editForm.type === 'other' ? 'border-primary text-primary bg-brand-50' : ''}`} onClick={() => setEditForm(f => ({ ...f, type: 'other' }))}>{t('addresses.types.other')}</Button>
                             </div>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="edit-name">Full Name</Label>
+                            <Label htmlFor="edit-name">{t('auth.fullName')}</Label>
                             <Input id="edit-name" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="edit-phone">Phone Number</Label>
+                            <Label htmlFor="edit-phone">{t('editProfile.phone')}</Label>
                             <Input id="edit-phone" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="edit-address">Address</Label>
+                            <Label htmlFor="edit-address">{t('addresses.address')}</Label>
                             <Textarea id="edit-address" value={editForm.address} onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))} />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="edit-landmark">Nearest Landmark (optional)</Label>
+                            <Label htmlFor="edit-landmark">{t('addresses.landmark')}</Label>
                             <Input
                                 id="edit-landmark"
-                                placeholder="Near City Mall, Opp. Temple"
+                                placeholder={t('addresses.landmarkPlaceholder')}
                                 value={editForm.landmark}
                                 onChange={e => setEditForm(f => ({ ...f, landmark: e.target.value }))}
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="edit-city">City</Label>
+                                <Label htmlFor="edit-city">{t('addresses.city')}</Label>
                                 <Input id="edit-city" placeholder="New Delhi" value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="edit-state">State</Label>
+                                <Label htmlFor="edit-state">{t('addresses.state')}</Label>
                                 <Input id="edit-state" placeholder="Delhi" value={editForm.state} onChange={e => setEditForm(f => ({ ...f, state: e.target.value }))} />
                             </div>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="edit-pincode">Pincode</Label>
+                            <Label htmlFor="edit-pincode">{t('addresses.pincode')}</Label>
                             <Input id="edit-pincode" placeholder="110075" value={editForm.pincode} onChange={e => setEditForm(f => ({ ...f, pincode: e.target.value }))} />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={updating}>Cancel</Button>
-                        <Button className="bg-primary hover:bg-[#0b721b]" onClick={handleUpdateAddress} disabled={updating}>{updating ? 'Updating...' : 'Update Address'}</Button>
+                        <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={updating}>{t('common:actions.cancel')}</Button>
+                        <Button className="bg-primary hover:bg-[#0b721b]" onClick={handleUpdateAddress} disabled={updating}>{updating ? t('addresses.updating') : t('addresses.update')}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -609,24 +611,24 @@ const AddressesPage = () => {
             <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle className="text-red-600">Delete Address?</DialogTitle>
+                        <DialogTitle className="text-red-600">{t('addresses.deleteTitle')}</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to delete this address? This action cannot be undone.
+                            {t('addresses.deleteMessage')}
                         </DialogDescription>
                     </DialogHeader>
 
                     {selectedAddress && (
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 my-2">
                             <div className="flex items-center gap-2 mb-1">
-                                <span className="font-bold text-slate-800">{selectedAddress.type}</span>
+                                <span className="font-bold text-slate-800">{t(`addresses.types.${String(selectedAddress.type || '').toLowerCase()}`, { defaultValue: selectedAddress.type })}</span>
                             </div>
                             <p className="text-slate-600 text-sm">{selectedAddress.address}</p>
                         </div>
                     )}
 
                     <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={deleting}>Cancel</Button>
-                        <Button variant="destructive" className="bg-red-500 hover:bg-red-600" onClick={handleConfirmDelete} disabled={deleting}>{deleting ? 'Deleting...' : 'Delete'}</Button>
+                        <Button variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={deleting}>{t('common:actions.cancel')}</Button>
+                        <Button variant="destructive" className="bg-red-500 hover:bg-red-600" onClick={handleConfirmDelete} disabled={deleting}>{deleting ? t('addresses.deleting') : t('common:actions.delete')}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

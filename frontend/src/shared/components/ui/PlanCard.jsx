@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, Shield, Zap, Gift, Users, TrendingUp, ShoppingBag, Layers, Percent, Target, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +17,7 @@ const iconMap = {
 };
 
 const PlanCard = ({ plan, onEdit, onDelete, isAdmin = false, isActive = false, expiryDate = null, showStrikePriceOnly = false }) => {
+    const { t } = useTranslation('common');
     const hasDiscount = showStrikePriceOnly && plan.originalPrice && plan.price > plan.originalPrice;
     const activePrice = hasDiscount ? plan.originalPrice : plan.price;
     const slashedPrice = hasDiscount ? plan.price : null;
@@ -58,16 +60,16 @@ const PlanCard = ({ plan, onEdit, onDelete, isAdmin = false, isActive = false, e
                             </div>
                             {hasDiscount && (
                                 <span className="inline-block bg-rose-50 text-rose-600 px-2 py-0.5 rounded-md text-[10px] font-black w-fit uppercase tracking-widest border border-rose-100/50">
-                                    {Math.round(((plan.price - plan.originalPrice) / plan.price) * 100)}% OFF
+                                    {t('planCard.percentOff', { percent: Math.round(((plan.price - plan.originalPrice) / plan.price) * 100) })}
                                 </span>
                             )}
-                            <span className="text-xs font-bold text-slate-400">/ year</span>
+                            <span className="text-xs font-bold text-slate-400">{t('planCard.perYear')}</span>
                         </div>
                     </div>
                 </div>
 
                 <p className="text-sm font-medium text-slate-500 mb-8 line-clamp-2">
-                    {plan.description || "Unlock premium features and elevate your experience."}
+                    {plan.description || t('planCard.defaultDescription')}
                 </p>
 
                 <div className="space-y-4 mb-8">
@@ -84,7 +86,7 @@ const PlanCard = ({ plan, onEdit, onDelete, isAdmin = false, isActive = false, e
                                 <div>
                                     <p className="text-xs font-black text-slate-900 leading-none mb-1">{feature.label}</p>
                                     <p className="text-[10px] font-bold text-slate-400 leading-none">
-                                        {feature.unit === 'Boolean' ? (feature.value ? 'Enabled' : 'Disabled') : `${feature.value}${feature.unit}`}
+                                        {feature.unit === 'Boolean' ? (feature.value ? t('planCard.enabled') : t('planCard.disabled')) : `${feature.value}${feature.unit}`}
                                     </p>
                                 </div>
                             </div>
@@ -98,13 +100,13 @@ const PlanCard = ({ plan, onEdit, onDelete, isAdmin = false, isActive = false, e
                             onClick={() => onEdit(plan)}
                             className="flex-1 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
                         >
-                            Edit Plan
+                            {t('planCard.edit')}
                         </button>
                         <button 
                             onClick={() => onDelete(plan._id)}
                             className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
                         >
-                            Delete
+                            {t('actions.delete')}
                         </button>
                     </div>
                 ) : (
@@ -116,7 +118,7 @@ const PlanCard = ({ plan, onEdit, onDelete, isAdmin = false, isActive = false, e
                             )}
                             style={!isActive ? { backgroundColor: plan.displayColor } : {}}
                         >
-                            {isActive ? "Active Plan" : "Subscribe Now"}
+                            {isActive ? t('planCard.active') : t('planCard.subscribe')}
                         </button>
                     </div>
                 )}

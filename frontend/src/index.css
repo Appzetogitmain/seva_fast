@@ -470,3 +470,10 @@ html.admin-app-scroll::-webkit-scrollbar-thumb:hover {
     -webkit-touch-callout: none;
   }
 }
+
+/* Hindi / Marathi: Devanagari conjuncts break apart with letter-spacing, and
+   uppercase has no effect, so drop the English-style tracking for these languages. */
+html:lang(hi) *,
+html:lang(mr) * {
+  letter-spacing: normal !important;
+}

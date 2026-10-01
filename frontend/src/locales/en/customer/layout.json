@@ -1,0 +1,13 @@
+{
+  "returnPickupOtp": "Return Pickup OTP",
+  "returnPickupOtpSub": "Share this code with the delivery partner to confirm your return pickup.",
+  "returnReceived": "Return Received Alert",
+  "returnReceivedSub": "Use this code to confirm that your return has reached the seller.",
+  "messageFrom": "Message from {{name}}",
+  "photoMessage": "You have received a message regarding your photo order.",
+  "tapToReply": "Tap to view & reply",
+  "photoStatus": "Photo Order {{status}}",
+  "statusUpdate": "Status Update",
+  "theSeller": "The seller",
+  "tapToViewOrder": "Tap to view order"
+}

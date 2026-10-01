@@ -1,0 +1,10 @@
+{
+  "title": "Best Offers for You",
+  "subtitle": "Grab these exclusive deals before they expire!",
+  "loading": "Loading offers...",
+  "couponDeals": "Coupon deals",
+  "autoApplied": "AUTO-APPLIED",
+  "appliesOnOrder": "Applies on order #{{number}}",
+  "emptyTitle": "No active offers right now",
+  "emptyMessage": "Check back soon. Our team is curating fresh deals for you."
+}

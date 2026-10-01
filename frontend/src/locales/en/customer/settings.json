@@ -1,0 +1,10 @@
+{
+  "title": "Settings",
+  "subtitle": "Configure your app preferences",
+  "general": "General",
+  "notifications": "Notifications",
+  "security": "Security",
+  "changePassword": "Change Password",
+  "privacySettings": "Privacy Settings",
+  "deleteAccount": "Delete Account"
+}

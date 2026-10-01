@@ -1,0 +1,9 @@
+{
+  "title": "My Wishlist",
+  "savedCount_one": "{{count}} item saved",
+  "savedCount_other": "{{count}} items saved",
+  "clear": "Clear",
+  "emptyTitle": "No items in wishlist",
+  "emptyMessage": "Start saving your favorite items to see them here later.",
+  "explore": "Explore Products"
+}

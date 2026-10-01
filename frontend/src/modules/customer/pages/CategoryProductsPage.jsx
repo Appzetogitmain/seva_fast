@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, Heart, Search, Minus, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,6 +20,7 @@ import { useSettings } from '@core/context/SettingsContext';
 import ServiceUnavailableSection from '@shared/components/ServiceUnavailableSection';
 
 const CategoryProductsPage = () => {
+    const { t } = useTranslation('customer');
     const { categoryName: catId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -135,7 +137,7 @@ const CategoryProductsPage = () => {
                             </h1>
                             {filteredProducts.length > 0 && (
                                 <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
-                                    Showing {filteredProducts.length} items
+                                    {t('category.showing', { count: filteredProducts.length })}
                                 </p>
                             )}
                         </div>
@@ -148,8 +150,8 @@ const CategoryProductsPage = () => {
                     <div className="w-full flex-1">
                         <ServiceUnavailableSection
                             embedded
-                            description={`${settings?.appName || 'Our service'} is not available in your area yet. We're expanding fast!`}
-                            buttonLabel="Try Refreshing"
+                            description={t('category.notAvailable', { app: settings?.appName || t('category.ourService') })}
+                            buttonLabel={t('category.tryRefreshing')}
                             onRetry={fetchData}
                         />
                     </div>
@@ -194,7 +196,7 @@ const CategoryProductsPage = () => {
                                 </div>
                             ) : filteredProducts.length === 0 ? (
                                 <div className="text-center py-16 text-slate-500 font-medium">
-                                    No products found in this subcategory.
+                                    {t('category.noProducts')}
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-4">

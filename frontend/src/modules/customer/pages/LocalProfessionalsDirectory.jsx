@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { customerApi } from '../services/customerApi';
 import { useToast } from '@shared/components/ui/Toast';
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 
 const LocalProfessionalsDirectory = () => {
+    const { t } = useTranslation('customer');
     const { showToast } = useToast();
     const [searchParams] = useSearchParams();
     const urlCategoryId = searchParams.get('categoryId') || searchParams.get('category') || '';
@@ -67,7 +69,7 @@ const LocalProfessionalsDirectory = () => {
             }
         } catch (error) {
             console.error("Failed to load local directory data", error);
-            showToast("Failed to fetch local service professionals", "error");
+            showToast(t('directory.loadFailed'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -84,19 +86,19 @@ const LocalProfessionalsDirectory = () => {
 
     const handleTriggerGeolocation = () => {
         if (!navigator.geolocation) {
-            return showToast("Geolocation is not supported by your browser", "error");
+            return showToast(t('addresses.errors.noGeo'), "error");
         }
         setIsGeoActive(true);
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 setLat(position.coords.latitude.toString());
                 setLng(position.coords.longitude.toString());
-                showToast("Location captured! Showing nearby professionals.", "success");
+                showToast(t('directory.locationCaptured'), "success");
             },
             (error) => {
                 console.error("Geolocation failed", error);
                 setIsGeoActive(false);
-                showToast("Failed to fetch location. Defaulting to Indore citywide search.", "error");
+                showToast(t('directory.locationFailed'), "error");
             }
         );
     };
@@ -112,13 +114,13 @@ const LocalProfessionalsDirectory = () => {
             {/* Page Header */}
             <div className="text-center space-y-4 mb-10">
                 <h1 className="text-3xl md:text-4xl font-black text-slate-950 tracking-tight flex items-center justify-center gap-3">
-                    Verified Local Professionals
+                    {t('directory.title')}
                     <div className="p-2 bg-brand-50 rounded-xl">
                         <Briefcase className="h-6 w-6 text-brand-600" />
                     </div>
                 </h1>
                 <p className="text-sm font-bold text-slate-400 max-w-md mx-auto leading-relaxed">
-                    Locate plumbers, electricians, painters, and household service experts directly in your operational area.
+                    {t('directory.subtitle')}
                 </p>
                 <div className="pt-1">
                     <Link
@@ -126,7 +128,7 @@ const LocalProfessionalsDirectory = () => {
                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-brand-100/50 shadow-sm"
                     >
                         <Briefcase className="h-4.5 w-4.5" />
-                        Register / Manage Profile
+                        {t('directory.register')}
                     </Link>
                 </div>
             </div>
@@ -139,7 +141,7 @@ const LocalProfessionalsDirectory = () => {
                         <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-brand-500 transition-colors" />
                         <input
                             type="text"
-                            placeholder="Search by keywords (e.g. plumber, repair, paint)..."
+                            placeholder={t('directory.searchPlaceholder')}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="w-full pl-12 pr-5 py-4 bg-slate-50 border-none rounded-[20px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
@@ -152,7 +154,7 @@ const LocalProfessionalsDirectory = () => {
                             <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="City"
+                                placeholder={t('addresses.city')}
                                 value={selectedCity}
                                 onChange={(e) => setSelectedCity(e.target.value)}
                                 className="w-full pl-12 pr-5 py-4 bg-slate-50 border-none rounded-[20px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
@@ -166,7 +168,7 @@ const LocalProfessionalsDirectory = () => {
                                 onClick={handleClearLocation}
                                 className="w-full sm:w-auto px-6 py-4 bg-emerald-50 text-emerald-600 rounded-[20px] text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all"
                             >
-                                <Compass className="h-4 w-4 animate-pulse" /> Near Me
+                                <Compass className="h-4 w-4 animate-pulse" /> {t('directory.nearMe')}
                                 <X className="h-3.5 w-3.5" />
                             </button>
                         ) : (
@@ -175,7 +177,7 @@ const LocalProfessionalsDirectory = () => {
                                 onClick={handleTriggerGeolocation}
                                 className="w-full sm:w-auto px-6 py-4 bg-slate-50 text-slate-600 rounded-[20px] text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-100 transition-all"
                             >
-                                <Compass className="h-4 w-4" /> Near Me
+                                <Compass className="h-4 w-4" /> {t('directory.nearMe')}
                             </button>
                         )}
 
@@ -183,7 +185,7 @@ const LocalProfessionalsDirectory = () => {
                             type="submit"
                             className="w-full sm:w-auto px-8 py-4 bg-black text-white rounded-[20px] text-xs font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-md"
                         >
-                            Find
+                            {t('directory.find')}
                         </button>
                     </div>
                 </form>
@@ -195,7 +197,7 @@ const LocalProfessionalsDirectory = () => {
                         className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${!selectedCategoryId ? 'bg-black text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
                             }`}
                     >
-                        All Categories
+                        {t('directory.allCategories')}
                     </button>
                     {categories.map((cat) => (
                         <button
@@ -221,14 +223,14 @@ const LocalProfessionalsDirectory = () => {
             {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-32 space-y-4">
                     <Loader2 className="h-12 w-12 text-brand-500 animate-spin" />
-                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Searching Local Directory...</p>
+                    <p className="text-sm font-black text-slate-400 uppercase tracking-widest">{t('directory.searching')}</p>
                 </div>
             ) : professionals.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[40px] border border-slate-100">
                     <Briefcase className="h-12 w-12 text-slate-300 mb-4" />
-                    <h3 className="text-lg font-black text-slate-900">No Professionals Found</h3>
+                    <h3 className="text-lg font-black text-slate-900">{t('directory.emptyTitle')}</h3>
                     <p className="text-sm font-bold text-slate-400 mt-2 max-w-xs text-center">
-                        Try modifying your filters, selecting a different city, or toggling "Near Me" search distance parameters.
+                        {t('directory.emptyMessage')}
                     </p>
                 </div>
             ) : (
@@ -273,16 +275,16 @@ const LocalProfessionalsDirectory = () => {
                             <div className="mt-6 border-t border-slate-50 pt-4 space-y-3">
                                 {pro.services?.length > 0 && (
                                     <div className="space-y-1">
-                                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Featured Services</span>
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('directory.featured')}</span>
                                         <div className="flex flex-wrap gap-1.5">
                                             {pro.services.slice(0, 2).map((svc, idx) => (
                                                 <span key={idx} className="text-[11px] font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
-                                                    {svc.name} ({svc.price === 0 || svc.price === '0' ? 'FREE' : '₹' + svc.price})
+                                                    {svc.name} ({svc.price === 0 || svc.price === '0' ? t('directory.free') : '₹' + svc.price})
                                                 </span>
                                             ))}
                                             {pro.services.length > 2 && (
                                                 <span className="text-[10px] font-black text-brand-600 bg-brand-50 px-2 py-1 rounded-lg">
-                                                    +{pro.services.length - 2} more
+                                                    {t('directory.more', { count: pro.services.length - 2 })}
                                                 </span>
                                             )}
                                         </div>
@@ -294,7 +296,7 @@ const LocalProfessionalsDirectory = () => {
                                         onClick={() => setActiveCatalogProfessional(pro)}
                                         className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center"
                                     >
-                                        View Catalog
+                                        {t('directory.viewCatalog')}
                                     </button>
                                     <a
                                         href={`tel:${pro.phone}`}
@@ -337,7 +339,7 @@ const LocalProfessionalsDirectory = () => {
                         </div>
 
                         <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Available Catalog Services</h3>
+                            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">{t('directory.catalog')}</h3>
                             {activeCatalogProfessional.services?.length > 0 ? (
                                 activeCatalogProfessional.services.map((svc, i) => (
                                     <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
@@ -349,7 +351,7 @@ const LocalProfessionalsDirectory = () => {
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-xs text-slate-400 italic font-bold py-6 text-center">No service catalog items available.</p>
+                                <p className="text-xs text-slate-400 italic font-bold py-6 text-center">{t('directory.noCatalog')}</p>
                             )}
                         </div>
 

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { Check, Contact2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
@@ -37,21 +38,22 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
   displayPhone,
   displayAddress,
 }) {
+  const { t } = useTranslation('customer');
   return (
     <motion.div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
       {/* "Order for someone else" toggle */}
       <div className="flex justify-between items-center mb-3">
         <span className="text-xs text-slate-500 font-medium">
-          Ordering for someone else?
+          {t('checkout.address.someoneElse')}
         </span>
         <button
           onClick={onToggleRecipientForm}
           className="text-primary text-xs font-bold hover:underline">
           {showRecipientForm
-            ? "Close"
+            ? t('common:actions.close')
             : savedRecipient
-              ? "Change details"
-              : "Add details"}
+              ? t('checkout.address.changeDetails')
+              : t('checkout.address.addDetails')}
         </button>
       </div>
 
@@ -79,7 +81,7 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
           <button
             onClick={onRemoveRecipient}
             className="text-red-500 text-xs font-bold hover:underline">
-            Remove
+            {t('common:actions.remove')}
           </button>
         </div>
       )}
@@ -96,11 +98,11 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
             <div className="bg-[#f8f9fb] rounded-2xl p-4 border border-slate-100 space-y-4">
               <div>
                 <h4 className="text-sm font-bold text-slate-800 mb-3">
-                  Enter delivery address details
+                  {t('checkout.address.enterAddress')}
                 </h4>
                 <div className="space-y-3">
                   <Input
-                    placeholder="Enter complete address*"
+                    placeholder={t('checkout.address.completeAddress')}
                     value={recipientData.completeAddress}
                     onChange={(e) =>
                       onRecipientDataChange({ ...recipientData, completeAddress: e.target.value })
@@ -108,7 +110,7 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
                     className="h-12 rounded-xl border-slate-200 focus:ring-primary focus:border-primary text-sm"
                   />
                   <Input
-                    placeholder="Find landmark (optional)"
+                    placeholder={t('checkout.address.landmark')}
                     value={recipientData.landmark}
                     onChange={(e) =>
                       onRecipientDataChange({ ...recipientData, landmark: e.target.value })
@@ -116,7 +118,7 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
                     className="h-12 rounded-xl border-slate-200 focus:ring-primary focus:border-primary text-sm"
                   />
                   <Input
-                    placeholder="Enter pin code (optional)"
+                    placeholder={t('checkout.address.pincode')}
                     value={recipientData.pincode}
                     onChange={(e) =>
                       onRecipientDataChange({ ...recipientData, pincode: e.target.value })
@@ -128,14 +130,14 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
 
               <div>
                 <h4 className="text-sm font-bold text-slate-800 mb-1">
-                  Enter receiver details
+                  {t('checkout.address.enterReceiver')}
                 </h4>
                 <p className="text-[10px] text-slate-400 mb-3 font-medium">
-                  We&apos;ll contact receiver to get the exact delivery address
+                  {t('checkout.address.contactReceiver')}
                 </p>
                 <div className="space-y-3">
                   <Input
-                    placeholder="Receiver's name*"
+                    placeholder={t('checkout.address.receiverName')}
                     value={recipientData.name}
                     onChange={(e) =>
                       onRecipientDataChange({ ...recipientData, name: e.target.value })
@@ -144,7 +146,7 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
                   />
                   <div className="relative">
                     <Input
-                      placeholder="Receiver's phone number*"
+                      placeholder={t('checkout.address.receiverPhone')}
                       value={recipientData.phone}
                       onChange={(e) =>
                         onRecipientDataChange({ ...recipientData, phone: e.target.value })
@@ -162,7 +164,7 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
               <Button
                 onClick={onSaveRecipient}
                 className="w-full h-12 bg-[var(--brand-700)] hover:bg-[var(--brand-600)] text-white font-bold rounded-xl">
-                Save address
+                {t('checkout.address.save')}
               </Button>
             </div>
           </motion.div>
@@ -171,8 +173,8 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
 
       {/* Delivery address heading */}
       <div className="mb-3">
-        <h3 className="font-black text-slate-800 text-base">Delivery Address</h3>
-        <p className="text-xs text-slate-500">Select or edit your saved address</p>
+        <h3 className="font-black text-slate-800 text-base">{t('checkout.address.title')}</h3>
+        <p className="text-xs text-slate-500">{t('checkout.address.subtitle')}</p>
       </div>
 
       {/* Active address card */}
@@ -190,12 +192,12 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
                 <button
                   onClick={(e) => { e.stopPropagation(); onEditAddress(); }}
                   className="text-slate-500 text-xs font-bold hover:underline">
-                  Edit
+                  {t('common:actions.edit')}
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); onSelectAddress(); }}
                   className="text-primary text-xs font-bold hover:underline">
-                  Change
+                  {t('checkout.address.change')}
                 </button>
               </div>
             </div>
@@ -211,7 +213,7 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
         onClick={onUseCurrentLocation}
         disabled={isFetchingLocation}
         className="mt-3 w-full py-2.5 rounded-2xl border border-dashed border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-        {isFetchingLocation ? "Detecting live location..." : "Use current live location"}
+        {isFetchingLocation ? t('checkout.address.detecting') : t('checkout.address.useLive')}
       </button>
 
       {/* Confirmation banner */}
@@ -221,10 +223,10 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
         </div>
         <div className="flex-1">
           <p className="text-[13px] font-semibold text-brand-900">
-            Delivery address confirmed
+            {t('checkout.address.confirmed')}
           </p>
           <p className="text-[11px] font-medium text-brand-800/80">
-            We&apos;ll deliver to the address you&apos;ve entered above.
+            {t('checkout.address.confirmedSub')}
           </p>
         </div>
       </motion.div>

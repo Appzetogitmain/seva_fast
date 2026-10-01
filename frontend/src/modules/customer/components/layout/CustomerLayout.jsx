@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Header from './Header';
 import Footer from './Footer';
 import BottomNav from './BottomNav';
@@ -20,6 +21,7 @@ import { isBirthdayToday } from '@shared/utils/birthdayUtils';
 import { notificationSound } from '@core/utils/notificationSound';
 
 const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = false, showCart: showCartProp, showBottomNav: showBottomNavProp }) => {
+    const { t: tr } = useTranslation('customer');
     const location = useLocation();
     const navigate = useNavigate();
     const { isOpen: isProductDetailOpen } = useProductDetail();
@@ -69,9 +71,9 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                             <ShieldCheck size={28} />
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-lg font-black text-slate-900 leading-tight mb-1">Return Pickup OTP</h3>
+                            <h3 className="text-lg font-black text-slate-900 leading-tight mb-1">{tr('layout.returnPickupOtp')}</h3>
                             <p className="text-sm text-slate-500 font-medium mb-3">
-                                Share this code with the delivery partner to confirm your return pickup.
+                                {tr('layout.returnPickupOtpSub')}
                             </p>
                             <div className="flex items-center gap-2">
                                 <span className="text-3xl font-black tracking-[0.2em] text-brand-600 bg-brand-50 px-4 py-2 rounded-xl border border-brand-100">
@@ -93,9 +95,9 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                             <Package size={28} />
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-lg font-black text-slate-900 leading-tight mb-1">Return Received Alert</h3>
+                            <h3 className="text-lg font-black text-slate-900 leading-tight mb-1">{tr('layout.returnReceived')}</h3>
                             <p className="text-sm text-slate-500 font-medium mb-3">
-                                Use this code to confirm that your return has reached the seller.
+                                {tr('layout.returnReceivedSub')}
                             </p>
                             <div className="flex items-center gap-2">
                                 <span className="text-3xl font-black tracking-[0.2em] text-green-600 bg-green-50 px-4 py-2 rounded-xl border border-green-100">
@@ -130,17 +132,17 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm font-bold text-slate-900 truncate">
-                                    Message from {payload.sellerName || 'Seller'}
+                                    {tr('layout.messageFrom', { name: payload.sellerName || tr('orders.seller') })}
                                 </h3>
                                 <span className="text-[10px] bg-indigo-50 text-indigo-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
-                                    Photo Order
+                                    {tr('home.photoOrder')}
                                 </span>
                             </div>
                             <p className="text-xs text-slate-600 font-medium mt-1 line-clamp-2">
-                                {payload.text || 'You have received a message regarding your photo order.'}
+                                {payload.text || tr('layout.photoMessage')}
                             </p>
                             <div className="mt-2 flex items-center gap-1 text-xs font-bold text-indigo-600">
-                                <span>Tap to view & reply</span>
+                                <span>{tr('layout.tapToReply')}</span>
                                 <ChevronRight size={14} />
                             </div>
                         </div>
@@ -171,17 +173,17 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-sm font-bold text-slate-900 truncate">
-                                    Photo Order {payload.status}
+                                    {tr('layout.photoStatus', { status: tr(`orderStatus.photo.${payload.status}`, { defaultValue: payload.status }) })}
                                 </h3>
                                 <span className="text-[10px] bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
-                                    Status Update
+                                    {tr('layout.statusUpdate')}
                                 </span>
                             </div>
                             <p className="text-xs text-slate-600 font-medium mt-1">
-                                {payload.sellerName || 'The seller'} marked your photo order as {payload.status}.
+                                {payload.sellerName || tr('layout.theSeller')} marked your photo order as {payload.status}.
                             </p>
                             <div className="mt-2 flex items-center gap-1 text-xs font-bold text-blue-600">
-                                <span>Tap to view order</span>
+                                <span>{tr('layout.tapToViewOrder')}</span>
                                 <ChevronRight size={14} />
                             </div>
                         </div>

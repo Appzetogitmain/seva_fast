@@ -1,9 +1,11 @@
 import React, { useState, useRef } from "react";
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from "react-router-dom";
 import { ExternalLink, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PlatformBannerSlider = ({ ads = [] }) => {
+  const { t } = useTranslation('customer');
   const navigate = useNavigate();
   if (!ads || ads.length === 0) return null;
 
@@ -86,7 +88,7 @@ const PlatformBannerSlider = ({ ads = [] }) => {
                         setIsMuted(!isMuted);
                       }}
                       className="absolute bottom-2.5 right-2.5 z-30 p-1 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-md border border-white/10 transition-all active:scale-90"
-                      title={isMuted ? "Unmute" : "Mute"}
+                      title={isMuted ? t('home.unmute') : t('home.mute')}
                     >
                       {isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
                     </button>
@@ -110,7 +112,7 @@ const PlatformBannerSlider = ({ ads = [] }) => {
                   <div className="space-y-1 text-left pointer-events-none max-w-full">
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="px-1.5 py-0.5 bg-brand-500/20 text-brand-400 border border-brand-500/30 text-[7px] md:text-[8px] font-black tracking-wider uppercase rounded backdrop-blur-sm">
-                        Sponsored
+                        {t('home.sponsored')}
                       </span>
                       {adItem.city && (
                         <span className="px-1.5 py-0.5 bg-white/10 text-slate-200 text-[7px] md:text-[8px] font-black tracking-wider uppercase rounded backdrop-blur-sm">
@@ -129,7 +131,7 @@ const PlatformBannerSlider = ({ ads = [] }) => {
                   {adItem.targetUrl && (
                     <div className="shrink-0 flex items-center mt-2">
                       <button className="flex items-center gap-1 px-2.5 py-1 bg-white text-black hover:bg-brand-50 rounded-full text-[7px] md:text-[8px] font-black uppercase tracking-wider shadow-md transition-all active:scale-95">
-                        Visit
+                        {t('home.visit')}
                         <ExternalLink className="h-2 w-2 text-black" />
                       </button>
                     </div>

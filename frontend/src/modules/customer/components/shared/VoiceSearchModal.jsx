@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, X, Volume2, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
+    const { t } = useTranslation('customer');
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [interimText, setInterimText] = useState('');
@@ -89,11 +91,11 @@ const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
                 console.warn('Voice recognition error:', event.error);
                 setIsListening(false);
                 if (event.error === 'not-allowed') {
-                    setError('Microphone permission denied. Please allow mic access in browser settings.');
+                    setError(t('voice.errors.permission'));
                 } else if (event.error === 'no-speech') {
-                    setError('No speech detected. Please try speaking again.');
+                    setError(t('voice.errors.noSpeech'));
                 } else {
-                    setError('Voice recognition error. Please try again.');
+                    setError(t('voice.errors.generic'));
                 }
             };
 
@@ -105,7 +107,7 @@ const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
         } catch (err) {
             console.error('Speech recognition exception:', err);
             setIsListening(false);
-            setError('Could not start microphone. Please try again.');
+            setError(t('voice.errors.start'));
         }
     };
 
@@ -177,9 +179,9 @@ const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
                             <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-4">
                                 <AlertCircle size={32} />
                             </div>
-                            <h3 className="text-lg font-black text-slate-800 mb-1">Voice Search Unsupported</h3>
+                            <h3 className="text-lg font-black text-slate-800 mb-1">{t('voice.unsupported')}</h3>
                             <p className="text-xs text-slate-500 max-w-xs mb-4">
-                                Your browser does not support Web Speech API. Please try using Google Chrome.
+                                {t('voice.unsupportedSub')}
                             </p>
                         </div>
                     ) : (
@@ -223,7 +225,7 @@ const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
                             <div className="mt-4 min-h-[60px] flex flex-col items-center justify-center">
                                 {isListening && (
                                     <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-primary mb-1 animate-pulse">
-                                        <Volume2 size={14} /> Listening... Speak product name
+                                        <Volume2 size={14} /> {t('voice.listening')}
                                     </div>
                                 )}
 
@@ -238,7 +240,7 @@ const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
                                         <span className="text-primary italic">"{transcript || interimText}"</span>
                                     ) : !error ? (
                                         <span className="text-slate-400 font-medium text-sm">
-                                            Try saying <span className="font-bold text-slate-600">"Mango"</span>, <span className="font-bold text-slate-600">"Doodh"</span>, or <span className="font-bold text-slate-600">"Fresh Milk"</span>
+                                            {t('voice.trySaying')}
                                         </span>
                                     ) : null}
                                 </div>
@@ -251,7 +253,7 @@ const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
                                         onClick={startListening}
                                         className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 transition-colors"
                                     >
-                                        <RefreshCw size={14} /> Tap to Speak Again
+                                        <RefreshCw size={14} /> {t('voice.speakAgain')}
                                     </button>
                                 ) : null}
 
@@ -263,7 +265,7 @@ const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
                                         }}
                                         className="flex-1 py-3 px-4 bg-primary text-white font-black rounded-2xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
                                     >
-                                        <Sparkles size={14} /> Search "{transcript}"
+                                        <Sparkles size={14} /> {t('voice.searchFor', { query: transcript })}
                                     </button>
                                 )}
                             </div>

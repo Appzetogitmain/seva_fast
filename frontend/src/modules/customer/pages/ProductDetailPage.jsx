@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence, useAnimation, useDragControls } from 'framer-motion';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { X, ChevronDown, Share2, Heart, Search, Clock, Minus, Plus, ShoppingBag, Star, MessageSquare, ArrowLeft, ChevronRight, RotateCcw } from 'lucide-react';
@@ -25,6 +26,7 @@ import {
 import { useAuth } from '@core/context/AuthContext';
 
 const ProductDetailPage = () => {
+    const { t } = useTranslation('customer');
     const { id } = useParams();
     const navigate = useNavigate();
     const [selectedProduct, setSelectedProduct] = useState(null);
@@ -112,7 +114,7 @@ const ProductDetailPage = () => {
                 }
             } catch (error) {
                 console.error("Failed to load product:", error);
-                showToast("Failed to load product details", "error");
+                showToast(t('pdp.loadFailed'), "error");
             } finally {
                 setIsLoadingProduct(false);
             }
@@ -228,15 +230,15 @@ const ProductDetailPage = () => {
     const detailBadgeText = React.useMemo(() => {
       if (isFirstOrder && firstOrderDiscount > 0) {
         if (existingDiscountPercent > 0) {
-          return `${existingDiscountPercent}% + ${firstOrderDiscount}% EXTRA OFF`;
+          return t('product.extraOff', { percent: existingDiscountPercent, extra: firstOrderDiscount });
         }
-        return `${firstOrderDiscount}% OFF`;
+        return t('product.percentOff', { percent: firstOrderDiscount });
       }
       if (existingDiscountPercent > 0) {
-        return `${existingDiscountPercent}% OFF`;
+        return t('product.percentOff', { percent: existingDiscountPercent });
       }
       return null;
-    }, [isFirstOrder, firstOrderDiscount, existingDiscountPercent]);
+    }, [isFirstOrder, firstOrderDiscount, existingDiscountPercent, t]);
 
     const cartItem = selectedProduct
         ? cart.find(
@@ -276,7 +278,7 @@ const ProductDetailPage = () => {
         e.stopPropagation();
         toggleWishlistGlobal({ ...selectedProduct, variantSku: variantKey || "" });
         showToast(
-            isWishlisted ? `${selectedProduct.name} removed from wishlist` : `${selectedProduct.name} added to wishlist`,
+            isWishlisted ? t('pdp.removedFromWishlist', { name: selectedProduct.name }) : t('pdp.addedToWishlist', { name: selectedProduct.name }),
             isWishlisted ? 'info' : 'success'
         );
     };
@@ -287,7 +289,7 @@ const ProductDetailPage = () => {
         if (navigator.share) {
             navigator.share({
                 title: selectedProduct.name,
-                text: selectedProduct.description || `Check out ${selectedProduct.name} on Seva!`,
+                text: selectedProduct.description || t('pdp.shareText', { name: selectedProduct.name }),
                 url: shareUrl,
             }).catch((err) => {
                 console.log("Error sharing:", err);
@@ -295,10 +297,10 @@ const ProductDetailPage = () => {
         } else {
             navigator.clipboard.writeText(shareUrl)
                 .then(() => {
-                    showToast("Product link copied to clipboard!", "success");
+                    showToast(t('pdp.linkCopied'), "success");
                 })
                 .catch(() => {
-                    showToast("Failed to copy link", "error");
+                    showToast(t('pdp.copyFailed'), "error");
                 });
         }
     };
@@ -318,7 +320,7 @@ const ProductDetailPage = () => {
         e.stopPropagation();
   
         if (!user) {
-          showToast("Please login to get notified", "error");
+          showToast(t('product.loginToNotify'), "error");
           navigate("/customer/auth");
           return;
         }
@@ -329,9 +331,9 @@ const ProductDetailPage = () => {
             productId: selectedProduct.id || selectedProduct._id,
             variantSku: variantKey || "",
           });
-          showToast("We will notify you when it's back in stock!", "success");
+          showToast(t('product.notifySuccess'), "success");
         } catch (error) {
-          showToast(error.response?.data?.message || "Failed to register request", "error");
+          showToast(error.response?.data?.message || t('product.notifyFailed'), "error");
         } finally {
           setIsDemanding(false);
         }
@@ -424,7 +426,7 @@ const ProductDetailPage = () => {
                 </div>
             ) : !selectedProduct ? (
                 <div className="flex h-screen items-center justify-center text-slate-500 font-bold">
-                    Product not found
+                    {t('pdp.notFound')}
                 </div>
             ) : (
                 <>
@@ -454,7 +456,7 @@ const ProductDetailPage = () => {
                                                 whileTap={{ scale: 0.9 }}
                                                 onClick={handleShare}
                                                 className="w-10 h-10 bg-white/95 backdrop-blur-md rounded-xl shadow-md shadow-black/5 flex items-center justify-center hover:shadow-lg transition-all border border-gray-100/80 text-gray-500 hover:text-primary"
-                                                title="Share Product"
+                                                title={t('pdp.share')}
                                             >
                                                 <Share2 size={18} strokeWidth={2.5} />
                                             </motion.button>
@@ -567,7 +569,7 @@ const ProductDetailPage = () => {
                                                             transition={{ delay: 0.12 }}
                                                             className="inline-flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-600 px-3 py-1.5 rounded-lg text-[10px] font-[700] uppercase tracking-wider"
                                                         >
-                                                            Non-Returnable
+                                                            {t('orderDetail.nonReturnable')}
                                                         </motion.div>
                                                     );
                                                 }
@@ -578,7 +580,7 @@ const ProductDetailPage = () => {
                                                         transition={{ delay: 0.12 }}
                                                         className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-600 px-3 py-1.5 rounded-lg text-[10px] font-[700] uppercase tracking-wider"
                                                     >
-                                                        {retDays} Day{retDays !== 1 ? 's' : ''} Return
+                                                        {t('pdp.dayReturn', { count: retDays })}
                                                     </motion.div>
                                                 );
                                             })()}
@@ -589,7 +591,7 @@ const ProductDetailPage = () => {
                                                     transition={{ delay: 0.15 }}
                                                     className="text-[10px] font-[700] text-primary bg-brand-50 px-3 py-1.5 rounded-lg border border-brand-200/50 uppercase tracking-wider"
                                                 >
-                                                    💰 Save ₹{activePricing.originalPrice - activePricing.unitPrice}
+                                                    💰 {t('pdp.save', { amount: activePricing.originalPrice - activePricing.unitPrice })}
                                                 </motion.div>
                                             )}
                                             {reviews.length > 0 && (
@@ -655,7 +657,7 @@ const ProductDetailPage = () => {
                                                             disabled={true}
                                                             className="bg-red-50 text-red-500 h-10 px-5 rounded-xl font-black text-[11px] flex items-center gap-2 shadow-sm transition-all uppercase tracking-widest border border-red-200 cursor-not-allowed"
                                                         >
-                                                            NOT IN YOUR AREA
+                                                            {t('pdp.notInArea')}
                                                         </motion.button>
                                                     ) : isOutOfStock ? (
                                                         <motion.button
@@ -665,7 +667,7 @@ const ProductDetailPage = () => {
                                                             disabled={isDemanding}
                                                             className="bg-gray-100 text-gray-500 h-10 px-5 rounded-xl font-black text-[11px] flex items-center gap-2 shadow-sm transition-all uppercase tracking-widest border border-gray-200"
                                                         >
-                                                            {isDemanding ? "..." : "NOTIFY ME"}
+                                                            {isDemanding ? "..." : t('product.notifyMe')}
                                                         </motion.button>
                                                     ) : quantity > 0 ? (
                                                         <div className="flex items-center gap-1 bg-white border border-brand-200 rounded-xl p-1 shadow-sm">
@@ -685,7 +687,7 @@ const ProductDetailPage = () => {
                                                         className="bg-gradient-to-r from-primary to-[var(--brand-400)] text-white h-10 px-5 rounded-xl font-black text-[11px] flex items-center gap-2 shadow-md shadow-brand-100 hover:shadow-brand-200 transition-all uppercase tracking-widest border border-white/20"
                                                     >
                                                         <ShoppingBag size={15} strokeWidth={3} />
-                                                        Add to Cart
+                                                        {t('pdp.addToCart')}
                                                     </motion.button>
                                                     )}
                                                 </div>
@@ -697,7 +699,7 @@ const ProductDetailPage = () => {
                                         {/* Variants Selection (Desktop) */}
                                         {selectedProduct.variants && selectedProduct.variants.length > 0 && (
                                             <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100/50 mt-4">
-                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Select Variant</h4>
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">{t('pdp.selectVariant')}</h4>
                                                 <div className="flex gap-2.5 flex-wrap">
                                                     {selectedProduct.variants.map((v, idx) => {
                                                         const isSelected = selectedVariant && variantsMatch(selectedVariant, v);
@@ -722,11 +724,11 @@ const ProductDetailPage = () => {
                                                                 <span>{v.name}</span>
                                                                 {isVOutOfStock ? (
                                                                     <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wider border border-red-100">
-                                                                        Out of Stock
+                                                                        {t('checkout.summary.outOfStock')}
                                                                     </span>
                                                                 ) : vStock <= 5 ? (
                                                                     <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
-                                                                        Only {vStock} left
+                                                                        {t('pdp.onlyLeft', { count: vStock })}
                                                                     </span>
                                                                 ) : null}
                                                             </motion.button>
@@ -742,7 +744,7 @@ const ProductDetailPage = () => {
                                             {cleanDesc && (
                                                 <AccordionItem 
                                                     id="description" 
-                                                    title="Product Description" 
+                                                    title={t('pdp.description')} 
                                                     icon={<Clock size={16} />}
                                                 >
                                                     <div
@@ -755,16 +757,16 @@ const ProductDetailPage = () => {
                                             {/* Product Details */}
                                             <AccordionItem 
                                                 id="details" 
-                                                title="Product Details" 
+                                                title={t('pdp.details')} 
                                                 icon={<Search size={16} />}
                                             >
                                                 <div className="grid grid-cols-2 gap-3 mt-1">
                                                     {[
-                                                        { label: 'Delivery Coverage', value: selectedProduct.availability === 'pan_india' ? 'Pan India' : 'Local Only', emoji: '🚚' },
-                                                        ...(selectedProduct.shelfLife ? [{ label: 'Shelf Life', value: selectedProduct.shelfLife, emoji: '📅' }] : []),
-                                                        ...(selectedProduct.countryOfOrigin ? [{ label: 'Country of Origin', value: selectedProduct.countryOfOrigin, emoji: '🇮🇳' }] : []),
-                                                        ...(selectedProduct.fssaiCode ? [{ label: 'FSSAI License', value: selectedProduct.fssaiCode, emoji: '🛡️' }] : []),
-                                                        { label: 'Customer Care', value: supportEmail, emoji: '📧' }
+                                                        { label: t('pdp.coverage'), value: selectedProduct.availability === 'pan_india' ? t('pdp.panIndia') : t('pdp.localOnly'), emoji: '🚚' },
+                                                        ...(selectedProduct.shelfLife ? [{ label: t('pdp.shelfLife'), value: selectedProduct.shelfLife, emoji: '📅' }] : []),
+                                                        ...(selectedProduct.countryOfOrigin ? [{ label: t('pdp.origin'), value: selectedProduct.countryOfOrigin, emoji: '🇮🇳' }] : []),
+                                                        ...(selectedProduct.fssaiCode ? [{ label: t('pdp.fssai'), value: selectedProduct.fssaiCode, emoji: '🛡️' }] : []),
+                                                        { label: t('pdp.customerCare'), value: supportEmail, emoji: '📧' }
                                                     ].map((d) => (
                                                         <div key={d.label} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 group hover:bg-white hover:shadow-sm transition-all">
                                                             <span className="text-[10px] text-slate-400 block mb-0.5 font-bold uppercase tracking-wider">{d.label}</span>
@@ -776,12 +778,12 @@ const ProductDetailPage = () => {
 
                                             <AccordionItem
                                                 id="returns"
-                                                title="Return Policy"
+                                                title={t('pdp.returnPolicy')}
                                                 icon={<RotateCcw size={16} />}
                                             >
                                                 {!selectedProduct.isReturnable ? (
                                                     <p className="text-[13px] text-rose-500 font-bold leading-relaxed">
-                                                        This item is non-returnable.
+                                                        {t('pdp.nonReturnableNote')}
                                                     </p>
                                                 ) : settings?.returnPolicy ? (
                                                     <div 
@@ -790,8 +792,8 @@ const ProductDetailPage = () => {
                                                     />
                                                 ) : (
                                                     <p className="text-[13px] text-slate-500 font-medium leading-relaxed">
-                                                        Request a return from your order details page within {selectedProduct.returnWindowDays || 1} {selectedProduct.returnWindowDays === 1 ? 'day' : 'days'} after delivery.
-                                                        Items should be unused and in original condition with accessories.
+                                                        {t('pdp.returnNote', { count: selectedProduct.returnWindowDays || 1 })}
+                                                        {t('pdp.returnCondition')}
                                                     </p>
                                                 )}
                                             </AccordionItem>
@@ -799,7 +801,7 @@ const ProductDetailPage = () => {
                                             {/* Customer Reviews */}
                                             <AccordionItem 
                                                 id="reviews" 
-                                                title={reviews.length > 0 ? `Customer Reviews (${reviews.length})` : 'Customer Reviews'}
+                                                title={reviews.length > 0 ? t('pdp.reviewsCount', { count: reviews.length }) : t('pdp.reviews')}
                                                 icon={<Star size={16} />}
                                             >
                                                 <div className="space-y-6 mt-2">
@@ -817,14 +819,14 @@ const ProductDetailPage = () => {
                                                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
                                                         <h4 className="font-black text-slate-800 text-xs mb-3 flex items-center gap-2">
                                                             <MessageSquare size={13} className="text-primary" />
-                                                            Rate this product
+                                                            {t('pdp.rate')}
                                                         </h4>
                                                         <Button
                                                             type="button"
                                                             onClick={() => setShowReviewSheet(true)}
                                                             className="w-full h-10 bg-primary hover:opacity-90 text-white font-black rounded-xl text-[11px] uppercase tracking-[0.1em] transition-all shadow-lg shadow-brand-100"
                                                         >
-                                                            Write a Review
+                                                            {t('pdp.writeReview')}
                                                         </Button>
                                                     </div>
                                                     ) : canReview === false ? (
@@ -832,8 +834,8 @@ const ProductDetailPage = () => {
                                                         <Star size={14} className="text-slate-300 mt-0.5 flex-shrink-0" />
                                                         <p className="text-[11px] font-semibold text-slate-400 leading-relaxed">
                                                             {canReviewReason === 'already_reviewed'
-                                                                ? 'You have already submitted a review for this product. Thank you!'
-                                                                : 'Only customers who have purchased and received this product can leave a review.'}
+                                                                ? t('pdp.alreadyReviewed')
+                                                                : t('pdp.onlyBuyers')}
                                                         </p>
                                                     </div>
                                                     ) : null}
@@ -876,7 +878,7 @@ const ProductDetailPage = () => {
                                                         ) : (
                                                             <div className="py-10 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                                                                 <MessageSquare size={20} className="text-slate-300 mx-auto mb-2" />
-                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No reviews yet — be the first!</p>
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('pdp.noReviews')}</p>
                                                             </div>
                                                         )}
                                                     </div>

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from "react";
+import i18n from '@core/i18n';
 import { customerApi } from "../services/customerApi";
 import { useAuth } from "../../../core/context/AuthContext";
 import { toast } from "sonner";
@@ -142,12 +143,12 @@ export const CartProvider = ({ children }) => {
     const maxStock = getAvailableStock(mergedProduct, variantSku);
 
     if (maxStock <= 0) {
-      toast.error("This product is currently out of stock");
+      toast.error(i18n.t('customer:cart.outOfStock'));
       return false;
     }
 
     if (currentQty + deltaQty > maxStock) {
-      toast.error(`Cannot add more than available stock (${maxStock} in stock)`);
+      toast.error(i18n.t('customer:cart.maxStock', { count: maxStock }));
       return false;
     }
 
@@ -380,7 +381,7 @@ export const CartProvider = ({ children }) => {
     if (delta > 0) {
       const maxStock = getAvailableStock(currentItem, normalizedVariantSku);
       if (newQty > maxStock) {
-        toast.error(`Cannot exceed available stock (${maxStock} in stock)`);
+        toast.error(i18n.t('customer:cart.maxStock', { count: maxStock }));
         return false;
       }
     }

@@ -1,0 +1,7 @@
+{
+  "itemsCount_one": "{{count}} item",
+  "itemsCount_other": "{{count}} items",
+  "viewCart": "View Cart",
+  "outOfStock": "This product is currently out of stock",
+  "maxStock": "Cannot add more than available stock ({{count}} in stock)"
+}

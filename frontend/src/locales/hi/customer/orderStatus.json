@@ -1,0 +1,24 @@
+{
+  "pending": "लंबित",
+  "confirmed": "कन्फ़र्म",
+  "packed": "पैक हो गया",
+  "out_for_delivery": "डिलीवरी के लिए निकला",
+  "delivered": "डिलीवर हो गया",
+  "cancelled": "रद्द",
+  "delayed": "देरी हो रही है",
+  "return_requested": "रिटर्न का अनुरोध",
+  "return_approved": "रिटर्न स्वीकृत",
+  "return_pickup_assigned": "पिकअप तय",
+  "return_pickup_verified": "पिकअप सत्यापित",
+  "returned": "लौटाया गया",
+  "qc_passed": "रिटर्न जाँच पास",
+  "qc_failed": "रिटर्न जाँच फ़ेल",
+  "refund_completed": "लौटाया गया और रिफ़ंड हुआ",
+  "photo": {
+    "Pending": "लंबित",
+    "Accepted": "स्वीकृत",
+    "Rejected": "अस्वीकृत",
+    "Completed": "पूरा हुआ",
+    "Cancelled": "रद्द"
+  }
+}

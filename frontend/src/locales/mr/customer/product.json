@@ -1,0 +1,9 @@
+{
+  "percentOff": "{{percent}}% सूट",
+  "extraOff": "{{percent}}% + {{extra}}% अतिरिक्त सूट",
+  "loginToNotify": "सूचना मिळवण्यासाठी कृपया लॉगिन करा",
+  "notifySuccess": "स्टॉकमध्ये परत आल्यावर आम्ही तुम्हाला कळवू!",
+  "notifyFailed": "विनंती नोंदवता आली नाही",
+  "notifyMe": "मला कळवा",
+  "add": "जोडा"
+}

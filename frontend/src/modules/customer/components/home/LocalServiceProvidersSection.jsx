@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { customerApi } from '../../services/customerApi';
 import { ArrowRight } from 'lucide-react';
@@ -32,6 +33,7 @@ const getCategoryFallbackImage = (name = '') => {
 };
 
 const LocalServiceProvidersSection = () => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const [categories, setCategories] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -69,7 +71,7 @@ const LocalServiceProvidersSection = () => {
             <div className="flex items-center justify-center gap-3 mb-2.5 sm:mb-3">
                 <span className="h-[2px] w-8 sm:w-12 bg-amber-600 rounded-full"></span>
                 <h2 className="text-sm sm:text-base md:text-lg font-black text-slate-900 uppercase tracking-wide text-center">
-                    Local Service Providers
+                    {t('home.localServices.title')}
                 </h2>
                 <span className="h-[2px] w-8 sm:w-12 bg-amber-600 rounded-full"></span>
             </div>
@@ -80,10 +82,10 @@ const LocalServiceProvidersSection = () => {
                 <div className="w-full lg:w-[260px] xl:w-[290px] shrink-0 bg-[#FFF7ED] border border-[#FDE6D2] rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xs relative overflow-hidden group">
                     <div className="relative z-10">
                         <h3 className="text-lg sm:text-xl font-black text-slate-900 leading-snug tracking-tight">
-                            Find Trusted Local Service Providers
+                            {t('home.localServices.heading')}
                         </h3>
                         <p className="text-xs font-semibold text-slate-600 mt-1.5 leading-normal">
-                            Search, Compare & Hire Best Local Experts
+                            {t('home.localServices.sub')}
                         </p>
                     </div>
 
@@ -92,7 +94,7 @@ const LocalServiceProvidersSection = () => {
                             onClick={() => navigate('/professionals')}
                             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#FF5A00] hover:bg-[#E04F00] active:scale-95 text-white font-black text-[11px] uppercase tracking-wider rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer"
                         >
-                            <span>Search Now</span>
+                            <span>{t('home.localServices.searchNow')}</span>
                             <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                     </div>
@@ -146,7 +148,7 @@ const LocalServiceProvidersSection = () => {
                                 </div>
                             </div>
                             <span className="text-[11px] font-black text-amber-950 group-hover:text-[#FF5A00] transition-colors text-center">
-                                View More
+                                {t('home.localServices.viewMore')}
                             </span>
                         </div>
                     </div>

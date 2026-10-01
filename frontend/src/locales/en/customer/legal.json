@@ -1,0 +1,13 @@
+{
+  "lastUpdated": "Last updated: {{date}}",
+  "publishedBy": "Published by {{name}}",
+  "audience": {
+    "customer": "Customer",
+    "seller": "Seller",
+    "delivery": "Delivery Partner"
+  },
+  "termsIntro": "Welcome to {{app}}. By accessing or using our {{audience}} services, you agree to be bound by these Terms and Conditions.",
+  "termsMissing": "Detailed {{audience}} terms have not been published by the admin yet. Please check back later or contact support.",
+  "privacyIntro": "At {{app}}, we take {{audience}} privacy seriously. This Privacy Policy explains how we collect, use, and protect your personal information.",
+  "privacyMissing": "A detailed {{audience}} privacy policy has not been published by the admin yet. Please check back later or contact support."
+}

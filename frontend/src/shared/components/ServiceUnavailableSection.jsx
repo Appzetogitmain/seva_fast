@@ -1,18 +1,20 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import Lottie from 'lottie-react';
 import comingSoonAnimation from '@/assets/lottie/Coming soon (2).json';
 
 const ServiceUnavailableSection = ({
     embedded = false,
-    title = 'Service',
-    description = "Ah! We haven't reached your neighborhood yet.",
-    buttonLabel = 'Check Again',
+    title,
+    description,
+    buttonLabel,
     onRetry,
     showHomeButton = false,
     secondaryButtonLabel,
     onSecondaryClick,
 }) => {
+    const { t } = useTranslation('common');
     const navigate = useNavigate();
     const animationData = useMemo(() => comingSoonAnimation, []);
 
@@ -35,11 +37,11 @@ const ServiceUnavailableSection = ({
             </div>
 
             <h3 className="mt-2 text-3xl md:text-5xl font-black text-slate-800 text-center uppercase tracking-tight">
-                {title} <span className="text-primary">Unavailable</span>
+                {title || t('unavailable.service')} <span className="text-primary">{t('unavailable.unavailable')}</span>
             </h3>
 
             <p className="mt-4 text-slate-500 font-bold max-w-md text-center px-6 text-sm md:text-lg opacity-80 leading-relaxed">
-                {description}
+                {description || t('unavailable.description')}
             </p>
 
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -48,7 +50,7 @@ const ServiceUnavailableSection = ({
                     onClick={handleRetry}
                     className="px-10 py-4 bg-primary text-white font-black rounded-[24px] uppercase text-[13px] tracking-widest transition-all active:scale-95 hover:brightness-105 shadow-lg shadow-primary/20"
                 >
-                    {buttonLabel}
+                    {buttonLabel || t('unavailable.checkAgain')}
                 </button>
 
                 {showHomeButton && (
@@ -57,7 +59,7 @@ const ServiceUnavailableSection = ({
                         onClick={() => navigate('/')}
                         className="px-10 py-4 bg-white border border-slate-200 text-slate-700 font-black rounded-[24px] uppercase text-[13px] tracking-widest transition-all active:scale-95 hover:bg-slate-50"
                     >
-                        Back to Home
+                        {t('unavailable.backHome')}
                     </button>
                 )}
 

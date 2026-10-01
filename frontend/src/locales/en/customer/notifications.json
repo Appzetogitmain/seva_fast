@@ -1,0 +1,22 @@
+{
+  "justNow": "Just now",
+  "minutesAgo": "{{count}}m ago",
+  "hoursAgo": "{{count}}h ago",
+  "yesterday": "Yesterday",
+  "daysAgo": "{{count}}d ago",
+  "allRead": "All notifications marked as read",
+  "markFailed": "Could not mark notifications as read",
+  "newCount": "{{count}} New",
+  "subtitle": "Stay updated on your orders & offers",
+  "markAllTitle": "Mark all as read",
+  "markAll": "Mark all read",
+  "all": "All ({{count}})",
+  "unread": "Unread ({{count}})",
+  "refresh": "Refresh",
+  "loading": "Loading notifications...",
+  "noUnread": "No Unread Notifications",
+  "empty": "No Notifications Yet",
+  "noUnreadMessage": "You've read all your updates! Check the 'All' tab to review previous notifications.",
+  "emptyMessage": "You're all caught up! Order milestones, alerts, and special offers will show up here.",
+  "viewDetails": "View details"
+}

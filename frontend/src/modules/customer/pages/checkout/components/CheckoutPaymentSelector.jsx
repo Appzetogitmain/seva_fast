@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { Wallet } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -23,6 +24,7 @@ const CheckoutPaymentSelector = React.memo(function CheckoutPaymentSelector({
   walletBalance,
   walletAmountToUse,
 }) {
+  const { t } = useTranslation('customer');
   return (
     <>
       {/* Wallet Section */}
@@ -35,10 +37,10 @@ const CheckoutPaymentSelector = React.memo(function CheckoutPaymentSelector({
               </div>
               <div>
                 <h3 className="font-black text-slate-800 text-sm tracking-tight uppercase">
-                  Use Wallet Balance
+                  {t('checkout.payment.useWallet')}
                 </h3>
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                  Available: ₹{walletBalance}
+                  {t('checkout.payment.available', { amount: walletBalance })}
                 </p>
               </div>
             </div>
@@ -60,7 +62,7 @@ const CheckoutPaymentSelector = React.memo(function CheckoutPaymentSelector({
               className="pt-2 border-t border-slate-50 mt-2">
               <div className="flex justify-between items-center bg-brand-50/50 p-2 rounded-xl">
                 <span className="text-[11px] font-bold text-slate-600 uppercase">
-                  Amount to be used
+                  {t('checkout.payment.amountUsed')}
                 </span>
                 <span className="text-[13px] font-black text-primary">
                   ₹{walletAmountToUse}
@@ -74,11 +76,11 @@ const CheckoutPaymentSelector = React.memo(function CheckoutPaymentSelector({
       {/* Payment Method */}
       <motion.div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
         <h3 className="font-black text-slate-800 mb-4 uppercase text-sm tracking-widest">
-          Payment Method
+          {t('checkout.payment.method')}
         </h3>
         {paymentMethods.some((method) => method.id === "online") ? (
           <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Online payments are processed securely via Razorpay
+            {t('checkout.payment.onlineNote')}
           </p>
         ) : null}
         <div className="space-y-2">

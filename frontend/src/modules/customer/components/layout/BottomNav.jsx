@@ -2,17 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, LayoutGrid, User, Sparkles, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 const navItems = [
-    { label: 'Home', icon: Home, path: '/' },
-    { label: 'Category', icon: LayoutGrid, path: '/categories' },
-    { label: 'Services', icon: Wrench, path: '/professionals' },
-    { label: 'Plans', icon: Sparkles, path: '/plans' },
-    { label: 'Profile', icon: User, path: '/profile' },
+    { labelKey: 'nav.home', icon: Home, path: '/' },
+    { labelKey: 'nav.category', icon: LayoutGrid, path: '/categories' },
+    { labelKey: 'nav.services', icon: Wrench, path: '/professionals' },
+    { labelKey: 'nav.plans', icon: Sparkles, path: '/plans' },
+    { labelKey: 'nav.profile', icon: User, path: '/profile' },
 ];
 
 const BottomNav = () => {
     const location = useLocation();
+    const { t } = useTranslation('customer');
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
     useEffect(() => {
@@ -99,7 +101,7 @@ const BottomNav = () => {
                                 )}
                                 style={{ transform: isActive ? "translateY(1px)" : "translateY(0)" }}
                             >
-                                {item.label}
+                                {t(item.labelKey)}
                             </span>
                         </div>
 

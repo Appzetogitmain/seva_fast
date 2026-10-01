@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Star, X, PartyPopper } from 'lucide-react';
 
 // A lightweight, one-time invitation shown once an order is marked
@@ -6,6 +7,7 @@ import { Star, X, PartyPopper } from 'lucide-react';
 // existing WriteReviewSheet rating flow instead of leaving the "Review"
 // buttons on each item to be discovered manually.
 const PostDeliveryRatingPrompt = ({ isOpen, items = [], onRate, onDismiss }) => {
+    const { t } = useTranslation('customer');
     if (!isOpen) return null;
 
     return (
@@ -15,7 +17,7 @@ const PostDeliveryRatingPrompt = ({ isOpen, items = [], onRate, onDismiss }) => 
                     type="button"
                     onClick={onDismiss}
                     className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
-                    aria-label="Dismiss"
+                    aria-label={t('common:actions.close')}
                 >
                     <X size={16} />
                 </button>
@@ -24,9 +26,9 @@ const PostDeliveryRatingPrompt = ({ isOpen, items = [], onRate, onDismiss }) => 
                     <PartyPopper size={30} className="text-amber-500" />
                 </div>
 
-                <h2 className="text-lg font-bold text-slate-900 mb-2">Your order has been delivered!</h2>
+                <h2 className="text-lg font-bold text-slate-900 mb-2">{t('ratingPrompt.title')}</h2>
                 <p className="text-sm text-slate-500 mb-5 leading-relaxed">
-                    How was {items.length > 1 ? 'it' : (items[0]?.name || 'your order')}? Rate {items.length > 1 ? 'your products' : 'it'} to help other customers.
+                    {items.length > 1 ? t('ratingPrompt.messageMany') : t('ratingPrompt.messageOne', { name: items[0]?.name || t('ratingPrompt.yourOrder') })}
                 </p>
 
                 <div className="flex items-center justify-center gap-1 mb-6">
@@ -40,14 +42,14 @@ const PostDeliveryRatingPrompt = ({ isOpen, items = [], onRate, onDismiss }) => 
                     onClick={onRate}
                     className="w-full py-3 rounded-xl bg-primary text-white font-semibold text-sm mb-2 hover:bg-[var(--brand-400)] transition-colors"
                 >
-                    Rate Now
+                    {t('ratingPrompt.rateNow')}
                 </button>
                 <button
                     type="button"
                     onClick={onDismiss}
                     className="w-full py-2.5 text-slate-500 font-medium text-xs hover:text-slate-700 transition-colors"
                 >
-                    Maybe later
+                    {t('ratingPrompt.later')}
                 </button>
             </div>
         </div>

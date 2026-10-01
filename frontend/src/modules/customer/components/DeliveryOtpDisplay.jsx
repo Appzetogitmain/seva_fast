@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useTranslation } from 'react-i18next';
 import { motion } from "framer-motion";
 import { CheckCircle, Clock, MapPin, Shield } from "lucide-react";
 import {
@@ -33,6 +34,7 @@ const matchesOrderIdentifier = (payloadOrderId, identifiers = []) => {
 };
 
 const DeliveryOtpDisplay = ({ orderId, checkoutGroupId = null, initialOtp = null, initialExpiresAt = null }) => {
+  const { t } = useTranslation('customer');
   const [otpData, setOtpData] = useState(null);
   const [isDelivered, setIsDelivered] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
@@ -201,10 +203,10 @@ const DeliveryOtpDisplay = ({ orderId, checkoutGroupId = null, initialOtp = null
           </div>
         </div>
         <h3 className="text-lg font-bold text-brand-900 mb-1">
-          Delivery Confirmed!
+          {t('otp.confirmed')}
         </h3>
         <p className="text-sm text-brand-700">
-          Your order has been successfully delivered
+          {t('otp.confirmedSub')}
         </p>
       </div>
     );
@@ -225,10 +227,10 @@ const DeliveryOtpDisplay = ({ orderId, checkoutGroupId = null, initialOtp = null
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-brand-900 uppercase tracking-wider">
-                Delivery Partner Nearby
+                {t('otp.nearby')}
               </p>
               <p className="text-xs text-brand-700">
-                Within 0-300 meters of your location
+                {t('otp.nearbySub')}
               </p>
             </div>
           </div>
@@ -252,7 +254,7 @@ const DeliveryOtpDisplay = ({ orderId, checkoutGroupId = null, initialOtp = null
                 isExpiringSoon ? "text-amber-800" : "text-purple-800"
               }`}
             >
-              Delivery OTP
+              {t('otp.title')}
             </p>
           </div>
 
@@ -265,7 +267,7 @@ const DeliveryOtpDisplay = ({ orderId, checkoutGroupId = null, initialOtp = null
           </div>
 
           <p className={`text-[10px] ${isExpiringSoon ? "text-amber-700" : "text-purple-700"}`}>
-            Share this code with your delivery partner
+            {t('otp.share')}
           </p>
         </motion.div>
 
@@ -281,7 +283,7 @@ const DeliveryOtpDisplay = ({ orderId, checkoutGroupId = null, initialOtp = null
           <div className="flex items-center gap-2">
             <Clock className={`w-4 h-4 ${isExpiringSoon ? "text-amber-600" : "text-gray-600"}`} />
             <span className={`text-xs font-semibold ${isExpiringSoon ? "text-amber-900" : "text-gray-700"}`}>
-              {isExpiringSoon ? "Expiring Soon" : "Valid For"}
+              {isExpiringSoon ? t('otp.expiringSoon') : t('otp.validFor')}
             </span>
           </div>
           <span
@@ -296,7 +298,7 @@ const DeliveryOtpDisplay = ({ orderId, checkoutGroupId = null, initialOtp = null
         {/* Security Notice */}
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
           <p className="text-xs text-gray-600 text-center">
-            🔒 This OTP is valid for 10 minutes and will be hidden when you switch apps
+            {t('otp.note')}
           </p>
         </div>
       </div>

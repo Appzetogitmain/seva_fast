@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@core/context/AuthContext';
@@ -24,13 +25,14 @@ import {
 import { toast } from 'sonner';
 import { customerApi } from '../services/customerApi';
 import { isValidIndianPhone } from '../utils/phoneValidation';
+import LanguageSwitcher from '@shared/components/LanguageSwitcher';
 import { buildPlayStoreReferUrl } from '../utils/referralLinks';
 import BgImage from '@/assets/image.png';
 import PlanCard from '@/shared/components/ui/PlanCard';
 
 const CATEGORIES = [
     {
-        title: "Grocery",
+        titleKey: 'auth.categories.grocery',
         icon: <ShoppingBasket size={28} />,
         color: "#ecfeff",
         ring: "var(--primary)",
@@ -40,7 +42,7 @@ const CATEGORIES = [
         img: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=600"
     },
     {
-        title: "Store",
+        titleKey: 'auth.categories.store',
         icon: <Smartphone size={28} />,
         color: "#f0f9ff",
         ring: "var(--brand-400)",
@@ -50,7 +52,7 @@ const CATEGORIES = [
         img: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=600"
     },
     {
-        title: "Food",
+        titleKey: 'auth.categories.food',
         icon: <Utensils size={28} />,
         color: "#f0fdfa",
         ring: "#22d3ee",
@@ -60,7 +62,7 @@ const CATEGORIES = [
         img: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=80&w=600"
     },
     {
-        title: "Health",
+        titleKey: 'auth.categories.health',
         icon: <ShieldCheck size={28} />,
         color: "#eff6ff",
         ring: "#60a5fa",
@@ -103,6 +105,7 @@ const removeCustomerDraft = () => {
 };
 
 const CustomerAuth = () => {
+    const { t } = useTranslation('customer');
     const [isLogin, setIsLogin] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [showOtp, setShowOtp] = useState(false);
@@ -226,7 +229,7 @@ const CustomerAuth = () => {
     const handleSendOtp = async (e) => {
         e?.preventDefault();
         if (!isValidIndianPhone(formData.phone)) {
-            toast.error('Enter a valid 10-digit mobile number starting with 6-9');
+            toast.error(t('auth.errors.invalidPhone'));
             return;
         }
         setIsLoading(true);
@@ -234,14 +237,14 @@ const CustomerAuth = () => {
         try {
             if (isLogin) {
                 const res = await customerApi.sendLoginOtp({ phone: formData.phone });
-                toast.success(res.data?.message || 'OTP sent successfully!');
+                toast.success(res.data?.message || t('auth.otpSent'));
             } else {
                 if (!formData.name.trim()) {
-                    toast.error('Name is required');
+                    toast.error(t('auth.errors.nameRequired'));
                     return;
                 }
                 if (!formData.dateOfBirth) {
-                    toast.error('Please enter your date of birth');
+                    toast.error(t('auth.errors.dobRequired'));
                     return;
                 }
                 const res = await customerApi.sendSignupOtp({
@@ -249,7 +252,7 @@ const CustomerAuth = () => {
                     phone: formData.phone,
                     referralCode: referralCode.trim() || undefined,
                 });
-                toast.success(res.data?.message || 'OTP sent successfully!');
+                toast.success(res.data?.message || t('auth.otpSent'));
             }
             setShowOtp(true);
             setTimer(60);
@@ -262,7 +265,7 @@ const CustomerAuth = () => {
                 isLogin &&
                 (status === 404 || errorCode === 'ACCOUNT_NOT_FOUND')
             ) {
-                toast.info('No account found for this number. Please sign up.');
+                toast.info(t('auth.errors.noAccount'));
                 setShowOtp(false);
                 setIsLogin(false);
                 navigate('/signup', {
@@ -278,7 +281,7 @@ const CustomerAuth = () => {
             ) {
                 toast.error(
                     error?.response?.data?.message ||
-                        'An account already exists with this number. Please login.',
+                        t('auth.errors.accountExists'),
                 );
                 setShowOtp(false);
                 setIsLogin(true);
@@ -289,7 +292,7 @@ const CustomerAuth = () => {
                 return;
             }
 
-            toast.error(error?.response?.data?.message || 'Failed to send OTP. Please check your number.');
+            toast.error(error?.response?.data?.message || t('auth.errors.sendFailed'));
         } finally {
             setIsLoading(false);
         }
@@ -298,7 +301,7 @@ const CustomerAuth = () => {
     const handleVerifyOtp = async (e) => {
         e.preventDefault();
         if (!formData.otp || formData.otp.length < 4) {
-            toast.error('Enter valid OTP code');
+            toast.error(t('auth.errors.invalidOtp'));
             return;
         }
         setIsLoading(true);
@@ -317,15 +320,15 @@ const CustomerAuth = () => {
             removeCustomerDraft();
 
             if (!isLogin && !customer.currentPlan) {
-                toast.success('Account created! Please select a plan to continue.');
+                toast.success(t('auth.accountCreated'));
                 navigate('/plans', { replace: true });
             } else {
-                toast.success('Successfully Logged In!');
+                toast.success(t('auth.loggedIn'));
                 navigate('/');
             }
         } catch (error) {
             console.error('SMS OTP verification error:', error);
-            toast.error(error?.response?.data?.message || 'Invalid OTP');
+            toast.error(error?.response?.data?.message || t('auth.errors.wrongOtp'));
         } finally {
             setIsLoading(false);
         }
@@ -338,7 +341,7 @@ const CustomerAuth = () => {
             const res = await customerApi.getPlans({ forceRefresh: true });
             setPlans(res.data.results || res.data.result || []);
         } catch(e) {
-            toast.error("Failed to fetch plans");
+            toast.error(t('auth.plans.loadFailed'));
         }
         setLoadingPlans(false);
     };
@@ -411,6 +414,7 @@ const CustomerAuth = () => {
                                 </div>
                                 <span className="text-white font-black tracking-tighter text-lg sm:text-xl drop-shadow-md">{appName.toUpperCase()}</span>
                             </div>
+                            <LanguageSwitcher className="scale-90 origin-right" />
                         </div>
 
                         <AnimatePresence mode="wait">
@@ -441,9 +445,9 @@ const CustomerAuth = () => {
                                 animate={{ opacity: 1, y: 0 }}
                                 className="text-xl sm:text-2xl font-black tracking-tight leading-none mb-1.5"
                             >
-                                {activeCategory.title.toUpperCase()} INSIDE
+                                {t('auth.categoryInside', { category: t(activeCategory.titleKey).toUpperCase() })}
                             </motion.h2>
-                            <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[3px] opacity-75">Everything delivered fast</p>
+                            <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[3px] opacity-75">{t('auth.tagline')}</p>
                         </div>
 
                         {/* S-Curve Divider */}
@@ -512,7 +516,7 @@ const CustomerAuth = () => {
                                             className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${isLogin ? 'bg-white shadow-sm' : 'text-gray-400'}`}
                                             style={{ color: isLogin ? activeCategory.theme : undefined }}
                                         >
-                                            Login
+                                            {t('auth.login')}
                                         </button>
                                         <button
                                             type="button"
@@ -524,16 +528,16 @@ const CustomerAuth = () => {
                                             className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${!isLogin ? 'bg-white shadow-sm' : 'text-gray-400'}`}
                                             style={{ color: !isLogin ? activeCategory.theme : undefined }}
                                         >
-                                            Sign Up
+                                            {t('auth.signUp')}
                                         </button>
                                     </div>
 
                                     <div className="space-y-2 text-center">
                                         <h3 className="text-xl font-black text-gray-900 tracking-tight">
-                                            {isLogin ? 'Welcome Back!' : 'Create Account'}
+                                            {isLogin ? t('auth.welcomeBack') : t('auth.createAccount')}
                                         </h3>
                                         <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                                            OTP will be sent for verification
+                                            {t('auth.otpNotice')}
                                         </p>
                                     </div>
 
@@ -547,7 +551,7 @@ const CustomerAuth = () => {
                                                     required
                                                     name="name"
                                                     value={formData.name || ""}
-                                                    placeholder="Full Name"
+                                                    placeholder={t('auth.fullName')}
                                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
                                                     style={{ '--theme-color': activeCategory.theme }}
                                                     onChange={(e) => {
@@ -585,7 +589,7 @@ const CustomerAuth = () => {
                                                 <input
                                                     name="referralCode"
                                                     value={referralCode}
-                                                    placeholder="Referral Code (Optional)"
+                                                    placeholder={t('auth.referralCode')}
                                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 uppercase tracking-wider outline-none focus:bg-white transition-all"
                                                     onChange={(e) => {
                                                         const val = e.target.value.toUpperCase().trim();
@@ -610,7 +614,7 @@ const CustomerAuth = () => {
                                                 name="phone"
                                                 maxLength={10}
                                                 value={formData.phone || ''}
-                                                placeholder="Mobile Number"
+                                                placeholder={t('auth.mobileNumber')}
                                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-20 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
                                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
                                                 onFocus={(e) => e.target.style.borderColor = activeCategory.theme}
@@ -624,7 +628,7 @@ const CustomerAuth = () => {
                                             className="w-full text-white py-4 rounded-[24px] text-xs font-black tracking-[4px] flex items-center justify-center gap-3 active:scale-95 transition-all uppercase"
                                             style={{ backgroundColor: activeCategory.theme, boxShadow: `0 20px 40px ${activeCategory.shadow}` }}
                                         >
-                                            {isLoading ? 'Verifying...' : 'Continue'}
+                                            {isLoading ? t('auth.verifying') : t('common:actions.continue')}
                                             <ChevronRight size={18} />
                                         </button>
                                         <button
@@ -634,14 +638,14 @@ const CustomerAuth = () => {
                                             style={{ color: activeCategory.theme, borderColor: activeCategory.theme }}
                                         >
                                             <Eye size={16} />
-                                            View Subscription Plans
+                                            {t('auth.viewPlans')}
                                         </button>
                                     </form>
 
                                     {/* Legal Agreement Footer */}
                                     <div className="pt-2 flex flex-col items-center gap-1">
                                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest text-center">
-                                            By continuing, you agree to our
+                                            {t('auth.agree')}
                                         </p>
                                         <div className="flex items-center gap-1.5 underline decoration-gray-200 underline-offset-4">
                                             <button 
@@ -649,7 +653,7 @@ const CustomerAuth = () => {
                                                 className="text-[10px] font-black uppercase tracking-widest hover:text-gray-900 transition-colors"
                                                 style={{ color: activeCategory.theme }}
                                             >
-                                                Terms & Condition
+                                                {t('auth.terms')}
                                             </button>
                                             <span className="text-[8px] text-gray-300">•</span>
                                             <button 
@@ -657,7 +661,7 @@ const CustomerAuth = () => {
                                                 className="text-[10px] font-black uppercase tracking-widest hover:text-gray-900 transition-colors"
                                                 style={{ color: activeCategory.theme }}
                                             >
-                                                Privacy Policy
+                                                {t('auth.privacy')}
                                             </button>
                                         </div>
                                     </div>
@@ -677,7 +681,7 @@ const CustomerAuth = () => {
                                             <ChevronLeft size={20} />
                                         </button>
                                         <div>
-                                            <h3 className="text-xl font-black text-gray-900 tracking-tight">Verify Device</h3>
+                                            <h3 className="text-xl font-black text-gray-900 tracking-tight">{t('auth.verifyDevice')}</h3>
                                             <p className="text-[10px] font-black tracking-widest text-gray-400 uppercase">+91 {formData.phone}</p>
                                         </div>
                                     </div>
@@ -716,7 +720,7 @@ const CustomerAuth = () => {
                                                 disabled={isLoading}
                                                 className="w-full bg-gray-900 text-white py-5 rounded-[24px] text-xs font-black tracking-[4px] shadow-2xl flex items-center justify-center gap-3 uppercase active:scale-95 transition-all"
                                             >
-                                                {isLoading ? 'Authenticating...' : `Enter ${appName}`}
+                                                {isLoading ? t('auth.authenticating') : t('auth.enterApp', { app: appName })}
                                             </button>
                                             <div className="flex justify-center">
                                                 <button
@@ -726,7 +730,7 @@ const CustomerAuth = () => {
                                                     className={`text-[10px] font-black uppercase tracking-widest ${timer > 0 ? 'text-gray-300' : 'underline'}`}
                                                     style={{ color: timer > 0 ? undefined : activeCategory.theme }}
                                                 >
-                                                    {timer > 0 ? `Resend Code in ${timer}s` : 'Resend Now'}
+                                                    {timer > 0 ? t('auth.resendIn', { seconds: timer }) : t('auth.resendNow')}
                                                 </button>
                                             </div>
                                         </div>
@@ -766,8 +770,8 @@ const CustomerAuth = () => {
                         >
                             <div className="flex justify-between items-center mb-8">
                                 <div>
-                                    <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Our Plans</h2>
-                                    <p className="text-sm font-bold text-gray-500 mt-1">Choose a plan to start shopping today!</p>
+                                    <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">{t('auth.plans.title')}</h2>
+                                    <p className="text-sm font-bold text-gray-500 mt-1">{t('auth.plans.subtitle')}</p>
                                 </div>
                                 <button onClick={() => setShowPlansModal(false)} className="p-3 bg-white shadow-sm rounded-2xl hover:bg-gray-100 transition-colors">
                                     <X size={20} className="text-gray-500" />
@@ -777,17 +781,17 @@ const CustomerAuth = () => {
                             {loadingPlans ? (
                                 <div className="text-center py-20 font-bold text-gray-400 uppercase tracking-widest text-sm flex flex-col items-center gap-4">
                                     <div className="w-10 h-10 border-4 border-gray-200 border-t-[var(--theme-color)] rounded-full animate-spin" style={{ '--theme-color': activeCategory.theme }}></div>
-                                    Loading Plans...
+                                    {t('auth.plans.loading')}
                                 </div>
                             ) : plans.length === 0 ? (
                                 <div className="text-center py-20 font-bold text-gray-400 uppercase tracking-widest text-sm">
-                                    No active plans available
+                                    {t('auth.plans.empty')}
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {plans.map(plan => (
                                         <div key={plan._id} onClick={() => {
-                                            toast.info("Please complete sign up or login to subscribe!");
+                                            toast.info(t('auth.plans.loginToSubscribe'));
                                             setShowPlansModal(false);
                                         }}>
                                             <PlanCard plan={plan} isAdmin={false} showStrikePriceOnly={true} />

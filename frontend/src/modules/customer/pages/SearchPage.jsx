@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation as useRouterLocation } from 'react-router-dom';
 import { Search, Mic, ArrowLeft, X, TrendingUp, ChevronRight, History, Sparkles, Filter, SlidersHorizontal, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +14,7 @@ import VoiceSearchModal from '../components/shared/VoiceSearchModal';
 import { matchProductWithQuery } from '../utils/searchSynonyms';
 
 const SearchPage = () => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const location = useRouterLocation();
     const { isOpen: isProductDetailOpen } = useProductDetail();
@@ -250,7 +252,7 @@ const SearchPage = () => {
                         <input
                             autoFocus
                             type="text"
-                            placeholder='Search items, categories (e.g. Mango, Doodh)...'
+                            placeholder={t('search.placeholder')}
                             value={query}
                             onKeyDown={handleKeyDown}
                             onChange={(e) => setQuery(e.target.value)}
@@ -271,7 +273,7 @@ const SearchPage = () => {
                             <button 
                                 onClick={() => setIsVoiceModalOpen(true)}
                                 className="p-2 text-slate-400 hover:text-primary hover:bg-slate-50 transition-all rounded-full relative"
-                                title="Search by Voice"
+                                title={t('header.voiceSearch')}
                             >
                                 <Mic size={20} strokeWidth={2.5} />
                             </button>
@@ -286,11 +288,11 @@ const SearchPage = () => {
                     <section>
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                             <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                                Search Results
+                                {t('search.results')}
                                 {isLoading && <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
                             </h2>
                             <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{filteredResults.length} found</span>
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t('search.found', { count: filteredResults.length })}</span>
                                 <button 
                                     onClick={() => setShowFilters(!showFilters)}
                                     className={cn("px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border", 
@@ -298,7 +300,7 @@ const SearchPage = () => {
                                         ? "bg-primary/10 border-primary/20 text-primary" 
                                         : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50")}
                                 >
-                                    <SlidersHorizontal size={14} /> Filters 
+                                    <SlidersHorizontal size={14} /> {t('search.filters')} 
                                     {(priceFilter || brandFilter || ratingFilter > 0) && (
                                         <span className="w-2 h-2 rounded-full bg-primary" />
                                     )}
@@ -318,11 +320,11 @@ const SearchPage = () => {
                                     <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-wrap gap-6">
                                         {/* Price Filter */}
                                         <div>
-                                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Price</h4>
+                                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">{t('search.price')}</h4>
                                             <div className="flex flex-wrap gap-2">
                                                 <button onClick={() => setPriceFilter(priceFilter === 'under50' ? '' : 'under50')}
                                                     className={cn("px-3 py-1.5 rounded-full text-xs font-bold transition-all border", priceFilter === 'under50' ? "bg-primary text-white border-primary" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300")}>
-                                                    Under ₹50
+                                                    {t('search.under', { amount: 50 })}
                                                 </button>
                                                 <button onClick={() => setPriceFilter(priceFilter === '50to200' ? '' : '50to200')}
                                                     className={cn("px-3 py-1.5 rounded-full text-xs font-bold transition-all border", priceFilter === '50to200' ? "bg-primary text-white border-primary" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300")}>
@@ -330,14 +332,14 @@ const SearchPage = () => {
                                                 </button>
                                                 <button onClick={() => setPriceFilter(priceFilter === 'over200' ? '' : 'over200')}
                                                     className={cn("px-3 py-1.5 rounded-full text-xs font-bold transition-all border", priceFilter === 'over200' ? "bg-primary text-white border-primary" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300")}>
-                                                    Over ₹200
+                                                    {t('search.over', { amount: 200 })}
                                                 </button>
                                             </div>
                                         </div>
 
                                         {/* Rating Filter */}
                                         <div>
-                                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Rating</h4>
+                                            <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">{t('search.rating')}</h4>
                                             <div className="flex flex-wrap gap-2">
                                                 {[3, 4].map(star => (
                                                     <button key={star} onClick={() => setRatingFilter(ratingFilter === star ? 0 : star)}
@@ -351,7 +353,7 @@ const SearchPage = () => {
                                         {/* Brand Filter */}
                                         {availableBrands.length > 0 && (
                                             <div>
-                                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Brand</h4>
+                                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">{t('search.brand')}</h4>
                                                 <div className="flex flex-wrap gap-2">
                                                     {availableBrands.map(brand => (
                                                         <button key={brand} onClick={() => setBrandFilter(brandFilter === brand ? '' : brand)}
@@ -370,7 +372,7 @@ const SearchPage = () => {
                                                     onClick={() => { setPriceFilter(''); setBrandFilter(''); setRatingFilter(0); }}
                                                     className="px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                 >
-                                                    Clear All
+                                                    {t('search.clearAll')}
                                                 </button>
                                             </div>
                                         )}
@@ -395,16 +397,16 @@ const SearchPage = () => {
                                         <Search size={22} />
                                     </div>
                                     <h3 className="text-base md:text-lg font-bold text-slate-900 mb-1">
-                                        No exact product found for &ldquo;<span className="text-amber-800 font-extrabold">{query}</span>&rdquo;
+                                        {t('search.noExact')} &ldquo;<span className="text-amber-800 font-extrabold">{query}</span>&rdquo;
                                     </h3>
                                     <p className="text-xs md:text-sm text-slate-600 max-w-md mx-auto mb-4">
-                                        We couldn't find an exact match for this item in our store right now. Check out the similar products below:
+                                        {t('search.noExactMessage')}
                                     </p>
                                     <button
                                         onClick={() => setIsVoiceModalOpen(true)}
                                         className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white font-bold rounded-xl text-xs shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
                                     >
-                                        <Mic size={15} /> Try Voice Search Again
+                                        <Mic size={15} /> {t('search.tryVoiceAgain')}
                                     </button>
                                 </div>
 
@@ -415,10 +417,10 @@ const SearchPage = () => {
                                             <div className="flex items-center gap-2">
                                                 <Sparkles size={18} className="text-primary animate-pulse" />
                                                 <h3 className="text-base md:text-lg font-extrabold text-slate-900 tracking-tight">
-                                                    Similar Products
+                                                    {t('search.similar')}
                                                 </h3>
                                             </div>
-                                            <span className="text-xs font-semibold text-slate-500">Available in store</span>
+                                            <span className="text-xs font-semibold text-slate-500">{t('search.availableInStore')}</span>
                                         </div>
 
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-3 md:gap-x-4 gap-y-6 md:gap-y-10">
@@ -439,7 +441,7 @@ const SearchPage = () => {
                         {pastSearches.length > 0 && (
                             <section>
                                 <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Recently Searched</h3>
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('search.recent')}</h3>
                                     <button
                                         onClick={() => {
                                             setPastSearches([]);
@@ -447,7 +449,7 @@ const SearchPage = () => {
                                         }}
                                         className="text-xs font-bold text-slate-400 hover:text-red-500 transition-colors"
                                     >
-                                        Clear History
+                                        {t('search.clearHistory')}
                                     </button>
                                 </div>
                                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -475,7 +477,7 @@ const SearchPage = () => {
 
                         {/* Popular Quick Search Tags */}
                         <section>
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Trending Searches</h3>
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">{t('search.trending')}</h3>
                             <div className="flex flex-wrap gap-2">
                                 {['Mango', 'Doodh', 'Milk', 'Paneer', 'Chips', 'Atta', 'Rice', 'Cold Drink'].map((tag) => (
                                     <button
@@ -493,12 +495,12 @@ const SearchPage = () => {
                         {/* 2. Lowest Price Ever Section */}
                         <section>
                             <div className="flex justify-between items-center mb-5">
-                                <h2 className="text-xl font-black text-slate-800 tracking-tight">Lowest Price Ever!</h2>
+                                <h2 className="text-xl font-black text-slate-800 tracking-tight">{t('search.lowestPrice')}</h2>
                                 <button 
                                     className="flex items-center gap-1 md:gap-1.5 px-3 py-1 md:px-4 md:py-1.5 bg-slate-50 hover:bg-slate-100 rounded-full text-xs md:text-sm font-black transition-all text-primary" 
                                     onClick={() => navigate('/category/all')}
                                 >
-                                    See All <ChevronRight size={14} strokeWidth={3} />
+                                    {t('common:actions.seeAll')} <ChevronRight size={14} strokeWidth={3} />
                                 </button>
                             </div>
                             <div className="flex gap-2 md:gap-4 overflow-x-auto no-scrollbar -mx-5 px-5 pb-3 snap-x">

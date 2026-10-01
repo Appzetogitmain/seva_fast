@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n, { getDateLocale } from '@core/i18n';
 import { useNavigate } from 'react-router-dom';
 import {
     Bell, CheckCheck, Package, Truck, CheckCircle2,
@@ -45,13 +47,13 @@ function formatTimeAgo(dateString) {
         const diffHrs = Math.floor(diffMin / 60);
         const diffDays = Math.floor(diffHrs / 24);
 
-        if (diffSec < 45) return 'Just now';
-        if (diffMin < 60) return `${diffMin}m ago`;
-        if (diffHrs < 24) return `${diffHrs}h ago`;
-        if (diffDays === 1) return 'Yesterday';
-        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffSec < 45) return i18n.t('customer:notifications.justNow');
+        if (diffMin < 60) return i18n.t('customer:notifications.minutesAgo', { count: diffMin });
+        if (diffHrs < 24) return i18n.t('customer:notifications.hoursAgo', { count: diffHrs });
+        if (diffDays === 1) return i18n.t('customer:notifications.yesterday');
+        if (diffDays < 7) return i18n.t('customer:notifications.daysAgo', { count: diffDays });
 
-        return date.toLocaleDateString('en-US', {
+        return date.toLocaleDateString(getDateLocale(), {
             month: 'short',
             day: 'numeric',
             year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
@@ -116,6 +118,7 @@ function resolveNotificationTarget(notif) {
 }
 
 export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChange }) => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const [notifications, setNotifications] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -151,9 +154,9 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
             await customerApi.markAllNotificationsRead();
             setNotifications(prev => prev.map(n => ({ ...n, isRead: true, read: true })));
             if (onUnreadCountChange) onUnreadCountChange(0);
-            toast.success("All notifications marked as read");
+            toast.success(t('notifications.allRead'));
         } catch (err) {
-            toast.error("Could not mark notifications as read");
+            toast.error(t('notifications.markFailed'));
         } finally {
             setIsMarkingAll(false);
         }
@@ -198,14 +201,14 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h3 className="font-bold text-slate-900 text-base leading-none">Notifications</h3>
+                                <h3 className="font-bold text-slate-900 text-base leading-none">{t('header.notifications')}</h3>
                                 {unreadCount > 0 && (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-600 text-white">
-                                        {unreadCount} New
+                                        {t('notifications.newCount', { count: unreadCount })}
                                     </span>
                                 )}
                             </div>
-                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Stay updated on your orders & offers</p>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">{t('notifications.subtitle')}</p>
                         </div>
                     </div>
 
@@ -215,10 +218,10 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
                                 onClick={handleMarkAllRead}
                                 disabled={isMarkingAll}
                                 className="px-2.5 py-1.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                                title="Mark all as read"
+                                title={t('notifications.markAllTitle')}
                             >
                                 <CheckCheck size={14} />
-                                <span className="hidden sm:inline">Mark all read</span>
+                                <span className="hidden sm:inline">{t('notifications.markAll')}</span>
                             </button>
                         )}
                         <button
@@ -242,7 +245,7 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
                                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                             )}
                         >
-                            All ({notifications.length})
+                            {t('notifications.all', { count: notifications.length })}
                         </button>
                         <button
                             onClick={() => setFilter('unread')}
@@ -253,13 +256,13 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
                                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                             )}
                         >
-                            Unread ({unreadCount})
+                            {t('notifications.unread', { count: unreadCount })}
                         </button>
                         <button
                             onClick={fetchNotifications}
                             disabled={isLoading}
                             className="ml-auto p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                            title="Refresh"
+                            title={t('notifications.refresh')}
                         >
                             <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
                         </button>
@@ -271,7 +274,7 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
                     {isLoading && notifications.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 space-y-3">
                             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-                            <p className="text-xs font-semibold text-slate-500">Loading notifications...</p>
+                            <p className="text-xs font-semibold text-slate-500">{t('notifications.loading')}</p>
                         </div>
                     ) : filteredNotifications.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-72 text-center px-4 space-y-3">
@@ -280,12 +283,12 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
                             </div>
                             <div>
                                 <h4 className="text-sm font-bold text-slate-800">
-                                    {filter === 'unread' ? "No Unread Notifications" : "No Notifications Yet"}
+                                    {filter === 'unread' ? t('notifications.noUnread') : t('notifications.empty')}
                                 </h4>
                                 <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
                                     {filter === 'unread' 
-                                        ? "You've read all your updates! Check the 'All' tab to review previous notifications."
-                                        : "You're all caught up! Order milestones, alerts, and special offers will show up here."
+                                        ? t('notifications.noUnreadMessage')
+                                        : t('notifications.emptyMessage')
                                     }
                                 </p>
                             </div>
@@ -336,7 +339,7 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
 
                                         {hasLink && (
                                             <div className="mt-2 flex items-center gap-1 text-[11px] font-bold text-indigo-600 group-hover:text-indigo-800 transition-colors">
-                                                <span>View details</span>
+                                                <span>{t('notifications.viewDetails')}</span>
                                                 <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
                                             </div>
                                         )}

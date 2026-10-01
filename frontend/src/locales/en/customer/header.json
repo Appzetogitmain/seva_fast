@@ -1,0 +1,16 @@
+{
+  "search": "Search",
+  "searchPhrases": [
+    "bread",
+    "milk",
+    "chocolate",
+    "eggs",
+    "chips"
+  ],
+  "notifications": "Notifications",
+  "deliveryIn": "Delivery in {{time}}",
+  "voiceSearch": "Voice Search",
+  "openCart": "Open cart",
+  "detectingLocation": "Detecting location...",
+  "searchProducts": "Search Products..."
+}

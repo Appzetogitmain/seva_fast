@@ -1,0 +1,17 @@
+{
+  "loading": "Loading your orders…",
+  "title": "My Orders",
+  "standardTab": "🛒 Standard Orders",
+  "photoTab": "📷 Photo Orders",
+  "emptyTitle": "No orders yet",
+  "emptyMessage": "When you place an order, it will appear here so you can track it easily.",
+  "thumbnail": "Order thumbnail",
+  "orderNumber": "Order #{{id}}",
+  "tapToView": "Tap to view details",
+  "total": "Total",
+  "noPhotoTitle": "No custom orders",
+  "noPhotoMessage": "You haven't placed any photo/custom orders yet.",
+  "order": "Order",
+  "seller": "Seller",
+  "openChat": "Open Chat"
+}

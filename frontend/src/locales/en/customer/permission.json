@@ -1,0 +1,7 @@
+{
+  "title": "Enable Your Location",
+  "message": "Allow location access so we can show your exact delivery address, accurate delivery times and nearby products on Home.",
+  "detecting": "Detecting your location...",
+  "allow": "Allow Location Access",
+  "notNow": "Not now, use default location"
+}

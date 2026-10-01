@@ -1,0 +1,14 @@
+{
+  "welcome": "Hi there! 👋 Welcome to {{app}} Support.",
+  "welcomeSub": "Send a message and an admin will reply here.",
+  "supportReply": "Support reply",
+  "newMessage": "New message",
+  "title": "Support Chat",
+  "online": "Online",
+  "noNumber": "Support number not configured",
+  "messagesLabel": "Support chat messages",
+  "loading": "Loading chat…",
+  "openCamera": "Open camera",
+  "gallery": "Upload from gallery",
+  "loadFailed": "Failed to load support chat"
+}

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownLeft, ChevronLeft, Wallet } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
 import { formatDateTime } from '@shared/utils/formatDate';
 
 const WalletPage = () => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const [balance, setBalance] = useState(0);
     const [transactions, setTransactions] = useState([]);
@@ -43,33 +45,33 @@ const WalletPage = () => {
                 >
                     <ChevronLeft size={22} className="text-slate-800" />
                 </button>
-                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Wallet</h1>
+                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">{t('profile.menu.wallet')}</h1>
             </div>
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-4">
                 <div className="bg-white rounded-xl border border-slate-200 p-4">
-                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Available Balance</p>
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{t('wallet.balance')}</p>
                     <h2 className="text-3xl font-semibold text-slate-900 mt-1">
                         {loading ? '...' : `₹${(balance || 0).toLocaleString('en-IN')}`}
                     </h2>
-                    <p className="text-xs text-slate-500 mt-1">Return refunds are credited here</p>
+                    <p className="text-xs text-slate-500 mt-1">{t('wallet.refundsNote')}</p>
                 </div>
 
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                        <h3 className="text-base font-semibold text-slate-800">Transaction History</h3>
+                        <h3 className="text-base font-semibold text-slate-800">{t('wallet.history')}</h3>
                         <Wallet size={18} className="text-slate-400" />
                     </div>
 
                     {loading ? (
                         <div className="py-12 flex justify-center text-slate-400 text-sm font-semibold">
-                            Loading...
+                            {t('common:actions.loading')}
                         </div>
                     ) : transactions.length === 0 ? (
                         <div className="py-12 flex flex-col items-center justify-center text-center px-6">
-                            <p className="text-sm font-semibold text-slate-500 mb-1">No wallet payments yet</p>
+                            <p className="text-sm font-semibold text-slate-500 mb-1">{t('wallet.emptyTitle')}</p>
                             <p className="text-xs text-slate-400">
-                                Orders paid using wallet will appear here.
+                                {t('wallet.emptyMessage')}
                             </p>
                         </div>
                     ) : (

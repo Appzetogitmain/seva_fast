@@ -9,10 +9,13 @@ import { useSettings } from '@core/context/SettingsContext';
 import LocationDrawer from '../shared/LocationDrawer';
 import { CustomerNotificationsModal } from '../shared/CustomerNotificationsModal';
 import { customerApi } from '../../services/customerApi';
+import { useTranslation } from 'react-i18next';
+import { translateEta } from '@core/i18n';
 
 const Header = () => {
     const navigate = useNavigate();
     const { settings } = useSettings();
+    const { t } = useTranslation('customer');
     const { count: wishlistCount } = useWishlist();
     const { cartCount } = useCart();
     const location = useLocation();
@@ -37,7 +40,7 @@ const Header = () => {
     }, []);
 
     // Search placeholder animation
-    const [searchPlaceholder, setSearchPlaceholder] = useState('Search ');
+    const [searchPlaceholder, setSearchPlaceholder] = useState(`${t('header.search')} `);
     const [typingState, setTypingState] = useState({
         textIndex: 0,
         charIndex: 0,
@@ -45,8 +48,8 @@ const Header = () => {
         isPaused: false
     });
 
-    const staticText = "Search ";
-    const typingPhrases = ['"bread"', '"milk"', '"chocolate"', '"eggs"', '"chips"'];
+    const staticText = `${t('header.search')} `;
+    const typingPhrases = t('header.searchPhrases', { returnObjects: true }).map((w) => `"${w}"`);
 
     React.useEffect(() => {
         const { textIndex, charIndex, isDeleting, isPaused } = typingState;
@@ -109,7 +112,7 @@ const Header = () => {
                         <div className="flex flex-col leading-tight">
                             <span className="text-[10px] font-black text-white/80 uppercase tracking-widest flex items-center gap-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
-                                {currentLocation.time}
+                                {translateEta(currentLocation.time)}
                             </span>
                             <div className="flex items-center gap-1 font-black text-white text-base">
                                 <span className="max-w-[150px] truncate">{currentLocation.name}</span> <span className="text-[10px] opacity-70">▼</span>
@@ -121,7 +124,7 @@ const Header = () => {
                         type="button"
                         onClick={() => setIsNotificationsOpen(true)}
                         className="relative h-10 w-10 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-sm active:scale-95 transition-transform cursor-pointer"
-                        aria-label="Notifications"
+                        aria-label={t('header.notifications')}
                     >
                         <Bell size={20} className="text-white" />
                         {unreadNotificationsCount > 0 && (
@@ -153,7 +156,7 @@ const Header = () => {
                         >
                             <div className="flex flex-col items-start leading-none group">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 group-hover:text-[var(--primary)] transition-colors">
-                                    Delivery in {currentLocation.time}
+                                    {t('header.deliveryIn', { time: translateEta(currentLocation.time) })}
                                 </span>
                                 <div className="flex items-center gap-1 font-bold text-slate-700 text-sm group-hover:text-[var(--primary)] transition-colors">
                                     <span className="max-w-[150px] truncate">{currentLocation.name}</span> <MapPin size={14} className="fill-current" />
@@ -164,10 +167,10 @@ const Header = () => {
 
                     {/* Desktop Navigation */}
                     <nav className="hidden md:flex items-center gap-6">
-                        <Link to="/" className="text-sm font-medium transition-colors hover:text-[var(--primary)]">Home</Link>
+                        <Link to="/" className="text-sm font-medium transition-colors hover:text-[var(--primary)]">{t('nav.home')}</Link>
 
-                        <Link to="/categories" className="text-sm font-medium transition-colors hover:text-[var(--primary)]">Categories</Link>
-                        <Link to="/offers" className="text-sm font-medium transition-colors hover:text-[var(--primary)]">Offers</Link>
+                        <Link to="/categories" className="text-sm font-medium transition-colors hover:text-[var(--primary)]">{t('nav.categories')}</Link>
+                        <Link to="/offers" className="text-sm font-medium transition-colors hover:text-[var(--primary)]">{t('nav.offers')}</Link>
                     </nav>
 
                     {/* Search Bar - Hidden on checkout page */}
@@ -191,7 +194,7 @@ const Header = () => {
                                         navigate('/search?voice=true');
                                     }}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-primary transition-colors rounded-full"
-                                    title="Voice Search"
+                                    title={t('header.voiceSearch')}
                                 >
                                     <Mic size={16} />
                                 </button>
@@ -205,7 +208,7 @@ const Header = () => {
                             type="button"
                             onClick={() => setIsNotificationsOpen(true)}
                             className="relative flex items-center justify-center p-2 hover:bg-slate-50 rounded-full transition-colors group cursor-pointer"
-                            aria-label="Notifications"
+                            aria-label={t('header.notifications')}
                         >
                             <Bell className="h-6 w-6 text-slate-600 group-hover:text-[var(--primary)] transition-colors" />
                             {unreadNotificationsCount > 0 && (

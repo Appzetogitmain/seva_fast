@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import ProductCard from "../../../components/shared/ProductCard";
 
 /**
@@ -13,12 +14,13 @@ import ProductCard from "../../../components/shared/ProductCard";
 const CheckoutRecommendedProducts = React.memo(function CheckoutRecommendedProducts({
   products,
 }) {
+  const { t } = useTranslation('customer');
   if (!products || products.length === 0) return null;
 
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
       <h3 className="font-black text-slate-800 text-lg mb-4">
-        You might also like
+        {t('checkout.recommended')}
       </h3>
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar -mx-4 px-4 snap-x">
         {products.map((product) => (

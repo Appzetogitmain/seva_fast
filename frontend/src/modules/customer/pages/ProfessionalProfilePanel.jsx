@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { getDateLocale } from '@core/i18n';
 import { customerApi } from '../services/customerApi';
 import { useToast } from '@shared/components/ui/Toast';
 import {
@@ -26,6 +28,7 @@ import { useSettings } from '@core/context/SettingsContext';
 import { formatDate } from '@shared/utils/formatDate';
 
 const ProfessionalProfilePanel = () => {
+    const { t } = useTranslation('customer');
     const { showToast } = useToast();
     const { settings } = useSettings();
     const [isLoading, setIsLoading] = useState(true);
@@ -132,7 +135,7 @@ const ProfessionalProfilePanel = () => {
                 setAd(null);
             } else {
                 console.error("Failed to load professional profile", error);
-                showToast("Failed to load profile details", "error");
+                showToast(t('pro.msg.loadFailed'), "error");
             }
         } finally {
             setIsLoading(false);
@@ -182,17 +185,17 @@ const ProfessionalProfilePanel = () => {
             if (res.data?.success && (res.data.result?.secureUrl || res.data.result?.url)) {
                 targetSetUrl(res.data.result.secureUrl || res.data.result.url);
                 targetSetType(type);
-                showToast('Media uploaded successfully', 'success');
+                showToast(t('pro.msg.mediaUploaded'), 'success');
             } else if (res.data?.secureUrl || res.data?.url) {
                 targetSetUrl(res.data.secureUrl || res.data.url);
                 targetSetType(type);
-                showToast('Media uploaded successfully', 'success');
+                showToast(t('pro.msg.mediaUploaded'), 'success');
             } else {
-                showToast('Failed to upload media', 'error');
+                showToast(t('pro.msg.mediaFailed'), 'error');
             }
         } catch (error) {
             console.error("Media upload error:", error, error.response?.data);
-            showToast(error.response?.data?.message || 'Error uploading media file', 'error');
+            showToast(error.response?.data?.message || t('pro.msg.mediaError'), 'error');
         } finally {
             setIsUploadingMedia(false);
         }
@@ -216,10 +219,10 @@ const ProfessionalProfilePanel = () => {
     const handleUpdateProfileSubmit = async (e) => {
         e.preventDefault();
         if (!editName || !editPhone || !editProfession || !editDescription || !editAddress || !editCity) {
-            return showToast("Please fill all required fields", "error");
+            return showToast(t('pro.msg.fillRequired'), "error");
         }
         if (editPhone.length !== 10) {
-            return showToast("Phone number must be exactly 10 digits", "error");
+            return showToast(t('pro.msg.phone10'), "error");
         }
         try {
             setIsLoading(true);
@@ -237,12 +240,12 @@ const ProfessionalProfilePanel = () => {
             };
             const res = await customerApi.updateProfessionalProfile(payload);
             if (res.data?.success) {
-                showToast("Profile details updated successfully! Your listing is pending admin moderation.", "success");
+                showToast(t('pro.msg.profileUpdated'), "success");
                 setIsEditingProfile(false);
                 loadProfile();
             }
         } catch (error) {
-            showToast(error.response?.data?.message || "Failed to update profile", "error");
+            showToast(error.response?.data?.message || t('pro.msg.profileFailed'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -250,7 +253,7 @@ const ProfessionalProfilePanel = () => {
 
     const handleAutoDetectLocation = () => {
         if (!navigator.geolocation) {
-            return showToast("Geolocation is not supported by your browser", "error");
+            return showToast(t('pro.msg.noGeo'), "error");
         }
         setIsLocating(true);
         navigator.geolocation.getCurrentPosition(
@@ -258,12 +261,12 @@ const ProfessionalProfilePanel = () => {
                 setLat(position.coords.latitude.toFixed(6));
                 setLng(position.coords.longitude.toFixed(6));
                 setIsLocating(false);
-                showToast("Coordinates detected successfully!", "success");
+                showToast(t('pro.msg.coordsDetected'), "success");
             },
             (error) => {
                 console.error("Geolocation error:", error);
                 setIsLocating(false);
-                showToast("Failed to detect location. Please type manually or enable location access.", "error");
+                showToast(t('pro.msg.coordsFailed'), "error");
             },
             { enableHighAccuracy: true, timeout: 10000 }
         );
@@ -273,10 +276,10 @@ const ProfessionalProfilePanel = () => {
         e.preventDefault();
         const finalCategoryIds = categoryIds.length > 0 ? categoryIds : (categoryId ? [categoryId] : []);
         if (!name || !phone || !profession || finalCategoryIds.length === 0 || !description || !address || !city) {
-            return showToast("Please fill all required fields and select at least one category", "error");
+            return showToast(t('pro.msg.fillRequiredCat'), "error");
         }
         if (phone.length !== 10) {
-            return showToast("Phone number must be exactly 10 digits", "error");
+            return showToast(t('pro.msg.phone10'), "error");
         }
         try {
             setIsLoading(true);
@@ -296,11 +299,11 @@ const ProfessionalProfilePanel = () => {
             };
             const res = await customerApi.createProfessionalProfile(payload);
             if (res.data?.success) {
-                showToast("Professional profile registered successfully!", "success");
+                showToast(t('pro.msg.registered'), "success");
                 loadProfile();
             }
         } catch (error) {
-            showToast(error.response?.data?.message || "Registration failed", "error");
+            showToast(error.response?.data?.message || t('pro.msg.registerFailed'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -335,7 +338,7 @@ const ProfessionalProfilePanel = () => {
     const handleSubmitPlatformAd = async (e) => {
         e.preventDefault();
         if (!platTitle.trim() || !platContent.trim() || !platCity.trim()) {
-            return showToast("Title, Description, and City are required", "error");
+            return showToast(t('pro.msg.adRequired'), "error");
         }
         try {
             setIsLoading(true);
@@ -365,11 +368,11 @@ const ProfessionalProfilePanel = () => {
                 if (!editingPlatformAdId || updatedAd.paymentStatus === 'unpaid') {
                     await handlePayPlatformAd(updatedAd);
                 } else {
-                    showToast("Advertisement updated successfully and pending admin review", "success");
+                    showToast(t('pro.msg.adUpdated'), "success");
                 }
             }
         } catch (error) {
-            showToast(error.response?.data?.message || "Failed to submit request", "error");
+            showToast(error.response?.data?.message || t('pro.msg.requestFailed'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -399,13 +402,13 @@ const ProfessionalProfilePanel = () => {
             setIsLoading(true);
             const loaded = await loadRazorpayScript();
             if (!loaded) {
-                showToast("Failed to load Razorpay SDK. Check your internet connection.", "error");
+                showToast(t('pro.msg.sdkFailed'), "error");
                 return;
             }
 
             const initRes = await customerApi.initiatePayPlatformAd(id);
             if (!initRes.data?.success) {
-                showToast(initRes.data?.message || "Failed to initiate payment", "error");
+                showToast(initRes.data?.message || t('pro.msg.paymentInit'), "error");
                 return;
             }
 
@@ -427,13 +430,13 @@ const ProfessionalProfilePanel = () => {
                             razorpay_signature: response.razorpay_signature
                         });
                         if (verifyRes.data?.success) {
-                            showToast("Payment successful! Banner ad request submitted for admin review.", "success");
+                            showToast(t('pro.msg.adPaid'), "success");
                             loadPlatformAds();
                         } else {
-                            showToast(verifyRes.data?.message || "Payment verification failed", "error");
+                            showToast(verifyRes.data?.message || t('pro.msg.verifyFailed'), "error");
                         }
                     } catch (err) {
-                        showToast(err.response?.data?.message || "Verification request failed", "error");
+                        showToast(err.response?.data?.message || t('pro.msg.verifyRequestFailed'), "error");
                     } finally {
                         setIsLoading(false);
                     }
@@ -448,7 +451,7 @@ const ProfessionalProfilePanel = () => {
                 },
                 modal: {
                     ondismiss: () => {
-                        showToast("Payment cancelled. Complete payment from dashboard to submit.", "info");
+                        showToast(t('pro.msg.adPaymentCancelled'), "info");
                     }
                 }
             };
@@ -456,7 +459,7 @@ const ProfessionalProfilePanel = () => {
             const rzp = new window.Razorpay(options);
             rzp.open();
         } catch (error) {
-            showToast(error.response?.data?.message || "Payment initiation failed", "error");
+            showToast(error.response?.data?.message || t('pro.msg.paymentInitFailed'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -494,7 +497,7 @@ const ProfessionalProfilePanel = () => {
 
     const handleSaveCategories = async () => {
         if (editCategoryIds.length === 0) {
-            return showToast("Please select at least one category", "error");
+            return showToast(t('pro.msg.selectCategory'), "error");
         }
         try {
             setIsLoading(true);
@@ -502,12 +505,12 @@ const ProfessionalProfilePanel = () => {
                 categoryIds: editCategoryIds
             });
             if (res.data?.success) {
-                showToast("Categories updated successfully! Your ad is pending admin moderation.", "success");
+                showToast(t('pro.msg.categoriesUpdated'), "success");
                 setIsEditingCategories(false);
                 loadProfile();
             }
         } catch (error) {
-            showToast(error.response?.data?.message || "Failed to update categories", "error");
+            showToast(error.response?.data?.message || t('pro.msg.categoriesFailed'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -525,11 +528,11 @@ const ProfessionalProfilePanel = () => {
                 setIsConfirmingPayment(false);
                 const res = await customerApi.payProfessionalProfile();
                 if (res.data?.success) {
-                    showToast("Listing activation successful!", "success");
+                    showToast(t('pro.msg.activated'), "success");
                     loadProfile();
                 }
             } catch (error) {
-                showToast(error.response?.data?.message || "Activation failed", "error");
+                showToast(error.response?.data?.message || t('pro.msg.activationFailed'), "error");
             } finally {
                 setIsLoading(false);
             }
@@ -541,13 +544,13 @@ const ProfessionalProfilePanel = () => {
             setIsConfirmingPayment(false);
             const loaded = await loadRazorpayScript();
             if (!loaded) {
-                showToast("Failed to load Razorpay SDK. Check your internet connection.", "error");
+                showToast(t('pro.msg.sdkFailed'), "error");
                 return;
             }
 
             const initRes = await customerApi.initiatePayProfessionalProfile();
             if (!initRes.data?.success) {
-                showToast(initRes.data?.message || "Failed to initiate payment", "error");
+                showToast(initRes.data?.message || t('pro.msg.paymentInit'), "error");
                 return;
             }
 
@@ -569,13 +572,13 @@ const ProfessionalProfilePanel = () => {
                             razorpay_signature: response.razorpay_signature
                         });
                         if (verifyRes.data?.success) {
-                            showToast("Listing payment verified and activated successfully!", "success");
+                            showToast(t('pro.msg.listingPaid'), "success");
                             loadProfile();
                         } else {
-                            showToast(verifyRes.data?.message || "Payment verification failed", "error");
+                            showToast(verifyRes.data?.message || t('pro.msg.verifyFailed'), "error");
                         }
                     } catch (err) {
-                        showToast(err.response?.data?.message || "Verification request failed", "error");
+                        showToast(err.response?.data?.message || t('pro.msg.verifyRequestFailed'), "error");
                     } finally {
                         setIsLoading(false);
                     }
@@ -590,7 +593,7 @@ const ProfessionalProfilePanel = () => {
                 },
                 modal: {
                     ondismiss: () => {
-                        showToast("Payment cancelled", "info");
+                        showToast(t('pro.msg.paymentCancelled'), "info");
                     }
                 }
             };
@@ -598,7 +601,7 @@ const ProfessionalProfilePanel = () => {
             const rzp = new window.Razorpay(options);
             rzp.open();
         } catch (error) {
-            showToast(error.response?.data?.message || "Payment initiation failed", "error");
+            showToast(error.response?.data?.message || t('pro.msg.paymentInitFailed'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -606,7 +609,7 @@ const ProfessionalProfilePanel = () => {
 
     const handleAddServiceItem = () => {
         if (!newServiceName.trim() || !newServicePrice) {
-            return showToast("Service name and price are required", "error");
+            return showToast(t('pro.msg.serviceRequired'), "error");
         }
         const newItem = {
             name: newServiceName.trim(),
@@ -642,12 +645,12 @@ const ProfessionalProfilePanel = () => {
             }
             const res = await customerApi.updateProfessionalServices({ services: finalServices });
             if (res.data?.success) {
-                showToast("Service catalog updated and is pending moderation approval.", "success");
+                showToast(t('pro.msg.catalogUpdated'), "success");
                 setIsEditingCatalog(false);
                 loadProfile();
             }
         } catch (error) {
-            showToast("Failed to save services list", "error");
+            showToast(t('pro.msg.catalogFailed'), "error");
         } finally {
             setIsLoading(false);
         }
@@ -657,7 +660,7 @@ const ProfessionalProfilePanel = () => {
         return (
             <div className="flex flex-col items-center justify-center py-40 space-y-4">
                 <Loader2 className="h-12 w-12 text-brand-500 animate-spin" />
-                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Loading Professional Dashboard...</p>
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">{t('pro.loading')}</p>
             </div>
         );
     }
@@ -671,7 +674,7 @@ const ProfessionalProfilePanel = () => {
                     className={`pb-4 text-xs font-black uppercase tracking-widest transition-all relative ${activeTab === 'directory' ? 'text-black' : 'text-slate-400 hover:text-slate-600'
                         }`}
                 >
-                    Directory Listing
+                    {t('pro.tabListing')}
                     {activeTab === 'directory' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-black rounded-full animate-in fade-in" />}
                 </button>
                 <button
@@ -694,16 +697,16 @@ const ProfessionalProfilePanel = () => {
                                 <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                                 <div className="space-y-1 flex-1">
                                     <h3 className="text-xs font-black text-amber-800 uppercase tracking-wider">
-                                        {ad.paymentStatus !== 'paid' && ad.approvalStatus !== 'approved' ? 'Action Required: Complete Listing Setup' :
-                                            ad.paymentStatus !== 'paid' ? 'Action Required: Activate Listing' : 'Pending Admin Verification'}
+                                        {ad.paymentStatus !== 'paid' && ad.approvalStatus !== 'approved' ? t('pro.actionSetup') :
+                                            ad.paymentStatus !== 'paid' ? t('pro.actionActivate') : t('pro.pendingVerification')}
                                     </h3>
                                     <p className="text-xs text-amber-700 font-bold leading-relaxed">
                                         {ad.paymentStatus !== 'paid' && ad.approvalStatus !== 'approved' ? (
-                                            `Your listing is currently unpaid and pending admin verification. Please activate the listing to make it visible to customers.`
+                                            t('pro.unpaidPendingMsg')
                                         ) : ad.paymentStatus !== 'paid' ? (
-                                            `Your service categories have been updated. Please pay the listing fee of ₹${getListingPriceToShow()} from your wallet balance to activate your profile.`
+                                            t('pro.payFeeMsg', { amount: getListingPriceToShow() })
                                         ) : (
-                                            "Your service profile details are submitted and currently pending admin verification. It will be published in the public directory once approved."
+                                            t('pro.pendingMsg')
                                         )}
                                     </p>
                                     {ad.paymentStatus !== 'paid' && (
@@ -711,7 +714,7 @@ const ProfessionalProfilePanel = () => {
                                             onClick={handlePayListing}
                                             className="mt-3 px-5 py-2.5 bg-black hover:bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                                         >
-                                            {getListingPriceToShow() === 0 ? 'Activate Free Listing' : `Pay ₹${getListingPriceToShow()} Now`}
+                                            {getListingPriceToShow() === 0 ? t('pro.activateFree') : t('pro.payNow', { amount: getListingPriceToShow() })}
                                         </button>
                                     )}
                                 </div>
@@ -728,16 +731,16 @@ const ProfessionalProfilePanel = () => {
                                         onClick={handleOpenEditProfile}
                                         className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 text-[9px] font-black uppercase tracking-wider rounded-full transition-all border border-slate-100 shadow-sm"
                                     >
-                                        <Edit2 className="h-3 w-3" /> Edit Profile Details
+                                        <Edit2 className="h-3 w-3" /> {t('pro.editTitle')}
                                     </button>
                                 </div>
                                 <div className="flex items-center gap-4 text-xs font-bold text-slate-500 flex-wrap">
                                     <span className="flex items-center gap-1"><MapPin className="h-4 w-4 text-slate-400" /> {ad.city} ({ad.address})</span>
                                     <span className="flex items-center gap-1"><Phone className="h-4 w-4 text-slate-400" /> {ad.phone}</span>
-                                    <span className="flex items-center gap-1"><Calendar className="h-4 w-4 text-slate-400" /> {ad.experienceYears} Yrs Exp</span>
+                                    <span className="flex items-center gap-1"><Calendar className="h-4 w-4 text-slate-400" /> {t('pro.yearsExp', { count: ad.experienceYears })}</span>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap pt-1">
-                                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Categories:</span>
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('pro.categoriesLabel')}</span>
                                     {ad.categories && ad.categories.length > 0 ? (
                                         ad.categories.filter(Boolean).map((c) => {
                                             const categoryName = typeof c === 'string'
@@ -780,7 +783,7 @@ const ProfessionalProfilePanel = () => {
                                 </div>
                             </div>
                             <div className="flex flex-col items-start md:items-end gap-1 bg-slate-50 p-4 rounded-3xl border border-slate-100 w-full md:w-auto min-w-[150px]">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Wallet Balance</span>
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.walletBalance')}</span>
                                 <span className="text-xl font-black text-slate-900">₹{walletBalance}</span>
                             </div>
                         </div>
@@ -796,10 +799,10 @@ const ProfessionalProfilePanel = () => {
                                         ad.approvalStatus === 'rejected' ? <XCircle className="h-8 w-8" /> : <Clock className="h-8 w-8" />}
                                 </div>
                                 <div className="space-y-1">
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Verification Status</span>
-                                    <h3 className="text-lg font-black text-slate-900 capitalize">{ad.approvalStatus}</h3>
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.verificationStatus')}</span>
+                                    <h3 className="text-lg font-black text-slate-900 capitalize">{t(`pro.status.${ad.approvalStatus}`, { defaultValue: ad.approvalStatus })}</h3>
                                     {ad.rejectionReason && (
-                                        <p className="text-xs font-bold text-rose-500 mt-1">Reason: {ad.rejectionReason}</p>
+                                        <p className="text-xs font-bold text-rose-500 mt-1">{t('pro.reason', { reason: ad.rejectionReason })}</p>
                                     )}
                                 </div>
                             </div>
@@ -812,10 +815,10 @@ const ProfessionalProfilePanel = () => {
                                         <DollarSign className="h-8 w-8" />
                                     </div>
                                     <div className="space-y-1">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ad Subscription Status</span>
-                                        <h3 className="text-lg font-black text-slate-900 capitalize">{ad.paymentStatus}</h3>
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.subscriptionStatus')}</span>
+                                        <h3 className="text-lg font-black text-slate-900 capitalize">{t(`pro.status.${ad.paymentStatus}`, { defaultValue: ad.paymentStatus })}</h3>
                                         {ad.expiresAt && ad.paymentStatus === 'paid' && (
-                                            <p className="text-xs font-semibold text-slate-400">Expires on: {new Date(ad.expiresAt).toLocaleDateString()}</p>
+                                            <p className="text-xs font-semibold text-slate-400">{t('pro.expiresOn', { date: new Date(ad.expiresAt).toLocaleDateString(getDateLocale()) })}</p>
                                         )}
                                     </div>
                                 </div>
@@ -824,7 +827,7 @@ const ProfessionalProfilePanel = () => {
                                         onClick={handlePayListing}
                                         className="px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all hover:scale-105"
                                     >
-                                        {getListingPriceToShow() === 0 ? 'Activate Free Listing' : `Pay ₹${getListingPriceToShow()}`}
+                                        {getListingPriceToShow() === 0 ? t('pro.activateFree') : t('pro.pay', { amount: getListingPriceToShow() })}
                                     </button>
                                 )}
                             </div>
@@ -834,8 +837,8 @@ const ProfessionalProfilePanel = () => {
                     <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-slate-100 shadow-sm space-y-6">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
-                                <h2 className="text-xl font-black text-slate-955">Service Price Catalog</h2>
-                                <p className="text-xs text-slate-400 font-bold mt-1">Manage individual service task items you offer to customers.</p>
+                                <h2 className="text-xl font-black text-slate-955">{t('pro.catalogTitle')}</h2>
+                                <p className="text-xs text-slate-400 font-bold mt-1">{t('pro.catalogSub')}</p>
                             </div>
                             {!isEditingCatalog ? (
                                 <button
@@ -850,7 +853,7 @@ const ProfessionalProfilePanel = () => {
                                         onClick={handleSaveCatalog}
                                         className="flex-1 sm:flex-none px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center"
                                     >
-                                        Save Changes
+                                        {t('checkout.saveChanges')}
                                     </button>
                                     <button
                                         onClick={() => {
@@ -859,7 +862,7 @@ const ProfessionalProfilePanel = () => {
                                         }}
                                         className="flex-1 sm:flex-none px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center"
                                     >
-                                        Cancel
+                                        {t('common:actions.cancel')}
                                     </button>
                                 </div>
                             )}
@@ -872,17 +875,17 @@ const ProfessionalProfilePanel = () => {
                                     {/* Editing Catalog Inputs */}
                                     <div className="p-6 bg-slate-50 rounded-[28px] border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                                         <div className="space-y-1 md:col-span-4">
-                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Service Title</label>
+                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('pro.serviceTitle')}</label>
                                             <input
                                                 type="text"
                                                 value={newServiceName}
                                                 onChange={(e) => setNewServiceName(e.target.value)}
-                                                placeholder="e.g. Tap Leak Repair"
+                                                placeholder={t('pro.serviceTitlePlaceholder')}
                                                 className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
                                             />
                                         </div>
                                         <div className="space-y-1 md:col-span-3">
-                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Pricing (₹)</label>
+                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('pro.pricing')}</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -898,7 +901,7 @@ const ProfessionalProfilePanel = () => {
                                                 type="text"
                                                 value={newServiceDesc}
                                                 onChange={(e) => setNewServiceDesc(e.target.value)}
-                                                placeholder="Brief summary..."
+                                                placeholder={t('pro.summaryPlaceholder')}
                                                 className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
                                             />
                                         </div>
@@ -915,7 +918,7 @@ const ProfessionalProfilePanel = () => {
 
                                     <div className="space-y-3">
                                         {servicesList.length === 0 ? (
-                                            <p className="text-xs text-slate-400 italic text-center py-6 font-bold">No services added to your catalog yet.</p>
+                                            <p className="text-xs text-slate-400 italic text-center py-6 font-bold">{t('pro.noServices')}</p>
                                         ) : (
                                             servicesList.map((svc, i) => (
                                                 <div key={i} className="flex justify-between items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
@@ -956,14 +959,14 @@ const ProfessionalProfilePanel = () => {
                                                 <Plus className="h-6 w-6" />
                                             </div>
                                             <div className="text-center space-y-1">
-                                                <p className="text-sm font-black text-slate-800">Your Service Catalog is Empty</p>
-                                                <p className="text-xs text-slate-400 font-bold max-w-xs">List individual service task offerings (e.g. Pipe Fitting, Fan Repair) with pricing.</p>
+                                                <p className="text-sm font-black text-slate-800">{t('pro.catalogEmpty')}</p>
+                                                <p className="text-xs text-slate-400 font-bold max-w-xs">{t('pro.catalogEmptySub')}</p>
                                             </div>
                                             <button
                                                 onClick={() => setIsEditingCatalog(true)}
                                                 className="px-6 py-3 bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all hover:scale-105 shadow-sm"
                                             >
-                                                Add Your First Service
+                                                {t('pro.addFirst')}
                                             </button>
                                         </div>
                                     )}
@@ -976,27 +979,27 @@ const ProfessionalProfilePanel = () => {
                         {/* SERVICE PROFESSIONAL REGISTRATION WIZARD */}
                         <div>
                             <h1 className="text-2xl font-black text-slate-950 flex items-center gap-2">
-                                List Your Professional Service
+                                {t('pro.registerTitle')}
                                 <Sparkles className="h-5 w-5 text-brand-500" />
                             </h1>
-                            <p className="text-sm text-slate-400 font-bold mt-1">Get verified, advertise your service category, and connect with local customers.</p>
+                            <p className="text-sm text-slate-400 font-bold mt-1">{t('pro.registerSub')}</p>
                         </div>
 
                         <form onSubmit={handleRegister} className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Full Name</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('auth.fullName')}</label>
                                     <input
                                         type="text"
                                         required
                                         value={name}
                                         onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                                        placeholder="Enter your name"
+                                        placeholder={t('editProfile.namePlaceholder')}
                                         className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Phone Number</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('editProfile.phone')}</label>
                                     <input
                                         type="tel"
                                         inputMode="numeric"
@@ -1004,12 +1007,12 @@ const ProfessionalProfilePanel = () => {
                                         maxLength={10}
                                         value={phone}
                                         onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                                        placeholder="10-digit mobile number"
+                                        placeholder={t('checkout.form.mobile10')}
                                         className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Email Address (Optional)</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.emailOptional')}</label>
                                     <input
                                         type="email"
                                         value={email}
@@ -1017,21 +1020,21 @@ const ProfessionalProfilePanel = () => {
                                         placeholder="yourname@domain.com"
                                         className={`w-full px-5 py-4 bg-slate-50 border ${email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? 'border-red-400' : 'border-none'} rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all`}
                                     />
-                                    {email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && <p className="text-red-500 text-[10px] mt-1 font-bold">Please enter a valid email address</p>}
+                                    {email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && <p className="text-red-500 text-[10px] mt-1 font-bold">{t('pro.invalidEmail')}</p>}
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Profession Service Title</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.professionTitle')}</label>
                                     <input
                                         type="text"
                                         required
                                         value={profession}
                                         onChange={(e) => setProfession(e.target.value)}
-                                        placeholder="e.g. Master Plumber, AC Mechanic"
+                                        placeholder={t('pro.professionPlaceholder')}
                                         className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                     />
                                 </div>
                                 <div className="space-y-2 col-span-1 md:col-span-2">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Select Service Categories (Choose one or more)</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.selectCategories')}</label>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                         {categories.map((cat) => {
                                             const isSelected = categoryIds.includes(cat._id);
@@ -1068,7 +1071,7 @@ const ProfessionalProfilePanel = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Years of Experience</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.experience')}</label>
                                     <input
                                         type="number"
                                         required
@@ -1080,32 +1083,32 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Operational City</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.city')}</label>
                                     <input
                                         type="text"
                                         required
                                         value={city}
                                         onChange={(e) => setCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                                        placeholder="e.g. Indore"
+                                        placeholder={t('pro.cityPlaceholder')}
                                         className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Full Address</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.address')}</label>
                                     <input
                                         type="text"
                                         required
                                         value={address}
                                         onChange={(e) => setAddress(e.target.value)}
-                                        placeholder="Detailed shop or service area address"
+                                        placeholder={t('pro.addressPlaceholder')}
                                         className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                     />
                                 </div>
                                 <div className="col-span-1 md:col-span-2 p-5 bg-indigo-50/40 rounded-3xl border border-indigo-100/30 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
                                     <div className="space-y-1">
-                                        <h4 className="text-xs font-black uppercase tracking-wider text-indigo-800">Set Service Location Coordinates</h4>
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-indigo-800">{t('pro.coordsTitle')}</h4>
                                         <p className="text-[11px] text-slate-500 font-bold leading-relaxed">
-                                            Customers will locate you based on these coordinates. Use auto-detect for accuracy.
+                                            {t('pro.coordsSub')}
                                         </p>
                                     </div>
                                     <button
@@ -1122,13 +1125,13 @@ const ProfessionalProfilePanel = () => {
                                         ) : (
                                             <>
                                                 <MapPin className="h-4 w-4" />
-                                                Detect My Location
+                                                {t('pro.detect')}
                                             </>
                                         )}
                                     </button>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Latitude Coordinate</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.latitude')}</label>
                                     <input
                                         type="text"
                                         required
@@ -1139,7 +1142,7 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Longitude Coordinate</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.longitude')}</label>
                                     <input
                                         type="text"
                                         required
@@ -1153,12 +1156,12 @@ const ProfessionalProfilePanel = () => {
 
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Service Profile Description</label>
+                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.description')}</label>
                                 <textarea
                                     required
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
-                                    placeholder="Introduce your plumbing/electrician services, specializations, tools, and booking callout policies..."
+                                    placeholder={t('pro.descriptionPlaceholder')}
                                     rows="4"
                                     className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all resize-none"
                                 />
@@ -1173,12 +1176,12 @@ const ProfessionalProfilePanel = () => {
                                     <div className="bg-amber-50/50 p-6 rounded-3xl border border-amber-100 flex items-start gap-4">
                                         <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
                                         <div className="space-y-1">
-                                            <h4 className="text-xs font-black uppercase tracking-wider text-amber-800">Advertisement Listing Subscription Fee</h4>
+                                            <h4 className="text-xs font-black uppercase tracking-wider text-amber-800">{t('pro.feeTitle')}</h4>
                                             <p className="text-xs text-amber-700 font-bold leading-relaxed">
                                                 {isFree ? (
-                                                    "Registration creates a pending profile. You can activate this listing for free once registered."
+                                                    t('pro.feeFree')
                                                 ) : (
-                                                    `Registration creates a pending profile. You will need to pay ₹${fee} via wallet balance to activate the listing for a 30-day period.`
+                                                    t('pro.feePaid', { amount: fee })
                                                 )}
                                             </p>
                                         </div>
@@ -1190,7 +1193,7 @@ const ProfessionalProfilePanel = () => {
                                 type="submit"
                                 className="w-full py-5 bg-black hover:scale-[1.01] transition-all text-white rounded-[24px] text-xs font-black uppercase tracking-widest flex items-center justify-center gap-3 mt-8 shadow-xl shadow-brand-100"
                             >
-                                Register Profile Details <ChevronRight className="h-4 w-4" />
+                                {t('pro.registerButton')} <ChevronRight className="h-4 w-4" />
                             </button>
                         </form>
                     </div>
@@ -1201,11 +1204,11 @@ const ProfessionalProfilePanel = () => {
                     <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                         <div className="space-y-2">
                             <h1 className="text-2xl font-black text-slate-955 flex items-center gap-2">
-                                Promotional Banners
+                                {t('pro.tabBanners')}
                                 <Sparkles className="h-5 w-5 text-brand-500 animate-pulse" />
                             </h1>
                             <p className="text-xs text-slate-400 font-bold leading-relaxed max-w-xl">
-                                Run custom banner images or video advertisements on SevaFast platform. Gated behind admin approval (₹{settings?.platformAdListingFee ?? 999} / 30 Days).
+                                {t('pro.bannersSub', { amount: settings?.platformAdListingFee ?? 999 })}
                             </p>
                         </div>
                         <button
@@ -1224,14 +1227,14 @@ const ProfessionalProfilePanel = () => {
                                     <Sparkles className="h-8 w-8" />
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-sm font-black text-slate-800">No Banner Ads Submitted Yet</p>
-                                    <p className="text-xs text-slate-400 font-bold max-w-sm">Create an ad request to promote your service, store, or clinic at the top banner positions on SevaFast.</p>
+                                    <p className="text-sm font-black text-slate-800">{t('pro.noBanners')}</p>
+                                    <p className="text-xs text-slate-400 font-bold max-w-sm">{t('pro.noBannersSub')}</p>
                                 </div>
                                 <button
                                     onClick={() => setIsSubmittingPlatformAd(true)}
                                     className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                                 >
-                                    Submit First Banner Ad
+                                    {t('pro.firstBanner')}
                                 </button>
                             </div>
                         ) : (
@@ -1245,7 +1248,7 @@ const ProfessionalProfilePanel = () => {
                                             </div>
                                         ) : (
                                             <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100 relative aspect-video flex items-center justify-center">
-                                                <span className="text-[9px] font-black uppercase text-slate-400">No Image</span>
+                                                <span className="text-[9px] font-black uppercase text-slate-400">{t('pro.noImage')}</span>
                                             </div>
                                         )}
                                         {(adItem.videoUrl || (adItem.mediaUrl && adItem.mediaType === 'video')) ? (
@@ -1254,7 +1257,7 @@ const ProfessionalProfilePanel = () => {
                                             </div>
                                         ) : (
                                             <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100 relative aspect-video flex items-center justify-center">
-                                                <span className="text-[9px] font-black uppercase text-slate-400">No Video</span>
+                                                <span className="text-[9px] font-black uppercase text-slate-400">{t('pro.noVideo')}</span>
                                             </div>
                                         )}
                                     </div>
@@ -1268,12 +1271,12 @@ const ProfessionalProfilePanel = () => {
                                         <p className="text-xs font-bold text-slate-500 leading-relaxed line-clamp-3">{adItem.content}</p>
                                         {adItem.targetUrl && (
                                             <a href={adItem.targetUrl} target="_blank" rel="noreferrer" className="inline-flex text-[10px] font-black text-brand-600 hover:text-brand-700 underline truncate max-w-full">
-                                                Target link: {adItem.targetUrl}
+                                                {t('pro.targetLink', { url: adItem.targetUrl })}
                                             </a>
                                         )}
                                         {adItem.approvalStatus === 'rejected' && adItem.rejectionReason && (
                                             <div className="p-3 bg-rose-50 text-rose-700 text-xs font-bold rounded-xl border border-rose-100">
-                                                Rejection Reason: {adItem.rejectionReason}
+                                                {t('pro.rejectionReason', { reason: adItem.rejectionReason })}
                                             </div>
                                         )}
                                     </div>
@@ -1284,19 +1287,19 @@ const ProfessionalProfilePanel = () => {
                                             {/* Approval status badge */}
                                             {adItem.paymentStatus === 'unpaid' ? (
                                                 <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-500">
-                                                    Draft (Unpaid)
+                                                    {t('pro.draft')}
                                                 </span>
                                             ) : (
                                                 <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider capitalize ${adItem.approvalStatus === 'approved' ? 'bg-emerald-50 text-emerald-700' :
                                                         adItem.approvalStatus === 'rejected' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'
                                                     }`}>
-                                                    {adItem.approvalStatus === 'pending' ? 'Pending Admin Approval' : adItem.approvalStatus}
+                                                    {adItem.approvalStatus === 'pending' ? t('pro.pendingApproval') : t(`pro.status.${adItem.approvalStatus}`, { defaultValue: adItem.approvalStatus })}
                                                 </span>
                                             )}
                                             {/* Payment status badge */}
                                             <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider capitalize ${adItem.paymentStatus === 'paid' ? 'bg-sky-50 text-sky-700' : 'bg-slate-50 text-slate-500'
                                                 }`}>
-                                                {adItem.paymentStatus}
+                                                {t(`pro.status.${adItem.paymentStatus}`, { defaultValue: adItem.paymentStatus })}
                                             </span>
                                         </div>
 
@@ -1305,7 +1308,7 @@ const ProfessionalProfilePanel = () => {
                                                 onClick={() => handlePayPlatformAd(adItem)}
                                                 className="w-full px-4 py-2.5 bg-black hover:bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all text-center"
                                             >
-                                                Pay ₹{adItem.price || settings?.platformAdListingFee || 999} to Submit Request
+                                                {t('pro.payToSubmit', { amount: adItem.price || settings?.platformAdListingFee || 999 })}
                                             </button>
                                         )}
                                         <button
@@ -1329,8 +1332,8 @@ const ProfessionalProfilePanel = () => {
                         {/* STICKY HEADER */}
                         <div className="flex justify-between items-center p-6 md:p-8 pb-4 border-b border-slate-100 shrink-0">
                             <div>
-                                <h2 className="text-xl font-black text-slate-900">{editingPlatformAdId ? "Edit Banner Ad Request" : "New Banner Ad Request"}</h2>
-                                <p className="text-xs text-slate-400 font-bold mt-1">Submit banner files and details to run local/global ads.</p>
+                                <h2 className="text-xl font-black text-slate-900">{editingPlatformAdId ? t('pro.editBanner') : t('pro.newBanner')}</h2>
+                                <p className="text-xs text-slate-400 font-bold mt-1">{t('pro.bannerFormSub')}</p>
                             </div>
                             <button
                                 onClick={resetPlatformAdForm}
@@ -1344,18 +1347,18 @@ const ProfessionalProfilePanel = () => {
                         <form onSubmit={handleSubmitPlatformAd} id="banner-ad-form" className="flex-1 overflow-y-auto px-6 md:px-8 py-4 space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ad Campaign Title</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.adTitle')}</label>
                                     <input
                                         type="text"
                                         required
                                         value={platTitle}
                                         onChange={(e) => setPlatTitle(e.target.value)}
-                                        placeholder="e.g. Special Discount Offer"
+                                        placeholder={t('pro.adTitlePlaceholder')}
                                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Target Link / URL (Optional)</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.adLink')}</label>
                                     <input
                                         type="url"
                                         value={platTargetUrl}
@@ -1365,25 +1368,25 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1 md:col-span-2">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Target Operational City</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.adCity')}</label>
                                     <input
                                         type="text"
                                         required
                                         value={platCity}
                                         onChange={(e) => setPlatCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                                        placeholder="e.g. Indore"
+                                        placeholder={t('pro.cityPlaceholder')}
                                         className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                     />
                                 </div>
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ad Content / Description</label>
+                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.adContent')}</label>
                                 <textarea
                                     required
                                     value={platContent}
                                     onChange={(e) => setPlatContent(e.target.value)}
-                                    placeholder="Write a clear call-to-action description or information about this advertisement banner..."
+                                    placeholder={t('pro.adContentPlaceholder')}
                                     rows="3"
                                     className="w-full px-4 py-3.5 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none resize-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                 />
@@ -1391,7 +1394,7 @@ const ProfessionalProfilePanel = () => {
 
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
-                                    <span className="text-xs font-black uppercase tracking-wider text-slate-700">Choose Media Type</span>
+                                    <span className="text-xs font-black uppercase tracking-wider text-slate-700">{t('pro.mediaType')}</span>
                                     <div className="flex bg-slate-200/60 p-1 rounded-xl gap-1">
                                         <button
                                             type="button"
@@ -1401,7 +1404,7 @@ const ProfessionalProfilePanel = () => {
                                                     : "text-slate-500 hover:text-slate-800"
                                                 }`}
                                         >
-                                            Image {platImageUrl && "✓"}
+                                            {t('pro.image')} {platImageUrl && "✓"}
                                         </button>
                                         <button
                                             type="button"
@@ -1411,7 +1414,7 @@ const ProfessionalProfilePanel = () => {
                                                     : "text-slate-500 hover:text-slate-800"
                                                 }`}
                                         >
-                                            Video {platVideoUrl && "✓"}
+                                            {t('pro.video')} {platVideoUrl && "✓"}
                                         </button>
                                     </div>
                                 </div>
@@ -1420,17 +1423,17 @@ const ProfessionalProfilePanel = () => {
                                     {/* PHOTO UPLOAD */}
                                     {activeMediaTab === 'image' && (
                                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 relative animate-in fade-in duration-200">
-                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">Banner Photo (Image)</h4>
+                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">{t('pro.bannerPhoto')}</h4>
                                             <label className="cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border border-slate-200 border-dashed rounded-xl transition-all relative overflow-hidden group">
                                                 {isUploadingMedia ? (
                                                     <Loader2 className="h-5 w-5 text-brand-500 animate-spin" />
                                                 ) : platImageUrl ? (
-                                                    <img src={platImageUrl} alt="Preview" className="h-full w-full object-cover" />
+                                                    <img src={platImageUrl} alt={t('photoOrder.preview')} className="h-full w-full object-cover" />
                                                 ) : (
                                                     <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-slate-600">
                                                         <Upload className="h-5 w-5" />
-                                                        <span className="text-[8px] font-black uppercase mt-1">Upload Photo (Gallery / Files)</span>
-                                                        <span className="text-[7px] text-slate-400 font-bold mt-0.5">JPEG, PNG up to 10MB</span>
+                                                        <span className="text-[8px] font-black uppercase mt-1">{t('pro.uploadPhoto')}</span>
+                                                        <span className="text-[7px] text-slate-400 font-bold mt-0.5">{t('pro.photoHint')}</span>
                                                     </div>
                                                 )}
                                                 <input
@@ -1449,7 +1452,7 @@ const ProfessionalProfilePanel = () => {
                                                     onClick={() => { setPlatImageUrl(''); }}
                                                     className="text-[8px] font-black uppercase text-rose-500 hover:text-rose-700"
                                                 >
-                                                    Remove Photo
+                                                    {t('pro.removePhoto')}
                                                 </button>
                                             )}
                                         </div>
@@ -1458,7 +1461,7 @@ const ProfessionalProfilePanel = () => {
                                     {/* VIDEO UPLOAD */}
                                     {activeMediaTab === 'video' && (
                                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 relative animate-in fade-in duration-200">
-                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">Banner Video</h4>
+                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">{t('pro.bannerVideo')}</h4>
                                             <label className="cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border border-slate-200 border-dashed rounded-xl transition-all relative overflow-hidden group">
                                                 {isUploadingMedia ? (
                                                     <Loader2 className="h-5 w-5 text-brand-500 animate-spin" />
@@ -1467,8 +1470,8 @@ const ProfessionalProfilePanel = () => {
                                                 ) : (
                                                     <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-slate-600">
                                                         <Upload className="h-5 w-5" />
-                                                        <span className="text-[8px] font-black uppercase mt-1">Upload Video</span>
-                                                        <span className="text-[7px] text-slate-400 font-bold mt-0.5">MP4, WebM up to 10MB</span>
+                                                        <span className="text-[8px] font-black uppercase mt-1">{t('pro.uploadVideo')}</span>
+                                                        <span className="text-[7px] text-slate-400 font-bold mt-0.5">{t('pro.videoHint')}</span>
                                                     </div>
                                                 )}
                                                 <input
@@ -1487,7 +1490,7 @@ const ProfessionalProfilePanel = () => {
                                                     onClick={() => { setPlatVideoUrl(''); }}
                                                     className="text-[8px] font-black uppercase text-rose-500 hover:text-rose-700"
                                                 >
-                                                    Remove Video
+                                                    {t('pro.removeVideo')}
                                                 </button>
                                             )}
                                         </div>
@@ -1499,7 +1502,7 @@ const ProfessionalProfilePanel = () => {
                                 <div className="space-y-0.5">
                                     <h4 className="text-[10px] font-black uppercase tracking-wider text-amber-800">Advertisement Price: ₹{settings?.platformAdListingFee ?? 999}</h4>
                                     <p className="text-[10px] text-amber-700 font-bold leading-normal">
-                                        The subscription runs for 30 days. After payment, your request is submitted for admin review and approval.
+                                        {t('pro.subscriptionNote')}
                                     </p>
                                 </div>
                             </div>
@@ -1512,7 +1515,7 @@ const ProfessionalProfilePanel = () => {
                                 onClick={resetPlatformAdForm}
                                 className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider text-center transition-all"
                             >
-                                Cancel
+                                {t('common:actions.cancel')}
                             </button>
                             <button
                                 type="submit"
@@ -1520,7 +1523,7 @@ const ProfessionalProfilePanel = () => {
                                 disabled={isLoading || isUploadingMedia}
                                 className="flex-1 py-3.5 bg-black hover:bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-wider text-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {isLoading ? "Submitting..." : (editingPlatformAdId ? "Update & Continue" : "Submit & Pay")}
+                                {isLoading ? t('orderDetail.submitting') : (editingPlatformAdId ? t('pro.updateContinue') : t('pro.submitPay'))}
                             </button>
                         </div>
                     </div>
@@ -1533,8 +1536,8 @@ const ProfessionalProfilePanel = () => {
                     <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto scrollbar-none">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h2 className="text-xl font-black text-slate-900">Manage Service Categories</h2>
-                                <p className="text-xs text-slate-400 font-bold mt-1">Select one or more service categories you offer.</p>
+                                <h2 className="text-xl font-black text-slate-900">{t('pro.manageCategories')}</h2>
+                                <p className="text-xs text-slate-400 font-bold mt-1">{t('pro.manageCategoriesSub')}</p>
                             </div>
                             <button
                                 onClick={() => setIsEditingCategories(false)}
@@ -1582,13 +1585,13 @@ const ProfessionalProfilePanel = () => {
                                 onClick={() => setIsEditingCategories(false)}
                                 className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center"
                             >
-                                Cancel
+                                {t('common:actions.cancel')}
                             </button>
                             <button
                                 onClick={handleSaveCategories}
                                 className="flex-1 py-4 bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center hover:scale-[1.01]"
                             >
-                                Save Changes
+                                {t('checkout.saveChanges')}
                             </button>
                         </div>
                     </div>
@@ -1600,7 +1603,7 @@ const ProfessionalProfilePanel = () => {
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in">
                     <div className="bg-white rounded-[32px] p-6 md:p-8 max-w-md w-full shadow-2xl space-y-6">
                         <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-black text-slate-900">Activate Service Listing</h2>
+                            <h2 className="text-xl font-black text-slate-900">{t('pro.activateTitle')}</h2>
                             <button
                                 onClick={() => setIsConfirmingPayment(false)}
                                 className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition-all"
@@ -1612,11 +1615,11 @@ const ProfessionalProfilePanel = () => {
                         <div className="space-y-4">
                             <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 space-y-2">
                                 <div className="flex justify-between items-center text-xs">
-                                    <span className="font-bold text-slate-500">Listing Activation Fee</span>
+                                    <span className="font-bold text-slate-500">{t('pro.activationFee')}</span>
                                     <span className="font-black text-slate-800">₹{getListingPriceToShow()}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
-                                    <span className="font-bold text-slate-500">Your Wallet Balance</span>
+                                    <span className="font-bold text-slate-500">{t('pro.yourWallet')}</span>
                                     <span className="font-black text-slate-800">
                                         ₹{walletBalance}
                                     </span>
@@ -1626,7 +1629,7 @@ const ProfessionalProfilePanel = () => {
                             <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex gap-3 text-emerald-800 text-xs font-semibold leading-relaxed">
                                 <Sparkles className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="font-bold">Payment Activation Ready</p>
+                                    <p className="font-bold">{t('pro.activationReady')}</p>
                                     <p className="mt-0.5 text-emerald-600">Click below to deduct ₹{getListingPriceToShow()} from your wallet balance and activate the ad listing.</p>
                                 </div>
                             </div>
@@ -1637,13 +1640,13 @@ const ProfessionalProfilePanel = () => {
                                 onClick={() => setIsConfirmingPayment(false)}
                                 className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center"
                             >
-                                Cancel
+                                {t('common:actions.cancel')}
                             </button>
                             <button
                                 onClick={executePayment}
                                 className="flex-1 py-4 bg-black hover:bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center hover:scale-[1.01]"
                             >
-                                Pay ₹{getListingPriceToShow()} Now
+                                {t('pro.payNow', { amount: getListingPriceToShow() })}
                             </button>
                         </div>
                     </div>
@@ -1656,8 +1659,8 @@ const ProfessionalProfilePanel = () => {
                     <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto scrollbar-none animate-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h2 className="text-xl font-black text-slate-900">Edit Profile Details</h2>
-                                <p className="text-xs text-slate-400 font-bold mt-1">Update your professional details.</p>
+                                <h2 className="text-xl font-black text-slate-900">{t('pro.editTitle')}</h2>
+                                <p className="text-xs text-slate-400 font-bold mt-1">{t('pro.editSub')}</p>
                             </div>
                             <button
                                 onClick={() => setIsEditingProfile(false)}
@@ -1669,7 +1672,7 @@ const ProfessionalProfilePanel = () => {
                         <form onSubmit={handleUpdateProfileSubmit} className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Full Name</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('auth.fullName')}</label>
                                     <input
                                         type="text"
                                         required
@@ -1679,7 +1682,7 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Phone Number</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('editProfile.phone')}</label>
                                     <input
                                         type="tel"
                                         inputMode="numeric"
@@ -1691,17 +1694,17 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Email Address (Optional)</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.emailOptional')}</label>
                                     <input
                                         type="email"
                                         value={editEmail}
                                         onChange={(e) => setEditEmail(e.target.value)}
                                         className={`w-full px-4 py-3 bg-slate-50 border ${editEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail) ? 'border-red-400' : 'border-none'} rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all`}
                                     />
-                                    {editEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail) && <p className="text-red-500 text-[10px] mt-1 font-bold">Please enter a valid email address</p>}
+                                    {editEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail) && <p className="text-red-500 text-[10px] mt-1 font-bold">{t('pro.invalidEmail')}</p>}
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Profession Service Title</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.professionTitle')}</label>
                                     <input
                                         type="text"
                                         required
@@ -1711,7 +1714,7 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Years of Experience</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.experience')}</label>
                                     <input
                                         type="number"
                                         required
@@ -1722,7 +1725,7 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Operational City</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.city')}</label>
                                     <input
                                         type="text"
                                         required
@@ -1732,7 +1735,7 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1 md:col-span-2">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Full Address</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.address')}</label>
                                     <input
                                         type="text"
                                         required
@@ -1742,7 +1745,7 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Latitude Coordinate</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.latitude')}</label>
                                     <input
                                         type="text"
                                         required
@@ -1752,7 +1755,7 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Longitude Coordinate</label>
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.longitude')}</label>
                                     <input
                                         type="text"
                                         required
@@ -1763,7 +1766,7 @@ const ProfessionalProfilePanel = () => {
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Service Profile Description</label>
+                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.description')}</label>
                                 <textarea
                                     required
                                     value={editDescription}
@@ -1778,14 +1781,14 @@ const ProfessionalProfilePanel = () => {
                                     onClick={() => setIsEditingProfile(false)}
                                     className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider text-center"
                                 >
-                                    Cancel
+                                    {t('common:actions.cancel')}
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isUploadingMedia}
                                     className="flex-1 py-3.5 bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider text-center hover:scale-[1.01] disabled:opacity-60"
                                 >
-                                    Save Changes
+                                    {t('checkout.saveChanges')}
                                 </button>
                             </div>
                         </form>

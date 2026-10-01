@@ -148,6 +148,17 @@ export function getOrderStatusLabel(order) {
 }
 
 /**
+ * Stable key for the same status getOrderStatusLabel describes, for looking up
+ * a translated label (e.g. `orderStatus.${key}`); fall back to the English label.
+ */
+export function getOrderStatusKey(order) {
+  const rs = order?.returnStatus;
+  if (rs && rs !== "none") return rs;
+  if (isOrderDelayed(order)) return "delayed";
+  return getLegacyStatusFromOrder(order);
+}
+
+/**
  * Short, consistent display id for an order — last 10 characters with a `#`
  * prefix. Mirrors the pattern already used in SellerOrderAlertModal; use this
  * everywhere an order id is shown in the UI instead of the raw Mongo id.

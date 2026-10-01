@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Sparkles, X, Gift, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -9,6 +10,7 @@ const WelcomeScratchCardModal = ({
     freeDelivery = true,
     userId = 'guest',
 }) => {
+    const { t } = useTranslation('customer');
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
     const [isScratched, setIsScratched] = useState(false);
@@ -61,7 +63,7 @@ const WelcomeScratchCardModal = ({
             ctx.font = 'bold 16px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('✨ Scratch Here to Reveal! ✨', width / 2, height / 2);
+            ctx.fillText(t('scratch.canvas'), width / 2, height / 2);
         }, 100);
 
         return () => clearTimeout(timer);
@@ -161,14 +163,14 @@ const WelcomeScratchCardModal = ({
                 {/* Top Badge & Header */}
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-black uppercase tracking-wider mb-4 animate-bounce">
                     <Sparkles className="w-4 h-4 text-amber-400" />
-                    Welcome Surprise Gift
+                    {t('scratch.badge')}
                 </div>
 
                 <h2 className="text-xl font-black tracking-tight text-white mb-1">
-                    First Order Special Offer! 🎉
+                    {t('scratch.title')}
                 </h2>
                 <p className="text-xs font-medium text-purple-200/80 mb-6">
-                    {isScratched ? "You've unlocked your exclusive reward!" : "Scratch the card below to reveal your welcome offer"}
+                    {isScratched ? t('scratch.unlocked') : t('scratch.instruction')}
                 </p>
 
                 {/* Scratch Card Outer Shell */}
@@ -179,15 +181,15 @@ const WelcomeScratchCardModal = ({
                             <Gift className="w-8 h-8 animate-pulse" />
                         </div>
                         <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-white to-amber-300">
-                            {discountPercent}% OFF
+                            {t('product.percentOff', { percent: discountPercent })}
                         </div>
                         {freeDelivery && (
                             <div className="text-xs font-black text-amber-400 uppercase tracking-widest mt-1">
-                                + FREE Delivery on 1st Order!
+                                {t('scratch.freeDelivery')}
                             </div>
                         )}
                         <p className="text-[11px] text-slate-300 mt-2 font-medium">
-                            Auto-applied at checkout for your first purchase.
+                            {t('scratch.autoApplied')}
                         </p>
                     </div>
 
@@ -214,12 +216,12 @@ const WelcomeScratchCardModal = ({
                         className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-sm uppercase tracking-wider hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2"
                     >
                         <ShoppingBag className="w-4 h-4" />
-                        Shop Now & Claim Gift
+                        {t('scratch.shopNow')}
                     </button>
                 ) : (
                     <div className="text-[11px] font-bold text-purple-300/60 uppercase tracking-widest flex items-center justify-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        Scratch to activate your 1st order offer
+                        {t('scratch.activate')}
                     </div>
                 )}
             </div>

@@ -1,0 +1,17 @@
+{
+  "loadFailed": "Failed to load chat messages",
+  "sendFailed": "Failed to send message",
+  "uploadFailed": "Failed to upload image",
+  "downloadFailed": "Failed to download image",
+  "yourRequest": "Your Request",
+  "loading": "Loading messages...",
+  "sellerQuote": "Seller Quote",
+  "estimatedPrice": "Estimated Price:",
+  "contactInfo": "Seller Contact Info",
+  "contactShared": "The seller has shared their contact information with you.",
+  "call": "Call",
+  "attachment": "Chat Attachment",
+  "downloadPhoto": "Download Photo",
+  "attachPhoto": "Attach Photo",
+  "typeMessage": "Type a message..."
+}

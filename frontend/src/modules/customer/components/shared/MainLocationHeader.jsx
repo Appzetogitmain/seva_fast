@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useTranslation } from 'react-i18next';
+import { translateEta } from '@core/i18n';
 import { useNavigate } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import Lottie from "lottie-react";
@@ -48,6 +50,7 @@ function CategoryNavColumn({
   headerIconColor = "#0F172A",
 }) {
   const iconColor = "#0F172A";
+  const { t } = useTranslation('customer');
   const fontColor = "#0F172A";
   const colRef = useRef(null);
   const labelRef = useRef(null);
@@ -128,7 +131,7 @@ function CategoryNavColumn({
             color: "#0F172A",
             opacity: isActive ? 1 : 0.78,
           }}>
-          {cat.name}
+          {cat.id === 'all' ? t('home.all') : cat.name}
         </span>
       </div>
       {isActive && (
@@ -162,6 +165,7 @@ const MainLocationHeader = ({
   onCategorySelect,
 }) => {
   const { scrollY } = useScroll();
+  const { t } = useTranslation('customer');
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [cartAnimData, setCartAnimData] = useState(null);
 
@@ -194,7 +198,7 @@ const MainLocationHeader = ({
   };
 
   // Search placeholder animation
-  const [searchPlaceholder, setSearchPlaceholder] = useState("Search ");
+  const [searchPlaceholder, setSearchPlaceholder] = useState(`${t('header.search')} `);
   const [typingState, setTypingState] = useState({
     textIndex: 0,
     charIndex: 0,
@@ -202,14 +206,8 @@ const MainLocationHeader = ({
     isPaused: false,
   });
 
-  const staticText = "Search ";
-  const typingPhrases = [
-    '"bread"',
-    '"milk"',
-    '"chocolate"',
-    '"eggs"',
-    '"chips"',
-  ];
+  const staticText = `${t('header.search')} `;
+  const typingPhrases = t('header.searchPhrases', { returnObjects: true }).map((w) => `"${w}"`);
 
   useEffect(() => {
     const { textIndex, charIndex, isDeleting, isPaused } = typingState;
@@ -348,7 +346,7 @@ const MainLocationHeader = ({
               display: displayCart,
             }}
             type="button"
-            aria-label="Open cart"
+            aria-label={t('header.openCart')}
             onClick={() => navigate("/checkout")}
             className="absolute top-3 right-5 sm:top-4 sm:right-6 md:top-5 md:right-8 z-20 w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 cursor-pointer">
             {cartAnimData ? (
@@ -387,7 +385,7 @@ const MainLocationHeader = ({
                     className="text-[11px] font-bold uppercase tracking-wider leading-none"
                     style={{ color: headerFontColor }}
                   >
-                    {currentLocation.time}
+                    {translateEta(currentLocation.time)}
                   </span>
                 </div>
                 <button
@@ -404,7 +402,7 @@ const MainLocationHeader = ({
                     style={{ color: headerFontColor }}
                   >
                     {isFetchingLocation
-                      ? "Detecting location..."
+                      ? t('header.detectingLocation')
                       : currentLocation.name}
                   </div>
                   <ChevronDownIcon
@@ -425,7 +423,7 @@ const MainLocationHeader = ({
                 <SearchIcon sx={{ color: "#000000", fontSize: 20 }} />
                 <input
                   type="text"
-                  placeholder={searchPlaceholder || "Search Products..."}
+                  placeholder={searchPlaceholder || t('header.searchProducts')}
                   readOnly
                   className="flex-1 bg-transparent border-none outline-none pl-2 text-slate-800 font-semibold placeholder:text-black text-[15px] cursor-pointer"
                 />
@@ -435,7 +433,7 @@ const MainLocationHeader = ({
                     navigate("/search?voice=true");
                   }}
                   className="flex items-center gap-2 border-l border-slate-100 pl-3 cursor-pointer hover:scale-110 active:scale-95 transition-transform"
-                  title="Voice Search"
+                  title={t('header.voiceSearch')}
                 >
                   <MicIcon sx={{ color: "#000000", fontSize: 20 }} />
                 </div>
@@ -506,7 +504,7 @@ const MainLocationHeader = ({
                       className="text-base font-bold tracking-tight leading-none"
                       style={{ color: headerFontColor }}
                     >
-                      {currentLocation.time}
+                      {translateEta(currentLocation.time)}
                     </span>
                   </div>
                   <button
@@ -523,7 +521,7 @@ const MainLocationHeader = ({
                       style={{ color: headerFontColor }}
                     >
                       {isFetchingLocation
-                        ? "Detecting location..."
+                        ? t('header.detectingLocation')
                         : currentLocation.name}
                     </div>
                     <ChevronDownIcon
@@ -545,7 +543,7 @@ const MainLocationHeader = ({
               <SearchIcon sx={{ color: "#000000", fontSize: 18 }} />
               <input
                 type="text"
-                placeholder={searchPlaceholder || "Search Products..."}
+                placeholder={searchPlaceholder || t('header.searchProducts')}
                 readOnly
                 className="flex-1 bg-transparent border-none outline-none pl-2 text-slate-800 font-semibold placeholder:text-black text-[14px] cursor-pointer"
               />
@@ -555,7 +553,7 @@ const MainLocationHeader = ({
                   navigate("/search?voice=true");
                 }}
                 className="flex items-center gap-2 border-l border-slate-100 pl-2.5 cursor-pointer hover:scale-110 active:scale-95 transition-transform"
-                title="Voice Search"
+                title={t('header.voiceSearch')}
               >
                 <MicIcon sx={{ color: "#000000", fontSize: 18 }} />
               </div>

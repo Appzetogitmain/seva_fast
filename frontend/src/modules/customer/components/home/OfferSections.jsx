@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import ProductCard from "../shared/ProductCard";
@@ -10,6 +11,7 @@ import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
 import { mapProductForCustomerListing } from "../../utils/productPricing";
 
 const OfferSections = ({ sections }) => {
+  const { t } = useTranslation('customer');
   if (!sections || sections.length === 0) return null;
 
   const validSections = [...sections]
@@ -53,7 +55,7 @@ const OfferSections = ({ sections }) => {
                 </div>
                 <div className="flex-1 pr-4">
                   <p className="text-[10px] md:text-[11px] font-bold uppercase tracking-wider text-black/60 mb-1">
-                    Trending right now
+                    {t('home.trendingNow')}
                   </p>
                   <h3 className="text-xl md:text-2xl font-bold tracking-tight leading-tight drop-shadow-sm">
                     {section.title}
@@ -89,7 +91,7 @@ const OfferSections = ({ sections }) => {
                   {sectionProducts.length > 0 && (
                     <div className="absolute top-1 left-1 px-2 py-0.5 rounded-full bg-black/70 text-[9px] font-semibold text-white/90 tracking-wide flex items-center gap-1">
                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-400" />
-                      {sectionProducts.length} items
+                      {t('home.itemsCount', { count: sectionProducts.length })}
                     </div>
                   )}
 
@@ -106,7 +108,7 @@ const OfferSections = ({ sections }) => {
                   {sectionProducts.length === 0 ? (
                     <div className="w-full py-10 flex flex-col items-center justify-center text-center">
                       <p className="text-sm md:text-base text-slate-400 font-bold">
-                        Looking for the best items in this category...
+                        {t('home.lookingForItems')}
                       </p>
                     </div>
                   ) : (

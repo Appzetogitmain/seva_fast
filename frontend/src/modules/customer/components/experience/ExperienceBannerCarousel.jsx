@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { motion, useMotionValue } from "framer-motion";
@@ -18,6 +19,7 @@ const BANNER_TRANSFORM = "f_auto,q_auto,c_limit";
 const BANNER_SRCSET_WIDTHS = [{ w: 480 }, { w: 828 }, { w: 1280 }, { w: 1920 }];
 
 const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap = 0, edgeToEdge = false }) => {
+  const { t } = useTranslation('customer');
   const navigate = useNavigate();
   if (!items || !items.length) return null;
 
@@ -172,7 +174,7 @@ const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap 
               onClick={hasLink ? (e) => handleBannerClick(banner, e) : undefined}
               role={hasLink ? "button" : undefined}
               tabIndex={hasLink ? 0 : undefined}
-              title={banner.title || (hasLink ? "Click to view" : undefined)}
+              title={banner.title || (hasLink ? t('home.clickToView') : undefined)}
               onKeyDown={
                 hasLink
                   ? (e) => {

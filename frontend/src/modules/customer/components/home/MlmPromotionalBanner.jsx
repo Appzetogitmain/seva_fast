@@ -1,4 +1,6 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
+import { translateIfDefault } from '@core/i18n';
 import { useNavigate } from "react-router-dom";
 import {
   Sparkles,
@@ -49,6 +51,7 @@ const resolveStepIcon = (iconType) => {
 const MlmPromotionalBanner = ({ className = "" }) => {
   const navigate = useNavigate();
   const { settings } = useSettings();
+  const { t } = useTranslation('customer');
 
   const mlmConfig = settings?.mlmPromo || {
     enabled: true,
@@ -110,7 +113,7 @@ const MlmPromotionalBanner = ({ className = "" }) => {
           <div className="relative w-full">
             <img
               src={mlmConfig.customImageUrl}
-              alt={mlmConfig.title || "MLM Promotion"}
+              alt={mlmConfig.title || t('home.mlm.alt')}
               className="w-full h-auto object-cover max-h-[260px] md:max-h-[300px]"
             />
             <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6 z-10">
@@ -118,7 +121,7 @@ const MlmPromotionalBanner = ({ className = "" }) => {
                 onClick={handleCtaClick}
                 className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs md:text-sm rounded-full shadow-lg hover:shadow-orange-500/40 transition-all flex items-center gap-1.5 active:scale-95"
               >
-                {mlmConfig.ctaText || "JOIN NOW"}
+                {translateIfDefault(t, mlmConfig.ctaText, 'home.mlm.cta')}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -131,16 +134,16 @@ const MlmPromotionalBanner = ({ className = "" }) => {
               {mlmConfig.badgeText && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/25 text-orange-700 text-[10px] md:text-xs font-black tracking-wider uppercase backdrop-blur-sm">
                   <Sparkles className="w-3.5 h-3.5 text-orange-500 fill-orange-500" />
-                  {mlmConfig.badgeText}
+                  {translateIfDefault(t, mlmConfig.badgeText, 'home.mlm.badge')}
                 </div>
               )}
 
               <h2 className="text-lg sm:text-xl md:text-2xl lg:text-[26px] font-black text-slate-900 leading-[1.2] tracking-tight uppercase">
-                {mlmConfig.title || "JOIN SEVAFAST MULTI LEVEL MARKETING"}
+                {translateIfDefault(t, mlmConfig.title, 'home.mlm.title')}
               </h2>
 
               <p className="text-xs sm:text-sm md:text-[15px] font-semibold text-slate-700 leading-snug">
-                {mlmConfig.subtitle || "Earn More, Refer More, Grow Your Network!"}
+                {translateIfDefault(t, mlmConfig.subtitle, 'home.mlm.subtitle')}
               </p>
 
               <div className="pt-1.5 flex items-center justify-center lg:justify-start">
@@ -148,7 +151,7 @@ const MlmPromotionalBanner = ({ className = "" }) => {
                   onClick={handleCtaClick}
                   className="px-6 py-2.5 md:px-7 md:py-3 bg-gradient-to-r from-[#FF6B00] via-[#FF7A00] to-[#FF9E00] hover:from-[#EA580C] hover:to-[#F59E0B] text-white font-extrabold text-xs sm:text-sm tracking-wider uppercase rounded-xl md:rounded-2xl shadow-[0_6px_20px_rgba(255,107,0,0.35)] group-hover:shadow-[0_8px_25px_rgba(255,107,0,0.5)] transition-all duration-300 flex items-center gap-2 active:scale-95 cursor-pointer"
                 >
-                  <span>{mlmConfig.ctaText || "JOIN NOW"}</span>
+                  <span>{translateIfDefault(t, mlmConfig.ctaText, 'home.mlm.cta')}</span>
                   <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
                 </button>
               </div>
@@ -172,13 +175,13 @@ const MlmPromotionalBanner = ({ className = "" }) => {
 
                     {/* Step Title */}
                     <h4 className="text-[11px] sm:text-xs md:text-[13px] font-black text-slate-800 leading-tight">
-                      {step.title}
+                      {translateIfDefault(t, step.title, `home.mlm.steps.${idx}.title`)}
                     </h4>
 
                     {/* Step Subtitle (optional) */}
                     {step.subtitle && (
                       <p className="text-[9px] sm:text-[10px] md:text-[11px] font-medium text-slate-500 mt-0.5 hidden sm:block line-clamp-1">
-                        {step.subtitle}
+                        {translateIfDefault(t, step.subtitle, `home.mlm.steps.${idx}.subtitle`)}
                       </p>
                     )}
                   </div>

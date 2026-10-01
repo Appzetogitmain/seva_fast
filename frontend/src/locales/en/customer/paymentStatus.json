@@ -1,0 +1,23 @@
+{
+  "verifying": "Verifying Payment",
+  "verifyingSub": "Please wait while we confirm your transaction with Razorpay. Do not refresh or go back.",
+  "confirmed": "Order Confirmed!",
+  "successful": "Payment Successful",
+  "orderId": "Order ID",
+  "redirecting": "Redirecting to your order details in 4 seconds...",
+  "goToOrders": "Go to My Orders",
+  "failed": "Payment Failed",
+  "rejected": "Transaction Rejected",
+  "failedSub": "Oops! Something went wrong with the transaction. Your money (if debited) will be refunded automatically by Razorpay.",
+  "tryAgain": "Try Again",
+  "pending": "Payment Pending",
+  "awaiting": "Awaiting Confirmation",
+  "pendingSub": "We haven't received confirmation from Razorpay yet. This sometimes happens due to bank delays. Please check your order history in a few minutes.",
+  "viewHistory": "View Order History",
+  "errors": {
+    "missingOrder": "Missing Order ID",
+    "network": "Cannot reach the backend. Please check your internet connection and try again.",
+    "session": "Your session is missing or expired. Please log in again and check the order from My Orders.",
+    "invalidRef": "Invalid payment reference"
+  }
+}

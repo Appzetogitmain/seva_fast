@@ -1,0 +1,25 @@
+{
+  "ticketRaised": "Ticket raised successfully",
+  "ticketFailed": "Failed to create ticket",
+  "instant": "Instant Support",
+  "raiseTicket": "Raise Ticket",
+  "formalRequest": "Formal Request",
+  "notAvailable": "Not available",
+  "phoneCopied": "Phone number copied!",
+  "copyFailed": "Copy failed, number: {{phone}}",
+  "emailUs": "Email Us",
+  "faq": "Frequently Asked Questions",
+  "noFaq": "No FAQs available right now.",
+  "describe": "Describe your issue in detail",
+  "subject": "Subject",
+  "subjectPlaceholder": "What's the issue about?",
+  "priority": {
+    "low": "low",
+    "medium": "medium",
+    "high": "high"
+  },
+  "description": "Description",
+  "descriptionPlaceholder": "Please explain the issue clearly...",
+  "submitting": "SUBMITTING...",
+  "submit": "SUBMIT TICKET"
+}

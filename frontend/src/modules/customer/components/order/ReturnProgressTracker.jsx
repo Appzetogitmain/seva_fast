@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from 'react-i18next';
 import { motion } from "framer-motion";
 import {
   CheckCircle2,
@@ -11,12 +12,12 @@ import {
 } from "lucide-react";
 
 const RETURN_STEPS = [
-  { id: "return_requested", label: "Return Requested", icon: ClipboardCheck },
-  { id: "return_approved", label: "Return Approved", icon: CheckCircle2 },
-  { id: "return_pickup_assigned", label: "Pickup Assigned", icon: Truck },
-  { id: "return_in_transit", label: "In Transit", icon: Truck },
-  { id: "returned", label: "Picked Up", icon: PackageCheck },
-  { id: "refund_completed", label: "Refund Completed", icon: Wallet },
+  { id: "return_requested", labelKey: 'orderStatus.return_requested', icon: ClipboardCheck },
+  { id: "return_approved", labelKey: 'orderStatus.return_approved', icon: CheckCircle2 },
+  { id: "return_pickup_assigned", labelKey: 'orderStatus.return_pickup_assigned', icon: Truck },
+  { id: "return_in_transit", labelKey: 'orderDetail.inTransit', icon: Truck },
+  { id: "returned", labelKey: 'tracking.pickedUp', icon: PackageCheck },
+  { id: "refund_completed", labelKey: 'tracking.refundCompleted', icon: Wallet },
 ];
 
 const STATUS_INDEX = RETURN_STEPS.reduce((acc, step, idx) => {
@@ -25,6 +26,7 @@ const STATUS_INDEX = RETURN_STEPS.reduce((acc, step, idx) => {
 }, {});
 
 const ReturnProgressTracker = ({ returnStatus }) => {
+  const { t } = useTranslation('customer');
   const status = String(returnStatus || "").trim();
   if (!status || status === "none") return null;
 
@@ -33,15 +35,15 @@ const ReturnProgressTracker = ({ returnStatus }) => {
     typeof STATUS_INDEX[status] === "number" ? STATUS_INDEX[status] : 0;
 
   const rejectedSteps = [
-    { id: "return_requested", label: "Return Requested", icon: ClipboardCheck },
-    { id: "return_rejected", label: "Return Rejected", icon: XCircle },
+    { id: "return_requested", labelKey: 'orderStatus.return_requested', icon: ClipboardCheck },
+    { id: "return_rejected", labelKey: 'tracking.returnRejected', icon: XCircle },
   ];
 
   const steps = isRejected ? rejectedSteps : RETURN_STEPS;
 
   return (
     <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-      <h4 className="text-sm font-bold text-slate-800 mb-4">Return Status</h4>
+      <h4 className="text-sm font-bold text-slate-800 mb-4">{t('tracking.returnStatus')}</h4>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -94,7 +96,7 @@ const ReturnProgressTracker = ({ returnStatus }) => {
                             : "text-slate-400"
                     }`}
                   >
-                    {step.label}
+                    {t(step.labelKey)}
                   </p>
                 </div>
               </div>

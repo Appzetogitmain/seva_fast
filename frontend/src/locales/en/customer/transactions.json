@@ -1,0 +1,9 @@
+{
+  "basedOn": "Based on your recent orders",
+  "loading": "Loading transactions...",
+  "emptyTitle": "No transactions yet",
+  "emptyMessage": "Place an order to see your payment history here.",
+  "refund": "Refund",
+  "orderPayment": "Order Payment",
+  "online": "Online"
+}

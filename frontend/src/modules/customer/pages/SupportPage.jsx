@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { MessageCircle, Phone, Mail, ChevronDown, ChevronUp, FileText, ChevronLeft, PlusCircle, X, Send } from 'lucide-react';
 import { useToast } from '@shared/components/ui/Toast';
@@ -13,6 +14,7 @@ const FAQ_CACHE_KEY = 'customer_faqs_cache_v1';
 const FAQ_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const SupportPage = () => {
+    const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const location = useLocation();
     const { showToast } = useToast();
@@ -93,12 +95,12 @@ const SupportPage = () => {
                 userType: 'Customer'
             });
             if (res.data.success) {
-                showToast("Ticket raised successfully", "success");
+                showToast(t('support.ticketRaised'), "success");
                 setIsTicketModalOpen(false);
                 setTicketData({ subject: '', description: '', priority: 'medium' });
             }
         } catch (error) {
-            showToast(error.response?.data?.message || "Failed to create ticket", "error");
+            showToast(error.response?.data?.message || t('support.ticketFailed'), "error");
         } finally {
             setTicketLoading(false);
         }
@@ -113,23 +115,23 @@ const SupportPage = () => {
                 >
                     <ChevronLeft size={22} className="text-slate-800" />
                 </button>
-                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Help & Support</h1>
+                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">{t('profile.menu.support')}</h1>
             </div>
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-5">
                 {/* Contact Channels */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <ContactCard icon={MessageCircle} label="Chat Us" sub="Instant Support" to="/chat" />
+                    <ContactCard icon={MessageCircle} label={t('help.chatUs')} sub={t('support.instant')} to="/chat" />
                     <ContactCard
                         icon={PlusCircle}
-                        label="Raise Ticket"
-                        sub="Formal Request"
+                        label={t('support.raiseTicket')}
+                        sub={t('support.formalRequest')}
                         onClick={() => setIsTicketModalOpen(true)}
                     />
                     <ContactCard
                         icon={Phone}
-                        label="Call Us"
-                        sub={supportPhone || 'Not available'}
+                        label={t('help.callUs')}
+                        sub={supportPhone || t('support.notAvailable')}
                         onClick={() => {
                             if (!supportPhone) return;
                             const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
@@ -137,14 +139,14 @@ const SupportPage = () => {
                                 window.location.href = `tel:${supportPhone}`;
                             } else {
                                 navigator.clipboard.writeText(supportPhone)
-                                    .then(() => showToast('Phone number copied!', 'success'))
-                                    .catch(() => showToast('Copy failed, number: ' + supportPhone, 'info'));
+                                    .then(() => showToast(t('support.phoneCopied'), 'success'))
+                                    .catch(() => showToast(t('support.copyFailed', { phone: supportPhone }), 'info'));
                             }
                         }}
                     />
                     <ContactCard
                         icon={Mail}
-                        label="Email Us"
+                        label={t('support.emailUs')}
                         sub={supportEmailShort}
                         href={supportEmail ? `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(supportEmail)}` : undefined}
                         newTab
@@ -153,7 +155,7 @@ const SupportPage = () => {
 
                 {/* FAQ Section */}
                 <div>
-                    <h2 className="text-base font-semibold text-slate-800 mb-3 px-1">Frequently Asked Questions</h2>
+                    <h2 className="text-base font-semibold text-slate-800 mb-3 px-1">{t('support.faq')}</h2>
                     <div className="space-y-3">
                         {faqs.length > 0 ? (
                             faqs.map((faq) => (
@@ -165,7 +167,7 @@ const SupportPage = () => {
                             ))
                         ) : (
                             <div className="bg-white rounded-2xl shadow-[0_4px_10px_rgb(0,0,0,0.02)] border border-slate-100 px-5 py-4 text-sm text-slate-400 text-center">
-                                No FAQs available right now.
+                                {t('support.noFaq')}
                             </div>
                         )}
                     </div>
@@ -203,8 +205,8 @@ const SupportPage = () => {
                             <div className="p-8">
                                 <div className="flex items-center justify-between mb-8">
                                     <div>
-                                        <h2 className="text-2xl font-black text-slate-800">Raise a Ticket</h2>
-                                        <p className="text-sm text-slate-500 font-medium">Describe your issue in detail</p>
+                                        <h2 className="text-2xl font-black text-slate-800">{t('help.raiseTicket')}</h2>
+                                        <p className="text-sm text-slate-500 font-medium">{t('support.describe')}</p>
                                     </div>
                                     <button
                                         onClick={() => setIsTicketModalOpen(false)}
@@ -216,13 +218,13 @@ const SupportPage = () => {
 
                                 <form onSubmit={handleTicketSubmit} className="space-y-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Subject</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('support.subject')}</label>
                                         <input
                                             type="text"
                                             required
                                             value={ticketData.subject}
                                             onChange={(e) => setTicketData({ ...ticketData, subject: e.target.value })}
-                                            placeholder="What's the issue about?"
+                                            placeholder={t('support.subjectPlaceholder')}
                                             className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all"
                                         />
                                     </div>
@@ -240,18 +242,18 @@ const SupportPage = () => {
                                                         : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
                                                 )}
                                             >
-                                                {p}
+                                                {t(`support.priority.${p}`)}
                                             </button>
                                         ))}
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Description</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('support.description')}</label>
                                         <textarea
                                             required
                                             value={ticketData.description}
                                             onChange={(e) => setTicketData({ ...ticketData, description: e.target.value })}
-                                            placeholder="Please explain the issue clearly..."
+                                            placeholder={t('support.descriptionPlaceholder')}
                                             className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold min-h-[150px] outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all"
                                         />
                                     </div>
@@ -264,11 +266,11 @@ const SupportPage = () => {
                                         {ticketLoading ? (
                                             <div className="flex items-center gap-2 text-center w-full justify-center">
                                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                SUBMITTING...
+                                                {t('support.submitting')}
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-2 text-center w-full justify-center">
-                                                <Send size={20} /> SUBMIT TICKET
+                                                <Send size={20} /> {t('support.submit')}
                                             </div>
                                         )}
                                     </Button>

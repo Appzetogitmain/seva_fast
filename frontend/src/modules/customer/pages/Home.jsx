@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from "react-router-dom";
 import { useInViewAnimation } from "@/core/hooks/useInViewAnimation";
 import { useSettings } from "@/core/context/SettingsContext";
@@ -201,6 +202,7 @@ const getCachedHomePageData = (location) =>
   homePageDataCache.get(getHomePageDataCacheKey(location)) || null;
 
 const Home = () => {
+  const { t } = useTranslation('customer');
   const { scrollY } = useScroll();
   const { isOpen: isProductDetailOpen } = useProductDetail();
   const { currentLocation } = useLocation();
@@ -573,10 +575,10 @@ const Home = () => {
           <button
             onClick={() => setIsCustomOrderModalOpen(true)}
             className={`fixed ${cartCount > 0 ? 'bottom-[140px]' : 'bottom-20'} left-4 md:bottom-8 md:left-8 z-[100] bg-indigo-600 border-2 border-white text-white px-4 py-3 md:px-5 md:py-3.5 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.3)] hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 group`}
-            title="Send Custom Photo Order"
+            title={t('home.photoOrderTitle')}
           >
             <Camera size={22} className="group-hover:animate-pulse" />
-            <span className="text-xs md:text-sm font-bold tracking-wide">Photo Order</span>
+            <span className="text-xs md:text-sm font-bold tracking-wide">{t('home.photoOrder')}</span>
           </button>
         </>
       )}
