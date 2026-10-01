@@ -958,7 +958,7 @@ const SellerProfile = () => {
         <span className="text-slate-300">•</span>
         <button
           type="button"
-          onClick={() => navigate("/privacy?for=seller")}
+          onClick={() => navigate("/seller/privacy")}
           className="hover:text-slate-900 transition-colors"
         >
           Privacy Policy

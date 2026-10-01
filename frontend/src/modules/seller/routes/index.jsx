@@ -47,6 +47,7 @@ const CodCash = React.lazy(() => import("../pages/CodCash"));
 
 const ProductDemands = React.lazy(() => import("../pages/ProductDemands"));
 const Splash = React.lazy(() => import("../pages/Splash"));
+const Privacy = React.lazy(() => import("../pages/Privacy"));
 
 const navItems = [
   { label: "Dashboard", path: "/seller", icon: HiOutlineSquares2X2, end: true },
@@ -196,6 +197,7 @@ const SellerRoutes = () => {
         <Route path="/plans" element={<SellerPlans />} />
         <Route path="/promotions" element={<StorePromotions />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </DashboardLayout>

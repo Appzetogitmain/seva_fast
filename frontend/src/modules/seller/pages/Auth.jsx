@@ -1734,13 +1734,30 @@ const Auth = () => {
       </motion.div>
 
       {/* Bottom Tagline & Copyright */}
-      <div className="relative z-10 flex flex-col items-center gap-1.5 text-center px-4">
-        <span className="flex items-center gap-4 text-slate-300 text-[10px] font-black uppercase tracking-[6px]">
+      <div className="relative z-10 flex flex-col items-center gap-2 text-center px-4 mt-2">
+        <span className="flex items-center gap-4 text-slate-400 text-[10px] font-black uppercase tracking-[6px]">
           Empowering Business Digitalization
         </span>
-        <span className="text-slate-300 text-[10px] font-bold tracking-widest">
+        <span className="text-slate-400 text-[10px] font-bold tracking-widest">
           Made with Sevafast
         </span>
+        <div className="flex items-center justify-center gap-4 text-xs font-bold text-slate-400 mt-1">
+          <button
+            type="button"
+            onClick={() => navigate("/terms?for=seller")}
+            className="hover:text-slate-600 transition-colors"
+          >
+            Terms &amp; Conditions
+          </button>
+          <span className="text-slate-300">•</span>
+          <button
+            type="button"
+            onClick={() => navigate("/privacy?for=seller")}
+            className="hover:text-slate-600 transition-colors"
+          >
+            Privacy Policy
+          </button>
+        </div>
       </div>
 
       {isMapOpen && (
