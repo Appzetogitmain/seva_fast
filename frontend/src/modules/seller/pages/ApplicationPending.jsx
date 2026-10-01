@@ -74,10 +74,6 @@ const ApplicationPending = () => {
     }, 400);
   };
 
-  // If already approved on mount or state change, immediately redirect to seller dashboard
-  if (!isLoading && isAuthenticated && role === "seller" && isApproved) {
-    return <Navigate to="/seller" replace />;
-  }
 
   // 1. Real-time WebSocket listener for immediate approval without reload
   useEffect(() => {
@@ -243,6 +239,11 @@ const ApplicationPending = () => {
   const isRejected = currentStatus === "rejected";
   const isStatusUnknown = !currentStatus;
   const rejectionReason = location.state?.rejectionReason || user?.rejectionReason || "";
+
+  // If already approved on mount or state change, immediately redirect to seller dashboard
+  if (!isLoading && isAuthenticated && role === "seller" && isApproved) {
+    return <Navigate to="/seller" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 relative overflow-hidden font-['Outfit']">

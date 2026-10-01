@@ -231,19 +231,19 @@ export const processMonthlyTurnoverCommissions = async () => {
             
             const orders = await Order.find({
                 seller: seller._id,
-                status: "Delivered",
+                $or: [{ workflowStatus: "DELIVERED" }, { status: "delivered" }],
                 createdAt: { $gte: startOfPrevMonth, $lte: endOfPrevMonth }
             }).lean();
-            
-            const totalTurnover = orders.reduce((sum, order) => {
-                return sum + (order.totalAmount || 0);
-            }, 0);
-            
+
+            const totalTurnover = roundCurrency(orders.reduce((sum, order) => {
+                return sum + Number(order.pricing?.total || 0);
+            }, 0));
+
             if (totalTurnover <= 0) continue;
-            
-            const commissionAmount = (totalTurnover * commissionPercent) / 100;
-            
-            user.walletBalance = (user.walletBalance || 0) + commissionAmount;
+
+            const commissionAmount = roundCurrency((totalTurnover * commissionPercent) / 100);
+
+            user.walletBalance = roundCurrency((user.walletBalance || 0) + commissionAmount);
             await user.save();
             
             await Transaction.create({
@@ -278,10 +278,11 @@ export const processOrderLevelCommissions = async (order) => {
 
     // RULE: Only process commission for the customer's FIRST delivered order.
     try {
+        // workflowStatus is stored upper-case ("DELIVERED"); legacy `status` is lower-case.
         const previousDeliveredOrdersCount = await Order.countDocuments({
             customer: order.customer,
-            workflowStatus: 'delivered',
-            _id: { $ne: order._id }
+            _id: { $ne: order._id },
+            $or: [{ workflowStatus: 'DELIVERED' }, { status: 'delivered' }],
         });
         if (previousDeliveredOrdersCount > 0) {
             console.log(`[CommissionService] Skipping level commission: Order ${order._id} is not the first order for customer ${order.customer}`);
@@ -344,19 +345,23 @@ export const processOrderLevelCommissions = async (order) => {
                 commissionPercent = defaultCommissions[currentLevel - 1] || 0;
             }
             
-            if (commissionPercent && typeof commissionPercent === 'number' && commissionPercent > 0) {
-                    let commissionAmount = (orderAmount * commissionPercent) / 100;
-                    
-                    referrer.walletBalance = (referrer.walletBalance || 0) + commissionAmount;
+            const txReference = `LVL-COMM-${orderIdString}-${currentLevel}`;
+            const alreadyCredited =
+                commissionPercent > 0 && (await Transaction.exists({ reference: txReference }));
+
+            if (!alreadyCredited && commissionPercent && typeof commissionPercent === 'number' && commissionPercent > 0) {
+                    let commissionAmount = roundCurrency((orderAmount * commissionPercent) / 100);
+
+                    referrer.walletBalance = roundCurrency((referrer.walletBalance || 0) + commissionAmount);
                     await referrer.save();
-                    
+
                     await Transaction.create({
                         user: referrer._id,
                         userModel: "User",
                         type: "Commission",
                         amount: commissionAmount,
                         status: "Settled",
-                        reference: `LVL-COMM-${orderIdString}-${currentLevel}`,
+                        reference: txReference,
                         meta: {
                             orderId: order._id,
                             level: currentLevel,

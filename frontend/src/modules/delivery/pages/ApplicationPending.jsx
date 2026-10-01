@@ -23,10 +23,6 @@ const ApplicationPending = () => {
       ? "approved"
       : location.state?.applicationStatus || "pending";
 
-  // If already verified, immediately redirect to dashboard
-  if (!isLoading && isAuthenticated && role === "delivery" && isVerified) {
-    return <Navigate to="/delivery/dashboard" replace />;
-  }
 
   const isRejected = applicationStatus === "rejected";
 
@@ -99,6 +95,11 @@ const ApplicationPending = () => {
       setIsChecking(false);
     }
   };
+
+  // If already verified, immediately redirect to dashboard
+  if (!isLoading && isAuthenticated && role === "delivery" && isVerified) {
+    return <Navigate to="/delivery/dashboard" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-[#0F172A] relative overflow-hidden font-['Outfit']">
