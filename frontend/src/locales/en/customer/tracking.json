@@ -21,7 +21,7 @@
   "mapCancelledTitle": "Order cancelled",
   "mapCancelledMessage": "This order is closed. If payment was reserved, any applicable refund follows your store policy.",
   "waitingSeller": "Waiting for seller to accept",
-  "waitingSellerMessage": "The store has up to 60 seconds to confirm. If they don't, your order will be cancelled automatically.",
+  "waitingSellerMessage": "The store will confirm your order shortly. If it takes longer than usual, we'll let you know and you can cancel it from this page.",
   "searching": "Searching for delivery partner",
   "searchingMessage": "Hang tight! We're finding the best rider near you.",
   "packedAssigning": "Order Packed · Assigning Rider",

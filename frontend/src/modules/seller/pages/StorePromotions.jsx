@@ -109,7 +109,7 @@ const StorePromotions = () => {
             }
 
             const options = {
-                key: data.razorpayKey || process.env.REACT_APP_RAZORPAY_KEY_ID,
+                key: data.razorpayKey || import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount: data.amount,
                 currency: data.currency || "INR",
                 name: "SevaFast Platform",

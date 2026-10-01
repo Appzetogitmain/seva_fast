@@ -18,10 +18,9 @@ const BANNER_CHUNK_SIZE = 20;
 const BANNER_TRANSFORM = "f_auto,q_auto,c_limit";
 const BANNER_SRCSET_WIDTHS = [{ w: 480 }, { w: 828 }, { w: 1280 }, { w: 1920 }];
 
-const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap = 0, edgeToEdge = false }) => {
+const ExperienceBannerCarouselInner = ({ section, items, fullWidth = false, slideGap = 0, edgeToEdge = false }) => {
   const { t } = useTranslation('customer');
   const navigate = useNavigate();
-  if (!items || !items.length) return null;
 
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [visibleCount, setVisibleCount] = React.useState(() =>
@@ -250,6 +249,9 @@ const ExperienceBannerCarousel = ({ section, items, fullWidth = false, slideGap 
     </div>
   );
 };
+
+// Hooks above must run on every render, so the empty case is handled out here.
+const ExperienceBannerCarousel = (props) => (!props.items?.length ? null : <ExperienceBannerCarouselInner {...props} />);
 
 export default ExperienceBannerCarousel;
 

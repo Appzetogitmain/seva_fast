@@ -4,10 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { ExternalLink, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const PlatformBannerSlider = ({ ads = [] }) => {
+const PlatformBannerSliderInner = ({ ads = [] }) => {
   const { t } = useTranslation('customer');
   const navigate = useNavigate();
-  if (!ads || ads.length === 0) return null;
 
   const [isMuted, setIsMuted] = useState(true);
   const videoRefs = useRef({});
@@ -145,5 +144,8 @@ const PlatformBannerSlider = ({ ads = [] }) => {
     </div>
   );
 };
+
+// Hooks above must run on every render, so the empty case is handled out here.
+const PlatformBannerSlider = (props) => (!props.ads?.length ? null : <PlatformBannerSliderInner {...props} />);
 
 export default PlatformBannerSlider;

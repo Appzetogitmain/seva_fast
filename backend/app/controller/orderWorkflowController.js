@@ -232,13 +232,15 @@ export const getOrderRoute = async (req, res) => {
 export const requestReturnPickupOtp = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const result = await generateReturnPickupOtp(orderId);
+    const result = await generateReturnPickupOtp(orderId, req.user);
     if (!result.success) {
       return handleResponse(res, 400, result.error);
     }
 
     // ── Emit OTP to customer via Socket.IO/SMS ──────────────────────────────────
     try {
+      const order = await Order.findOne({ orderId }).select("customer address").lean();
+      if (!order) throw new Error(`Order ${orderId} not found for OTP notification`);
       const customerId = order.customer?.toString();
       if (customerId) {
         emitToCustomer(customerId, {
