@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
     User, MapPin, Package, CreditCard, Wallet, ChevronRight, ChevronDown,
     LogOut, ShieldCheck, Heart, HelpCircle, Info, Edit2, ChevronLeft, Bell,
-    Share2, Copy, Sparkles, Camera, X, Users, Briefcase, FileText, History
+    Share2, Copy, Sparkles, Camera, X, Users, Briefcase, FileText, History, Store
 } from 'lucide-react';
 import { useAuth } from '@core/context/AuthContext';
 import { useSettings } from '@core/context/SettingsContext';
@@ -19,7 +19,7 @@ import {
 } from '@core/firebase/pushClient';
 import { formatDate } from '@shared/utils/formatDate';
 import LanguageSwitcher from '@shared/components/LanguageSwitcher';
-import { buildAppReferUrl, buildPlayStoreReferUrl } from '../utils/referralLinks';
+import { buildAppReferUrl, buildPlayStoreReferUrl, buildSellerReferUrl } from '../utils/referralLinks';
 import { CustomPhotoOrderModal } from '../components/shared/CustomPhotoOrderModal';
 import { CustomerNotificationsModal } from '../components/shared/CustomerNotificationsModal';
 
@@ -248,6 +248,7 @@ const ProfilePage = () => {
         ? buildAppReferUrl(siteOrigin, referralCode)
         : buildPlayStoreReferUrl(settings?.playStoreLink);
     const cardReferUrl = siteReferUrl;
+    const sellerReferUrl = buildSellerReferUrl(siteOrigin, referralCode);
     const referrerName = getReferrerDisplayName(user?.referredBy);
     const logoUrl = settings?.logoUrl || '/seva-fast-logo.png';
     const supportEmail = settings?.supportEmail || 'sevafast2@gmail.com';
@@ -596,6 +597,54 @@ const ProfilePage = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Refer a Seller: opens/installs the seller app with this customer's code pre-filled */}
+                {referralCode ? (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="shrink-0 rounded-lg bg-white p-1 ring-1 ring-slate-200">
+                                <img
+                                    src={qrSrc(sellerReferUrl, 140)}
+                                    alt="Seller referral QR"
+                                    className="h-16 w-16 object-contain"
+                                    crossOrigin="anonymous"
+                                />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                    <Store size={14} className="shrink-0 text-violet-600" />
+                                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">
+                                        {t('profile.sellerRefer.title')}
+                                    </h3>
+                                </div>
+                                <p className="mt-1 text-[11px] font-medium leading-snug text-slate-500">
+                                    {t('profile.sellerRefer.subtitle')}
+                                </p>
+                                <div className="mt-2 flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleShare(sellerReferUrl, t('profile.sellerRefer.shareLabel'))}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"
+                                    >
+                                        <Share2 size={12} />
+                                        {t('profile.sellerRefer.share')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(sellerReferUrl);
+                                            toast.success(t('profile.share.linkCopied'));
+                                        }}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-700 transition hover:bg-slate-200 active:scale-95"
+                                    >
+                                        <Copy size={12} />
+                                        {t('profile.sellerRefer.copy')}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
 
                 {/* Monthly Referral Target Progress Widget */}
                 {targetDetails && targetDetails.monthlyTarget ? (

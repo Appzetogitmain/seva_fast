@@ -39,6 +39,13 @@
     "photo": "photo",
     "noQr": "Save your URL to create a QR code"
   },
+  "sellerRefer": {
+    "title": "Refer a Seller",
+    "subtitle": "Share this link with shop owners. Your code is applied automatically when they sign up on the seller app.",
+    "share": "Share",
+    "copy": "Copy link",
+    "shareLabel": "Seller signup"
+  },
   "target": {
     "title": "Monthly Referral Target",
     "month": "Month: {{month}}",

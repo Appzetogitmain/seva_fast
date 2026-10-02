@@ -110,6 +110,7 @@ const settingSchema = new mongoose.Schema(
 
         // Apps
         playStoreLink: String,
+        sellerPlayStoreLink: String,
         appStoreLink: String,
 
         // SEO

@@ -76,6 +76,7 @@ const AdminSettings = () => {
         linkedin: '',
         youtube: '',
         playStoreLink: '',
+        sellerPlayStoreLink: '',
         appStoreLink: '',
         metaTitle: '',
         metaDescription: '',
@@ -1023,6 +1024,18 @@ const AdminSettings = () => {
                                                 type="url"
                                                 value={settings.playStoreLink}
                                                 onChange={(e) => handleInputChange('playStoreLink', e.target.value)}
+                                                className="w-full pl-12 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seller App Play Store Link (Android)</label>
+                                        <div className="relative group">
+                                            <Smartphone className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-violet-600" />
+                                            <input
+                                                type="url"
+                                                value={settings.sellerPlayStoreLink}
+                                                onChange={(e) => handleInputChange('sellerPlayStoreLink', e.target.value)}
                                                 className="w-full pl-12 pr-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
                                             />
                                         </div>

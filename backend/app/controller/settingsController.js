@@ -41,6 +41,7 @@ const ALLOWED_KEYS = [
   "linkedin",
   "youtube",
   "playStoreLink",
+  "sellerPlayStoreLink",
   "appStoreLink",
   "metaTitle",
   "metaDescription",
@@ -160,6 +161,7 @@ const updateSettingsSchema = Joi.object({
   linkedin: Joi.string().allow("").max(500),
   youtube: Joi.string().allow("").max(500),
   playStoreLink: Joi.string().allow("").max(500),
+  sellerPlayStoreLink: Joi.string().allow("").max(500),
   appStoreLink: Joi.string().allow("").max(500),
   metaTitle: Joi.string().allow("").max(200),
   metaDescription: Joi.string().allow("").max(500),
@@ -277,7 +279,7 @@ export const getPublicSettings = async (req, res) => {
       async () => {
         const existing = await Setting.findOne(filter)
           .select(
-            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled showQuickCategoriesSection deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo createdAt updatedAt",
+            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName playStoreLink sellerPlayStoreLink appStoreLink returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled showQuickCategoriesSection deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo createdAt updatedAt",
           )
           .lean();
         return existing || null;

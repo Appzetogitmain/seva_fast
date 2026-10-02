@@ -30,6 +30,31 @@ import Lottie from "lottie-react";
 import sellerAnimation from "../../../assets/INSTANT_6.json";
 import { sellerApi } from "../services/sellerApi";
 import MapPicker from "../../../shared/components/MapPicker";
+import { buildSellerPlayStoreReferUrl } from "../../customer/utils/referralLinks";
+
+// Referral code from a "refer a seller" link (?ref=) or pushed in by the seller Flutter
+// app from the Play Install Referrer. Kept in sessionStorage so it survives the
+// login/signup toggle and the multi-step form.
+const SELLER_REFERRAL_KEY = "seva_seller_referral_code";
+
+const getStoredSellerReferral = () => {
+  try {
+    return sessionStorage.getItem(SELLER_REFERRAL_KEY) || "";
+  } catch {
+    return "";
+  }
+};
+
+const storeSellerReferral = (code) => {
+  try {
+    if (code) sessionStorage.setItem(SELLER_REFERRAL_KEY, code);
+    else sessionStorage.removeItem(SELLER_REFERRAL_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+
+const normalizeReferral = (code) => String(code || "").trim().toUpperCase();
 
 const createInitialVerificationState = () => ({
   status: "idle",
@@ -67,6 +92,7 @@ const createInitialFormData = () => ({
   branch: "",
   accountNumber: "",
   ifscCode: "",
+  referralCode: getStoredSellerReferral(),
 });
 
 const isValidAccountNumber = (val) => /^\d{9,18}$/.test(String(val || "").trim());
@@ -75,7 +101,14 @@ const isValidIFSC = (val) => /^[A-Z]{4}0[A-Z0-9]{6}$/.test(String(val || "").tri
 const Auth = () => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search || "");
-  const shouldOpenSignup = searchParams.get("mode") === "signup";
+  const urlReferral = normalizeReferral(
+    searchParams.get("ref") || searchParams.get("referralCode") || "",
+  );
+  // Store once, before the form state initialises, so the code is pre-filled on first render.
+  useState(() => {
+    if (urlReferral) storeSellerReferral(urlReferral);
+  });
+  const shouldOpenSignup = searchParams.get("mode") === "signup" || Boolean(urlReferral);
   const [isLogin, setIsLogin] = useState(!shouldOpenSignup);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -221,6 +254,24 @@ const Auth = () => {
   });
 
   const [formData, setFormData] = useState(createInitialFormData);
+
+  // "Refer a seller" links carry install=1. If the seller app is installed Android opens
+  // it directly (App Link); if we are still in an Android browser, send the visitor to
+  // the seller app's Play Store page with the code as install referrer so the app can
+  // apply it on first launch. Desktop/iOS stay here with the code pre-filled.
+  useEffect(() => {
+    if (searchParams.get("install") !== "1" || !urlReferral) return;
+    if (window.Flutter || !/Android/i.test(navigator.userAgent)) return;
+    const redirectKey = `seva_seller_install_redirect_${urlReferral}`;
+    try {
+      if (sessionStorage.getItem(redirectKey)) return;
+      sessionStorage.setItem(redirectKey, "1");
+    } catch {
+      /* ignore */
+    }
+    window.location.href = buildSellerPlayStoreReferUrl(settings?.sellerPlayStoreLink, urlReferral);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const resetSignupForm = useCallback(() => {
     setFormData(createInitialFormData());
@@ -422,6 +473,31 @@ const Auth = () => {
     setIsLogin(nextIsLogin);
     resetSignupForm();
   };
+
+  // Lets the seller Flutter wrapper push a referral code (deep link / install referrer)
+  // into an already loaded page: window.SevaFastApplySellerReferral('CODE').
+  // SevaFastApplyReferral is the same hook name the customer app uses, kept as an alias
+  // in case the seller wrapper was cloned from it.
+  useEffect(() => {
+    const applyReferral = (code) => {
+      const clean = normalizeReferral(code);
+      if (!clean) return false;
+      storeSellerReferral(clean);
+      if (isLoginRef.current) {
+        window.history.pushState({ sellerAuth: true, mode: "signup", step: 1 }, "");
+        setIsLogin(false);
+        setSignupStep(1);
+      }
+      setFormData((prev) => ({ ...prev, referralCode: clean }));
+      return true;
+    };
+    window.SevaFastApplySellerReferral = applyReferral;
+    window.SevaFastApplyReferral = applyReferral;
+    return () => {
+      delete window.SevaFastApplySellerReferral;
+      delete window.SevaFastApplyReferral;
+    };
+  }, []);
 
   const updateVerificationState = (field, updates) => {
     setVerifications((prev) => ({
@@ -913,6 +989,7 @@ const Auth = () => {
             /* ignore */
           }
         }
+        storeSellerReferral("");
         setIsLogin(true);
         setSignupStep(1);
         resetSignupForm();
@@ -1403,7 +1480,11 @@ const Auth = () => {
                           placeholder="Referral Code (Optional)"
                           className="w-full pl-11 pr-4 py-3.5 sm:py-4 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-slate-200 transition-all placeholder:text-slate-400 placeholder:font-normal placeholder:normal-case placeholder:text-xs sm:placeholder:text-sm uppercase"
                           value={formData.referralCode || ""}
-                          onChange={(e) => setFormData({ ...formData, referralCode: e.target.value.toUpperCase() })}
+                          onChange={(e) => {
+                            const code = e.target.value.toUpperCase();
+                            storeSellerReferral(normalizeReferral(code));
+                            setFormData({ ...formData, referralCode: code });
+                          }}
                         />
                       </div>
                     )}
