@@ -15,7 +15,7 @@
       "namespace": "android_app",
       "package_name": "com.sevafast.seller",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_SELLER_APP_SIGNING_SHA256_FINGERPRINT"
+        "AC:86:E7:D6:50:5D:D2:CC:78:CC:7F:E9:15:A2:38:F3:7B:DB:62:4C:D4:6A:2E:70:36:DD:E2:7A:B3:D6:77:D7"
       ]
     }
   }

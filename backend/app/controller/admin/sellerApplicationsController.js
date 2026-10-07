@@ -3,6 +3,7 @@ import getPagination from "../../utils/pagination.js";
 import {
   approveSellerApplicationById,
   getPendingSellerApplications,
+  issueSellerCertificateById,
   rejectSellerApplicationById,
 } from "../../services/admin/sellerApplicationService.js";
 import { notify } from "../../modules/notifications/notification.service.js";
@@ -33,6 +34,27 @@ export const getPendingSellers = async (req, res) => {
     return handleResponse(res, 200, "Pending seller applications fetched", data);
   } catch (error) {
     return handleResponse(res, 500, error.message);
+  }
+};
+
+export const issueSellerCertificate = async (req, res) => {
+  try {
+    const seller = await issueSellerCertificateById({
+      sellerId: req.params.id,
+      certificateDetails: req.body || {},
+    });
+
+    if (!seller) {
+      return handleResponse(res, 404, "Seller not found");
+    }
+
+    return handleResponse(res, 200, "Certificate issued successfully", {
+      id: String(seller._id),
+      sellerCode: seller.sellerCode,
+      certificate: seller.certificate,
+    });
+  } catch (error) {
+    return handleResponse(res, error.statusCode || 500, error.message);
   }
 };
 

@@ -14,6 +14,7 @@ export const adminApi = {
     getPendingSellers: (params) => axiosInstance.get('/admin/sellers/pending', { params }),
     updateSellerDetails: (id, data) => axiosInstance.put(`/admin/sellers/${id}`, data),
     approveSeller: (id, data) => axiosInstance.patch(`/admin/sellers/approve/${id}`, data),
+    issueSellerCertificate: (id, data = {}) => axiosInstance.post(`/admin/sellers/${id}/certificate`, data),
     rejectSeller: (id, data) => axiosInstance.delete(`/admin/sellers/reject/${id}`, { data }),
     uploadSellerKycDocument: (id, formData) =>
         axiosInstance.post(`/admin/sellers/${id}/kyc-document`, formData),

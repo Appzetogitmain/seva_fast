@@ -28,6 +28,7 @@ import {
     getActiveSellers,
     getPendingSellers,
     approveSellerApplication,
+    issueSellerCertificate,
     rejectSellerApplication,
     uploadSellerKycDocument,
     getSellerWithdrawals,
@@ -219,6 +220,7 @@ router.get("/sellers/active", verifyToken, allowRoles("admin", "sub-admin"), get
 router.get("/sellers/pending", verifyToken, allowRoles("admin", "sub-admin"), getPendingSellers);
 router.patch("/sellers/approve/:id", verifyToken, allowRoles("admin", "sub-admin"), approveSellerApplication);
 router.delete("/sellers/reject/:id", verifyToken, allowRoles("admin", "sub-admin"), rejectSellerApplication);
+router.post("/sellers/:id/certificate", verifyToken, allowRoles("admin", "sub-admin"), issueSellerCertificate);
 router.post("/sellers/:id/kyc-document", verifyToken, allowRoles("admin", "sub-admin"), upload.single("kycDocument"), uploadSellerKycDocument);
 router.put("/sellers/:id", verifyToken, allowRoles("admin", "sub-admin"), updateSellerDetails);
 router.delete("/sellers/:id", verifyToken, allowRoles("admin", "sub-admin"), deleteSeller);

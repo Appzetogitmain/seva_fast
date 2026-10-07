@@ -146,6 +146,33 @@ const ActiveSellers = () => {
       setIsUploadingKyc(false);
     }
   };
+  const [isIssuingCertificate, setIsIssuingCertificate] = useState(false);
+
+  const sellerHasDocuments = (seller) =>
+    Object.values(seller?.documents || {}).some(Boolean);
+
+  const handleIssueCertificate = async () => {
+    if (!selectedSeller) return;
+    const action = selectedSeller.certificate ? 'Re-issue' : 'Issue';
+    if (!window.confirm(`${action} Certified Seller certificate for ${selectedSeller.shopName || selectedSeller.name}?`)) return;
+    setIsIssuingCertificate(true);
+    try {
+      const res = await adminApi.issueSellerCertificate(selectedSeller.id || selectedSeller._id);
+      const updated = res.data?.result || res.data;
+      setSelectedSeller((prev) => ({
+        ...prev,
+        sellerCode: updated.sellerCode,
+        certificate: updated.certificate,
+      }));
+      toast.success('Certificate issued! The seller will see it in their app.');
+      setRefreshTick((t) => t + 1);
+    } catch (err) {
+      console.error('Failed to issue certificate', err);
+      toast.error(err.response?.data?.message || 'Failed to issue certificate');
+    } finally {
+      setIsIssuingCertificate(false);
+    }
+  };
   const [headerCategories, setHeaderCategories] = useState([]);
 
   useEffect(() => {
@@ -784,6 +811,56 @@ const ActiveSellers = () => {
                           <span className="text-xs text-slate-500">Branch</span>
                           <span className="text-xs font-bold text-slate-700">{selectedSeller.bankDetails?.branch || 'N/A'}</span>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Certified Seller Certificate */}
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                        Certified Seller Certificate
+                      </p>
+                      <div className="p-4 bg-white rounded-2xl ring-1 ring-slate-100 space-y-3">
+                        {selectedSeller.certificate ? (
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-slate-500">Certificate No.</span>
+                              <span className="text-xs font-bold text-slate-700">{selectedSeller.certificate.certificateNo}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-slate-500">Valid Until</span>
+                              <span className="text-xs font-bold text-slate-700">{selectedSeller.certificate.validUntil || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-slate-500">Status</span>
+                              <span className={cn("text-xs font-bold", selectedSeller.certificate.accepted ? "text-emerald-600" : "text-amber-600")}>
+                                {selectedSeller.certificate.accepted ? 'Accepted by seller' : 'Awaiting seller acceptance'}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] font-medium text-slate-500 leading-relaxed">
+                            {sellerHasDocuments(selectedSeller)
+                              ? 'No certificate issued yet. Seller has uploaded KYC documents.'
+                              : 'Seller has not uploaded KYC documents. Certificate can be issued once documents are uploaded.'}
+                          </p>
+                        )}
+                        {sellerHasDocuments(selectedSeller) && (
+                          <button
+                            type="button"
+                            onClick={handleIssueCertificate}
+                            disabled={isIssuingCertificate}
+                            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+                          >
+                            {isIssuingCertificate ? (
+                              <>
+                                <HiOutlineArrowPath className="h-3.5 w-3.5 animate-spin" />
+                                <span>Issuing...</span>
+                              </>
+                            ) : (
+                              <span>{selectedSeller.certificate ? 'Re-issue Certificate' : 'Issue Certificate'}</span>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
 

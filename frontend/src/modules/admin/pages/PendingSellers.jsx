@@ -194,9 +194,32 @@ const PendingSellers = () => {
         }));
     }, [viewingSeller]);
 
+    const hasDocuments = (seller) => (seller?.documents || []).length > 0;
+
+    const handleApproveWithoutCertificate = async (seller) => {
+        if (!window.confirm(`Approve ${seller.shopName}? No certificate will be issued until the seller uploads KYC documents.`)) return;
+        setIsProcessing(true);
+        try {
+            await adminApi.approveSeller(seller.id, {});
+            setIsReviewModalOpen(false);
+            setViewingSeller(null);
+            showToast('Seller approved. Certificate can be issued after documents are uploaded.', 'success');
+            await fetchPendingSellers();
+        } catch (error) {
+            console.error('Failed to approve seller', error);
+            showToast(error.response?.data?.message || 'Failed to approve seller', 'error');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const handleOpenApprovalModal = (seller) => {
         const targetSeller = seller || viewingSeller;
         if (!targetSeller) return;
+        if (!hasDocuments(targetSeller)) {
+            handleApproveWithoutCertificate(targetSeller);
+            return;
+        }
         setViewingSeller(targetSeller);
 
         const todayStr = new Date().toLocaleDateString('en-IN', {
@@ -417,7 +440,7 @@ const PendingSellers = () => {
                                             <button
                                                 onClick={() => handleOpenApprovalModal(s)}
                                                 className="h-8 w-8 flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all ring-1 ring-emerald-100"
-                                                title="Approve & Issue Certificate"
+                                                title={hasDocuments(s) ? "Approve & Issue Certificate" : "Approve (no certificate — documents not uploaded)"}
                                             >
                                                 <HiOutlineCheckCircle className="h-5 w-5" />
                                             </button>
@@ -752,7 +775,7 @@ const PendingSellers = () => {
                                                         ) : (
                                                             <>
                                                                 <HiOutlineCheckCircle className="h-4 w-4" />
-                                                                <span>APPROVE &amp; ISSUE CERTIFICATE</span>
+                                                                <span>{hasDocuments(viewingSeller) ? 'APPROVE & ISSUE CERTIFICATE' : 'APPROVE (NO CERTIFICATE)'}</span>
                                                             </>
                                                         )}
                                                     </button>

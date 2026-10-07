@@ -129,13 +129,11 @@ export async function getPendingSellerApplications({
   };
 }
 
-export async function approveSellerApplicationById({ sellerId, reviewedBy, certificateDetails }) {
-  const existingSeller = await Seller.findById(sellerId);
-  if (!existingSeller) {
-    return null;
-  }
+function hasUploadedDocuments(seller) {
+  return formatSellerDocuments(seller?.documents).length > 0;
+}
 
-  const sellerCode = existingSeller.sellerCode || buildSellerCode();
+function buildCertificateData(seller, sellerCode, certificateDetails) {
   const certNo =
     certificateDetails?.certificateNo ||
     `CRT-${sellerCode.replace(/[^a-zA-Z0-9]/g, "")}-${Date.now().toString().slice(-4)}`;
@@ -153,16 +151,16 @@ export async function approveSellerApplicationById({ sellerId, reviewedBy, certi
     year: "numeric",
   });
 
-  const certificateData = {
+  return {
     certificateNo: certNo,
     sellerId: certificateDetails?.sellerId || sellerCode,
-    sellerName: certificateDetails?.sellerName || existingSeller.name || "",
-    shopName: certificateDetails?.shopName || existingSeller.shopName || "",
-    category: certificateDetails?.category || existingSeller.category || "General",
+    sellerName: certificateDetails?.sellerName || seller.name || "",
+    shopName: certificateDetails?.shopName || seller.shopName || "",
+    category: certificateDetails?.category || seller.category || "General",
     cityLocation:
       certificateDetails?.cityLocation ||
-      existingSeller.city ||
-      existingSeller.address ||
+      seller.city ||
+      seller.address ||
       "Registered Location",
     issueDate: certificateDetails?.issueDate || todayStr,
     validFrom: certificateDetails?.validFrom || todayStr,
@@ -171,23 +169,32 @@ export async function approveSellerApplicationById({ sellerId, reviewedBy, certi
     issuedAt: new Date(),
     accepted: false,
   };
+}
 
-  const seller = await Seller.findByIdAndUpdate(
-    sellerId,
-    {
-      $set: {
-        isVerified: true,
-        isActive: true,
-        applicationStatus: "approved",
-        reviewedAt: new Date(),
-        reviewedBy,
-        rejectionReason: null,
-        sellerCode,
-        certificate: certificateData,
-      },
-    },
-    { new: true },
-  );
+export async function approveSellerApplicationById({ sellerId, reviewedBy, certificateDetails }) {
+  const existingSeller = await Seller.findById(sellerId);
+  if (!existingSeller) {
+    return null;
+  }
+
+  const sellerCode = existingSeller.sellerCode || buildSellerCode();
+
+  // Certified-seller certificate is only issued once KYC documents are on file.
+  // Sellers approved without documents get one later via issueSellerCertificateById.
+  const update = {
+    isVerified: true,
+    isActive: true,
+    applicationStatus: "approved",
+    reviewedAt: new Date(),
+    reviewedBy,
+    rejectionReason: null,
+    sellerCode,
+  };
+  if (hasUploadedDocuments(existingSeller)) {
+    update.certificate = buildCertificateData(existingSeller, sellerCode, certificateDetails);
+  }
+
+  const seller = await Seller.findByIdAndUpdate(sellerId, { $set: update }, { new: true });
 
   if (!seller) {
     return null;
@@ -204,6 +211,38 @@ export async function approveSellerApplicationById({ sellerId, reviewedBy, certi
   });
 
   return formatSellerApplication(seller);
+}
+
+export async function issueSellerCertificateById({ sellerId, certificateDetails }) {
+  const existingSeller = await Seller.findById(sellerId);
+  if (!existingSeller) {
+    return null;
+  }
+
+  if (!existingSeller.isVerified) {
+    const error = new Error("Approve the seller before issuing a certificate");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!hasUploadedDocuments(existingSeller)) {
+    const error = new Error("Seller has not uploaded KYC documents yet");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const sellerCode = existingSeller.sellerCode || buildSellerCode();
+  const seller = await Seller.findByIdAndUpdate(
+    sellerId,
+    {
+      $set: {
+        sellerCode,
+        certificate: buildCertificateData(existingSeller, sellerCode, certificateDetails),
+      },
+    },
+    { new: true },
+  );
+
+  return seller;
 }
 
 export async function rejectSellerApplicationById({

@@ -605,6 +605,8 @@ export async function getActiveSellersData({
       businessInfo: seller.businessInfo || null,
       description: seller.description || "No application note provided.",
       documents: seller.documents || {},
+      sellerCode: seller.sellerCode || "",
+      certificate: seller.certificate || null,
       officialKycDocumentUrl: seller.officialKycDocumentUrl || "",
       kycUploadedAt: seller.kycUploadedAt || null,
       acceptsPhotoOrders: seller.acceptsPhotoOrders || false,
