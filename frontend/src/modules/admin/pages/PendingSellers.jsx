@@ -414,15 +414,13 @@ const PendingSellers = () => {
                                     </td>
                                     <td className="px-6 py-5 text-right align-middle">
                                         <div className="flex items-center justify-end gap-3 h-full">
-                                            {s.documents && s.documents.length > 0 && (
-                                                <button
-                                                    onClick={() => handleOpenApprovalModal(s)}
-                                                    className="h-8 w-8 flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all ring-1 ring-emerald-100"
-                                                    title="Approve & Issue Certificate"
-                                                >
-                                                    <HiOutlineCheckCircle className="h-5 w-5" />
-                                                </button>
-                                            )}
+                                            <button
+                                                onClick={() => handleOpenApprovalModal(s)}
+                                                className="h-8 w-8 flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all ring-1 ring-emerald-100"
+                                                title="Approve & Issue Certificate"
+                                            >
+                                                <HiOutlineCheckCircle className="h-5 w-5" />
+                                            </button>
                                             <button
                                                 onClick={() => handleReject(s.id)}
                                                 className="h-8 w-8 flex items-center justify-center rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all ring-1 ring-rose-100"
@@ -741,8 +739,7 @@ const PendingSellers = () => {
                                                 >
                                                     REJECT APPLICATION
                                                 </button>
-                                                {reviewDocuments.length > 0 && (
-                                                    <button
+                                                <button
                                                         disabled={isProcessing}
                                                         onClick={() => handleOpenApprovalModal(viewingSeller)}
                                                         className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-bold tracking-widest shadow-2xl hover:bg-slate-800 transition-all transform active:scale-[0.98] uppercase flex items-center justify-center gap-2"
@@ -759,7 +756,6 @@ const PendingSellers = () => {
                                                             </>
                                                         )}
                                                     </button>
-                                                )}
                                             </div>
                                         </div>
                                     </div>

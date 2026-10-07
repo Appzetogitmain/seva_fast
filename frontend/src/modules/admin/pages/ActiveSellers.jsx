@@ -17,6 +17,7 @@ import {
   HiOutlineDocumentText,
   HiOutlineCloudArrowUp,
   HiOutlineArrowTopRightOnSquare,
+  HiOutlineBuildingOffice2,
 } from "react-icons/hi2";
 import { Store, Sparkles, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
