@@ -2,8 +2,8 @@ import React, { useEffect } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import DashboardLayout from "@shared/layout/DashboardLayout";
 import Orders from "../pages/Orders";
-import { socketService } from "@core/services/socket";
-import { onPhotoOrderMessage } from "@core/services/orderSocket";
+import { onNewPhotoOrder, onPhotoOrderMessage } from "@core/services/orderSocket";
+import { notificationSound } from "@core/utils/notificationSound";
 import { toast } from "sonner";
 import { useAuth } from "@core/context/AuthContext";
 import SellerCertificateModal from "../components/SellerCertificateModal";
@@ -110,7 +110,8 @@ const SellerRoutes = () => {
 
   useEffect(() => {
     const handleNewPhotoOrder = (order) => {
-      playBeep();
+      // Same audio element the FCM foreground listener uses, so a socket + push arriving together play once
+      notificationSound.playOrderAlertSound();
       toast.custom((t) => (
         <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-indigo-500 flex flex-col gap-2 w-80">
           <div className="flex items-center gap-3">
@@ -119,7 +120,7 @@ const SellerRoutes = () => {
             </div>
             <div>
               <h4 className="font-bold text-gray-900">New Photo Order!</h4>
-              <p className="text-sm text-gray-500">From a customer</p>
+              <p className="text-sm text-gray-500">From {order?.customer?.name || "a customer"}</p>
             </div>
           </div>
           <button 
@@ -135,7 +136,7 @@ const SellerRoutes = () => {
       ), { duration: 8000 });
     };
 
-    socketService.on("new_photo_order", handleNewPhotoOrder);
+    const cleanupNewOrder = onNewPhotoOrder(token, handleNewPhotoOrder);
 
     const cleanupMessage = onPhotoOrderMessage(token, (payload) => {
       playBeep();
@@ -164,7 +165,7 @@ const SellerRoutes = () => {
     });
 
     return () => {
-      socketService.off("new_photo_order", handleNewPhotoOrder);
+      cleanupNewOrder();
       cleanupMessage();
     };
   }, [navigate, token]);

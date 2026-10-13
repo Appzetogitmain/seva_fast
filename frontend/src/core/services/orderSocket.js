@@ -263,6 +263,20 @@ export function onPhotoOrderMessage(getToken, handler) {
   return () => s.off("photo_order:new_message", handler);
 }
 
+export function onNewPhotoOrder(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("new_photo_order", handler);
+  return () => s.off("new_photo_order", handler);
+}
+
+export function onPhotoOrderStatusUpdate(getToken, handler) {
+  const s = getOrderSocket(getToken);
+  if (!s || typeof handler !== "function") return () => {};
+  s.on("photo_order_status_update", handler);
+  return () => s.off("photo_order_status_update", handler);
+}
+
 export function onPhotoOrderStatusAlert(getToken, handler) {
   const s = getOrderSocket(getToken);
   if (!s || typeof handler !== "function") return () => {};

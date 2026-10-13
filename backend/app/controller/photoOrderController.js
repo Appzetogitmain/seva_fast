@@ -2,6 +2,8 @@ import PhotoOrder from "../models/photoOrder.js";
 import Seller from "../models/seller.js";
 import handleResponse from "../utils/helper.js";
 import { getIO } from "../socket/socketManager.js";
+import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
+import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
 
 /* ===============================
    CUSTOMER: GET SELLERS BY CITY
@@ -66,13 +68,16 @@ export const createPhotoOrder = async (req, res) => {
             return handleResponse(res, 400, "Either a Photo or Notes/Enquiry must be provided");
         }
 
-        const photoOrder = await PhotoOrder.create({
+        const created = await PhotoOrder.create({
             customer: customerId,
             seller: sellerId,
             photoUrl,
             notes,
             city
         });
+        // Populate customer so the seller's list/toast can render it directly from the socket payload
+        const photoOrder = await created.populate("customer", "name phone email");
+        const customerName = photoOrder.customer?.name || req.user.name || "Customer";
 
         try {
             const io = getIO();
@@ -80,6 +85,13 @@ export const createPhotoOrder = async (req, res) => {
         } catch (err) {
             console.error("Socket error on new photo order:", err);
         }
+
+        // Push notification (FCM) so the seller hears the alert even when the app is in background/closed
+        emitNotificationEvent(NOTIFICATION_EVENTS.NEW_PHOTO_ORDER, {
+            sellerId: String(sellerId),
+            orderId: String(photoOrder._id),
+            customerName,
+        });
 
         return handleResponse(res, 201, "Custom photo order sent successfully", photoOrder);
     } catch (error) {
@@ -258,6 +270,14 @@ export const sendChatMessage = async (req, res) => {
                     message: savedMessage
                 });
                 io.to(`seller:${order.seller}`).emit("photo_order_status_update", order);
+
+                emitNotificationEvent(NOTIFICATION_EVENTS.PHOTO_ORDER_MESSAGE, {
+                    sellerId: String(order.seller),
+                    orderId: String(order._id),
+                    messageId: String(savedMessage._id),
+                    customerName: req.user.name || "Customer",
+                    text: text || (type === 'image' ? 'Sent a photo' : 'New message'),
+                });
             }
         } catch (err) {
             console.error("Socket error emitting chat message:", err);

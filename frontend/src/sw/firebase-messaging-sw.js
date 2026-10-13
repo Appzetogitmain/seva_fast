@@ -97,6 +97,7 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId || firebaseConfig.apiKey
     "ORDER_READY",
     "SELLER_TIMEOUT_ALERT",
     "NO_RIDER_ALERT",
+    "NEW_PHOTO_ORDER",
   ]);
 
   function isOrderAlert(data = {}) {
@@ -171,6 +172,7 @@ self.addEventListener("push", (event) => {
       const ORDER_ALERT_EVENTS_PUSH = new Set([
         "NEW_ORDER", "NEW_DELIVERY_BROADCAST", "NEW_RETURN_BROADCAST",
         "DELIVERY_ASSIGNED", "ORDER_READY", "SELLER_TIMEOUT_ALERT", "NO_RIDER_ALERT",
+        "NEW_PHOTO_ORDER",
       ]);
       const eventType = String(data.eventType || "").toUpperCase();
       const isAlert = ORDER_ALERT_EVENTS_PUSH.has(eventType);

@@ -13,6 +13,7 @@ export const ORDER_ALERT_EVENTS = new Set([
   "ORDER_READY",
   "SELLER_TIMEOUT_ALERT",
   "NO_RIDER_ALERT",
+  "NEW_PHOTO_ORDER",
 ]);
 
 export function isOrderAlertEvent(eventType) {

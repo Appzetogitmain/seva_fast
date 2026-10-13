@@ -214,6 +214,7 @@ export async function deliverNotificationById(notificationId) {
     "ORDER_READY",
     "SELLER_TIMEOUT_ALERT",
     "NO_RIDER_ALERT",
+    "NEW_PHOTO_ORDER",
   ]);
   const isOrderAlertType = ORDER_ALERT_EVENT_TYPES.has(
     String(notification.type || "").toUpperCase()

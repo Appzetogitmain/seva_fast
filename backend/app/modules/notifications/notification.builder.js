@@ -80,6 +80,13 @@ function buildSellerOrderLink(orderId) {
     : buildAppPath("/seller/orders");
 }
 
+function buildSellerPhotoOrderLink(orderId) {
+  const id = String(orderId || "").trim();
+  return id
+    ? buildAppPath(`/seller/photo-orders?orderId=${encodeURIComponent(id)}`)
+    : buildAppPath("/seller/photo-orders");
+}
+
 function buildDeliveryOrderLink(orderId) {
   const id = String(orderId || "").trim();
   return id
@@ -232,6 +239,26 @@ function eventDefinition(eventType) {
         recipientIds: (payload) => normalizeIdList(payload.sellerId || payload.sellerIds),
         title: () => "Action Required: No Rider Available",
         body: (payload) => payload.sellerMessage || `No rider accepted Order #${payload.orderId}. Please assign own delivery boy or cancel.`,
+      };
+    case NOTIFICATION_EVENTS.NEW_PHOTO_ORDER:
+      return {
+        role: NOTIFICATION_ROLES.SELLER,
+        recipientIds: (payload) => normalizeIdList(payload.sellerId),
+        title: () => "New Photo Order 📸",
+        body: (payload) => {
+          const customerName = String(payload.customerName || "").trim();
+          return customerName
+            ? `${customerName} sent you a photo order. Tap to view.`
+            : "A customer sent you a photo order. Tap to view.";
+        },
+      };
+    case NOTIFICATION_EVENTS.PHOTO_ORDER_MESSAGE:
+      return {
+        role: NOTIFICATION_ROLES.SELLER,
+        recipientIds: (payload) => normalizeIdList(payload.sellerId),
+        title: (payload) =>
+          `Message from ${String(payload.customerName || "").trim() || "Customer"}`,
+        body: (payload) => truncateText(payload.text || "New message on your photo order"),
       };
     case NOTIFICATION_EVENTS.DELIVERY_ASSIGNED:
       return {
@@ -618,6 +645,19 @@ function eventData(eventType, payload = {}, role) {
       productId,
       variantSku: String(payload.variantSku || "").trim() || undefined,
       link: buildProductDetailLink(productId),
+      ...(payload.data || {}),
+    };
+  }
+
+  if (
+    eventType === NOTIFICATION_EVENTS.NEW_PHOTO_ORDER ||
+    eventType === NOTIFICATION_EVENTS.PHOTO_ORDER_MESSAGE
+  ) {
+    const orderId = String(payload.orderId || "").trim() || undefined;
+    return {
+      eventType,
+      orderId,
+      link: buildSellerPhotoOrderLink(orderId),
       ...(payload.data || {}),
     };
   }

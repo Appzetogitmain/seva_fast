@@ -5,8 +5,11 @@ import { HiOutlinePhotograph, HiOutlineCheckCircle, HiOutlineXCircle, HiOutlineC
 import { MessageCircle, Phone } from "lucide-react";
 import { formatDate } from "@shared/utils/formatDate";
 import { PhotoOrderChatDrawer } from "./PhotoOrderChatDrawer";
+import { useAuth } from "@core/context/AuthContext";
+import { onNewPhotoOrder, onPhotoOrderStatusUpdate } from "@core/services/orderSocket";
 
 const CustomOrders = () => {
+    const { token } = useAuth();
     const [orders, setOrders] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedOrderForChat, setSelectedOrderForChat] = useState(null);
@@ -26,6 +29,30 @@ const CustomOrders = () => {
     useEffect(() => {
         fetchOrders();
     }, []);
+
+    // Live updates: prepend new photo orders and merge status/chat changes without a page refresh
+    useEffect(() => {
+        if (!token) return undefined;
+        const cleanupNew = onNewPhotoOrder(token, (order) => {
+            if (!order?._id) return;
+            setOrders((prev) =>
+                prev.some((o) => o._id === order._id) ? prev : [order, ...prev]
+            );
+        });
+        const cleanupUpdate = onPhotoOrderStatusUpdate(token, (updated) => {
+            if (!updated?._id) return;
+            // Socket payload has unpopulated refs; keep the populated customer we already have
+            setOrders((prev) =>
+                prev.map((o) =>
+                    o._id === updated._id ? { ...o, ...updated, customer: o.customer } : o
+                )
+            );
+        });
+        return () => {
+            cleanupNew();
+            cleanupUpdate();
+        };
+    }, [token]);
 
     const updateStatus = async (id, status) => {
         try {
