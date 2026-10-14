@@ -30,7 +30,9 @@ export default function ChatbotWidget() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [speechLang, setSpeechLang] = useState("en-IN");
+  // Language for voice input; a ref so the post-speech auto-restart timeout
+  // (a stale closure) still reads the latest value.
+  const speechLangRef = useRef("en-IN");
   const [voiceMode, setVoiceMode] = useState(false);
   const [currentPromptIdx, setCurrentPromptIdx] = useState(0);
   const [displayedText, setDisplayedText] = useState("");
@@ -218,72 +220,78 @@ export default function ChatbotWidget() {
       .replace(/\$([0-9.,]+)\$/g, "$1");
   };
 
+  // Detects the spoken language of a reply as a BCP-47 tag. Indic scripts are
+  // matched by Unicode block; Marathi vs Hindi (both Devanagari) by common
+  // words; Roman-script Hindi ("Hinglish") by common Hindi words so it is read
+  // by a Hindi voice instead of an English one.
+  const detectTextLang = (text = "") => {
+    if (/[\u0A80-\u0AFF]/.test(text)) return "gu-IN";
+    if (/[\u0980-\u09FF]/.test(text)) return "bn-IN";
+    if (/[\u0B80-\u0BFF]/.test(text)) return "ta-IN";
+    if (/[\u0C00-\u0C7F]/.test(text)) return "te-IN";
+    if (/[\u0C80-\u0CFF]/.test(text)) return "kn-IN";
+    if (/[\u0D00-\u0D7F]/.test(text)) return "ml-IN";
+    if (/[\u0A00-\u0A7F]/.test(text)) return "pa-IN";
+    if (/[\u0B00-\u0B7F]/.test(text)) return "or-IN";
+    if (/[\u0900-\u097F]/.test(text)) {
+      const marathiHits = (
+        text.match(
+          /\u0933|\u0906\u0939\u0947|\u0906\u0939\u0947\u0924|\u0928\u093E\u0939\u0940|\u0924\u0941\u092E\u094D\u0939\u093E\u0932\u093E|\u0924\u0941\u092E\u091A|\u092E\u0932\u093E|\u092E\u093E\u091D|\u0906\u092E\u094D\u0939\u0940|\u0915\u0930\u093E|\u0939\u0935\u0947|\u0939\u0935\u0902|\u0915\u094B\u0923\u0924\u0947|\u0915\u094B\u0923\u0924\u093E|\u0906\u0923\u093F|\u092A\u093E\u0939\u093F\u091C\u0947|\u092E\u0927\u094D\u092F\u0947|\u0938\u093E\u0920\u0940|\u092C\u094B\u0932\u0947\u0928|\u091D\u093E\u0932\u0947/g
+        ) || []
+      ).length;
+      const hindiHits = (
+        text.match(/\u0939\u0948|\u0939\u0948\u0902|\u0928\u0939\u0940\u0902|\u0906\u092A\u0915\u094B|\u0906\u092A\u0915\u093E|\u0915\u094D\u092F\u093E|\u091A\u093E\u0939\u093F\u090F|\u092E\u0948\u0902|\u092E\u0947\u0902|\u0915\u0947 \u0932\u093F\u090F|\u0915\u0948\u0938\u0947|\u0915\u094C\u0928/g) || []
+      ).length;
+      return marathiHits > hindiHits ? "mr-IN" : "hi-IN";
+    }
+    const hinglishHits = (
+      text
+        .toLowerCase()
+        .match(
+          /\b(hai|hain|kya|aap|aapko|aapka|mera|meri|mere|nahi|nahin|chahiye|kaise|kaun|kaunsa|kitna|batao|bataiye|karo|kijiye|karein|liye|mein|hum|tum|accha|achha|haan|ji|abhi|wala|wali|sakte|raha|rahi|gaya|diya|dijiye|lijiye)\b/g
+        ) || []
+    ).length;
+    const wordCount = text.split(/\s+/).filter(Boolean).length || 1;
+    if (hinglishHits >= 2 && hinglishHits / wordCount >= 0.15) return "hi-IN";
+    return "en-IN";
+  };
+
   const getBestVoiceForText = (text) => {
+    const lang = detectTextLang(text);
     if (typeof window === "undefined" || !("speechSynthesis" in window))
-      return { voice: null, lang: "en-IN" };
+      return { voice: null, lang };
     const voices = window.speechSynthesis.getVoices() || [];
-    if (voices.length === 0) return { voice: null, lang: "en-IN" };
 
-    const isHindiOrMarathi = /[\u0900-\u097F]/.test(text);
-    const isGujarati = /[\u0A80-\u0AFF]/.test(text);
-    const isBengali = /[\u0980-\u09FF]/.test(text);
-    const isTamil = /[\u0B80-\u0BFF]/.test(text);
-    const isTelugu = /[\u0C00-\u0C7F]/.test(text);
-    const isKannada = /[\u0C80-\u0CFF]/.test(text);
+    const base = lang.split("-")[0];
+    const norm = (l = "") => l.replace("_", "-").toLowerCase();
+    const findVoice = (code) => {
+      const matches = voices.filter((v) => norm(v.lang).startsWith(code));
+      return (
+        matches.find((v) => norm(v.lang) === `${code}-in`) ||
+        matches.find((v) => /google/i.test(v.name)) ||
+        matches[0] ||
+        null
+      );
+    };
 
-    if (isGujarati) {
-      const v = voices.find(
-        (v) => v.lang && (v.lang.startsWith("gu") || v.lang.includes("GU"))
-      );
-      if (v) return { voice: v, lang: "gu-IN" };
-    }
-    if (isBengali) {
-      const v = voices.find(
-        (v) => v.lang && (v.lang.startsWith("bn") || v.lang.includes("BN"))
-      );
-      if (v) return { voice: v, lang: "bn-IN" };
-    }
-    if (isTamil) {
-      const v = voices.find(
-        (v) => v.lang && (v.lang.startsWith("ta") || v.lang.includes("TA"))
-      );
-      if (v) return { voice: v, lang: "ta-IN" };
-    }
-    if (isTelugu) {
-      const v = voices.find(
-        (v) => v.lang && (v.lang.startsWith("te") || v.lang.includes("TE"))
-      );
-      if (v) return { voice: v, lang: "te-IN" };
-    }
-    if (isKannada) {
-      const v = voices.find(
-        (v) => v.lang && (v.lang.startsWith("kn") || v.lang.includes("KN"))
-      );
-      if (v) return { voice: v, lang: "kn-IN" };
-    }
-    if (isHindiOrMarathi) {
-      const v = voices.find(
-        (v) =>
-          v.lang &&
-          (v.lang.startsWith("hi") ||
-            v.lang.includes("HI") ||
-            v.lang.startsWith("mr"))
-      );
-      if (v) return { voice: v, lang: "hi-IN" };
+    if (base === "en") {
+      const englishVoice = findVoice("en");
+      return { voice: englishVoice, lang: englishVoice?.lang || "en-IN" };
     }
 
-    const indianEnglish = voices.find(
-      (v) =>
-        v.lang &&
-        (v.lang === "en-IN" ||
-          v.lang.includes("en-IN") ||
-          v.lang.includes("en_IN"))
-    );
-    const englishVoice =
-      indianEnglish ||
-      voices.find((v) => v.lang && v.lang.startsWith("en")) ||
-      voices[0];
-    return { voice: englishVoice, lang: englishVoice?.lang || "en-IN" };
+    const native = findVoice(base);
+    if (native) return { voice: native, lang };
+
+    // Marathi without a Marathi voice: a Hindi voice reads Devanagari correctly.
+    if (base === "mr") {
+      const hindi = findVoice("hi");
+      if (hindi) return { voice: hindi, lang: "hi-IN" };
+    }
+
+    // No matching voice listed (or voices not loaded yet): never fall back to an
+    // English voice. Leave the voice unset and pass the language tag so the
+    // OS TTS engine picks its own voice for that language.
+    return { voice: null, lang };
   };
 
   // Synchronized Gemini-like Voice + Real-time Speech-Aligned Progressive Word Streaming
@@ -298,6 +306,13 @@ export default function ChatbotWidget() {
 
     const formattedText = formatAiText(fullReplyText);
     const cleanSpeech = formattedText.replace(/[*#_~`>•-]/g, "").trim();
+
+    // Keep voice input in the conversation's language: once the reply is in an
+    // Indic script, recognize the customer's next utterance in that language.
+    // Hinglish (Roman script) stays on en-IN, which transcribes it fine.
+    const hasIndicScript = /[\u0900-\u0D7F]/.test(cleanSpeech);
+    speechLangRef.current = hasIndicScript ? detectTextLang(cleanSpeech) : "en-IN";
+
     const words = formattedText.split(/\s+/).filter(Boolean);
 
     const modelMessageId = Date.now();
@@ -580,7 +595,7 @@ export default function ChatbotWidget() {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = true;
-      recognition.lang = speechLang;
+      recognition.lang = speechLangRef.current;
 
       let finalTranscript = "";
 

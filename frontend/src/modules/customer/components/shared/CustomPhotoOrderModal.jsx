@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
     Camera, X, ChevronDown, Sparkles, Crop, ZoomIn, ZoomOut,
     Check, MessageSquare, ChevronRight, History, Upload,
-    MapPin, Store, FileText, Send, ImagePlus, Trash2
+    MapPin, Store, FileText, Send, ImagePlus, Trash2, Loader2
 } from 'lucide-react';
 import axiosInstance from '@core/api/axios';
 import { useAuth } from '@core/context/AuthContext';
@@ -65,7 +65,7 @@ const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 
 export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     const { t } = useTranslation('customer');
     const { isAuthenticated, user } = useAuth();
-    const { currentLocation } = useLocation();
+    const { currentLocation, refreshLocation } = useLocation();
     const navigate = useNavigate();
 
     const [file, setFile] = useState(null);
@@ -89,18 +89,60 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     const cropContainerRef = useRef(null);
     const cropImgRef = useRef(null);
 
+    const [isDetecting, setIsDetecting] = useState(false);
+    // Prefill the city from the saved location only once per modal open, so
+    // the customer can clear the field without it being re-filled.
+    const hasPrefilledRef = useRef(false);
+
+    const toCityName = (loc) => {
+        const raw = loc?.city || loc?.name || "";
+        return raw.split(",")[0].trim().replace(/[^a-zA-Z\s]/g, "").trim();
+    };
+
     useEffect(() => {
-        if (isOpen && city && city.trim().length >= 2) {
-            fetchSellers(city.trim());
-        } else if (isOpen && !city && (currentLocation?.city || currentLocation?.name)) {
-            const raw = currentLocation.city || currentLocation.name || "";
-            const cleanCity = raw.split(",")[0].trim().replace(/[^a-zA-Z\s]/g, "");
-            if (cleanCity) {
-                setCity(cleanCity);
-                fetchSellers(cleanCity);
-            }
+        if (!isOpen) {
+            hasPrefilledRef.current = false;
+            return;
         }
-    }, [city, isOpen, currentLocation]);
+        if (hasPrefilledRef.current) return;
+        hasPrefilledRef.current = true;
+        const cleanCity = toCityName(currentLocation);
+        if (cleanCity) setCity(cleanCity);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const trimmed = city.trim();
+        if (trimmed.length < 2) {
+            setSellers([]);
+            return;
+        }
+        const timer = setTimeout(() => fetchSellers(trimmed), 400);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [city, isOpen]);
+
+    const handleAutoDetect = async () => {
+        if (isDetecting) return;
+        setIsDetecting(true);
+        try {
+            const result = await refreshLocation();
+            if (!result?.ok) {
+                toast.error(result?.error || 'Unable to fetch your current location');
+                return;
+            }
+            const detectedCity = toCityName({ city: result.location?.city });
+            if (!detectedCity) {
+                toast.error('Could not determine your city. Please type it manually.');
+                return;
+            }
+            setSelectedSellerId('');
+            setCity(detectedCity);
+        } finally {
+            setIsDetecting(false);
+        }
+    };
 
     const fetchSellers = async (overrideCity = null) => {
         const queryCity = overrideCity || city;
@@ -337,21 +379,16 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                                 <MapPin size={12} className="text-indigo-500" />
                                 {t('photoOrder.city')}
                             </label>
-                            {(currentLocation?.city || currentLocation?.name) && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const raw = currentLocation.city || currentLocation.name || "";
-                                        const cleanCity = raw.split(",")[0].trim().replace(/[^a-zA-Z\s]/g, "");
-                                        const targetCity = cleanCity || raw.trim();
-                                        setCity(targetCity);
-                                        fetchSellers(targetCity);
-                                    }}
-                                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-full flex items-center gap-1 cursor-pointer"
-                                >
-                                    <MapPin size={10} /> Auto Detect
-                                </button>
-                            )}
+                            <button
+                                type="button"
+                                onClick={handleAutoDetect}
+                                disabled={isDetecting}
+                                className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-full flex items-center gap-1 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+                            >
+                                {isDetecting
+                                    ? <><Loader2 size={10} className="animate-spin" /> Detecting...</>
+                                    : <><MapPin size={10} /> Auto Detect</>}
+                            </button>
                         </div>
                         <input
                             type="text"
