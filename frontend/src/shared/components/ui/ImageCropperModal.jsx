@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, ZoomIn, ZoomOut, Check, Crop } from 'lucide-react';
+import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
 
 const ImageCropperModal = ({
     isOpen,
@@ -9,6 +10,7 @@ const ImageCropperModal = ({
     onCropComplete,
     onClose
 }) => {
+    useLockBodyScroll(Boolean(isOpen));
     const [zoom, setZoom] = useState(1);
     const [rotation, setRotation] = useState(0);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -142,9 +144,18 @@ const ImageCropperModal = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in select-none">
+        <div 
+            className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[500] p-4 animate-in fade-in select-none overscroll-contain"
+            onWheel={preventBackdropScroll}
+            onTouchMove={preventBackdropScroll}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
             <div 
-                className="bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl flex flex-col gap-4 max-h-[92vh] overflow-hidden"
+                data-lenis-prevent
+                data-lenis-prevent-wheel
+                className="bg-white rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl flex flex-col gap-4 max-h-[92vh] overflow-hidden overscroll-contain"
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onTouchMove={handleMouseMove}

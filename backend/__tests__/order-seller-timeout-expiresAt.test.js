@@ -47,14 +47,16 @@ describe("processSellerTimeoutJob expiresAt handling", () => {
     jest.clearAllMocks();
   });
 
-  it("unsets expiresAt when cancelling after seller timeout", async () => {
+  it("flags delayed acceptance alert when seller timeout expires", async () => {
     const past = new Date(Date.now() - 5000);
-    const cancelledOrder = {
+    const alertedOrder = {
       orderId: "ORD-TIMEOUT-1",
       customer: "cust1",
       seller: "seller1",
       _id: "mongo1",
-      workflowStatus: WORKFLOW_STATUS.CANCELLED,
+      workflowStatus: WORKFLOW_STATUS.SELLER_PENDING,
+      sellerTimeoutAlert: true,
+      attentionRequired: true,
     };
 
     mockFindOne.mockResolvedValue({
@@ -64,8 +66,7 @@ describe("processSellerTimeoutJob expiresAt handling", () => {
       sellerPendingExpiresAt: past,
     });
 
-    mockFindOneAndUpdate.mockResolvedValue(cancelledOrder);
-    mockCompensate.mockResolvedValue(undefined);
+    mockFindOneAndUpdate.mockResolvedValue(alertedOrder);
 
     await processSellerTimeoutJob({ orderId: "ORD-TIMEOUT-1" });
 
@@ -73,13 +74,12 @@ describe("processSellerTimeoutJob expiresAt handling", () => {
       expect.objectContaining({ orderId: "ORD-TIMEOUT-1" }),
       expect.objectContaining({
         $set: expect.objectContaining({
-          workflowStatus: WORKFLOW_STATUS.CANCELLED,
-          cancelReason: "Seller timeout (60s)",
+          sellerTimeoutAlert: true,
+          attentionRequired: true,
+          attentionReason: "Seller acceptance delayed (> 10 min)",
         }),
-        $unset: { expiresAt: 1 },
       }),
       { new: true },
     );
-    expect(mockCompensate).toHaveBeenCalledWith(cancelledOrder, "ORD-TIMEOUT-1");
   });
 });

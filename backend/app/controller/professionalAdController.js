@@ -34,8 +34,7 @@ export const createAd = async (req, res) => {
         }
 
         const settings = await Setting.findOne({}) || {};
-        const isFree = validCategories.every(cat => cat.priceType === "free");
-        const validityDays = settings.professionalAdValidityDays ?? 30;
+        const validityDays = settings.professionalAdValidityDays ?? 365;
 
         const expiryDate = new Date();
         expiryDate.setDate(expiryDate.getDate() + validityDays);
@@ -57,23 +56,19 @@ export const createAd = async (req, res) => {
                 coordinates: [Number(lng), Number(lat)],
             },
             approvalStatus: "pending",
-            paymentStatus: isFree ? "paid" : "unpaid",
-            paymentDetails: isFree ? {
-                transactionId: `TXN-AD-FREE-${Date.now()}`,
+            paymentStatus: "paid",
+            paymentDetails: {
+                transactionId: `TXN-FREE-${Date.now()}`,
                 amountPaid: 0,
                 paidAt: new Date(),
-            } : undefined,
-            expiresAt: isFree ? expiryDate : undefined,
+            },
+            expiresAt: expiryDate,
             isPublished: false,
             mediaUrl: mediaUrl || "",
             mediaType: mediaType || "none",
         });
 
-        const successMsg = isFree
-            ? "Professional profile listing created successfully and is pending admin approval."
-            : "Professional profile listing created successfully. Please complete the listing payment to make it active.";
-
-        return handleResponse(res, 201, successMsg, newAd);
+        return handleResponse(res, 201, "Service provider profile created successfully and submitted for admin review.", newAd);
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }
@@ -117,38 +112,13 @@ export const updateMyAd = async (req, res) => {
             ad.categories = ids;
             ad.category = ids[0];
 
-             // If changed to free categories and not already paid, mark as paid
-             const isFree = validCategories.every(cat => cat.priceType === "free");
-             if (isFree) {
-                 if (ad.paymentStatus !== "paid") {
-                     const settings = await Setting.findOne({}) || {};
-                     const validityDays = settings.professionalAdValidityDays ?? 30;
-                     const expiryDate = new Date();
-                     expiryDate.setDate(expiryDate.getDate() + validityDays);
-
-                     ad.paymentStatus = "paid";
-                     ad.paymentDetails = {
-                         transactionId: `TXN-AD-FREE-${Date.now()}`,
-                         amountPaid: 0,
-                         paidAt: new Date(),
-                     };
-                     ad.expiresAt = expiryDate;
-                 }
-             } else {
-                 // If not all are free, check if they need to pay
-                 const settings = await Setting.findOne({}) || {};
-                 const paidCategories = validCategories.filter(cat => cat.priceType === "paid");
-                 const prices = paidCategories.map(cat => cat.price ?? settings.professionalAdListingFee ?? 499);
-                 const requiredFee = prices.reduce((sum, p) => sum + p, 0);
-
-                 const currentAmountPaid = ad.paymentDetails?.amountPaid || 0;
-                 const isExpired = ad.expiresAt && ad.expiresAt < new Date();
-                 if (currentAmountPaid < requiredFee || isExpired) {
-                     ad.paymentStatus = "unpaid";
-                     ad.expiresAt = null;
-                 }
-             }
-         }
+            ad.paymentStatus = "paid";
+            if (!ad.expiresAt || ad.expiresAt < new Date()) {
+                const expiryDate = new Date();
+                expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+                ad.expiresAt = expiryDate;
+            }
+        }
 
         if (name) ad.name = name.trim();
         if (phone) ad.phone = phone.trim();
@@ -323,9 +293,11 @@ export const searchAds = async (req, res) => {
 
         const query = {
             approvalStatus: "approved",
-            paymentStatus: "paid",
-            expiresAt: { $gt: new Date() },
             isPublished: true,
+            $or: [
+                { expiresAt: { $exists: false } },
+                { expiresAt: { $gt: new Date() } }
+            ]
         };
 
         if (categoryId) {
@@ -382,9 +354,10 @@ export const searchAds = async (req, res) => {
 export const adminGetAds = async (req, res) => {
     try {
         const { status, paymentStatus } = req.query;
-        const query = { paymentStatus: "paid" };
+        const query = {};
 
         if (status) query.approvalStatus = status;
+        if (paymentStatus) query.paymentStatus = paymentStatus;
 
         const ads = await ProfessionalAd.find(query)
             .populate("owner", "name phone email")
@@ -409,15 +382,16 @@ export const adminApproveAd = async (req, res) => {
 
         ad.approvalStatus = "approved";
         ad.rejectionReason = null;
+        ad.paymentStatus = "paid";
 
-        // Auto publish if payment is complete
-        if (ad.paymentStatus === "paid" && ad.expiresAt > new Date()) {
-            ad.isPublished = true;
-        }
+        const expiryDate = new Date();
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+        ad.expiresAt = expiryDate;
+        ad.isPublished = true;
 
         await ad.save();
 
-        return handleResponse(res, 200, "Advertisement approved successfully", ad);
+        return handleResponse(res, 200, "Service provider profile approved successfully", ad);
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }

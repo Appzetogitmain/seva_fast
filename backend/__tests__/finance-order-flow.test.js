@@ -107,7 +107,11 @@ jest.unstable_mockModule("../app/models/customer.js", () => ({
 }));
 
 jest.unstable_mockModule("../app/models/seller.js", () => ({
-  default: { find: jest.fn(), findOne: jest.fn(), findById: jest.fn() },
+  default: {
+    find: jest.fn().mockImplementation(() => ({ session: jest.fn().mockResolvedValue([]) })),
+    findOne: jest.fn().mockImplementation(() => ({ session: jest.fn().mockResolvedValue(null) })),
+    findById: jest.fn().mockImplementation(() => ({ session: jest.fn().mockResolvedValue(null) })),
+  },
 }));
 
 jest.unstable_mockModule("../app/models/order.js", () => ({
@@ -296,9 +300,11 @@ describe("finance order flow", () => {
 
   it("settles delivered orders by queueing payouts and admin earning", async () => {
     currentOrder.paymentMode = "ONLINE";
+    currentOrder.payment = { method: "online", status: "paid" };
     currentOrder.financeFlags = { onlinePaymentCaptured: true };
     currentOrder.status = "pending";
     currentOrder.orderStatus = "pending";
+    currentOrder.returnWindowExpiresAt = new Date(Date.now() - 60000);
 
     const updated = await settleDeliveredOrder({ _id: "order-1" }, { actorId: "admin-1" });
 
@@ -311,6 +317,7 @@ describe("finance order flow", () => {
 
   it("backfills paymentBreakdown snapshots when missing", async () => {
     currentOrder.paymentMode = "ONLINE";
+    currentOrder.payment = { method: "online", status: "paid" };
     currentOrder.financeFlags = { onlinePaymentCaptured: true };
     currentOrder.status = "pending";
     currentOrder.orderStatus = "pending";

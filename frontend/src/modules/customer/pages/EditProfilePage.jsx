@@ -80,11 +80,20 @@ const EditProfilePage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        const trimmedName = String(formData.name || '').trim();
+        if (!trimmedName) {
+            toast.error(t('auth.errors.nameRequired', { defaultValue: 'Full name is required' }));
+            return;
+        }
+        if (formData.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+            toast.error('Please enter a valid email address');
+            return;
+        }
         setIsLoading(true);
         try {
             const response = await customerApi.updateProfile({
-                name: formData.name,
-                email: formData.email,
+                name: trimmedName,
+                email: formData.email?.trim() || undefined,
                 dateOfBirth: formData.dateOfBirth,
                 profileImage: formData.profileImage,
             });
@@ -155,7 +164,7 @@ const EditProfilePage = () => {
                 </div>
 
                 {/* Edit Form */}
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} noValidate className="space-y-5">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-5">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{t('auth.fullName')}</label>

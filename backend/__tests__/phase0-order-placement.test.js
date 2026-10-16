@@ -52,12 +52,19 @@ const OrderMock = jest.fn().mockImplementation((doc) => {
 });
 OrderMock.find = mockOrderFind;
 OrderMock.findOne = mockOrderFindOne;
+OrderMock.countDocuments = jest.fn().mockImplementation(() => {
+  const query = {
+    session: jest.fn().mockResolvedValue(0),
+    then: (resolve) => resolve(0),
+  };
+  return query;
+});
 
 jest.unstable_mockModule("mongoose", () => ({
   default: {
     startSession: mockStartSession,
     Schema: Object.assign(
-      function () { return { index: jest.fn(), pre: jest.fn() }; },
+      function () { return { index: jest.fn(), pre: jest.fn(), virtual: jest.fn().mockReturnValue({}), methods: {}, statics: {} }; },
       { Types: { ObjectId: "ObjectId" } }
     ),
     model: jest.fn().mockReturnValue({}),
@@ -103,6 +110,7 @@ jest.unstable_mockModule("../app/services/orderIdService.js", () => ({
 
 jest.unstable_mockModule("../app/services/checkoutPricingService.js", () => ({
   buildCheckoutPricingSnapshot: mockBuildCheckoutPricingSnapshot,
+  resolveDeliveryDecisionsForCheckout: jest.fn(),
 }));
 
 jest.unstable_mockModule("../app/services/stockService.js", () => ({
@@ -113,6 +121,7 @@ jest.unstable_mockModule("../app/services/stockService.js", () => ({
     releasedAt: null,
   })),
   reserveStockForItems: mockReserveStockForItems,
+  releaseReservedStockForOrder: jest.fn(),
 }));
 
 jest.unstable_mockModule("../app/services/orderWorkflowService.js", () => ({
@@ -124,6 +133,7 @@ jest.unstable_mockModule("../app/services/finance/orderFinanceService.js", () =>
     order.paymentBreakdown = breakdown;
     order.pricing = { total: breakdown.grandTotal || 0 };
   }),
+  handleOnlineOrderFinance: jest.fn(),
 }));
 
 jest.unstable_mockModule("../app/services/idempotencyService.js", () => ({

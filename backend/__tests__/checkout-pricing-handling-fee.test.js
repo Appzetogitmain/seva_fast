@@ -27,6 +27,21 @@ jest.unstable_mockModule("../app/services/finance/financeSettingsService.js", ()
   getOrCreateFinanceSettings: mockGetOrCreateFinanceSettings,
 }));
 
+jest.unstable_mockModule("../app/models/seller.js", () => ({
+  default: {
+    findById: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      session: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue({
+        _id: "seller-id",
+        shopName: "Test Shop",
+        serviceRadius: 10,
+        location: null,
+      }),
+    }),
+  },
+}));
+
 const { buildCheckoutPricingSnapshot } = await import(
   "../app/services/checkoutPricingService.js"
 );
@@ -91,6 +106,7 @@ describe("checkout pricing snapshot handling fee", () => {
 
     mockGetOrCreateFinanceSettings.mockResolvedValue({
       deliveryPricingMode: "distance_based",
+      deliveryFeeSlabs: [{ minKm: 0, maxKm: 10, fee: 30 }],
       customerBaseDeliveryFee: 30,
       riderBasePayout: 30,
       baseDistanceCapacityKm: 0.5,

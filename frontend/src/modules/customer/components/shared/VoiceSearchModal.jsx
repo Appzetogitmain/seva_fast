@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, X, Volume2, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
+    useLockBodyScroll(Boolean(isOpen));
     const { t } = useTranslation('customer');
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
@@ -127,7 +129,11 @@ const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+            <div 
+                className="fixed inset-0 z-[300] flex items-center justify-center p-4 overscroll-contain"
+                onWheel={preventBackdropScroll}
+                onTouchMove={preventBackdropScroll}
+            >
                 {/* Backdrop */}
                 <motion.div
                     initial={{ opacity: 0 }}
@@ -139,10 +145,12 @@ const VoiceSearchModal = ({ isOpen, onClose, onSearchResult }) => {
 
                 {/* Modal Card */}
                 <motion.div
+                    data-lenis-prevent
+                    data-lenis-prevent-wheel
                     initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl overflow-hidden z-10 border border-slate-100 flex flex-col items-center text-center font-outfit"
+                    className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl overflow-hidden z-10 border border-slate-100 flex flex-col items-center text-center font-sans"
                 >
                     {/* Close Button */}
                     <button

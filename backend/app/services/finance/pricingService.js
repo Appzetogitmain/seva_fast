@@ -463,14 +463,30 @@ export function calculateCustomerDeliveryFee(
     };
   }
 
-  const slab = resolveDistanceSlab(deliverySettings.deliveryFeeSlabs, normalizedDistance);
-  const baseFee = roundCurrency(slab?.fee ?? 0);
-  const weightSurcharge = computeWeightSurcharge(
-    weightKg,
-    deliverySettings.deliveryFeeBaseWeightKg ?? 2,
-    deliverySettings.deliveryFeeExtraFeePerKg ?? 10,
-  );
-  const fullFee = roundCurrency(baseFee + weightSurcharge);
+  const hasSlabs = Array.isArray(deliverySettings.deliveryFeeSlabs) && deliverySettings.deliveryFeeSlabs.length > 0;
+  let baseFee = 0;
+  let roundedExtraKm = 0;
+  let slab = null;
+  let extraFee = 0;
+
+  if (hasSlabs) {
+    slab = resolveDistanceSlab(deliverySettings.deliveryFeeSlabs, normalizedDistance);
+    baseFee = roundCurrency(slab?.fee ?? 0);
+    extraFee = computeWeightSurcharge(
+      weightKg,
+      deliverySettings.deliveryFeeBaseWeightKg ?? 2,
+      deliverySettings.deliveryFeeExtraFeePerKg ?? 10,
+    );
+  } else {
+    baseFee = roundCurrency(deliverySettings.customerBaseDeliveryFee ?? 0);
+    const baseCapacity = Number(deliverySettings.baseDistanceCapacityKm ?? 0);
+    roundedExtraKm = normalizedDistance > baseCapacity
+      ? Math.ceil(normalizedDistance - baseCapacity)
+      : 0;
+    extraFee = roundedExtraKm * Number(deliverySettings.incrementalKmSurcharge ?? 0);
+  }
+
+  const fullFee = roundCurrency(baseFee + extraFee);
 
   const freeAboveOrderValue = slab?.freeAboveOrderValue;
   const qualifiesForSlabFreeDelivery =
@@ -482,11 +498,11 @@ export function calculateCustomerDeliveryFee(
     deliveryFeeCharged: chargedFee,
     deliveryFeeBase: fullFee,
     distanceKmActual: normalizedDistance,
-    distanceKmRounded: normalizedDistance,
-    roundedExtraKm: 0,
+    distanceKmRounded: hasSlabs ? normalizedDistance : (Math.ceil(normalizedDistance * 2) / 2 || normalizedDistance),
+    roundedExtraKm,
     mode,
     baseFee,
-    extraFee: weightSurcharge,
+    extraFee,
     slabApplied: slab ? { minKm: slab.minKm, maxKm: slab.maxKm } : null,
   };
 }

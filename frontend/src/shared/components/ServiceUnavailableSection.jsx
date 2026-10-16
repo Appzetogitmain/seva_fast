@@ -85,7 +85,7 @@ const ServiceUnavailableSection = ({
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-outfit">
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
             <div className="w-full max-w-2xl rounded-3xl bg-white border border-slate-100 shadow-[0_20px_60px_rgba(15,23,42,0.08)] p-6 md:p-10 text-center flex flex-col items-center">
                 {content}
             </div>

@@ -112,6 +112,7 @@ const PushNavigateBridge = () => {
 
 const RootLayout = () => (
     <>
+        <ScrollToTop />
         <PushNavigateBridge />
         <Outlet />
     </>
@@ -126,7 +127,7 @@ const CustomerLayoutWrapper = () => (
                         <ProductDetailProvider>
                             <ScrollToTop />
                             <CustomerLayout>
-                                <Suspense fallback={<div className="flex h-screen items-center justify-center font-outfit">Loading...</div>}>
+                                <Suspense fallback={<div className="flex h-screen items-center justify-center font-sans">Loading...</div>}>
                                     <Outlet />
                                 </Suspense>
                             </CustomerLayout>
@@ -233,7 +234,7 @@ const router = createBrowserRouter([
                 },
                 {
                     path: 'unauthorized',
-                    element: <div className="flex h-screen items-center justify-center font-outfit">Unauthorized Access</div>,
+                    element: <div className="flex h-screen items-center justify-center font-sans">Unauthorized Access</div>,
                 },
                 {
                     path: 'service-unavailable',

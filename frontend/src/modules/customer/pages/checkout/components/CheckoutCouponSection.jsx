@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useLockBodyScroll } from '@/shared/hooks/useLockBodyScroll';
 
 /**
  * CheckoutCouponSection
@@ -36,6 +37,7 @@ const CheckoutCouponSection = React.memo(function CheckoutCouponSection({
   onOpenChange,
   onApplyManualCode,
 }) {
+  useLockBodyScroll(Boolean(isOpen));
   const { t } = useTranslation('customer');
   return (
     <>

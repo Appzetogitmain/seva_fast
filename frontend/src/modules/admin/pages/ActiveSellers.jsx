@@ -1077,7 +1077,7 @@ const ActiveSellers = () => {
                       {selectedSeller.commissionModel === 'PLAN_BASED' && (
                         <div>
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Subscription Details</label>
-                          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 space-y-2 font-['Outfit']">
+                          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 space-y-2 font-sans">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-black text-emerald-900">{selectedSeller.subscription?.planName || 'Plan Active'}</span>
                               <span className={`px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full ${

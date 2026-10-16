@@ -77,7 +77,7 @@ const SellerPlanEditorModal = ({ isOpen, onClose, onSave, plan }) => {
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={plan ? "Edit Seller Subscription Plan" : "Create Seller Subscription Plan"}>
-            <form onSubmit={handleSubmit} className="space-y-6 pt-2 font-['Outfit']">
+            <form onSubmit={handleSubmit} className="space-y-6 pt-2 font-sans">
                 {/* Basic Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@core/context/AuthContext';
 import { useSettings } from '@core/context/SettingsContext';
 import {
@@ -17,6 +17,7 @@ import {
     ShoppingBasket,
     Heart,
     ChevronLeft,
+    ArrowLeft,
     X,
     Eye,
     Cake,
@@ -29,6 +30,7 @@ import LanguageSwitcher from '@shared/components/LanguageSwitcher';
 import { buildPlayStoreReferUrl } from '../utils/referralLinks';
 import BgImage from '@/assets/image.png';
 import PlanCard from '@/shared/components/ui/PlanCard';
+import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
 
 const CATEGORIES = [
     {
@@ -112,6 +114,7 @@ const CustomerAuth = () => {
     const [timer, setTimer] = useState(0);
     const [carouselIndex, setCarouselIndex] = useState(0);
     const [showPlansModal, setShowPlansModal] = useState(false);
+    useLockBodyScroll(Boolean(showPlansModal));
     const [plans, setPlans] = useState([]);
     const [loadingPlans, setLoadingPlans] = useState(false);
     const { login } = useAuth();
@@ -215,19 +218,23 @@ const CustomerAuth = () => {
         return () => clearInterval(interval);
     }, [timer]);
 
-    useEffect(() => {
-        if (showPlansModal) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => {
-            document.body.style.overflow = '';
-        };
-    }, [showPlansModal]);
 
     const handleSendOtp = async (e) => {
         e?.preventDefault();
+        if (!isLogin) {
+            if (!formData.name || !formData.name.trim()) {
+                toast.error(t('auth.errors.nameRequired', { defaultValue: 'Full name is required' }));
+                return;
+            }
+            if (!formData.dateOfBirth) {
+                toast.error(t('auth.errors.dobRequired', { defaultValue: 'Date of birth is required' }));
+                return;
+            }
+        }
+        if (!formData.phone || !formData.phone.trim()) {
+            toast.error(t('auth.errors.phoneRequired', { defaultValue: 'Mobile number is required' }));
+            return;
+        }
         if (!isValidIndianPhone(formData.phone)) {
             toast.error(t('auth.errors.invalidPhone'));
             return;
@@ -239,14 +246,6 @@ const CustomerAuth = () => {
                 const res = await customerApi.sendLoginOtp({ phone: formData.phone });
                 toast.success(res.data?.message || t('auth.otpSent'));
             } else {
-                if (!formData.name.trim()) {
-                    toast.error(t('auth.errors.nameRequired'));
-                    return;
-                }
-                if (!formData.dateOfBirth) {
-                    toast.error(t('auth.errors.dobRequired'));
-                    return;
-                }
                 const res = await customerApi.sendSignupOtp({
                     name: formData.name.trim(),
                     phone: formData.phone,
@@ -347,7 +346,7 @@ const CustomerAuth = () => {
     };
 
     return (
-        <div className="min-h-screen w-full relative flex items-center justify-center font-['Outfit',_sans-serif] overflow-hidden">
+        <div className="min-h-screen w-full relative flex items-center justify-center font-sans overflow-hidden">
 
             {/* Dynamic Atmospheric Background */}
             <div 
@@ -407,12 +406,38 @@ const CustomerAuth = () => {
                         className="relative h-36 sm:h-44 w-full overflow-hidden"
                     >
                         {/* Fixed Top Branding Bar inside Header */}
-                        <div className="absolute top-4 sm:top-6 left-0 w-full px-6 flex items-center justify-between z-50">
-                            <div className="flex items-center gap-2">
-                                <div className="w-9 h-9 bg-black/20 backdrop-blur-xl rounded-xl flex items-center justify-center border border-white/30 shadow-sm">
-                                    <ShoppingBag size={18} className="text-white drop-shadow-sm" />
-                                </div>
-                                <span className="text-white font-black tracking-tighter text-lg sm:text-xl drop-shadow-md">{appName.toUpperCase()}</span>
+                        <div className="absolute top-4 sm:top-6 left-0 w-full px-5 sm:px-6 flex items-center justify-between z-50">
+                            <div className="flex items-center gap-2 sm:gap-2.5">
+                                {/* Back Button */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (window.history.length > 2) {
+                                            navigate(-1);
+                                        } else {
+                                            navigate('/');
+                                        }
+                                    }}
+                                    aria-label="Back"
+                                    title="Back"
+                                    className="w-9 h-9 bg-black/25 hover:bg-black/40 active:scale-90 transition-all backdrop-blur-xl rounded-xl flex items-center justify-center border border-white/30 shadow-sm text-white cursor-pointer"
+                                >
+                                    <ArrowLeft size={18} className="text-white drop-shadow-sm" />
+                                </button>
+
+                                {/* Brand Logo & Text -> Click to Home */}
+                                <Link
+                                    to="/"
+                                    className="flex items-center gap-2 group cursor-pointer active:scale-95 transition-transform"
+                                    title="Go to Home"
+                                >
+                                    <div className="w-9 h-9 bg-black/20 group-hover:bg-black/30 backdrop-blur-xl rounded-xl flex items-center justify-center border border-white/30 shadow-sm transition-colors">
+                                        <ShoppingBag size={18} className="text-white drop-shadow-sm" />
+                                    </div>
+                                    <span className="text-white font-black tracking-tighter text-lg sm:text-xl drop-shadow-md group-hover:opacity-90 transition-opacity">
+                                        {appName.toUpperCase()}
+                                    </span>
+                                </Link>
                             </div>
                             <LanguageSwitcher className="scale-90 origin-right" />
                         </div>
@@ -492,7 +517,7 @@ const CustomerAuth = () => {
                 </div>
 
                 {/* SCROLLABLE FORM SECTION */}
-                <div className="flex-1 w-full overflow-y-auto custom-scrollbar flex flex-col">
+                <div className="flex-1 w-full overflow-y-auto no-scrollbar scrollbar-hide flex flex-col">
                     {/* Authentication Form Block */}
                     <div className="px-5 sm:px-6 pt-1 pb-6">
                         <AnimatePresence mode="wait">
@@ -541,86 +566,83 @@ const CustomerAuth = () => {
                                         </p>
                                     </div>
 
-                                    <form onSubmit={handleSendOtp} className="space-y-3">
+                                    <form onSubmit={handleSendOtp} noValidate className="space-y-3">
                                         {!isLogin && (
-                                            <div className="relative group">
-                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors" style={{ color: 'inherit' }}>
-                                                    <User size={18} className="group-focus-within:text-[var(--theme-color)]" style={{ color: 'inherit' }} />
-                                                </div>
-                                                <input
-                                                    required
-                                                    name="name"
-                                                    value={formData.name || ""}
-                                                    placeholder={t('auth.fullName')}
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
-                                                    style={{ '--theme-color': activeCategory.theme }}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
-                                                        setFormData({ ...formData, name: val });
-                                                    }}
-                                                    onFocus={(e) => e.target.style.borderColor = activeCategory.theme}
-                                                    onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
-                                                />
-                                            </div>
-                                        )}
-                                        {!isLogin && (
-                                            <div className="relative group">
-                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors">
-                                                    <Cake size={18} />
-                                                </div>
-                                                <input
-                                                    required
-                                                    type="date"
-                                                    name="dateOfBirth"
-                                                    max={new Date().toISOString().split('T')[0]}
-                                                    value={formData.dateOfBirth}
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
-                                                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                                                    onFocus={(e) => { e.target.style.borderColor = activeCategory.theme; }}
-                                                    onBlur={(e) => { e.target.style.borderColor = '#F3F4F6'; }}
-                                                />
-                                            </div>
-                                        )}
-                                        {!isLogin && (
-                                            <div className="relative group">
-                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors">
-                                                    <Gift size={18} />
-                                                </div>
-                                                <input
-                                                    name="referralCode"
-                                                    value={referralCode}
-                                                    placeholder={t('auth.referralCode')}
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 uppercase tracking-wider outline-none focus:bg-white transition-all"
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.toUpperCase().trim();
-                                                        setReferralCode(val);
-                                                        sessionStorage.setItem('seva_referral_code', val);
-                                                    }}
-                                                    onFocus={(e) => { e.target.style.borderColor = activeCategory.theme; }}
-                                                    onBlur={(e) => { e.target.style.borderColor = '#F3F4F6'; }}
-                                                />
-                                            </div>
-                                        )}
-                                        <div className="relative group">
-                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors">
-                                                <Phone size={18} />
-                                            </div>
-                                            <div className="absolute left-11 top-1/2 -translate-y-1/2 font-black text-sm text-gray-400 border-r border-gray-200 pr-2">
-                                                +91
-                                            </div>
-                                            <input
-                                                required
-                                                type="tel"
-                                                name="phone"
-                                                maxLength={10}
-                                                value={formData.phone || ''}
-                                                placeholder={t('auth.mobileNumber')}
-                                                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-20 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
-                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
-                                                onFocus={(e) => e.target.style.borderColor = activeCategory.theme}
-                                                onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
-                                            />
-                                        </div>
+                                             <div className="relative group">
+                                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors" style={{ color: 'inherit' }}>
+                                                     <User size={18} className="group-focus-within:text-[var(--theme-color)]" style={{ color: 'inherit' }} />
+                                                 </div>
+                                                 <input
+                                                     name="name"
+                                                     value={formData.name || ""}
+                                                     placeholder={t('auth.fullName')}
+                                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
+                                                     style={{ '--theme-color': activeCategory.theme }}
+                                                     onChange={(e) => {
+                                                         const val = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+                                                         setFormData({ ...formData, name: val });
+                                                     }}
+                                                     onFocus={(e) => e.target.style.borderColor = activeCategory.theme}
+                                                     onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
+                                                 />
+                                             </div>
+                                         )}
+                                         {!isLogin && (
+                                             <div className="relative group">
+                                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors">
+                                                     <Cake size={18} />
+                                                 </div>
+                                                 <input
+                                                     type="date"
+                                                     name="dateOfBirth"
+                                                     max={new Date().toISOString().split('T')[0]}
+                                                     value={formData.dateOfBirth}
+                                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
+                                                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                                                     onFocus={(e) => { e.target.style.borderColor = activeCategory.theme; }}
+                                                     onBlur={(e) => { e.target.style.borderColor = '#F3F4F6'; }}
+                                                 />
+                                             </div>
+                                         )}
+                                         {!isLogin && (
+                                             <div className="relative group">
+                                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors">
+                                                     <Gift size={18} />
+                                                 </div>
+                                                 <input
+                                                     name="referralCode"
+                                                     value={referralCode}
+                                                     placeholder={t('auth.referralCode')}
+                                                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-gray-800 uppercase tracking-wider outline-none focus:bg-white transition-all"
+                                                     onChange={(e) => {
+                                                         const val = e.target.value.toUpperCase().trim();
+                                                         setReferralCode(val);
+                                                         sessionStorage.setItem('seva_referral_code', val);
+                                                     }}
+                                                     onFocus={(e) => { e.target.style.borderColor = activeCategory.theme; }}
+                                                     onBlur={(e) => { e.target.style.borderColor = '#F3F4F6'; }}
+                                                 />
+                                             </div>
+                                         )}
+                                         <div className="relative group">
+                                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors">
+                                                 <Phone size={18} />
+                                             </div>
+                                             <div className="absolute left-11 top-1/2 -translate-y-1/2 font-black text-sm text-gray-400 border-r border-gray-200 pr-2">
+                                                 +91
+                                             </div>
+                                             <input
+                                                 type="tel"
+                                                 name="phone"
+                                                 maxLength={10}
+                                                 value={formData.phone || ''}
+                                                 placeholder={t('auth.mobileNumber')}
+                                                 className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-20 pr-4 py-3.5 text-sm font-bold text-gray-800 outline-none focus:bg-white transition-all"
+                                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
+                                                 onFocus={(e) => e.target.style.borderColor = activeCategory.theme}
+                                                 onBlur={(e) => e.target.style.borderColor = '#F3F4F6'}
+                                             />
+                                         </div>
 
                                         <button
                                             type="submit"
@@ -686,7 +708,7 @@ const CustomerAuth = () => {
                                         </div>
                                     </div>
 
-                                    <form onSubmit={handleVerifyOtp} className="space-y-10">
+                                    <form onSubmit={handleVerifyOtp} noValidate className="space-y-10">
                                         <div className="flex justify-between gap-2 px-1">
                                             {[...Array(6)].map((_, i) => (
                                                 <input
@@ -758,7 +780,9 @@ const CustomerAuth = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overscroll-contain"
+                        onWheel={preventBackdropScroll}
+                        onTouchMove={preventBackdropScroll}
                         onClick={() => setShowPlansModal(false)}
                     >
                         <motion.div
@@ -766,7 +790,9 @@ const CustomerAuth = () => {
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.9, opacity: 0 }}
                             onClick={e => e.stopPropagation()}
-                            className="bg-gray-50 rounded-[32px] w-full max-w-5xl max-h-[85vh] overflow-y-auto p-6 lg:p-10 shadow-2xl"
+                            data-lenis-prevent
+                            data-lenis-prevent-wheel
+                            className="bg-gray-50 rounded-[32px] w-full max-w-5xl max-h-[85vh] overflow-y-auto no-scrollbar scrollbar-hide overscroll-contain touch-pan-y p-6 lg:p-10 shadow-2xl"
                         >
                             <div className="flex justify-between items-center mb-8">
                                 <div>

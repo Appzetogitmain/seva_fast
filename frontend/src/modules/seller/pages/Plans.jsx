@@ -147,7 +147,7 @@ const SellerPlans = () => {
     const activePlanObj = plans.find((p) => p._id === sub?.planId);
 
     return (
-        <div className="max-w-6xl mx-auto p-3 sm:p-6 lg:p-8 font-['Outfit'] pb-24">
+        <div className="max-w-6xl mx-auto p-3 sm:p-6 lg:p-8 font-sans pb-24">
             {/* Header Banner */}
             <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-black text-white p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl shadow-xl relative overflow-hidden mb-6 sm:mb-8">
                 <div className="absolute top-0 right-0 w-64 sm:w-96 h-64 sm:h-96 bg-amber-500/10 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />

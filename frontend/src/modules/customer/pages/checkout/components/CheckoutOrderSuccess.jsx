@@ -2,6 +2,7 @@ import React from "react";
 import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Sparkles, Clock, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLockBodyScroll, preventBackdropScroll } from "@shared/hooks/useLockBodyScroll";
 
 /**
  * CheckoutOrderSuccess
@@ -17,6 +18,7 @@ const CheckoutOrderSuccess = React.memo(function CheckoutOrderSuccess({
   isScheduled,
 }) {
   const { t } = useTranslation('customer');
+  useLockBodyScroll(Boolean(show));
   const shortId = orderId ? String(orderId).slice(-6).toUpperCase() : "SUCCESS";
 
   return (
@@ -26,13 +28,17 @@ const CheckoutOrderSuccess = React.memo(function CheckoutOrderSuccess({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 overscroll-contain"
+          onWheel={preventBackdropScroll}
+          onTouchMove={preventBackdropScroll}
         >
           <motion.div
             initial={{ scale: 0.85, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            data-lenis-prevent
+            data-lenis-prevent-wheel
             className="relative w-full max-w-sm bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-emerald-500/30 rounded-3xl p-6 text-center shadow-2xl shadow-emerald-950/50 overflow-hidden"
           >
             {/* Ambient Background Glow */}

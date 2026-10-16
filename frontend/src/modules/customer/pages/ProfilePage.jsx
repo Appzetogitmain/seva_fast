@@ -22,6 +22,8 @@ import LanguageSwitcher from '@shared/components/LanguageSwitcher';
 import { buildAppReferUrl, buildPlayStoreReferUrl, buildSellerReferUrl } from '../utils/referralLinks';
 import { CustomPhotoOrderModal } from '../components/shared/CustomPhotoOrderModal';
 import { CustomerNotificationsModal } from '../components/shared/CustomerNotificationsModal';
+import MainLocationHeader from '../components/shared/MainLocationHeader';
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 const TEST_PUSH_STATUS_POLL_INTERVAL_MS = 1500;
 const TEST_PUSH_STATUS_MAX_ATTEMPTS = 20;
@@ -84,9 +86,23 @@ const ProfilePage = () => {
     const [unreadNotificationsCount, setUnreadNotificationsCount] = React.useState(0);
     const [targetDetails, setTargetDetails] = React.useState(null);
     const [isSharingCard, setIsSharingCard] = React.useState(false);
+    const [proProfile, setProProfile] = React.useState(null);
     const membershipCardRef = React.useRef(null);
 
     React.useEffect(() => {
+        const fetchProProfile = async () => {
+            try {
+                const res = await customerApi.getProfessionalProfile();
+                if (res.data?.success) {
+                    setProProfile(res.data.result);
+                }
+            } catch (err) {
+                // No profile yet or error
+                setProProfile(null);
+            }
+        };
+        fetchProProfile();
+
         const fetchTargetDetails = async () => {
             try {
                 const res = await customerApi.getReferralTree();
@@ -109,17 +125,6 @@ const ProfilePage = () => {
         };
         fetchUnreadCount();
     }, []);
-
-    React.useEffect(() => {
-        if (isReferralTreeModalOpen || isCustomOrderModalOpen || isNotificationsModalOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => {
-            document.body.style.overflow = '';
-        };
-    }, [isReferralTreeModalOpen, isCustomOrderModalOpen, isNotificationsModalOpen]);
 
     const handleShare = async (url, label = appName) => {
         const shareUrl = url || window.location.origin;
@@ -333,20 +338,91 @@ const ProfilePage = () => {
         }
     };
 
+    const handleBack = () => {
+        if (window.history.length > 1 && window.history.state?.idx > 0) {
+            navigate(-1);
+        } else {
+            navigate('/', { replace: true });
+        }
+    };
+
     return (
-        <div className="min-h-screen bg-slate-50 pb-24 md:pb-8 font-sans">
-            <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-sm px-4 pt-4 pb-3 border-b border-slate-200/60 mb-4 flex items-center gap-2">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="w-10 h-10 flex items-center justify-center hover:bg-slate-200/70 rounded-full transition-colors -ml-1"
-                >
-                    <ChevronLeft size={22} className="text-slate-800" />
-                </button>
-                <h1 className="text-xl font-semibold text-slate-900 tracking-tight">{t('profile.title')}</h1>
-                <LanguageSwitcher className="ml-auto" />
+        <div className="min-h-screen bg-slate-50 pb-24 md:pb-12 font-sans">
+            {/* Mount Existing Navbar (Header with location, search, cart, wishlist) */}
+            <MainLocationHeader />
+
+            {/* Profile Subheader with Safe Back Navigation & Language Switcher */}
+            <div className="pt-[140px] md:pt-[115px] max-w-2xl mx-auto px-4 pb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={handleBack}
+                        className="w-10 h-10 flex items-center justify-center hover:bg-slate-200/70 rounded-full transition-colors -ml-1"
+                        title={t('common.back', { defaultValue: 'Back' })}
+                        aria-label="Back"
+                    >
+                        <ChevronLeft size={22} className="text-slate-800" />
+                    </button>
+                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t('profile.title')}</h1>
+                </div>
+                <LanguageSwitcher />
             </div>
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-4">
+                {/* Service Provider Mode Switcher Banner */}
+                <div 
+                    onClick={() => navigate('/professionals/panel')}
+                    className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden cursor-pointer hover:border-indigo-400/40 transition-all duration-200"
+                >
+                    <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 relative z-10">
+                        <div className="flex items-start sm:items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0 mt-0.5 sm:mt-0">
+                                <Briefcase size={22} className="w-5 h-5 sm:w-[22px] sm:h-[22px]" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300">
+                                        {proProfile ? "Service Provider Mode" : "Service Provider Mode"}
+                                    </span>
+                                    {proProfile && (
+                                        <span className={cn(
+                                            "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border",
+                                            proProfile.approvalStatus === 'approved' ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
+                                            proProfile.approvalStatus === 'rejected' ? "bg-red-500/20 text-red-300 border-red-500/30" :
+                                            "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                        )}>
+                                            {proProfile.approvalStatus === 'approved' ? "Live" : proProfile.approvalStatus === 'rejected' ? "Rejected" : "In Review"}
+                                        </span>
+                                    )}
+                                </div>
+                                <h3 className="text-sm sm:text-base font-black text-white mt-1 tracking-tight break-words">
+                                    {proProfile ? `Provider: ${proProfile.profession || proProfile.name}` : "Switch to Service Provider"}
+                                </h3>
+                                <p className="text-[11px] sm:text-xs text-slate-300 font-medium leading-relaxed mt-0.5 line-clamp-2 sm:line-clamp-1">
+                                    {proProfile 
+                                        ? (proProfile.approvalStatus === 'approved' 
+                                            ? "Profile active — customers near you can call & contact you" 
+                                            : proProfile.approvalStatus === 'pending' 
+                                                ? "Under Admin review. Free listing goes live once approved" 
+                                                : `Rejected: ${proProfile.rejectionReason || 'Please update info'}`)
+                                        : "Offer plumber, electrician, technician or repairs directly to local customers"}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/professionals/panel');
+                            }}
+                            className="w-full sm:w-auto px-4 py-2.5 bg-white text-slate-950 hover:bg-slate-100 font-black text-xs uppercase tracking-wider rounded-xl transition shadow-md active:scale-95 shrink-0 whitespace-nowrap flex items-center justify-center gap-1.5"
+                        >
+                            {proProfile ? "Dashboard →" : "Register Free →"}
+                        </button>
+                    </div>
+                </div>
+
                 {/* User Identity Card — SEVAFAST membership layout */}
                 <div
                     ref={membershipCardRef}
@@ -620,7 +696,7 @@ const ProfilePage = () => {
                                 <p className="mt-1 text-[11px] font-medium leading-snug text-slate-500">
                                     {t('profile.sellerRefer.subtitle')}
                                 </p>
-                                <div className="mt-2 flex gap-2">
+                                <div className="mt-2 flex gap-2 flex-wrap">
                                     <button
                                         type="button"
                                         onClick={() => handleShare(sellerReferUrl, t('profile.sellerRefer.shareLabel'))}
@@ -891,8 +967,8 @@ const ProfilePage = () => {
 
 
 const MenuItem = ({ icon: Icon, label, sub, path, color = '#334155', bg = 'rgba(148,163,184,0.12)', badge = null }) => (
-    <Link to={path || '#'} className="px-4 py-3.5 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors group">
-        <div className="flex items-center gap-3">
+    <Link to={path || '#'} className="px-4 py-3.5 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors group gap-2">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
             <div
                 className="h-10 w-10 rounded-lg flex items-center justify-center relative shrink-0"
                 style={{ backgroundColor: bg }}
@@ -903,19 +979,19 @@ const MenuItem = ({ icon: Icon, label, sub, path, color = '#334155', bg = 'rgba(
                     style={{ color }}
                 />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-slate-800">{label}</h3>
+                    <h3 className="text-sm font-semibold text-slate-800 truncate">{label}</h3>
                     {badge !== null && badge > 0 && (
-                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-600 text-white">
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-600 text-white shrink-0">
                             {badge}
                         </span>
                     )}
                 </div>
-                {sub && <p className="text-[11px] text-slate-500 mt-0.5">{sub}</p>}
+                {sub && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{sub}</p>}
             </div>
         </div>
-        <div className="p-1.5 rounded-md group-hover:bg-slate-100 transition-colors">
+        <div className="p-1.5 rounded-md group-hover:bg-slate-100 transition-colors shrink-0">
             <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 transition-all group-hover:translate-x-0.5" />
         </div>
     </Link>
@@ -1003,6 +1079,7 @@ const ReferralNode = ({ node, isLast }) => {
 
 const ReferralTreeModal = ({ isOpen, onClose, user }) => {
     const { t } = useTranslation('customer');
+    useLockBodyScroll(Boolean(isOpen));
     const [treeData, setTreeData] = React.useState(null);
     const [earningsByLevel, setEarningsByLevel] = React.useState({});
     const [targetDetails, setTargetDetails] = React.useState(null);
@@ -1048,10 +1125,21 @@ const ReferralTreeModal = ({ isOpen, onClose, user }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-slate-50 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl h-[85vh] relative animate-in fade-in zoom-in duration-200">
+        <div 
+            className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overscroll-contain"
+            onWheel={preventBackdropScroll}
+            onTouchMove={preventBackdropScroll}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div 
+                className="bg-slate-50 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl h-[85vh] relative animate-in fade-in zoom-in duration-200"
+                data-lenis-prevent
+                data-lenis-prevent-wheel
+            >
                 {/* Header */}
-                <div className="p-4 border-b border-slate-200/60 flex items-center justify-between bg-white">
+                <div className="p-4 border-b border-slate-200/60 flex items-center justify-between bg-white shrink-0">
                     <h3 className="font-bold text-slate-800 flex items-center gap-2">
                         <Users size={20} className="text-indigo-600" />
                         {t('profile.tree.title')}
@@ -1062,7 +1150,14 @@ const ReferralTreeModal = ({ isOpen, onClose, user }) => {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div 
+                    data-lenis-prevent
+                    data-lenis-prevent-wheel
+                    className="flex-1 overflow-y-auto p-4 space-y-4 overscroll-contain touch-pan-y"
+                    tabIndex={0}
+                    onWheel={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                >
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center h-64 space-y-3">
                             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />

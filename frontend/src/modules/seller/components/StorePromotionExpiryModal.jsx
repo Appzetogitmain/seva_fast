@@ -40,7 +40,7 @@ const StorePromotionExpiryModal = () => {
         <>
             {/* 24-HOUR PRE-EXPIRY WARNING BANNER */}
             {statusData?.isExpiringSoon && !isDismissedWarning && (
-                <div className="bg-indigo-900 text-white px-4 py-3 shadow-xl flex items-center justify-between gap-4 font-['Outfit'] border-b border-indigo-500/30 relative z-40">
+                <div className="bg-indigo-900 text-white px-4 py-3 shadow-xl flex items-center justify-between gap-4 font-sans border-b border-indigo-500/30 relative z-40">
                     <div className="flex items-center gap-3 max-w-4xl mx-auto">
                         <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 animate-bounce" />
                         <p className="text-xs md:text-sm font-bold">
@@ -68,7 +68,7 @@ const StorePromotionExpiryModal = () => {
 
             {/* EXPIRY ALERT MODAL POPUP */}
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Store Promotion Expired">
-                <div className="py-2 space-y-6 font-['Outfit']">
+                <div className="py-2 space-y-6 font-sans">
                     <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-center gap-4">
                         <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-md shadow-indigo-200">
                             <Rocket className="h-6 w-6" />

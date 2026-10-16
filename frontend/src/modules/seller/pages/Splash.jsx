@@ -92,7 +92,7 @@ const Splash = () => {
   }, [navigate, isAuthenticated, role, user, token]);
 
   return (
-    <div className="min-h-screen bg-[#fcfaff] flex flex-col items-center justify-between text-slate-900 relative overflow-hidden font-['Outfit']">
+    <div className="min-h-screen bg-[#fcfaff] flex flex-col items-center justify-between text-slate-900 relative overflow-hidden font-sans">
       {/* Ambient background glows */}
       <div className="absolute top-0 left-0 w-80 h-80 bg-brand-100/40 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
       <div className="absolute bottom-32 right-0 w-80 h-80 bg-slate-100/60 rounded-full blur-3xl translate-x-1/2 pointer-events-none" />

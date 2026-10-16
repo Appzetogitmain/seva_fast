@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { categoryIcons } from '../constants/categoryIcons';
 import { Search, X } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { preventBackdropScroll } from '../hooks/useLockBodyScroll';
+import { useLockBodyScroll, preventBackdropScroll } from '../hooks/useLockBodyScroll';
 
 // MUI icon library (same as customer app categories)
 import HomeIcon from '@mui/icons-material/Home';
@@ -29,6 +29,7 @@ import BuildIcon from '@mui/icons-material/Build';
 import LuggageIcon from '@mui/icons-material/Luggage';
 
 const IconSelector = ({ selectedIcon, onSelect, onClose }) => {
+  useLockBodyScroll(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Map our internal icon ids to MUI icon components
@@ -61,7 +62,7 @@ const IconSelector = ({ selectedIcon, onSelect, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[310] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-[310] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overscroll-contain"
       onWheel={preventBackdropScroll}
       onTouchMove={preventBackdropScroll}
     >
@@ -97,6 +98,8 @@ const IconSelector = ({ selectedIcon, onSelect, onClose }) => {
 
         {/* Icon Grid */}
         <div
+          data-lenis-prevent
+          data-lenis-prevent-wheel
           className="p-6 overflow-y-auto flex-1 min-h-0 overscroll-contain touch-pan-y"
           onWheel={(e) => e.stopPropagation()}
           onTouchMove={(e) => e.stopPropagation()}

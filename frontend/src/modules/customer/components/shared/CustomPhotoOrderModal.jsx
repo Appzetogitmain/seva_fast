@@ -10,6 +10,7 @@ import { useAuth } from '@core/context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 /* ─── image compression helper ─── */
 const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 0.8) => {
@@ -63,6 +64,7 @@ const compressImage = async (file, maxWidth = 1280, maxHeight = 1280, quality = 
 /* ════════════════════════════════════════════════════════════ */
 
 export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
+    useLockBodyScroll(Boolean(isOpen));
     const { t } = useTranslation('customer');
     const { isAuthenticated, user } = useAuth();
     const { currentLocation, refreshLocation } = useLocation();
@@ -267,8 +269,16 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     /* ─────────── CROP VIEW ─────────── */
     if (isCropping && rawImageSrc) {
         return (
-            <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/70 backdrop-blur-md p-3">
-                <div className="bg-slate-900 rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div 
+                className="fixed inset-0 z-[600] flex items-center justify-center bg-black/70 backdrop-blur-md p-3 overscroll-contain"
+                onWheel={preventBackdropScroll}
+                onTouchMove={preventBackdropScroll}
+            >
+                <div 
+                    className="bg-slate-900 rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200"
+                    data-lenis-prevent
+                    data-lenis-prevent-wheel
+                >
                     <div className="p-4 flex items-center justify-between border-b border-white/10">
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
@@ -325,11 +335,22 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
 
     /* ─────────── MAIN FORM VIEW ─────────── */
     return (
-        <div className="fixed inset-0 z-[600] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl relative animate-in fade-in slide-in-from-bottom-4 duration-300 max-h-[92vh]">
+        <div 
+            className="fixed inset-0 z-[600] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm overscroll-contain"
+            onWheel={preventBackdropScroll}
+            onTouchMove={preventBackdropScroll}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div 
+                className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl relative animate-in fade-in slide-in-from-bottom-4 duration-300 max-h-[92vh]"
+                data-lenis-prevent
+                data-lenis-prevent-wheel
+            >
 
                 {/* ── Gradient Header ── */}
-                <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 px-5 py-4">
+                <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 px-5 py-4 shrink-0">
                     {/* decorative circles */}
                     <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 blur-sm" />
                     <div className="absolute -left-4 -bottom-8 w-20 h-20 rounded-full bg-white/5" />
@@ -354,7 +375,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                 {/* ── Track Orders Banner ── */}
                 <div
                     onClick={() => { onClose(); navigate('/orders?tab=photo'); }}
-                    className="mx-4 mt-4 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/70 rounded-xl px-3.5 py-3 flex items-center gap-3 cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all group active:scale-[0.98]"
+                    className="mx-4 mt-4 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/70 rounded-xl px-3.5 py-3 flex items-center gap-3 cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all group active:scale-[0.98] shrink-0"
                 >
                     <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-200">
                         <History size={17} />
@@ -370,7 +391,12 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
                 </div>
 
                 {/* ── Form Body ── */}
-                <form onSubmit={handleSubmit} className="px-4 pt-4 pb-5 space-y-4 overflow-y-auto flex-1">
+                <form 
+                    onSubmit={handleSubmit} 
+                    data-lenis-prevent
+                    data-lenis-prevent-wheel
+                    className="px-4 pt-4 pb-5 space-y-4 overflow-y-auto flex-1 overscroll-contain touch-pan-y"
+                >
 
                     {/* City Input */}
                     <div className="space-y-1.5">

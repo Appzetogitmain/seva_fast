@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, X, Gift, ShoppingBag, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 const WelcomeScratchCardModal = ({
     isOpen = false,
@@ -10,6 +11,7 @@ const WelcomeScratchCardModal = ({
     freeDelivery = true,
     userId = 'guest',
 }) => {
+    useLockBodyScroll(Boolean(isOpen));
     const { t } = useTranslation('customer');
     const canvasRef = useRef(null);
     const containerRef = useRef(null);
@@ -140,12 +142,21 @@ const WelcomeScratchCardModal = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
+        <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300 overscroll-contain"
+            onWheel={preventBackdropScroll}
+            onTouchMove={preventBackdropScroll}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
             {/* Confetti particles */}
             {showConfetti && <ConfettiCanvas />}
 
             <div
                 ref={containerRef}
+                data-lenis-prevent
+                data-lenis-prevent-wheel
                 className="relative w-full max-w-sm bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-2xl overflow-hidden text-center text-white animate-in zoom-in-95 duration-300"
             >
                 {/* Background glow radial */}

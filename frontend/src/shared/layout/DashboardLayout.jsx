@@ -15,6 +15,7 @@ import SellerOrdersContext from '@/modules/seller/context/SellerOrdersContext';
 import SellerEarningsContext, { defaultEarnings } from '@/modules/seller/context/SellerEarningsContext';
 import { getOrderSocket, onSellerOrderNew, onReturnDropOtp, onOrderStatusUpdate } from '@/core/services/orderSocket';
 import { getSellerOrderEarning } from '@/shared/utils/sellerOrderEarning';
+import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
 import orderAlertSound from '@/assets/sounds/order_alert.mp3';
 
 const POLL_INTERVAL_MS = 30000;
@@ -55,6 +56,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
     const acceptWindowTotalRef = useRef(60);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [returnDropOtpAlert, setReturnDropOtpAlert] = useState(null); // { orderId, otp, expiresAt }
+    useLockBodyScroll(Boolean(newOrderAlert || newReturnAlert || returnDropOtpAlert));
     const { user, logout, role } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
@@ -555,12 +557,18 @@ const DashboardLayout = ({ children, navItems, title }) => {
             {/* Global Order Alert Modal */}
             <AnimatePresence>
                 {newOrderAlert && (
-                    <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div
+                        className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overscroll-contain"
+                        onWheel={preventBackdropScroll}
+                        onTouchMove={preventBackdropScroll}
+                    >
                         <motion.div
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100"
+                            data-lenis-prevent
+                            data-lenis-prevent-wheel
+                            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 overscroll-contain"
                         >
                             <div className="flex flex-col items-center text-center">
                                 <div className="h-20 w-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 animate-bounce">
@@ -615,12 +623,18 @@ const DashboardLayout = ({ children, navItems, title }) => {
 
                 {/* Global Return Drop OTP Modal */}
                 {returnDropOtpAlert && (
-                    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+                    <div
+                        className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overscroll-contain"
+                        onWheel={preventBackdropScroll}
+                        onTouchMove={preventBackdropScroll}
+                    >
                         <motion.div
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-100"
+                            data-lenis-prevent
+                            data-lenis-prevent-wheel
+                            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-100 overscroll-contain"
                         >
                             <div className="flex flex-col items-center text-center">
                                 <div className="h-20 w-20 bg-brand-50 rounded-full flex items-center justify-center mb-6 animate-pulse">

@@ -500,7 +500,7 @@ const SellerDetail = () => {
                                                 </div>
                                                 
                                                 {seller.commissionModel === 'PLAN_BASED' && (
-                                                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 font-['Outfit'] space-y-2">
+                                                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 font-sans space-y-2">
                                                         <div className="flex items-center justify-between">
                                                             <p className="text-xs font-black text-emerald-900">{seller.subscription?.planName || 'Seller Subscription Active'}</p>
                                                             <span className={cn("px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full text-white", seller.subscription?.expiresAt && new Date(seller.subscription.expiresAt) > new Date() ? "bg-emerald-500" : "bg-rose-500")}>

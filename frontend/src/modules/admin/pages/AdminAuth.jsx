@@ -67,6 +67,22 @@ const AdminAuth = () => {
         console.log('Is Login:', isLogin);
         console.log('==============================');
 
+        if (!isLogin && !formData.name?.trim()) {
+            toast.error('Please enter your full name.');
+            setIsSubmitting(false);
+            return;
+        }
+        if (!formData.email?.trim()) {
+            toast.error('Please enter your email address.');
+            setIsSubmitting(false);
+            return;
+        }
+        if (!formData.password?.trim()) {
+            toast.error('Please enter your password.');
+            setIsSubmitting(false);
+            return;
+        }
+
         // Only validate password complexity for signup, not login
         if (!isLogin) {
             const pwd = (formData.password || '').trim();
@@ -124,7 +140,7 @@ const AdminAuth = () => {
     };
 
     return (
-        <div className="relative flex min-h-screen flex-col items-center justify-center bg-[#f3f6ff] p-6 py-10 font-['Outfit',_sans-serif]">
+        <div className="relative flex min-h-screen flex-col items-center justify-center bg-[#f3f6ff] p-6 py-10 font-sans">
             {/* Background Decorations */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-brand-50 opacity-40 rounded-full blur-[120px]"></div>
@@ -163,7 +179,7 @@ const AdminAuth = () => {
                                 </p>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="space-y-5">
+                            <form onSubmit={handleSubmit} noValidate className="space-y-5">
                                 <AnimatePresence mode="popLayout">
                                     {!isLogin && (
                                         <motion.div

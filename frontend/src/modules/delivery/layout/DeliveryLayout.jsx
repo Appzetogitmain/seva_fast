@@ -708,7 +708,7 @@ const DeliveryLayout = () => {
                     {activeOrder.earnings > 0 ? (
                       <div className="flex items-center gap-2 mb-6">
                         <span className="text-2xl font-black text-brand-600">₹{activeOrder.earnings}</span>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider font-outfit">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider font-sans">
                           Earnings
                         </span>
                       </div>

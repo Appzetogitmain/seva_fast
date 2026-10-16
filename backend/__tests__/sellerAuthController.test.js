@@ -54,6 +54,10 @@ describe("sellerAuthController signupSeller", () => {
         shopName: "Noyo Mart",
         category: "Groceries",
         address: "MG Road",
+        locality: "Palasia",
+        city: "Indore",
+        state: "Madhya Pradesh",
+        pincode: "452001",
         panNumber: "ABCDE1234F",
         bankDetails: {
           accountHolderName: "Seller Owner",

@@ -72,14 +72,36 @@ body.has-birthday-banner header.absolute.top-8 {
   top: calc(2rem + var(--birthday-banner-height)) !important;
 }
 
+@theme {
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-dm: 'DM Sans', sans-serif;
+  --font-outfit: 'DM Sans', sans-serif;
+}
+
 body {
   margin: 0;
-  font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 13px;
+}
+
+button, input, optgroup, select, textarea {
+  font-family: inherit;
+}
+
+.font-outfit,
+[class*="font-['Outfit']"] {
+  font-family: 'DM Sans', sans-serif !important;
+}
+
+/* Modal background scroll freeze */
+html.modal-scroll-locked,
+body.modal-scroll-locked {
+  overflow: hidden !important;
+  overscroll-behavior: contain !important;
 }
 
 /* Custom scrollbar */

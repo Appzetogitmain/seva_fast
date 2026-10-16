@@ -37,7 +37,7 @@ const RootErrorBoundary = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-outfit">
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-sans">
             <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-gray-100">
                 <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
                     <AlertCircle className="w-10 h-10 text-red-500" />

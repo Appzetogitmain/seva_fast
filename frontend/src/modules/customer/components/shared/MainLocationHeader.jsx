@@ -317,7 +317,7 @@ const MainLocationHeader = ({
     <>
       <div
         className={cn(
-          "fixed left-0 right-0 z-200",
+          "fixed left-0 right-0 z-[200]",
           isBirthday ? "top-9" : "top-0",
           isProductDetailOpen && "hidden md:block",
         )}>
