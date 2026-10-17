@@ -8,7 +8,7 @@ import { customerApi } from '../services/customerApi';
 import { useAuth } from '@/core/context/AuthContext';
 import PlanCard from '@/shared/components/ui/PlanCard';
 import { formatDate } from '@shared/utils/formatDate';
-import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
+import { useLockBodyScroll, preventBackdropScroll, forceUnlockBodyScroll } from '@/shared/hooks/useLockBodyScroll';
 
 const DEFAULT_REFERRAL_CODE = 'SEVAFAST';
 
@@ -160,7 +160,7 @@ const PlansPage = () => {
                     } catch (err) {
                         toast.error(err?.response?.data?.message || t('plans.errors.verifyFailed'));
                     } finally {
-                        unlockPageScroll();
+                        forceUnlockBodyScroll();
                         setSelectedPlan(null);
                         setReferralModalOpen(false);
                     }
@@ -174,7 +174,7 @@ const PlansPage = () => {
                 },
                 modal: {
                     ondismiss: () => {
-                        unlockPageScroll();
+                        forceUnlockBodyScroll();
                         setSelectedPlan(null);
                         setReferralModalOpen(false);
                     },
@@ -184,12 +184,12 @@ const PlansPage = () => {
             const rzp = new window.Razorpay(options);
             rzp.on('payment.failed', function (response) {
                 toast.error(response.error.description || t('plans.errors.paymentFailed'));
-                unlockPageScroll();
+                forceUnlockBodyScroll();
                 setSelectedPlan(null);
                 setReferralModalOpen(false);
             });
             setReferralModalOpen(false);
-            unlockPageScroll();
+            forceUnlockBodyScroll();
             rzp.open();
         } catch (error) {
             const message =
