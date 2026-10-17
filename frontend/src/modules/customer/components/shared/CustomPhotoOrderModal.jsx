@@ -94,6 +94,41 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     // the customer can clear the field without it being re-filled.
     const hasPrefilledRef = useRef(false);
 
+    /* ─── hardware/browser back closes the modal instead of exiting the app ─── */
+    const isOpenRef = useRef(isOpen);
+    const isCroppingRef = useRef(isCropping);
+    const onCloseRef = useRef(onClose);
+    isOpenRef.current = isOpen;
+    isCroppingRef.current = isCropping;
+    onCloseRef.current = onClose;
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const pushModalEntry = () =>
+            window.history.pushState({ ...window.history.state, photoOrderModal: true }, '');
+        if (!window.history.state?.photoOrderModal) pushModalEntry();
+
+        const handlePopState = () => {
+            if (isCroppingRef.current) {
+                // Back from the crop view returns to the form, keeping the modal open
+                setIsCropping(false);
+                setRawImageSrc(null);
+                pushModalEntry();
+                return;
+            }
+            onCloseRef.current();
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            // Closed via X: drop the entry we pushed. Deferred so a StrictMode remount
+            // (modal still open) doesn't pop it.
+            setTimeout(() => {
+                if (!isOpenRef.current && window.history.state?.photoOrderModal) window.history.back();
+            }, 0);
+        };
+    }, [isOpen]);
+
     const toCityName = (loc) => {
         const raw = loc?.city || loc?.name || "";
         return raw.split(",")[0].trim().replace(/[^a-zA-Z\s]/g, "").trim();
@@ -229,7 +264,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
     /* ─── submit ─── */
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!isAuthenticated || !user) { toast.error(t('photoOrder.errors.loginFirst')); onClose(); navigate('/login'); return; }
+        if (!isAuthenticated || !user) { toast.error(t('photoOrder.errors.loginFirst')); onClose(); navigate('/login', { replace: true }); return; }
         if (!file && !notes.trim()) return toast.error(t('photoOrder.errors.needContent'));
         if (!selectedSellerId) return toast.error(t('photoOrder.errors.selectSeller'));
 
@@ -249,11 +284,11 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
             toast.success(t('photoOrder.sent'));
             setIsSubmitting(false); setIsUploading(false); onClose();
             setFile(null); setOriginalFile(null); setFilePreview(''); setCity(''); setSelectedSellerId(''); setNotes('');
-            navigate('/orders?tab=photo');
+            navigate('/orders?tab=photo', { replace: true });
         } catch (error) {
             setIsUploading(false); setIsSubmitting(false);
             const status = error.response?.status;
-            if (status === 401 || status === 403) { toast.error(t('photoOrder.errors.loginFirstShort')); onClose(); navigate('/login'); }
+            if (status === 401 || status === 403) { toast.error(t('photoOrder.errors.loginFirstShort')); onClose(); navigate('/login', { replace: true }); }
             else if (error.response?.data?.message?.includes("file size") || error.response?.data?.message?.includes("File too large")) {
                 toast.error(t('photoOrder.errors.tooLarge'));
             } else { toast.error(error.response?.data?.message || t('photoOrder.errors.sendFailed')); }
@@ -353,7 +388,7 @@ export const CustomPhotoOrderModal = ({ isOpen, onClose }) => {
 
                 {/* ── Track Orders Banner ── */}
                 <div
-                    onClick={() => { onClose(); navigate('/orders?tab=photo'); }}
+                    onClick={() => { onClose(); navigate('/orders?tab=photo', { replace: true }); }}
                     className="mx-4 mt-4 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/70 rounded-xl px-3.5 py-3 flex items-center gap-3 cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all group active:scale-[0.98]"
                 >
                     <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-200">
