@@ -16,9 +16,7 @@ import {
     MapPin,
     Calendar,
     Phone,
-    Mail,
     AlertCircle,
-    User,
     ChevronRight,
     Edit2,
     X,
@@ -50,6 +48,7 @@ const ProfessionalProfilePanel = () => {
     const [address, setAddress] = useState('');
     const [city, setCity] = useState('');
     const [lat, setLat] = useState('22.7196'); // Default Indore coordinates
+    const [lng, setLng] = useState('75.8577'); // Default Indore coordinates
     const [isLocating, setIsLocating] = useState(false);
 
     // Form validation states

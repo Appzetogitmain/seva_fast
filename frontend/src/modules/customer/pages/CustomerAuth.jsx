@@ -318,13 +318,12 @@ const CustomerAuth = () => {
             login({ ...customer, token, role: 'customer' });
             removeCustomerDraft();
 
-            if (!isLogin && !customer.currentPlan) {
+            if (!isLogin) {
                 toast.success(t('auth.accountCreated'));
-                navigate('/plans', { replace: true });
             } else {
                 toast.success(t('auth.loggedIn'));
-                navigate('/');
             }
+            navigate('/', { replace: true });
         } catch (error) {
             console.error('SMS OTP verification error:', error);
             toast.error(error?.response?.data?.message || t('auth.errors.wrongOtp'));
@@ -346,11 +345,11 @@ const CustomerAuth = () => {
     };
 
     return (
-        <div className="min-h-screen w-full relative flex items-center justify-center font-sans overflow-hidden">
+        <div className="min-h-screen min-h-dvh w-full relative flex items-center justify-center font-sans py-4 sm:py-6 overflow-x-hidden overflow-y-auto">
 
             {/* Dynamic Atmospheric Background */}
             <div 
-                className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-1000"
+                className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-1000"
                 style={{ backgroundImage: `url(${BgImage})` }}
             >
                 <motion.div
@@ -361,7 +360,7 @@ const CustomerAuth = () => {
             </div>
 
             {/* Animated Blurred Blobs */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
                 <motion.div
                     animate={{
                         backgroundColor: activeCategory.theme,
@@ -395,7 +394,7 @@ const CustomerAuth = () => {
             </div>
 
             {/* Premium Centered Card Container */}
-            <div className="w-[92%] max-w-[400px] max-h-[90vh] bg-white relative z-10 overflow-hidden rounded-[36px] sm:rounded-[40px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] border border-white/40 flex flex-col transition-colors duration-1000">
+            <div className="w-[92%] max-w-[400px] max-h-[92vh] sm:max-h-[90vh] bg-white relative z-10 overflow-hidden rounded-[36px] sm:rounded-[40px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] border border-white/40 flex flex-col transition-colors duration-1000 my-auto">
 
                 {/* FIXED HEADER SECTION */}
                 <div className="w-full shrink-0 relative">
@@ -517,7 +516,13 @@ const CustomerAuth = () => {
                 </div>
 
                 {/* SCROLLABLE FORM SECTION */}
-                <div className="flex-1 w-full overflow-y-auto no-scrollbar scrollbar-hide flex flex-col">
+                <div 
+                    data-lenis-prevent
+                    data-lenis-prevent-wheel
+                    data-lenis-prevent-touch
+                    className="flex-1 min-h-0 w-full overflow-y-auto overscroll-contain touch-pan-y no-scrollbar scrollbar-hide flex flex-col"
+                    style={{ WebkitOverflowScrolling: 'touch' }}
+                >
                     {/* Authentication Form Block */}
                     <div className="px-5 sm:px-6 pt-1 pb-6">
                         <AnimatePresence mode="wait">
