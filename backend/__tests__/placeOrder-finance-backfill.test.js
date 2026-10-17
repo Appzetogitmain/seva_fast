@@ -33,7 +33,9 @@ jest.unstable_mockModule("../app/utils/helper.js", () => ({
 jest.unstable_mockModule("../app/constants/orderWorkflow.js", () => ({
   WORKFLOW_STATUS: { SELLER_PENDING: "SELLER_PENDING" },
   DEFAULT_SELLER_TIMEOUT_MS: () => 0,
+  DEFAULT_DELIVERY_TIMEOUT_MS: () => 0,
   workflowFromLegacyStatus: (status) => status,
+  legacyStatusFromWorkflow: (status) => status,
 }));
 
 jest.unstable_mockModule("../app/services/orderWorkflowService.js", () => ({
@@ -52,11 +54,17 @@ jest.unstable_mockModule("../app/services/orderSettlement.js", () => ({
 jest.unstable_mockModule("../app/services/finance/orderFinanceService.js", () => ({
   freezeFinancialSnapshot: mockFreezeFinancialSnapshot,
   reverseOrderFinanceOnCancellation: jest.fn(),
+  markSelfDeliveryCodCashWithSeller: jest.fn(),
 }));
 
 jest.unstable_mockModule("../app/services/finance/pricingService.js", () => ({
   hydrateOrderItems: mockHydrateOrderItems,
   generateOrderPaymentBreakdown: mockGenerateOrderPaymentBreakdown,
+  resolveSellerOrderEarning: jest.fn(),
+  splitDeliveryFee: jest.fn(() => ({ sellerShare: 0, adminShare: 0 })),
+  recalculateLogisticsEarnings: jest.fn(),
+  DELIVERY_FEE_SELLER_SHARE: 0,
+  DELIVERY_FEE_ADMIN_SHARE: 1,
 }));
 
 jest.unstable_mockModule("../app/models/order.js", () => ({

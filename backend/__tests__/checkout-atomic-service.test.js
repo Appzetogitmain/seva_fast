@@ -52,15 +52,29 @@ const OrderMock = jest.fn().mockImplementation((doc) => {
 });
 OrderMock.find = mockOrderFind;
 OrderMock.findOne = jest.fn();
+OrderMock.countDocuments = jest.fn().mockImplementation(() => {
+  const query = {
+    session: jest.fn().mockResolvedValue(0),
+    then: (resolve) => resolve(0),
+  };
+  return query;
+});
 
 jest.unstable_mockModule("mongoose", () => ({
   default: {
     startSession: mockStartSession,
     Schema: Object.assign(
-      function () { return { index: jest.fn(), pre: jest.fn() }; },
+      function () { return { index: jest.fn(), pre: jest.fn(), virtual: jest.fn().mockReturnValue({}), methods: {}, statics: {} }; },
       { Types: { ObjectId: "ObjectId" } }
     ),
     model: jest.fn().mockReturnValue({}),
+    Types: {
+      ObjectId: class ObjectId {
+        constructor(v) { this._id = v; }
+        toString() { return String(this._id); }
+        static isValid() { return true; }
+      },
+    },
   },
 }));
 
@@ -90,14 +104,20 @@ jest.unstable_mockModule("../app/models/order.js", () => ({
   default: OrderMock,
 }));
 
+const TransactionMock = jest.fn().mockImplementation((doc) => ({
+  ...doc,
+  _id: "tx-mock-oid",
+  save: jest.fn().mockResolvedValue(true),
+}));
+TransactionMock.create = mockTransactionCreate;
+
 jest.unstable_mockModule("../app/models/transaction.js", () => ({
-  default: {
-    create: mockTransactionCreate,
-  },
+  default: TransactionMock,
 }));
 
 jest.unstable_mockModule("../app/services/checkoutPricingService.js", () => ({
   buildCheckoutPricingSnapshot: mockBuildCheckoutPricingSnapshot,
+  resolveDeliveryDecisionsForCheckout: jest.fn().mockResolvedValue({}),
 }));
 
 jest.unstable_mockModule("../app/services/stockService.js", () => ({
@@ -108,6 +128,7 @@ jest.unstable_mockModule("../app/services/stockService.js", () => ({
     releasedAt: null,
   })),
   reserveStockForItems: mockReserveStockForItems,
+  releaseReservedStockForOrder: jest.fn().mockResolvedValue(true),
 }));
 
 jest.unstable_mockModule("../app/services/orderIdService.js", () => ({
@@ -127,6 +148,9 @@ jest.unstable_mockModule("../app/services/finance/orderFinanceService.js", () =>
     };
     return order;
   }),
+  handleOnlineOrderFinance: jest.fn().mockResolvedValue(true),
+  finalizeDeliveredOrderFinance: jest.fn().mockResolvedValue(true),
+  handleCancelledOrderFinance: jest.fn().mockResolvedValue(true),
 }));
 
 jest.unstable_mockModule("../app/services/idempotencyService.js", () => ({
@@ -386,12 +410,11 @@ describe("checkout atomic service", () => {
     expect(result.orders[1].checkoutGroupId).toBe("CHK-01JSRTEST0000000000000000");
     expect(result.orders[0].checkoutGroupIndex).toBe(0);
     expect(result.orders[1].checkoutGroupIndex).toBe(1);
-    expect(mockTransactionCreate).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ reference: "ORD-01JSRTEST0000000000000001" }),
-        expect.objectContaining({ reference: "ORD-01JSRTEST0000000000000002" }),
-      ]),
-      expect.objectContaining({ session: mockSession }),
+    expect(TransactionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ reference: "ORD-01JSRTEST0000000000000001" })
+    );
+    expect(TransactionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ reference: "ORD-01JSRTEST0000000000000002" })
     );
   });
 });

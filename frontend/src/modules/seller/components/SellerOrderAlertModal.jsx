@@ -6,11 +6,13 @@ import { useAuth } from "@core/context/AuthContext";
 import { getOrderSocket, onSellerOrderNew } from "@core/services/orderSocket";
 import { notificationSound } from "@core/utils/notificationSound";
 import AppZetoBridge from "@/lib/appZetoBridge";
+import { useLockBodyScroll, preventBackdropScroll } from "@/shared/hooks/useLockBodyScroll";
 
 export default function SellerOrderAlertModal() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
   const [newOrder, setNewOrder] = useState(null);
+  useLockBodyScroll(Boolean(newOrder));
   const [isMuted, setIsMuted] = useState(false);
 
   useEffect(() => {
@@ -68,13 +70,19 @@ export default function SellerOrderAlertModal() {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md">
+      <div
+        className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md overscroll-contain"
+        onWheel={preventBackdropScroll}
+        onTouchMove={preventBackdropScroll}
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.85, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.85, y: 20 }}
           transition={{ type: "spring", damping: 25, stiffness: 350 }}
-          className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border-2 border-indigo-500/30"
+          data-lenis-prevent
+          data-lenis-prevent-wheel
+          className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border-2 border-indigo-500/30 overscroll-contain"
         >
           {/* Top glowing header */}
           <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 p-6 text-white relative overflow-hidden">

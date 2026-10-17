@@ -7,6 +7,7 @@ import { useLocation } from "../../context/LocationContext";
 import { loadGoogleMaps } from "../../../../core/services/googleMapsLoader";
 import { customerApi } from "../../services/customerApi";
 import { getCachedGeocode, setCachedGeocode } from "@/core/utils/geocodeCache";
+import { useLockBodyScroll } from "@shared/hooks/useLockBodyScroll";
 
 const LocationDrawer = ({ isOpen, onClose }) => {
   const { t } = useTranslation('customer');
@@ -102,21 +103,8 @@ const LocationDrawer = ({ isOpen, onClose }) => {
     resetAutocompleteSession();
   }, [isOpen, resetAutocompleteSession]);
 
-  // Lock body scroll and intercept back button when drawer is open
-  React.useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      document.body.style.paddingRight =
-        "var(--removed-body-scroll-bar-size, 0px)"; // Prevent layout shift if possible
-    } else {
-      document.body.style.overflow = "";
-      document.body.style.paddingRight = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.paddingRight = "";
-    };
-  }, [isOpen, onClose]);
+  // Lock body scroll when drawer is open
+  useLockBodyScroll(Boolean(isOpen));
 
   const handleSelectCurrentLocation = (e) => {
     e.preventDefault();

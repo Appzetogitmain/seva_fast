@@ -5,8 +5,10 @@ import { Star, X, Upload, CheckCircle, Video, Image as ImageIcon, Loader2 } from
 import imageCompression from "browser-image-compression";
 import { customerApi } from "../../services/customerApi";
 import { toast } from "sonner";
+import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
 
 const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
+  useLockBodyScroll(Boolean(isOpen));
   const { t } = useTranslation('customer');
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
@@ -135,15 +137,19 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
   return (
     <>
       <div 
-        className="fixed inset-0 bg-black/60 z-[100] backdrop-blur-sm"
+        className="fixed inset-0 bg-black/60 z-[100] backdrop-blur-sm overscroll-contain"
+        onWheel={preventBackdropScroll}
+        onTouchMove={preventBackdropScroll}
         onClick={onClose}
       />
       <motion.div
+        data-lenis-prevent
+        data-lenis-prevent-wheel
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed bottom-0 left-0 right-0 z-[101] bg-white rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl"
+        className="fixed bottom-0 left-0 right-0 z-[101] bg-white rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl overscroll-contain"
       >
         <div className="flex-shrink-0 flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-lg font-black text-gray-900">{t('pdp.writeReview')}</h2>
@@ -155,7 +161,11 @@ const WriteReviewSheet = ({ isOpen, onClose, product, orderId }) => {
           </button>
         </div>
 
-        <div className="overflow-y-auto p-5 space-y-6 flex-1 custom-scrollbar">
+        <div 
+          data-lenis-prevent
+          data-lenis-prevent-wheel
+          className="overflow-y-auto p-5 space-y-6 flex-1 custom-scrollbar overscroll-contain touch-pan-y"
+        >
           
           {/* Product Info */}
           <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">

@@ -216,8 +216,11 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
         (path === '/terms' || path === '/privacy') &&
         (legalAudience === 'delivery' || legalAudience === 'seller');
 
-    // If props are passed, use them. Otherwise, use route-based logic.
-    const showHeader = showHeaderProp !== undefined ? showHeaderProp : (!hideHeaderRoutes.includes(path) && !path.startsWith('/category') && !path.startsWith('/orders'));
+    // Route-based header visibility logic
+    const showHeader = showHeaderProp !== undefined 
+        ? showHeaderProp 
+        : (!hideHeaderRoutes.includes(path) && !path.startsWith('/category') && !path.startsWith('/orders'));
+
     const showBottomNav = showBottomNavProp !== undefined ? showBottomNavProp : (!hideBottomNavRoutes.includes(path) && !isNonCustomerLegalPage);
     const showCart = showCartProp !== undefined ? showCartProp : (!hideCartRoutes.includes(path) && !path.startsWith('/orders'));
 
@@ -226,7 +229,6 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
     const showFooterMessage = showBottomNav && !hideFooterMessageRoutes.includes(path) && !path.startsWith('/category');
 
     // Hide elements on mobile only when product detail is open
-    // On desktop, we want to keep the header visible even if the modal is open
     const finalShowHeaderMobile = showHeader && !isProductDetailOpen && !path.startsWith('/product');
     const finalShowBottomNavMobile = showBottomNav && !isProductDetailOpen;
     const finalShowFooterMessageMobile = showFooterMessage && !isProductDetailOpen;
@@ -234,7 +236,7 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
     return (
         <div className={cn("min-h-screen bg-slate-50 flex flex-col font-sans", isBirthday && "pt-9")}>
             <BirthdayHeaderCelebration variant="global" />
-            {/* Header logic: Always show on desktop if showHeader is true. On mobile, hide if product detail is open. */}
+            {/* Header logic: Persistent on desktop for supported routes, conditionally on mobile */}
             {showHeader && (
                 <>
                     <div className="hidden md:block">

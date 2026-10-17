@@ -40,7 +40,8 @@ jest.unstable_mockModule('../app/utils/helper.js', () => ({
 }));
 
 jest.unstable_mockModule('../app/services/orderSettlement.js', () => ({
-  applyDeliveredSettlement: mockApplyDeliveredSettlement
+  applyDeliveredSettlement: mockApplyDeliveredSettlement,
+  backfillMissingCodRiderEarnings: jest.fn().mockResolvedValue(true)
 }));
 
 jest.unstable_mockModule('../app/constants/orderWorkflow.js', () => ({

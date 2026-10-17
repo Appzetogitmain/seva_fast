@@ -310,7 +310,7 @@ const SellerProfile = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-3 sm:p-6 lg:p-8 font-['Outfit'] space-y-6 pb-20">
+    <div className="max-w-6xl mx-auto p-3 sm:p-6 lg:p-8 font-sans space-y-6 pb-20">
       {/* Sleek Unified Profile Header */}
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
         {/* Subtle Top Accent Banner */}

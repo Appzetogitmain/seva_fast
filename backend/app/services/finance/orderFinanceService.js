@@ -538,7 +538,10 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
 
   if (order.seller) {
     const SellerModel = (await import("../../models/seller.js")).default;
-    const seller = await SellerModel.findById(order.seller).session(session);
+    const sellerQuery = SellerModel?.findById ? SellerModel.findById(order.seller) : null;
+    const seller = await (sellerQuery && typeof sellerQuery.session === "function"
+      ? sellerQuery.session(session)
+      : sellerQuery);
 
     if (seller) {
       const zoneId = seller.zoneId || order.zoneId || null;

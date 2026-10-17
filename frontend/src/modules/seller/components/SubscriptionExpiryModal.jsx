@@ -52,7 +52,7 @@ const SubscriptionExpiryModal = () => {
         <>
             {/* 24-HOUR PRE-EXPIRY WARNING BANNER */}
             {statusData?.isExpiringSoon && !isDismissedWarning && (
-                <div className="bg-amber-500 text-white px-4 py-3 shadow-lg flex items-center justify-between gap-4 font-['Outfit'] relative z-40">
+                <div className="bg-amber-500 text-white px-4 py-3 shadow-lg flex items-center justify-between gap-4 font-sans relative z-40">
                     <div className="flex items-center gap-3 max-w-4xl mx-auto">
                         <AlertTriangle className="h-5 w-5 shrink-0 animate-bounce" />
                         <p className="text-xs md:text-sm font-bold">
@@ -73,7 +73,7 @@ const SubscriptionExpiryModal = () => {
 
             {/* HARD EXPIRY MODAL POPUP */}
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Subscription Plan Expired">
-                <div className="py-2 space-y-6 font-['Outfit']">
+                <div className="py-2 space-y-6 font-sans">
                     <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100 flex items-center gap-4">
                         <div className="p-3 bg-rose-500 text-white rounded-xl shadow-md shadow-rose-200">
                             <ShieldAlert className="h-6 w-6" />

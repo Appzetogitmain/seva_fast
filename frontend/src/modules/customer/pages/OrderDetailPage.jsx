@@ -14,6 +14,7 @@ import ReturnProgressTracker from "../components/order/ReturnProgressTracker";
 import { applyCloudinaryTransform } from "@/core/utils/imageUtils";
 import { cn } from "@/lib/utils";
 import { launchOrderRazorpayPayment, loadRazorpayScript, resolveRazorpayCheckoutPayload } from "@shared/utils/razorpayCheckout";
+import { useLockBodyScroll, preventBackdropScroll } from "@/shared/hooks/useLockBodyScroll";
 import {
   ChevronLeft,
   Package,
@@ -467,16 +468,7 @@ const OrderDetailPage = () => {
     return () => clearInterval(iv);
   }, []);
 
-  useEffect(() => {
-    if (showInvoice || showHelp || showReturnModal) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [showInvoice, showHelp, showReturnModal]);
+  useLockBodyScroll(Boolean(showReturnModal));
 
   useEffect(() => {
     if (!order) {
@@ -1749,7 +1741,11 @@ const OrderDetailPage = () => {
 
       {/* Return Request Modal */}
       {showReturnModal && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center px-4">
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center px-4 overscroll-contain"
+          onWheel={preventBackdropScroll}
+          onTouchMove={preventBackdropScroll}
+        >
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1759,7 +1755,7 @@ const OrderDetailPage = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative z-10 w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 flex flex-col max-h-[85vh]"
+            className="relative z-10 w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 flex flex-col max-h-[85vh] overscroll-contain"
           >
             <h3 className="text-lg font-black text-slate-900 shrink-0">
               {t('orderDetail.requestReturn')}
@@ -1769,7 +1765,11 @@ const OrderDetailPage = () => {
             </p>
 
             {/* Scrollable content area */}
-            <div className="flex-1 overflow-y-auto space-y-4 min-h-0 pr-1">
+            <div
+              data-lenis-prevent
+              data-lenis-prevent-wheel
+              className="flex-1 overflow-y-auto overscroll-contain touch-pan-y space-y-4 min-h-0 pr-1"
+            >
               <div className="space-y-3">
                 {order.items.map((item, idx) => {
                   const checked = !!selectedReturnItems[idx];

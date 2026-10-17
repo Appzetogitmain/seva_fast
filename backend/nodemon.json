@@ -1,0 +1,14 @@
+{
+  "watch": [
+    "index.js",
+    "app"
+  ],
+  "ext": "js,json",
+  "ignore": [
+    "scripts/*",
+    "__tests__/*",
+    "docs/*",
+    "assets/*",
+    "*.log"
+  ]
+}

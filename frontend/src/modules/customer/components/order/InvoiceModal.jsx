@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useSettings } from '@core/context/SettingsContext';
 import { formatDateTime } from '@shared/utils/formatDate';
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 const formatMoney = (value) => {
   const num = Number(value || 0);
@@ -271,6 +272,7 @@ const generateInvoicePdf = async ({
 };
 
 const InvoiceModal = ({ isOpen, onClose, order }) => {
+  useLockBodyScroll(Boolean(isOpen));
   const { settings } = useSettings();
   const invoiceRef = useRef(null);
   const appName = settings?.appName || 'Seva Fast';
@@ -374,16 +376,20 @@ const InvoiceModal = ({ isOpen, onClose, order }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+            onWheel={preventBackdropScroll}
+            onTouchMove={preventBackdropScroll}
+            className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm overscroll-contain"
           >
             <motion.div
               id="invoice-modal-card"
+              data-lenis-prevent
+              data-lenis-prevent-wheel
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 24 }}
               transition={{ type: 'spring', duration: 0.45, bounce: 0.2 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-2xl relative flex flex-col"
+              className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-hidden shadow-2xl relative flex flex-col overscroll-contain"
             >
               <div className="bg-slate-50 px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <div>
@@ -399,7 +405,12 @@ const InvoiceModal = ({ isOpen, onClose, order }) => {
                 </button>
               </div>
 
-              <div id="invoice-modal-body" className="overflow-y-auto flex-1 p-4 sm:p-6">
+              <div 
+                id="invoice-modal-body" 
+                data-lenis-prevent
+                data-lenis-prevent-wheel
+                className="overflow-y-auto flex-1 p-4 sm:p-6 overscroll-contain touch-pan-y"
+              >
                 <div
                   ref={invoiceRef}
                   id="printable-invoice"

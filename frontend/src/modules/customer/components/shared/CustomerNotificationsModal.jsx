@@ -10,6 +10,7 @@ import {
 import { customerApi } from '../../services/customerApi';
 import { toast } from 'sonner';
 import { cn } from "@/lib/utils";
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 function getNotificationIcon(notif) {
     const event = String(notif.event || notif.type || '').toLowerCase();
@@ -118,6 +119,7 @@ function resolveNotificationTarget(notif) {
 }
 
 export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChange }) => {
+    useLockBodyScroll(Boolean(isOpen));
     const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const [notifications, setNotifications] = useState([]);
@@ -191,8 +193,19 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
         : notifications;
 
     return (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4">
-            <div className="bg-slate-50 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl h-[85vh] max-h-[680px] relative animate-in fade-in zoom-in-95 duration-200">
+        <div 
+            className="fixed inset-0 z-[600] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 overscroll-contain"
+            onWheel={preventBackdropScroll}
+            onTouchMove={preventBackdropScroll}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div 
+                className="bg-slate-50 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl h-[85vh] max-h-[680px] relative animate-in fade-in zoom-in-95 duration-200"
+                data-lenis-prevent
+                data-lenis-prevent-wheel
+            >
                 {/* Header */}
                 <div className="p-4 border-b border-slate-200/80 bg-white flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2.5">
@@ -270,7 +283,14 @@ export const CustomerNotificationsModal = ({ isOpen, onClose, onUnreadCountChang
                 )}
 
                 {/* Notification List */}
-                <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5">
+                <div 
+                    data-lenis-prevent
+                    data-lenis-prevent-wheel
+                    className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5 overscroll-contain touch-pan-y"
+                    tabIndex={0}
+                    onWheel={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                >
                     {isLoading && notifications.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 space-y-3">
                             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />

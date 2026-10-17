@@ -222,7 +222,7 @@ const StorePromotions = () => {
     const hasActive = promoStatus?.hasActivePromotion && activePromo;
 
     return (
-        <div className="max-w-6xl mx-auto p-3 sm:p-6 lg:p-8 font-['Outfit'] pb-24 space-y-8">
+        <div className="max-w-6xl mx-auto p-3 sm:p-6 lg:p-8 font-sans pb-24 space-y-8">
             {/* Header Banner - Boost Your Store */}
             <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 text-white p-6 sm:p-8 md:p-10 rounded-2xl sm:rounded-3xl shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />

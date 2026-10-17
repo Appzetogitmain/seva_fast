@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { customerApi } from '../services/customerApi';
 import { useToast } from '@shared/components/ui/Toast';
 import {
@@ -8,19 +8,30 @@ import {
     MapPin,
     Briefcase,
     Phone,
+    MessageCircle,
     Star,
     Compass,
     Calendar,
     ChevronDown,
+    ChevronLeft,
     X,
     Grid,
     List,
     DollarSign,
     Loader2
 } from 'lucide-react';
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
+
+const getWhatsAppUrl = (phone, name) => {
+    const cleanPhone = String(phone || '').replace(/\D/g, '');
+    const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    const text = encodeURIComponent(`Hello ${name || 'Sir'}, I found your profile on SevaFast and would like to inquire about your services.`);
+    return `https://wa.me/${fullPhone}?text=${text}`;
+};
 
 const LocalProfessionalsDirectory = () => {
-    const { t } = useTranslation('customer');
+    const { t } = useTranslation(['customer', 'common']);
+    const navigate = useNavigate();
     const { showToast } = useToast();
     const [searchParams] = useSearchParams();
     const urlCategoryId = searchParams.get('categoryId') || searchParams.get('category') || '';
@@ -46,6 +57,7 @@ const LocalProfessionalsDirectory = () => {
 
     // Selected professional catalog view modal state
     const [activeCatalogProfessional, setActiveCatalogProfessional] = useState(null);
+    useLockBodyScroll(Boolean(activeCatalogProfessional));
 
     const loadData = async () => {
         try {
@@ -109,8 +121,38 @@ const LocalProfessionalsDirectory = () => {
         setIsGeoActive(false);
     };
 
+    const handleBack = () => {
+        if (window.history.length > 1 && window.history.state?.idx > 0) {
+            navigate(-1);
+        } else {
+            navigate('/', { replace: true });
+        }
+    };
+
     return (
         <div className="max-w-6xl mx-auto px-4 py-8 animate-in fade-in duration-700 pb-20">
+            {/* Top Navigation Bar with Back Button */}
+            <div className="flex items-center justify-between gap-3 mb-6">
+                <button
+                    type="button"
+                    onClick={handleBack}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 rounded-2xl text-xs font-black uppercase tracking-wider transition border border-slate-200/80 shadow-sm active:scale-95 group"
+                    title={t('actions.back', { defaultValue: 'Back' })}
+                    aria-label="Back"
+                >
+                    <ChevronLeft size={20} className="text-slate-800 transition-transform group-hover:-translate-x-0.5" />
+                    <span>{t('actions.back', { defaultValue: 'Back' })}</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => navigate('/professionals/panel')}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-2xl text-xs font-black uppercase tracking-wider transition shadow-sm active:scale-95"
+                >
+                    <Briefcase size={14} />
+                    <span>Provider Panel</span>
+                </button>
+            </div>
+
             {/* Page Header */}
             <div className="text-center space-y-4 mb-10">
                 <h1 className="text-3xl md:text-4xl font-black text-slate-950 tracking-tight flex items-center justify-center gap-3">
@@ -122,14 +164,28 @@ const LocalProfessionalsDirectory = () => {
                 <p className="text-sm font-bold text-slate-400 max-w-md mx-auto leading-relaxed">
                     {t('directory.subtitle')}
                 </p>
-                <div className="pt-1">
-                    <Link
-                        to="/professionals/panel"
-                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-brand-100/50 shadow-sm"
-                    >
-                        <Briefcase className="h-4.5 w-4.5" />
-                        {t('directory.register')}
-                    </Link>
+                <div className="pt-3 max-w-xl mx-auto">
+                    <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 rounded-2xl p-4 text-white shadow-md border border-indigo-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-amber-400 shrink-0">
+                                <Briefcase size={20} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 justify-center sm:justify-start">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">Offer Services Near You</span>
+                                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-[9px] font-black rounded-full border border-emerald-500/30 uppercase">100% Free</span>
+                                </div>
+                                <p className="text-xs text-slate-300 font-medium mt-0.5">Electricians, Plumbers, Doctors, Tailors — Register your profile</p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => navigate('/professionals/panel')}
+                            className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition shadow active:scale-95 whitespace-nowrap shrink-0"
+                        >
+                            Register Free →
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -300,9 +356,19 @@ const LocalProfessionalsDirectory = () => {
                                     </button>
                                     <a
                                         href={`tel:${pro.phone}`}
-                                        className="p-3 bg-black hover:scale-105 transition-all text-white rounded-xl flex items-center justify-center"
+                                        className="p-3 bg-black hover:bg-slate-900 transition-all text-white rounded-xl flex items-center justify-center shadow-sm"
+                                        title="Call Service Provider"
                                     >
                                         <Phone className="h-4 w-4" />
+                                    </a>
+                                    <a
+                                        href={getWhatsAppUrl(pro.phone, pro.name)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-3 bg-emerald-600 hover:bg-emerald-700 transition-all text-white rounded-xl flex items-center justify-center shadow-sm"
+                                        title="Chat on WhatsApp"
+                                    >
+                                        <MessageCircle className="h-4 w-4" />
                                     </a>
                                 </div>
                             </div>
@@ -313,8 +379,16 @@ const LocalProfessionalsDirectory = () => {
 
             {/* SERVICE CATALOG LIST MODAL */}
             {activeCatalogProfessional && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
-                    <div className="bg-white rounded-[45px] p-8 max-w-lg w-full shadow-2xl space-y-6">
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in overscroll-contain"
+                    onWheel={preventBackdropScroll}
+                    onTouchMove={preventBackdropScroll}
+                    onClick={() => setActiveCatalogProfessional(null)}
+                >
+                    <div
+                        className="bg-white rounded-[45px] p-8 max-w-lg w-full shadow-2xl space-y-6"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex justify-between items-start">
                             <div>
                                 <h2 className="text-xl font-black text-slate-950">{activeCatalogProfessional.name}</h2>
@@ -338,7 +412,11 @@ const LocalProfessionalsDirectory = () => {
                             </button>
                         </div>
 
-                        <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+                        <div
+                            data-lenis-prevent
+                            data-lenis-prevent-wheel
+                            className="space-y-4 max-h-[300px] overflow-y-auto overscroll-contain touch-pan-y pr-2"
+                        >
                             <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">{t('directory.catalog')}</h3>
                             {activeCatalogProfessional.services?.length > 0 ? (
                                 activeCatalogProfessional.services.map((svc, i) => (
@@ -355,12 +433,20 @@ const LocalProfessionalsDirectory = () => {
                             )}
                         </div>
 
-                        <div className="flex gap-4 border-t border-slate-50 pt-6">
+                        <div className="flex gap-3 border-t border-slate-100 pt-5">
                             <a
                                 href={`tel:${activeCatalogProfessional.phone}`}
-                                className="flex-1 py-4 bg-black text-white rounded-[20px] text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 hover:scale-[1.01]"
+                                className="flex-1 py-3.5 bg-black hover:bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2"
                             >
-                                <Phone className="h-4 w-4" /> Call to Book Service
+                                <Phone className="h-4 w-4" /> Call Provider
+                            </a>
+                            <a
+                                href={getWhatsAppUrl(activeCatalogProfessional.phone, activeCatalogProfessional.name)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2"
+                            >
+                                <MessageCircle className="h-4 w-4" /> WhatsApp
                             </a>
                         </div>
                     </div>

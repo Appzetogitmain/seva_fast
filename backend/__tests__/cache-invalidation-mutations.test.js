@@ -49,13 +49,26 @@ describe("cache invalidation on category mutations", () => {
     });
     mockFind.mockResolvedValue([]);
     mockFindByIdAndDelete.mockResolvedValue({ _id: "cat-1" });
-    mockFindOne.mockReturnValue({ lean: async () => null });
+    mockFindOne.mockReturnValue({
+      select: () => ({
+        lean: async () => null,
+      }),
+      lean: async () => null,
+    });
   });
 
   test("createCategory invalidates category caches", async () => {
     await createCategory(
       {
-        body: { name: "Fruits", slug: "fruits", type: "header", iconId: "electronics" },
+        body: {
+          name: "Fruits",
+          slug: "fruits",
+          type: "header",
+          iconId: "electronics",
+          headerColor: "#FFFFFF",
+          headerFontColor: "#000000",
+          headerIconColor: "#FF0000",
+        },
       },
       {},
     );

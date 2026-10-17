@@ -214,7 +214,7 @@ const StorePromotions = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 font-['Outfit'] pb-24 space-y-8">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 font-sans pb-24 space-y-8">
             {/* Top Page Header */}
             <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
                 <div className="relative z-10">

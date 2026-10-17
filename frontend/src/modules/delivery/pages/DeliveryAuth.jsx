@@ -572,7 +572,7 @@ const DeliveryAuth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F4FF] flex flex-col items-center justify-center p-4 py-8 sm:py-10 font-['Outfit',_sans-serif]">
+    <div className="min-h-screen bg-[#F0F4FF] flex flex-col items-center justify-center p-4 py-8 sm:py-10 font-sans">
       {/* Background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-32 -left-32 w-80 h-80 bg-brand-200/40 rounded-full blur-3xl" />

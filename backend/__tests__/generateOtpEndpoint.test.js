@@ -10,7 +10,10 @@ const mockHandleResponse = jest.fn();
 const mockEmitToCustomer = jest.fn();
 
 jest.unstable_mockModule('../app/utils/orderLookup.js', () => ({
-  orderMatchQueryFromRouteParam: mockOrderMatchQueryFromRouteParam
+  normalizeOrderRouteParam: jest.fn((id) => String(id)),
+  orderMatchQueryFromRouteParam: mockOrderMatchQueryFromRouteParam,
+  resolveCanonicalOrderId: jest.fn().mockResolvedValue('ORD123456'),
+  requireCanonicalOrderId: jest.fn().mockResolvedValue('ORD123456'),
 }));
 
 jest.unstable_mockModule('../app/models/order.js', () => ({
@@ -34,7 +37,15 @@ jest.unstable_mockModule('../app/socket/socketManager.js', () => ({
 }));
 
 jest.unstable_mockModule('../app/services/orderSocketEmitter.js', () => ({
-  emitToCustomer: mockEmitToCustomer
+  emitToCustomer: mockEmitToCustomer,
+  emitDeliveryBroadcastForSeller: jest.fn().mockResolvedValue(true),
+  emitOrderStatusUpdate: jest.fn(),
+  emitToSeller: jest.fn(),
+  emitToDelivery: jest.fn(),
+  retractDeliveryBroadcastForOrder: jest.fn().mockResolvedValue(true),
+  emitDeliveryBroadcast: jest.fn(),
+  emitReturnBroadcastForCustomer: jest.fn().mockResolvedValue(true),
+  registerOrderSocketGetter: jest.fn(),
 }));
 
 jest.unstable_mockModule('../app/utils/helper.js', () => ({

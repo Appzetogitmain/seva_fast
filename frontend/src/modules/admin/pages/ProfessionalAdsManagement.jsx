@@ -24,7 +24,8 @@ import {
     X,
     Upload,
     User,
-    Crop
+    Crop,
+    FileSpreadsheet
 } from 'lucide-react';
 import ImageCropperModal from '@shared/components/ui/ImageCropperModal';
 
@@ -322,6 +323,43 @@ const ProfessionalAdsManagement = () => {
         );
     });
 
+    const handleExportToCSV = () => {
+        if (!ads || ads.length === 0) {
+            showToast("No service provider data to export", "info");
+            return;
+        }
+
+        const headers = ["Name", "Profession", "Categories", "Mobile Number", "Email", "City", "Address", "Experience (Years)", "Status", "Total Services"];
+        const rows = ads.map(item => {
+            const catNames = (item.categories && item.categories.length > 0)
+                ? item.categories.map(c => c.name || c).join(", ")
+                : (item.category?.name || "General");
+            const servicesCount = (item.services && item.services.length) || 0;
+            return [
+                `"${(item.name || "").replace(/"/g, '""')}"`,
+                `"${(item.profession || "").replace(/"/g, '""')}"`,
+                `"${catNames.replace(/"/g, '""')}"`,
+                `"${(item.phone || "").replace(/"/g, '""')}"`,
+                `"${(item.email || "").replace(/"/g, '""')}"`,
+                `"${(item.city || "").replace(/"/g, '""')}"`,
+                `"${(item.address || "").replace(/"/g, '""')}"`,
+                item.experienceYears || 0,
+                item.approvalStatus || "pending",
+                servicesCount
+            ].join(",");
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `SevaFast_Service_Providers_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast("Service providers exported to Excel/CSV successfully", "success");
+    };
+
     return (
         <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
             {/* Header Section */}
@@ -335,15 +373,27 @@ const ProfessionalAdsManagement = () => {
                     </h1>
                     <p className="ds-description mt-1">Review professional ads, approve catalogs, and configure local service directories.</p>
                 </div>
-                {activeTab === 'categories' && (
-                    <button
-                        onClick={() => handleOpenCategoryModal()}
-                        className="flex items-center gap-3 px-8 py-4 bg-black text-white rounded-[24px] text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-brand-100 hover:scale-[1.02] active:scale-95"
-                    >
-                        <Plus className="h-5 w-5" />
-                        Add Service Category
-                    </button>
-                )}
+                <div className="flex items-center gap-3 flex-wrap">
+                    {activeTab === 'moderation' && (
+                        <button
+                            type="button"
+                            onClick={handleExportToCSV}
+                            className="flex items-center gap-2.5 px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[24px] text-xs font-black uppercase tracking-wider transition shadow-lg active:scale-95"
+                        >
+                            <FileSpreadsheet className="h-4.5 w-4.5" />
+                            Export Excel / CSV
+                        </button>
+                    )}
+                    {activeTab === 'categories' && (
+                        <button
+                            onClick={() => handleOpenCategoryModal()}
+                            className="flex items-center gap-3 px-8 py-4 bg-black text-white rounded-[24px] text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-brand-100 hover:scale-[1.02] active:scale-95"
+                        >
+                            <Plus className="h-5 w-5" />
+                            Add Service Category
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Tabs Bar */}

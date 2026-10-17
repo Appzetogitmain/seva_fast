@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Star,
     CheckCircle,
@@ -73,7 +73,7 @@ const AdminReviews = () => {
     };
 
     return (
-        <div className="p-6 md:p-10 min-h-screen bg-slate-50 pb-24" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <div className="p-6 md:p-10 min-h-screen bg-slate-50 pb-24 font-sans">
             <div className="max-w-5xl mx-auto space-y-8">
 
                 {/* ── Header ─────────────────────────────── */}

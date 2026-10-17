@@ -8,19 +8,9 @@ import { customerApi } from '../services/customerApi';
 import { useAuth } from '@/core/context/AuthContext';
 import PlanCard from '@/shared/components/ui/PlanCard';
 import { formatDate } from '@shared/utils/formatDate';
+import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
 
 const DEFAULT_REFERRAL_CODE = 'SEVAFAST';
-
-const unlockPageScroll = () => {
-    document.body.style.overflow = '';
-    document.body.style.touchAction = '';
-    document.body.style.position = '';
-    document.documentElement.style.overflow = '';
-};
-
-const lockPageScroll = () => {
-    document.body.style.overflow = 'hidden';
-};
 
 const normalizePlanId = (value) => {
     if (!value) return '';
@@ -57,33 +47,7 @@ const PlansPage = () => {
         fetchPlans();
     }, []);
 
-    useEffect(() => {
-        if (referralModalOpen) {
-            lockPageScroll();
-        } else {
-            unlockPageScroll();
-        }
-        return () => {
-            unlockPageScroll();
-        };
-    }, [referralModalOpen]);
-
-    useEffect(() => {
-        const restoreScrollOnReturn = () => {
-            if (!referralModalOpen) {
-                unlockPageScroll();
-            }
-        };
-
-        window.addEventListener('focus', restoreScrollOnReturn);
-        document.addEventListener('visibilitychange', restoreScrollOnReturn);
-
-        return () => {
-            window.removeEventListener('focus', restoreScrollOnReturn);
-            document.removeEventListener('visibilitychange', restoreScrollOnReturn);
-            unlockPageScroll();
-        };
-    }, [referralModalOpen]);
+    useLockBodyScroll(Boolean(referralModalOpen && selectedPlan));
 
     const fetchPlans = async () => {
         try {
@@ -275,7 +239,7 @@ const PlansPage = () => {
     const hasAnyActivePlan = activePlanSubscriptions.size > 0;
 
     return (
-        <div className="min-h-screen bg-slate-50 pt-safe-top pb-safe-bottom pb-24 font-['Outfit',_sans-serif]">
+        <div className="min-h-screen bg-slate-50 pt-safe-top pb-safe-bottom pb-24 font-sans">
             <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100 shadow-sm">
                 <div className="px-4 h-16 flex items-center gap-4 max-w-7xl mx-auto">
                     <button 
@@ -349,13 +313,19 @@ const PlansPage = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm overscroll-contain"
+                        onWheel={preventBackdropScroll}
+                        onTouchMove={preventBackdropScroll}
+                        onClick={() => setReferralModalOpen(false)}
                     >
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl relative"
+                            onClick={(e) => e.stopPropagation()}
+                            data-lenis-prevent
+                            data-lenis-prevent-wheel
+                            className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl relative overscroll-contain touch-pan-y"
                         >
                             <button 
                                 onClick={() => setReferralModalOpen(false)}

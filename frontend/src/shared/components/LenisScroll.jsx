@@ -29,7 +29,7 @@ const LenisScroll = () => {
             },
         });
 
-        // Expose Lenis instance globally so modals can call stop()/start()
+        // Expose Lenis instance globally so modals and route changers can call stop()/start()/resize()
         window.__lenis = lenis;
 
         let rafId;
@@ -41,8 +41,18 @@ const LenisScroll = () => {
 
         rafId = requestAnimationFrame(raf);
 
+        // Keep Lenis limits automatically in sync with dynamic React content & route changes
+        let resizeObserver;
+        if (typeof ResizeObserver !== 'undefined' && document.body) {
+            resizeObserver = new ResizeObserver(() => {
+                lenis.resize();
+            });
+            resizeObserver.observe(document.body);
+        }
+
         return () => {
             cancelAnimationFrame(rafId);
+            resizeObserver?.disconnect();
             lenis.destroy();
             delete window.__lenis;
         };

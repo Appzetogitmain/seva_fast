@@ -187,7 +187,6 @@ export const createOrderWithFinancialSnapshot = async (req, res) => {
       timeSlot: validated.timeSlot || "now",
       tipAmount: validated.tipAmount || 0,
       walletAmount: validated.walletAmount || 0,
-      discountTotal: validated.discountTotal || 0,
       couponId: validated.couponId || null,
       isExpressDelivery: Boolean(validated.isExpressDelivery),
     };

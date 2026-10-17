@@ -112,6 +112,7 @@ const PushNavigateBridge = () => {
 
 const RootLayout = () => (
     <>
+        <ScrollToTop />
         <PushNavigateBridge />
         <Outlet />
     </>
@@ -124,9 +125,8 @@ const CustomerLayoutWrapper = () => (
                 <CartProvider>
                     <CartAnimationProvider>
                         <ProductDetailProvider>
-                            <ScrollToTop />
                             <CustomerLayout>
-                                <Suspense fallback={<div className="flex h-screen items-center justify-center font-outfit">Loading...</div>}>
+                                <Suspense fallback={<div className="flex h-screen items-center justify-center font-sans">Loading...</div>}>
                                     <Outlet />
                                 </Suspense>
                             </CustomerLayout>
@@ -160,7 +160,6 @@ const router = createBrowserRouter([
                     path: 'seller/auth',
                     element: (
                         <>
-                            <ScrollToTop />
                             <Auth />
                         </>
                     ),
@@ -169,7 +168,6 @@ const router = createBrowserRouter([
                     path: 'seller/pending-approval',
                     element: (
                         <>
-                            <ScrollToTop />
                             <ApplicationPending />
                         </>
                     ),
@@ -204,7 +202,6 @@ const router = createBrowserRouter([
                         <ProtectedRoute>
                             <RoleGuard allowedRoles={[UserRole.SELLER]}>
                                 <>
-                                    <ScrollToTop />
                                     <SellerModule />
                                 </>
                             </RoleGuard>
@@ -233,7 +230,7 @@ const router = createBrowserRouter([
                 },
                 {
                     path: 'unauthorized',
-                    element: <div className="flex h-screen items-center justify-center font-outfit">Unauthorized Access</div>,
+                    element: <div className="flex h-screen items-center justify-center font-sans">Unauthorized Access</div>,
                 },
                 {
                     path: 'service-unavailable',

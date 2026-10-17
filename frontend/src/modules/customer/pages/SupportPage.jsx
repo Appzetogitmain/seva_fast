@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { MessageCircle, Phone, Mail, ChevronDown, ChevronUp, FileText, ChevronLeft, PlusCircle, X, Send } from 'lucide-react';
+import { MessageCircle, Phone, Mail, ChevronDown, ChevronUp, FileText, ChevronLeft, PlusCircle, X, Send, AlertCircle } from 'lucide-react';
 import { useToast } from '@shared/components/ui/Toast';
 import { useSettings } from '@core/context/SettingsContext';
 import { customerApi } from '../services/customerApi';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import axiosInstance from '@core/api/axios';
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 const FAQ_CACHE_KEY = 'customer_faqs_cache_v1';
 const FAQ_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -23,12 +24,23 @@ const SupportPage = () => {
     const supportPhone = settings?.supportPhone || '';
     const supportEmailShort = supportEmail ? (supportEmail.length > 12 ? supportEmail.slice(0, 12) + '...' : supportEmail) : 'support@...';
     const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+    useLockBodyScroll(Boolean(isTicketModalOpen));
     const [ticketLoading, setTicketLoading] = useState(false);
+    const [ticketErrors, setTicketErrors] = useState({});
     const [ticketData, setTicketData] = useState({
         subject: '',
         description: '',
         priority: 'medium'
     });
+
+    const clearTicketError = (fieldName) => {
+        setTicketErrors((prev) => {
+            if (!prev[fieldName]) return prev;
+            const updated = { ...prev };
+            delete updated[fieldName];
+            return updated;
+        });
+    };
     const [faqs, setFaqs] = useState([]);
 
     useEffect(() => {
@@ -39,17 +51,6 @@ const SupportPage = () => {
             setIsTicketModalOpen(true);
         }
     }, [location]);
-
-    useEffect(() => {
-        if (isTicketModalOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => {
-            document.body.style.overflow = '';
-        };
-    }, [isTicketModalOpen]);
 
     useEffect(() => {
         const fetchFaqs = async () => {
@@ -88,15 +89,40 @@ const SupportPage = () => {
 
     const handleTicketSubmit = async (e) => {
         e.preventDefault();
+        const errs = {};
+        const trimmedSubject = String(ticketData.subject || '').trim();
+        const trimmedDesc = String(ticketData.description || '').trim();
+
+        if (!trimmedSubject) {
+            errs.subject = t('support.errors.subjectRequired', { defaultValue: 'Subject is required' });
+        } else if (trimmedSubject.length < 3) {
+            errs.subject = 'Subject must be at least 3 characters';
+        }
+
+        if (!trimmedDesc) {
+            errs.description = t('support.errors.descRequired', { defaultValue: 'Description is required' });
+        } else if (trimmedDesc.length < 10) {
+            errs.description = 'Description must be at least 10 characters';
+        }
+
+        if (Object.keys(errs).length > 0) {
+            setTicketErrors(errs);
+            showToast(Object.values(errs)[0], "error");
+            return;
+        }
+
         try {
             setTicketLoading(true);
             const res = await customerApi.createTicket({
                 ...ticketData,
+                subject: trimmedSubject,
+                description: trimmedDesc,
                 userType: 'Customer'
             });
             if (res.data.success) {
                 showToast(t('support.ticketRaised'), "success");
                 setIsTicketModalOpen(false);
+                setTicketErrors({});
                 setTicketData({ subject: '', description: '', priority: 'medium' });
             }
         } catch (error) {
@@ -187,7 +213,11 @@ const SupportPage = () => {
             {/* Ticket Creation Modal */}
             <AnimatePresence>
                 {isTicketModalOpen && (
-                    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div
+                        className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-contain"
+                        onWheel={preventBackdropScroll}
+                        onTouchMove={preventBackdropScroll}
+                    >
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -200,7 +230,9 @@ const SupportPage = () => {
                             animate={{ y: 0 }}
                             exit={{ y: "100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="relative bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-hidden z-10"
+                            data-lenis-prevent
+                            data-lenis-prevent-wheel
+                            className="relative bg-white w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl overflow-y-auto max-h-[85vh] overscroll-contain touch-pan-y z-10"
                         >
                             <div className="p-8">
                                 <div className="flex items-center justify-between mb-8">
@@ -216,16 +248,30 @@ const SupportPage = () => {
                                     </button>
                                 </div>
 
-                                <form onSubmit={handleTicketSubmit} className="space-y-6">
+                                <form onSubmit={handleTicketSubmit} noValidate className="space-y-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('support.subject')}</label>
+                                        <div className="flex items-center justify-between px-1">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('support.subject')} <span className="text-rose-500">*</span></label>
+                                            {ticketErrors.subject && (
+                                                <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                    <AlertCircle size={11} /> {ticketErrors.subject}
+                                                </span>
+                                            )}
+                                        </div>
                                         <input
                                             type="text"
-                                            required
                                             value={ticketData.subject}
-                                            onChange={(e) => setTicketData({ ...ticketData, subject: e.target.value })}
+                                            onChange={(e) => {
+                                                setTicketData({ ...ticketData, subject: e.target.value });
+                                                clearTicketError('subject');
+                                            }}
                                             placeholder={t('support.subjectPlaceholder')}
-                                            className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all"
+                                            className={cn(
+                                                "w-full rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all",
+                                                ticketErrors.subject
+                                                    ? "bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10 text-slate-900"
+                                                    : "bg-slate-50 border-none ring-1 ring-transparent focus:ring-primary/20 text-slate-800"
+                                            )}
                                         />
                                     </div>
 
@@ -248,14 +294,31 @@ const SupportPage = () => {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('support.description')}</label>
+                                        <div className="flex items-center justify-between px-1">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('support.description')} <span className="text-rose-500">*</span></label>
+                                            {ticketErrors.description && (
+                                                <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                    <AlertCircle size={11} /> {ticketErrors.description}
+                                                </span>
+                                            )}
+                                        </div>
                                         <textarea
-                                            required
                                             value={ticketData.description}
-                                            onChange={(e) => setTicketData({ ...ticketData, description: e.target.value })}
+                                            onChange={(e) => {
+                                                setTicketData({ ...ticketData, description: e.target.value });
+                                                clearTicketError('description');
+                                            }}
                                             placeholder={t('support.descriptionPlaceholder')}
-                                            className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold min-h-[150px] outline-none ring-1 ring-transparent focus:ring-primary/20 transition-all"
+                                            className={cn(
+                                                "w-full rounded-2xl px-5 py-4 text-sm font-bold min-h-[150px] outline-none transition-all resize-none",
+                                                ticketErrors.description
+                                                    ? "bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10 text-slate-900"
+                                                    : "bg-slate-50 border-none ring-1 ring-transparent focus:ring-primary/20 text-slate-800"
+                                            )}
                                         />
+                                        <p className="text-[10px] text-slate-400 font-bold text-right px-1">
+                                            {ticketData.description.trim().length}/10 characters minimum
+                                        </p>
                                     </div>
 
                                     <Button

@@ -18,6 +18,13 @@ jest.unstable_mockModule("../app/services/finance/orderFinanceService.js", () =>
   handleCodOrderFinance: jest.fn(),
   reconcileCodCash: jest.fn(),
   settleDeliveredOrder: jest.fn(),
+  releaseExpiredHeldSellerPayouts: jest.fn(),
+  settleCodWalletsAfterAdminCredit: jest.fn(),
+  chooseCodCollectMethod: jest.fn(),
+  handoffCodCashToSeller: jest.fn(),
+  markCodCashCollectedByRider: jest.fn(),
+  markCodOnlinePaid: jest.fn(),
+  markSelfDeliveryCodCashWithSeller: jest.fn(),
 }));
 
 jest.unstable_mockModule("../app/services/orderPlacementService.js", () => ({

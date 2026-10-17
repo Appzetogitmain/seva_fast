@@ -5,8 +5,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSettings } from '@core/context/SettingsContext';
 import { toast } from 'sonner';
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 const HelpModal = ({ isOpen, onClose }) => {
+    useLockBodyScroll(Boolean(isOpen));
     const { t } = useTranslation('customer');
     const navigate = useNavigate();
     const { settings } = useSettings();
@@ -49,15 +51,19 @@ const HelpModal = ({ isOpen, onClose }) => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm"
+                        onWheel={preventBackdropScroll}
+                        onTouchMove={preventBackdropScroll}
+                        className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm overscroll-contain"
                     >
                         <motion.div
+                            data-lenis-prevent
+                            data-lenis-prevent-wheel
                             initial={{ y: "100%" }}
                             animate={{ y: 0 }}
                             exit={{ y: "100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
                             onClick={(e) => e.stopPropagation()}
-                            className="bg-white rounded-t-[2rem] sm:rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+                            className="bg-white rounded-t-[2rem] sm:rounded-3xl w-full max-w-md overflow-hidden shadow-2xl overscroll-contain"
                         >
 
                             <div className="p-6">

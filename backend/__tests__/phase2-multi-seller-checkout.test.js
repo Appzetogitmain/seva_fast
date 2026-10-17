@@ -97,7 +97,7 @@ describe("Property 11: Checkout Group ID Generation", () => {
   test("generated IDs match CHK-{sortable-token} format", () => {
     for (let i = 0; i < 100; i++) {
       const id = generateCheckoutGroupId();
-      expect(id).toMatch(/^CHK-[0-9A-Z]{26}$/);
+      expect(id).toMatch(/^CHK-\d{6}-[0-9A-Z]{6}$/);
     }
   });
 

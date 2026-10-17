@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Sparkles, Loader2, X, RefreshCw, Check } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLockBodyScroll, preventBackdropScroll } from "../hooks/useLockBodyScroll";
 
 // Generated images come back as ~1024px PNGs (1-2MB). Resize to the panel's
 // recommended size and re-encode as JPEG so the saved upload stays small.
@@ -112,6 +113,7 @@ const AiImageGenerator = ({
   className,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  useLockBodyScroll(Boolean(isOpen));
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState(null);
@@ -187,7 +189,9 @@ const AiImageGenerator = ({
       {isOpen &&
         createPortal(
           <div
-            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overscroll-contain"
+            onWheel={preventBackdropScroll}
+            onTouchMove={preventBackdropScroll}
             onClick={close}>
             <div
               className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
@@ -205,7 +209,11 @@ const AiImageGenerator = ({
                 </button>
               </div>
 
-              <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div
+                data-lenis-prevent
+                data-lenis-prevent-wheel
+                className="p-5 space-y-4 max-h-[70vh] overflow-y-auto overscroll-contain touch-pan-y"
+              >
                 {referenceImage && (
                   <div className="space-y-2">
                     <label className="flex items-center gap-3 p-2 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer">

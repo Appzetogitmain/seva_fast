@@ -227,7 +227,7 @@ const SearchPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-white font-outfit">
+        <div className="min-h-screen bg-white font-sans">
             {/* Header / Search Input */}
             <div className={cn(
                 "sticky top-0 z-50 bg-linear-to-r from-primary to-[var(--brand-400)] shadow-[0_4px_20px_rgba(0,0,0,0.12)] relative overflow-hidden",

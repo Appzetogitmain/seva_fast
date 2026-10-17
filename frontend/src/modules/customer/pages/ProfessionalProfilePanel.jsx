@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { getDateLocale } from '@core/i18n';
 import { customerApi } from '../services/customerApi';
 import { useToast } from '@shared/components/ui/Toast';
 import {
-    Briefcase,
     Loader2,
     Sparkles,
     CheckCircle2,
@@ -22,13 +22,15 @@ import {
     ChevronRight,
     Edit2,
     X,
-    Upload
+    Upload,
+    ChevronLeft
 } from 'lucide-react';
 import { useSettings } from '@core/context/SettingsContext';
-import { formatDate } from '@shared/utils/formatDate';
+import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 const ProfessionalProfilePanel = () => {
     const { t } = useTranslation('customer');
+    const navigate = useNavigate();
     const { showToast } = useToast();
     const { settings } = useSettings();
     const [isLoading, setIsLoading] = useState(true);
@@ -48,8 +50,39 @@ const ProfessionalProfilePanel = () => {
     const [address, setAddress] = useState('');
     const [city, setCity] = useState('');
     const [lat, setLat] = useState('22.7196'); // Default Indore coordinates
-    const [lng, setLng] = useState('75.8577');
     const [isLocating, setIsLocating] = useState(false);
+
+    // Form validation states
+    const [regErrors, setRegErrors] = useState({});
+    const [editErrors, setEditErrors] = useState({});
+    const [bannerErrors, setBannerErrors] = useState({});
+
+    const clearRegError = (fieldName) => {
+        setRegErrors((prev) => {
+            if (!prev[fieldName]) return prev;
+            const updated = { ...prev };
+            delete updated[fieldName];
+            return updated;
+        });
+    };
+
+    const clearEditError = (fieldName) => {
+        setEditErrors((prev) => {
+            if (!prev[fieldName]) return prev;
+            const updated = { ...prev };
+            delete updated[fieldName];
+            return updated;
+        });
+    };
+
+    const clearBannerError = (fieldName) => {
+        setBannerErrors((prev) => {
+            if (!prev[fieldName]) return prev;
+            const updated = { ...prev };
+            delete updated[fieldName];
+            return updated;
+        });
+    };
 
     // Profile edit state
     const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -147,28 +180,7 @@ const ProfessionalProfilePanel = () => {
         loadPlatformAds();
     }, []);
 
-    useEffect(() => {
-        if (isEditingCategories || isConfirmingPayment || isEditingProfile || isSubmittingPlatformAd) {
-            document.body.style.overflow = 'hidden';
-            const navbars = document.querySelectorAll('.fixed.bottom-0');
-            navbars.forEach(nav => {
-                nav.style.setProperty('display', 'none', 'important');
-            });
-        } else {
-            document.body.style.overflow = '';
-            const navbars = document.querySelectorAll('.fixed.bottom-0');
-            navbars.forEach(nav => {
-                nav.style.removeProperty('display');
-            });
-        }
-        return () => {
-            document.body.style.overflow = '';
-            const navbars = document.querySelectorAll('.fixed.bottom-0');
-            navbars.forEach(nav => {
-                nav.style.removeProperty('display');
-            });
-        };
-    }, [isEditingCategories, isConfirmingPayment, isEditingProfile, isSubmittingPlatformAd]);
+    useLockBodyScroll(Boolean(isEditingCategories || isConfirmingPayment || isEditingProfile || isSubmittingPlatformAd));
 
     const handleUploadMediaFile = async (e, targetSetUrl, targetSetType) => {
         const file = e.target.files[0];
@@ -185,10 +197,12 @@ const ProfessionalProfilePanel = () => {
             if (res.data?.success && (res.data.result?.secureUrl || res.data.result?.url)) {
                 targetSetUrl(res.data.result.secureUrl || res.data.result.url);
                 targetSetType(type);
+                clearBannerError('media');
                 showToast(t('pro.msg.mediaUploaded'), 'success');
             } else if (res.data?.secureUrl || res.data?.url) {
                 targetSetUrl(res.data.secureUrl || res.data.url);
                 targetSetType(type);
+                clearBannerError('media');
                 showToast(t('pro.msg.mediaUploaded'), 'success');
             } else {
                 showToast(t('pro.msg.mediaFailed'), 'error');
@@ -213,34 +227,103 @@ const ProfessionalProfilePanel = () => {
         setEditCity(ad.city || '');
         setEditLat(ad.location?.coordinates?.[1] || '22.7196');
         setEditLng(ad.location?.coordinates?.[0] || '75.8577');
+        setEditErrors({});
         setIsEditingProfile(true);
+    };
+
+    const validateEditProfileForm = () => {
+        const errs = {};
+        const trimmedName = String(editName || '').trim();
+        const trimmedPhone = String(editPhone || '').trim();
+        const trimmedEmail = String(editEmail || '').trim();
+        const trimmedProfession = String(editProfession || '').trim();
+        const trimmedCity = String(editCity || '').trim();
+        const trimmedAddress = String(editAddress || '').trim();
+        const trimmedDesc = String(editDescription || '').trim();
+
+        if (!trimmedName) {
+            errs.name = "Full Name is required";
+        } else if (trimmedName.length < 2) {
+            errs.name = "Full Name must be at least 2 characters";
+        }
+
+        if (!trimmedPhone) {
+            errs.phone = "Mobile Number is required";
+        } else if (!/^[6-9]\d{9}$/.test(trimmedPhone)) {
+            errs.phone = "Enter a valid 10-digit mobile number (starts with 6-9)";
+        }
+
+        if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+            errs.email = "Please enter a valid email address";
+        }
+
+        if (!trimmedProfession) {
+            errs.profession = "Profession title is required";
+        } else if (trimmedProfession.length < 2) {
+            errs.profession = "Profession must be at least 2 characters";
+        }
+
+        if (editExperienceYears === '' || editExperienceYears === null || editExperienceYears === undefined) {
+            errs.experienceYears = "Experience in years is required (enter 0 for beginner)";
+        } else if (Number(editExperienceYears) < 0 || Number(editExperienceYears) > 70) {
+            errs.experienceYears = "Enter valid experience years (0-70)";
+        }
+
+        if (!trimmedCity) {
+            errs.city = "City is required";
+        } else if (trimmedCity.length < 2) {
+            errs.city = "City name must be at least 2 characters";
+        }
+
+        if (!trimmedAddress) {
+            errs.address = "Address is required";
+        } else if (trimmedAddress.length < 4) {
+            errs.address = "Address must be at least 4 characters";
+        }
+
+        if (!trimmedDesc) {
+            errs.description = "Service description is required";
+        } else if (trimmedDesc.length < 10) {
+            errs.description = "Please describe your services in at least 10 characters";
+        }
+
+        return errs;
     };
 
     const handleUpdateProfileSubmit = async (e) => {
         e.preventDefault();
-        if (!editName || !editPhone || !editProfession || !editDescription || !editAddress || !editCity) {
-            return showToast(t('pro.msg.fillRequired'), "error");
+        const errs = validateEditProfileForm();
+        setEditErrors(errs);
+
+        if (Object.keys(errs).length > 0) {
+            const firstKey = Object.keys(errs)[0];
+            showToast(errs[firstKey], "error");
+            const el = document.querySelector(`[name="edit-${firstKey}"]`) || document.querySelector(`#edit-${firstKey}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (typeof el.focus === 'function') el.focus();
+            }
+            return;
         }
-        if (editPhone.length !== 10) {
-            return showToast(t('pro.msg.phone10'), "error");
-        }
+
         try {
             setIsLoading(true);
             const payload = {
-                name: editName,
-                phone: editPhone,
-                email: editEmail,
-                profession: editProfession,
+                name: String(editName).trim(),
+                phone: String(editPhone).trim(),
+                email: String(editEmail).trim(),
+                profession: String(editProfession).trim(),
                 experienceYears: Number(editExperienceYears) || 0,
-                description: editDescription,
-                address: editAddress,
-                city: editCity,
+                description: String(editDescription).trim(),
+                address: String(editAddress).trim(),
+                city: String(editCity).trim(),
                 lat: parseFloat(editLat) || 22.7196,
                 lng: parseFloat(editLng) || 75.8577
             };
             const res = await customerApi.updateProfessionalProfile(payload);
             if (res.data?.success) {
                 showToast(t('pro.msg.profileUpdated'), "success");
+                setEditErrors({});
                 setIsEditingProfile(false);
                 loadProfile();
             }
@@ -272,34 +355,107 @@ const ProfessionalProfilePanel = () => {
         );
     };
 
+    const validateRegistrationForm = () => {
+        const errs = {};
+        const trimmedName = String(name || '').trim();
+        const trimmedPhone = String(phone || '').trim();
+        const trimmedEmail = String(email || '').trim();
+        const trimmedProfession = String(profession || '').trim();
+        const trimmedCity = String(city || '').trim();
+        const trimmedAddress = String(address || '').trim();
+        const trimmedDesc = String(description || '').trim();
+        const finalCategoryIds = categoryIds.length > 0 ? categoryIds : (categoryId ? [categoryId] : []);
+
+        if (!trimmedName) {
+            errs.name = "Full Name is required";
+        } else if (trimmedName.length < 2) {
+            errs.name = "Full Name must be at least 2 characters";
+        }
+
+        if (!trimmedPhone) {
+            errs.phone = "Mobile Number is required";
+        } else if (!/^[6-9]\d{9}$/.test(trimmedPhone)) {
+            errs.phone = "Enter a valid 10-digit mobile number (starts with 6, 7, 8, or 9)";
+        }
+
+        if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+            errs.email = "Please enter a valid email address";
+        }
+
+        if (!trimmedProfession) {
+            errs.profession = "Profession title is required (e.g. Electrician, Plumber)";
+        } else if (trimmedProfession.length < 2) {
+            errs.profession = "Profession must be at least 2 characters";
+        }
+
+        if (finalCategoryIds.length === 0) {
+            errs.categoryIds = "Please select at least one service category";
+        }
+
+        if (experienceYears === '' || experienceYears === null || experienceYears === undefined) {
+            errs.experienceYears = "Experience in years is required (enter 0 for beginner)";
+        } else if (Number(experienceYears) < 0 || Number(experienceYears) > 70) {
+            errs.experienceYears = "Enter valid experience years (0-70)";
+        }
+
+        if (!trimmedCity) {
+            errs.city = "Operating City is required";
+        } else if (trimmedCity.length < 2) {
+            errs.city = "City name must be at least 2 characters";
+        }
+
+        if (!trimmedAddress) {
+            errs.address = "Service Area / Address is required";
+        } else if (trimmedAddress.length < 4) {
+            errs.address = "Please enter a complete address (minimum 4 characters)";
+        }
+
+        if (!trimmedDesc) {
+            errs.description = "Service description is required";
+        } else if (trimmedDesc.length < 10) {
+            errs.description = "Please describe your services in at least 10 characters";
+        }
+
+        return errs;
+    };
+
     const handleRegister = async (e) => {
         e.preventDefault();
-        const finalCategoryIds = categoryIds.length > 0 ? categoryIds : (categoryId ? [categoryId] : []);
-        if (!name || !phone || !profession || finalCategoryIds.length === 0 || !description || !address || !city) {
-            return showToast(t('pro.msg.fillRequiredCat'), "error");
+        const errs = validateRegistrationForm();
+        setRegErrors(errs);
+
+        if (Object.keys(errs).length > 0) {
+            const firstKey = Object.keys(errs)[0];
+            showToast(errs[firstKey], "error");
+            const el = document.querySelector(`[name="${firstKey}"]`) || document.querySelector(`#reg-${firstKey}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (typeof el.focus === 'function') el.focus();
+            }
+            return;
         }
-        if (phone.length !== 10) {
-            return showToast(t('pro.msg.phone10'), "error");
-        }
+
         try {
             setIsLoading(true);
+            const finalCategoryIds = categoryIds.length > 0 ? categoryIds : (categoryId ? [categoryId] : []);
             const payload = {
-                name,
-                phone,
-                email,
-                profession,
+                name: String(name).trim(),
+                phone: String(phone).trim(),
+                email: String(email).trim(),
+                profession: String(profession).trim(),
                 categoryId: finalCategoryIds[0],
                 categoryIds: finalCategoryIds,
                 experienceYears: Number(experienceYears) || 0,
-                description,
-                address,
-                city,
+                description: String(description).trim(),
+                address: String(address).trim(),
+                city: String(city).trim(),
                 lat: parseFloat(lat) || 22.7196,
                 lng: parseFloat(lng) || 75.8577
             };
             const res = await customerApi.createProfessionalProfile(payload);
             if (res.data?.success) {
                 showToast(t('pro.msg.registered'), "success");
+                setRegErrors({});
                 loadProfile();
             }
         } catch (error) {
@@ -319,6 +475,7 @@ const ProfessionalProfilePanel = () => {
         setPlatTargetUrl(adItem.targetUrl || '');
         setPlatCity(adItem.city || '');
         setEditingPlatformAdId(adItem._id);
+        setBannerErrors({});
         setIsSubmittingPlatformAd(true);
     };
 
@@ -333,24 +490,67 @@ const ProfessionalProfilePanel = () => {
         setPlatVideoUrl('');
         setPlatTargetUrl('');
         setPlatCity('');
+        setBannerErrors({});
+    };
+
+    const validateBannerForm = () => {
+        const errs = {};
+        const trimmedTitle = String(platTitle || '').trim();
+        const trimmedCity = String(platCity || '').trim();
+        const trimmedContent = String(platContent || '').trim();
+        const trimmedTargetUrl = String(platTargetUrl || '').trim();
+
+        if (!trimmedTitle) {
+            errs.title = "Ad title is required";
+        } else if (trimmedTitle.length < 3) {
+            errs.title = "Ad title must be at least 3 characters";
+        }
+
+        if (!trimmedCity) {
+            errs.city = "Target city is required";
+        }
+
+        if (!trimmedContent) {
+            errs.content = "Ad description is required";
+        } else if (trimmedContent.length < 10) {
+            errs.content = "Ad description must be at least 10 characters";
+        }
+
+        if (trimmedTargetUrl) {
+            if (!/^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i.test(trimmedTargetUrl)) {
+                errs.targetUrl = "Please enter a valid website link (e.g. https://example.com)";
+            }
+        }
+
+        if (!platImageUrl && !platVideoUrl) {
+            errs.media = "Please upload a promotional photo or video";
+        }
+
+        setBannerErrors(errs);
+        return {
+            isValid: Object.keys(errs).length === 0,
+            errors: errs,
+        };
     };
 
     const handleSubmitPlatformAd = async (e) => {
         e.preventDefault();
-        if (!platTitle.trim() || !platContent.trim() || !platCity.trim()) {
-            return showToast(t('pro.msg.adRequired'), "error");
+        const { isValid, errors } = validateBannerForm();
+        if (!isValid) {
+            const firstMsg = Object.values(errors)[0] || "Please fill in all required fields.";
+            return showToast(firstMsg, "error");
         }
         try {
             setIsLoading(true);
             const payload = {
-                title: platTitle,
-                content: platContent,
+                title: platTitle.trim(),
+                content: platContent.trim(),
                 mediaUrl: platVideoUrl || platImageUrl || '',
                 mediaType: platVideoUrl ? 'video' : (platImageUrl ? 'image' : 'none'),
                 imageUrl: platImageUrl,
                 videoUrl: platVideoUrl,
-                targetUrl: platTargetUrl,
-                city: platCity
+                targetUrl: platTargetUrl.trim(),
+                city: platCity.trim()
             };
             let res;
             if (editingPlatformAdId) {
@@ -666,12 +866,32 @@ const ProfessionalProfilePanel = () => {
     }
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in duration-750 pb-20">
+        <div className="max-w-4xl mx-auto px-3.5 sm:px-4 py-4 sm:py-8 animate-in fade-in duration-750 pb-20">
+            {/* Top Switcher & Directory Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 mb-6 bg-slate-50 border border-slate-200/80 p-2.5 sm:p-3.5 rounded-2xl">
+                <button
+                    type="button"
+                    onClick={() => navigate('/profile')}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2.5 sm:py-2 bg-white hover:bg-slate-100 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition border border-slate-200 shadow-sm active:scale-95"
+                >
+                    <ChevronLeft className="h-4 w-4 shrink-0 text-slate-600" />
+                    <span>Switch to Customer Profile</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => navigate('/professionals')}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-wider transition border border-indigo-200/60 shadow-sm active:scale-95"
+                >
+                    <span>View Public Directory</span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-indigo-500" />
+                </button>
+            </div>
+
             {/* TABS HEADER */}
-            <div className="flex border-b border-slate-100 gap-8 mb-8">
+            <div className="flex items-center justify-center border-b border-slate-200/80 gap-6 sm:gap-10 mb-8 overflow-x-auto no-scrollbar">
                 <button
                     onClick={() => setActiveTab('directory')}
-                    className={`pb-4 text-xs font-black uppercase tracking-widest transition-all relative ${activeTab === 'directory' ? 'text-black' : 'text-slate-400 hover:text-slate-600'
+                    className={`pb-4 text-xs font-black uppercase tracking-widest transition-all relative shrink-0 ${activeTab === 'directory' ? 'text-black' : 'text-slate-400 hover:text-slate-600'
                         }`}
                 >
                     {t('pro.tabListing')}
@@ -690,43 +910,77 @@ const ProfessionalProfilePanel = () => {
             {activeTab === 'directory' && (
                 ad ? (
                     <div className="space-y-8">
-                        {/* PROFILE DASHBOARD DISPLAY */}
-                        {/* ALERT BANNER FOR UNPAID / PENDING APPROVAL */}
-                        {(ad.paymentStatus !== 'paid' || ad.approvalStatus !== 'approved') && (
-                            <div className="bg-amber-50/60 border border-amber-100 p-6 rounded-[32px] flex items-start gap-4 shadow-sm animate-in slide-in-from-top duration-500">
-                                <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                        {/* STATUS BANNER */}
+                        {ad.approvalStatus === 'pending' && (
+                            <div className="bg-amber-50/70 border border-amber-200 p-5 rounded-2xl flex items-start gap-3.5 shadow-sm animate-in slide-in-from-top duration-300">
+                                <Clock className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                                 <div className="space-y-1 flex-1">
-                                    <h3 className="text-xs font-black text-amber-800 uppercase tracking-wider">
-                                        {ad.paymentStatus !== 'paid' && ad.approvalStatus !== 'approved' ? t('pro.actionSetup') :
-                                            ad.paymentStatus !== 'paid' ? t('pro.actionActivate') : t('pro.pendingVerification')}
-                                    </h3>
-                                    <p className="text-xs text-amber-700 font-bold leading-relaxed">
-                                        {ad.paymentStatus !== 'paid' && ad.approvalStatus !== 'approved' ? (
-                                            t('pro.unpaidPendingMsg')
-                                        ) : ad.paymentStatus !== 'paid' ? (
-                                            t('pro.payFeeMsg', { amount: getListingPriceToShow() })
-                                        ) : (
-                                            t('pro.pendingMsg')
-                                        )}
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xs font-black text-amber-900 uppercase tracking-wider">
+                                            Free Listing Submitted — Under Admin Review
+                                        </h3>
+                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-200/70 text-amber-800">
+                                            Pending
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-amber-700 font-medium leading-relaxed">
+                                        Your service profile is submitted for free. Our admin team will verify your details shortly, after which your listing will be published in the public directory for nearby customers.
                                     </p>
-                                    {ad.paymentStatus !== 'paid' && (
-                                        <button
-                                            onClick={handlePayListing}
-                                            className="mt-3 px-5 py-2.5 bg-black hover:bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
-                                        >
-                                            {getListingPriceToShow() === 0 ? t('pro.activateFree') : t('pro.payNow', { amount: getListingPriceToShow() })}
-                                        </button>
-                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {ad.approvalStatus === 'approved' && (
+                            <div className="bg-emerald-50/70 border border-emerald-200 p-5 rounded-2xl flex items-start gap-3.5 shadow-sm animate-in slide-in-from-top duration-300">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                                <div className="space-y-1 flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xs font-black text-emerald-900 uppercase tracking-wider">
+                                            Profile Active & Live
+                                        </h3>
+                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-200/70 text-emerald-800">
+                                            Published
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-emerald-700 font-medium leading-relaxed">
+                                        Your service profile is live in the customer directory! Nearby customers can now discover your services and call or WhatsApp you directly.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {ad.approvalStatus === 'rejected' && (
+                            <div className="bg-rose-50/70 border border-rose-200 p-5 rounded-2xl flex items-start gap-3.5 shadow-sm animate-in slide-in-from-top duration-300">
+                                <XCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                                <div className="space-y-1 flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xs font-black text-rose-900 uppercase tracking-wider">
+                                            Profile Rejected by Admin
+                                        </h3>
+                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-200/70 text-rose-800">
+                                            Action Required
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-rose-700 font-medium leading-relaxed">
+                                        {ad.rejectionReason || "Please review your profile details, update the information, and resubmit for approval."}
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenEditProfile}
+                                        className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                                    >
+                                        <Edit2 className="h-3.5 w-3.5" /> Edit Profile & Resubmit
+                                    </button>
                                 </div>
                             </div>
                         )}
 
                         {/* Header profile block */}
-                        <div className="bg-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-3">
-                                    <h1 className="text-2xl font-black text-slate-955">{ad.name}</h1>
-                                    <span className="px-3 py-1 bg-brand-50 rounded-full text-xs font-black text-brand-600 uppercase tracking-wider">{ad.profession}</span>
+                        <div className="bg-white p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-[32px] md:rounded-[40px] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                            <div className="space-y-3 min-w-0 flex-1">
+                                <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+                                    <h1 className="text-xl sm:text-2xl font-black text-slate-955 break-words">{ad.name}</h1>
+                                    <span className="px-3 py-1 bg-brand-50 rounded-full text-xs font-black text-brand-600 uppercase tracking-wider shrink-0">{ad.profession}</span>
                                     <button
                                         onClick={handleOpenEditProfile}
                                         className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 text-[9px] font-black uppercase tracking-wider rounded-full transition-all border border-slate-100 shadow-sm"
@@ -985,65 +1239,149 @@ const ProfessionalProfilePanel = () => {
                             <p className="text-sm text-slate-400 font-bold mt-1">{t('pro.registerSub')}</p>
                         </div>
 
-                        <form onSubmit={handleRegister} className="space-y-6">
+                        <form onSubmit={handleRegister} noValidate className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('auth.fullName')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('auth.fullName')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {regErrors.name && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {regErrors.name}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
+                                        name="name"
+                                        id="reg-name"
                                         value={name}
-                                        onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                                        onChange={(e) => {
+                                            setName(e.target.value.replace(/[^a-zA-Z\s]/g, ''));
+                                            clearRegError('name');
+                                        }}
                                         placeholder={t('editProfile.namePlaceholder')}
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className={`w-full px-5 py-4 rounded-[16px] text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            regErrors.name 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('editProfile.phone')}</label>
-                                    <input
-                                        type="tel"
-                                        inputMode="numeric"
-                                        required
-                                        maxLength={10}
-                                        value={phone}
-                                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                                        placeholder={t('checkout.form.mobile10')}
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
-                                    />
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('editProfile.phone')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {regErrors.phone && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {regErrors.phone}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 select-none">
+                                            +91
+                                        </span>
+                                        <input
+                                            type="tel"
+                                            inputMode="numeric"
+                                            name="phone"
+                                            id="reg-phone"
+                                            maxLength={10}
+                                            value={phone}
+                                            onChange={(e) => {
+                                                setPhone(e.target.value.replace(/\D/g, ''));
+                                                clearRegError('phone');
+                                            }}
+                                            placeholder="9876543210"
+                                            className={`w-full pl-12 pr-5 py-4 rounded-[16px] text-sm font-bold text-slate-900 outline-none transition-all tracking-wider ${
+                                                regErrors.phone 
+                                                    ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                    : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                            }`}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.emailOptional')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.emailOptional')} <span className="text-slate-400 font-normal">({t('common.optional', { defaultValue: 'Optional' })})</span>
+                                        </label>
+                                        {regErrors.email && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {regErrors.email}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="email"
+                                        name="email"
+                                        id="reg-email"
                                         value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
+                                        onChange={(e) => {
+                                            setEmail(e.target.value);
+                                            clearRegError('email');
+                                        }}
                                         placeholder="yourname@domain.com"
-                                        className={`w-full px-5 py-4 bg-slate-50 border ${email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? 'border-red-400' : 'border-none'} rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all`}
+                                        className={`w-full px-5 py-4 rounded-[16px] text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            regErrors.email 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
-                                    {email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && <p className="text-red-500 text-[10px] mt-1 font-bold">{t('pro.invalidEmail')}</p>}
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.professionTitle')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.professionTitle')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {regErrors.profession && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {regErrors.profession}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
+                                        name="profession"
+                                        id="reg-profession"
                                         value={profession}
-                                        onChange={(e) => setProfession(e.target.value)}
+                                        onChange={(e) => {
+                                            setProfession(e.target.value);
+                                            clearRegError('profession');
+                                        }}
                                         placeholder={t('pro.professionPlaceholder')}
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className={`w-full px-5 py-4 rounded-[16px] text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            regErrors.profession 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
-                                <div className="space-y-2 col-span-1 md:col-span-2">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.selectCategories')}</label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                <div className="space-y-2 col-span-1 md:col-span-2" id="reg-categoryIds">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.selectCategories')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {regErrors.categoryIds && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {regErrors.categoryIds}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-2 rounded-2xl transition-all ${
+                                        regErrors.categoryIds ? 'border-2 border-rose-400 bg-rose-50/20 ring-2 ring-rose-400/10' : ''
+                                    }`}>
                                         {categories.map((cat) => {
                                             const isSelected = categoryIds.includes(cat._id);
                                             return (
                                                 <label
                                                     key={cat._id}
                                                     className={`flex items-center gap-3 p-4 rounded-2xl border transition-all cursor-pointer select-none ${isSelected
-                                                            ? 'bg-brand-50 border-brand-500/20 text-slate-900 shadow-sm'
-                                                            : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100/75'
+                                                            ? 'bg-brand-50 border-brand-500/20 text-slate-900 shadow-sm ring-1 ring-brand-500/30'
+                                                            : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100/75'
                                                         }`}
                                                 >
                                                     <input
@@ -1056,6 +1394,7 @@ const ProfessionalProfilePanel = () => {
                                                             } else {
                                                                 setCategoryIds(categoryIds.filter(id => id !== cat._id));
                                                             }
+                                                            clearRegError('categoryIds');
                                                         }}
                                                         className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 h-4 w-4 cursor-pointer"
                                                     />
@@ -1071,37 +1410,89 @@ const ProfessionalProfilePanel = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.experience')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.experience')} (Years) <span className="text-rose-500">*</span>
+                                        </label>
+                                        {regErrors.experienceYears && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {regErrors.experienceYears}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="number"
-                                        required
+                                        name="experienceYears"
+                                        id="reg-experienceYears"
                                         min="0"
+                                        max="70"
                                         value={experienceYears}
-                                        onChange={(e) => setExperienceYears(e.target.value)}
+                                        onChange={(e) => {
+                                            setExperienceYears(e.target.value);
+                                            clearRegError('experienceYears');
+                                        }}
                                         placeholder="e.g. 5"
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className={`w-full px-5 py-4 rounded-[16px] text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            regErrors.experienceYears 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.city')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.city')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {regErrors.city && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {regErrors.city}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
+                                        name="city"
+                                        id="reg-city"
                                         value={city}
-                                        onChange={(e) => setCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                                        onChange={(e) => {
+                                            setCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''));
+                                            clearRegError('city');
+                                        }}
                                         placeholder={t('pro.cityPlaceholder')}
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className={`w-full px-5 py-4 rounded-[16px] text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            regErrors.city 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.address')}</label>
+                                <div className="space-y-1 md:col-span-2">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.address')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {regErrors.address && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {regErrors.address}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
+                                        name="address"
+                                        id="reg-address"
                                         value={address}
-                                        onChange={(e) => setAddress(e.target.value)}
+                                        onChange={(e) => {
+                                            setAddress(e.target.value);
+                                            clearRegError('address');
+                                        }}
                                         placeholder={t('pro.addressPlaceholder')}
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className={`w-full px-5 py-4 rounded-[16px] text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            regErrors.address 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="col-span-1 md:col-span-2 p-5 bg-indigo-50/40 rounded-3xl border border-indigo-100/30 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
@@ -1134,37 +1525,59 @@ const ProfessionalProfilePanel = () => {
                                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.latitude')}</label>
                                     <input
                                         type="text"
-                                        required
+                                        name="lat"
+                                        id="reg-lat"
                                         value={lat}
                                         onChange={(e) => setLat(e.target.value)}
                                         placeholder="e.g. 22.7196"
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200/80 rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
                                     />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.longitude')}</label>
                                     <input
                                         type="text"
-                                        required
+                                        name="lng"
+                                        id="reg-lng"
                                         value={lng}
                                         onChange={(e) => setLng(e.target.value)}
                                         placeholder="e.g. 75.8577"
-                                        className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200/80 rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
                                     />
                                 </div>
                             </div>
 
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.description')}</label>
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                        {t('pro.description')} <span className="text-rose-500">*</span>
+                                    </label>
+                                    {regErrors.description && (
+                                        <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                            <AlertCircle size={11} /> {regErrors.description}
+                                        </span>
+                                    )}
+                                </div>
                                 <textarea
-                                    required
+                                    name="description"
+                                    id="reg-description"
                                     value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
+                                    onChange={(e) => {
+                                        setDescription(e.target.value);
+                                        clearRegError('description');
+                                    }}
                                     placeholder={t('pro.descriptionPlaceholder')}
                                     rows="4"
-                                    className="w-full px-5 py-4 bg-slate-50 border-none rounded-[16px] text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all resize-none"
+                                    className={`w-full px-5 py-4 rounded-[16px] text-sm font-bold text-slate-900 outline-none transition-all resize-none ${
+                                        regErrors.description 
+                                            ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                            : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                    }`}
                                 />
+                                <p className="text-[10px] text-slate-400 font-bold text-right">
+                                    {description.trim().length}/10 characters minimum
+                                </p>
                             </div>
 
                             {(() => {
@@ -1327,8 +1740,20 @@ const ProfessionalProfilePanel = () => {
 
             {/* CREATE PLATFORM AD MODAL */}
             {isSubmittingPlatformAd && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in">
-                    <div className="bg-white rounded-[32px] md:rounded-[40px] max-w-xl w-full shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col" style={{ maxHeight: '90vh' }}>
+                <div 
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in overscroll-contain"
+                    onWheel={preventBackdropScroll}
+                    onTouchMove={preventBackdropScroll}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) resetPlatformAdForm();
+                    }}
+                >
+                    <div 
+                        data-lenis-prevent
+                        data-lenis-prevent-wheel
+                        className="bg-white rounded-[32px] md:rounded-[40px] max-w-xl w-full shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col overscroll-contain" 
+                        style={{ maxHeight: '90vh' }}
+                    >
                         {/* STICKY HEADER */}
                         <div className="flex justify-between items-center p-6 md:p-8 pb-4 border-b border-slate-100 shrink-0">
                             <div>
@@ -1344,57 +1769,135 @@ const ProfessionalProfilePanel = () => {
                         </div>
 
                         {/* SCROLLABLE BODY */}
-                        <form onSubmit={handleSubmitPlatformAd} id="banner-ad-form" className="flex-1 overflow-y-auto px-6 md:px-8 py-4 space-y-4">
+                        <form 
+                            onSubmit={handleSubmitPlatformAd} 
+                            id="banner-ad-form" 
+                            noValidate
+                            data-lenis-prevent
+                            data-lenis-prevent-wheel
+                            className="flex-1 overflow-y-auto px-6 md:px-8 py-4 space-y-4 overscroll-contain touch-pan-y"
+                        >
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.adTitle')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.adTitle')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {bannerErrors.title && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {bannerErrors.title}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
                                         value={platTitle}
-                                        onChange={(e) => setPlatTitle(e.target.value)}
+                                        onChange={(e) => {
+                                            setPlatTitle(e.target.value);
+                                            clearBannerError('title');
+                                        }}
                                         placeholder={t('pro.adTitlePlaceholder')}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            bannerErrors.title
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.adLink')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.adLink')} <span className="text-slate-400 font-normal">({t('common.optional', { defaultValue: 'Optional' })})</span>
+                                        </label>
+                                        {bannerErrors.targetUrl && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {bannerErrors.targetUrl}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="url"
                                         value={platTargetUrl}
-                                        onChange={(e) => setPlatTargetUrl(e.target.value)}
+                                        onChange={(e) => {
+                                            setPlatTargetUrl(e.target.value);
+                                            clearBannerError('targetUrl');
+                                        }}
                                         placeholder="https://example.com/promo"
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            bannerErrors.targetUrl
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="space-y-1 md:col-span-2">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.adCity')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.adCity')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {bannerErrors.city && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {bannerErrors.city}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
                                         value={platCity}
-                                        onChange={(e) => setPlatCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
+                                        onChange={(e) => {
+                                            setPlatCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''));
+                                            clearBannerError('city');
+                                        }}
                                         placeholder={t('pro.cityPlaceholder')}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            bannerErrors.city
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.adContent')}</label>
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                        {t('pro.adContent')} <span className="text-rose-500">*</span>
+                                    </label>
+                                    {bannerErrors.content && (
+                                        <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                            <AlertCircle size={11} /> {bannerErrors.content}
+                                        </span>
+                                    )}
+                                </div>
                                 <textarea
-                                    required
                                     value={platContent}
-                                    onChange={(e) => setPlatContent(e.target.value)}
+                                    onChange={(e) => {
+                                        setPlatContent(e.target.value);
+                                        clearBannerError('content');
+                                    }}
                                     placeholder={t('pro.adContentPlaceholder')}
                                     rows="3"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none resize-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                    className={`w-full px-4 py-3.5 rounded-xl text-sm font-bold text-slate-900 outline-none resize-none transition-all ${
+                                        bannerErrors.content
+                                            ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
+                                            : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                    }`}
                                 />
+                                <p className="text-[10px] text-slate-400 font-bold text-right">
+                                    {platContent.trim().length}/10 characters minimum
+                                </p>
                             </div>
 
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
-                                    <span className="text-xs font-black uppercase tracking-wider text-slate-700">{t('pro.mediaType')}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-black uppercase tracking-wider text-slate-700">{t('pro.mediaType')} <span className="text-rose-500">*</span></span>
+                                        {bannerErrors.media && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {bannerErrors.media}
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex bg-slate-200/60 p-1 rounded-xl gap-1">
                                         <button
                                             type="button"
@@ -1424,7 +1927,11 @@ const ProfessionalProfilePanel = () => {
                                     {activeMediaTab === 'image' && (
                                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 relative animate-in fade-in duration-200">
                                             <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">{t('pro.bannerPhoto')}</h4>
-                                            <label className="cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border border-slate-200 border-dashed rounded-xl transition-all relative overflow-hidden group">
+                                            <label className={`cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border rounded-xl transition-all relative overflow-hidden group ${
+                                                bannerErrors.media
+                                                    ? 'border-2 border-dashed border-rose-500 bg-rose-50/20 ring-2 ring-rose-500/10'
+                                                    : 'border-slate-200 border-dashed'
+                                            }`}>
                                                 {isUploadingMedia ? (
                                                     <Loader2 className="h-5 w-5 text-brand-500 animate-spin" />
                                                 ) : platImageUrl ? (
@@ -1462,7 +1969,11 @@ const ProfessionalProfilePanel = () => {
                                     {activeMediaTab === 'video' && (
                                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 relative animate-in fade-in duration-200">
                                             <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">{t('pro.bannerVideo')}</h4>
-                                            <label className="cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border border-slate-200 border-dashed rounded-xl transition-all relative overflow-hidden group">
+                                            <label className={`cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border rounded-xl transition-all relative overflow-hidden group ${
+                                                bannerErrors.media
+                                                    ? 'border-2 border-dashed border-rose-500 bg-rose-50/20 ring-2 ring-rose-500/10'
+                                                    : 'border-slate-200 border-dashed'
+                                            }`}>
                                                 {isUploadingMedia ? (
                                                     <Loader2 className="h-5 w-5 text-brand-500 animate-spin" />
                                                 ) : platVideoUrl ? (
@@ -1532,8 +2043,19 @@ const ProfessionalProfilePanel = () => {
 
             {/* EDIT CATEGORIES MODAL */}
             {isEditingCategories && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in">
-                    <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto scrollbar-none">
+                <div 
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in overscroll-contain"
+                    onWheel={preventBackdropScroll}
+                    onTouchMove={preventBackdropScroll}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsEditingCategories(false);
+                    }}
+                >
+                    <div 
+                        data-lenis-prevent
+                        data-lenis-prevent-wheel
+                        className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto scrollbar-none overscroll-contain touch-pan-y"
+                    >
                         <div className="flex justify-between items-center">
                             <div>
                                 <h2 className="text-xl font-black text-slate-900">{t('pro.manageCategories')}</h2>
@@ -1600,8 +2122,19 @@ const ProfessionalProfilePanel = () => {
 
             {/* CONFIRM PAYMENT MODAL */}
             {isConfirmingPayment && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in">
-                    <div className="bg-white rounded-[32px] p-6 md:p-8 max-w-md w-full shadow-2xl space-y-6">
+                <div 
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in overscroll-contain"
+                    onWheel={preventBackdropScroll}
+                    onTouchMove={preventBackdropScroll}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsConfirmingPayment(false);
+                    }}
+                >
+                    <div 
+                        data-lenis-prevent
+                        data-lenis-prevent-wheel
+                        className="bg-white rounded-[32px] p-6 md:p-8 max-w-md w-full shadow-2xl space-y-6 overscroll-contain"
+                    >
                         <div className="flex justify-between items-center">
                             <h2 className="text-xl font-black text-slate-900">{t('pro.activateTitle')}</h2>
                             <button
@@ -1655,8 +2188,19 @@ const ProfessionalProfilePanel = () => {
 
             {/* EDIT PROFILE DETAILS & MEDIA MODAL */}
             {isEditingProfile && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in">
-                    <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto scrollbar-none animate-in zoom-in-95 duration-200">
+                <div 
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in overscroll-contain"
+                    onWheel={preventBackdropScroll}
+                    onTouchMove={preventBackdropScroll}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsEditingProfile(false);
+                    }}
+                >
+                    <div 
+                        data-lenis-prevent
+                        data-lenis-prevent-wheel
+                        className="bg-white rounded-[32px] md:rounded-[40px] p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[85vh] overflow-y-auto scrollbar-none animate-in zoom-in-95 duration-200 overscroll-contain touch-pan-y"
+                    >
                         <div className="flex justify-between items-center">
                             <div>
                                 <h2 className="text-xl font-black text-slate-900">{t('pro.editTitle')}</h2>
@@ -1669,111 +2213,258 @@ const ProfessionalProfilePanel = () => {
                                 <X className="h-4 w-4" />
                             </button>
                         </div>
-                        <form onSubmit={handleUpdateProfileSubmit} className="space-y-4">
+                        <form onSubmit={handleUpdateProfileSubmit} noValidate className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('auth.fullName')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('auth.fullName')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {editErrors.name && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {editErrors.name}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
+                                        id="edit-name"
+                                        name="edit-name"
                                         value={editName}
-                                        onChange={(e) => setEditName(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        onChange={(e) => {
+                                            setEditName(e.target.value.replace(/[^a-zA-Z\s]/g, ''));
+                                            clearEditError('name');
+                                        }}
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            editErrors.name 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('editProfile.phone')}</label>
-                                    <input
-                                        type="tel"
-                                        inputMode="numeric"
-                                        required
-                                        maxLength={10}
-                                        value={editPhone}
-                                        onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, ''))}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
-                                    />
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('editProfile.phone')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {editErrors.phone && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {editErrors.phone}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 select-none">
+                                            +91
+                                        </span>
+                                        <input
+                                            type="tel"
+                                            inputMode="numeric"
+                                            id="edit-phone"
+                                            name="edit-phone"
+                                            maxLength={10}
+                                            value={editPhone}
+                                            onChange={(e) => {
+                                                setEditPhone(e.target.value.replace(/\D/g, ''));
+                                                clearEditError('phone');
+                                            }}
+                                            className={`w-full pl-12 pr-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all tracking-wider ${
+                                                editErrors.phone 
+                                                    ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                    : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                            }`}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.emailOptional')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.emailOptional')} <span className="text-slate-400 font-normal">({t('common.optional', { defaultValue: 'Optional' })})</span>
+                                        </label>
+                                        {editErrors.email && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {editErrors.email}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="email"
+                                        id="edit-email"
+                                        name="edit-email"
                                         value={editEmail}
-                                        onChange={(e) => setEditEmail(e.target.value)}
-                                        className={`w-full px-4 py-3 bg-slate-50 border ${editEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail) ? 'border-red-400' : 'border-none'} rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all`}
+                                        onChange={(e) => {
+                                            setEditEmail(e.target.value);
+                                            clearEditError('email');
+                                        }}
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            editErrors.email 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
-                                    {editEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail) && <p className="text-red-500 text-[10px] mt-1 font-bold">{t('pro.invalidEmail')}</p>}
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.professionTitle')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.professionTitle')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {editErrors.profession && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {editErrors.profession}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
+                                        id="edit-profession"
+                                        name="edit-profession"
                                         value={editProfession}
-                                        onChange={(e) => setEditProfession(e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        onChange={(e) => {
+                                            setEditProfession(e.target.value);
+                                            clearEditError('profession');
+                                        }}
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            editErrors.profession 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.experience')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.experience')} (Years) <span className="text-rose-500">*</span>
+                                        </label>
+                                        {editErrors.experienceYears && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {editErrors.experienceYears}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="number"
-                                        required
+                                        id="edit-experienceYears"
+                                        name="edit-experienceYears"
                                         min="0"
+                                        max="70"
                                         value={editExperienceYears}
-                                        onChange={(e) => setEditExperienceYears(e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        onChange={(e) => {
+                                            setEditExperienceYears(e.target.value);
+                                            clearEditError('experienceYears');
+                                        }}
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            editErrors.experienceYears 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.city')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.city')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {editErrors.city && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {editErrors.city}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
+                                        id="edit-city"
+                                        name="edit-city"
                                         value={editCity}
-                                        onChange={(e) => setEditCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''))}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        onChange={(e) => {
+                                            setEditCity(e.target.value.replace(/[^a-zA-Z\s]/g, ''));
+                                            clearEditError('city');
+                                        }}
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            editErrors.city 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="space-y-1 md:col-span-2">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.address')}</label>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            {t('pro.address')} <span className="text-rose-500">*</span>
+                                        </label>
+                                        {editErrors.address && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {editErrors.address}
+                                            </span>
+                                        )}
+                                    </div>
                                     <input
                                         type="text"
-                                        required
+                                        id="edit-address"
+                                        name="edit-address"
                                         value={editAddress}
-                                        onChange={(e) => setEditAddress(e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        onChange={(e) => {
+                                            setEditAddress(e.target.value);
+                                            clearEditError('address');
+                                        }}
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            editErrors.address 
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
                                     />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.latitude')}</label>
                                     <input
                                         type="text"
-                                        required
+                                        id="edit-lat"
+                                        name="edit-lat"
                                         value={editLat}
                                         onChange={(e) => setEditLat(e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200/80 rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
                                     />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.longitude')}</label>
                                     <input
                                         type="text"
-                                        required
+                                        id="edit-lng"
+                                        name="edit-lng"
                                         value={editLng}
                                         onChange={(e) => setEditLng(e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200/80 rounded-xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.description')}</label>
+                                <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                        {t('pro.description')} <span className="text-rose-500">*</span>
+                                    </label>
+                                    {editErrors.description && (
+                                        <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                            <AlertCircle size={11} /> {editErrors.description}
+                                        </span>
+                                    )}
+                                </div>
                                 <textarea
-                                    required
+                                    id="edit-description"
+                                    name="edit-description"
                                     value={editDescription}
-                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    onChange={(e) => {
+                                        setEditDescription(e.target.value);
+                                        clearEditError('description');
+                                    }}
                                     rows="3"
-                                    className="w-full px-4 py-3.5 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-900 outline-none resize-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                    className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all resize-none ${
+                                        editErrors.description 
+                                            ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10' 
+                                             : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                    }`}
                                 />
+                                <p className="text-[10px] text-slate-400 font-bold text-right">
+                                    {editDescription.trim().length}/10 characters minimum
+                                </p>
                             </div>
                             <div className="flex gap-3 pt-4 border-t border-slate-100">
                                 <button
