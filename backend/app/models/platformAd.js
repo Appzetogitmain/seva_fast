@@ -39,6 +39,43 @@ const platformAdSchema = new mongoose.Schema(
             trim: true,
             default: "",
         },
+        hasExternalUrl: {
+            type: Boolean,
+            default: false,
+        },
+        businessName: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        contactPhone: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        whatsapp: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        address: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        posters: [{
+            type: String,
+            trim: true,
+        }],
+        videos: [{
+            type: String,
+            trim: true,
+        }],
+        callToActionText: {
+            type: String,
+            trim: true,
+            default: "Contact Us",
+        },
         city: {
             type: String,
             required: true,

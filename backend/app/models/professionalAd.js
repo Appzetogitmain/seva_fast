@@ -20,6 +20,15 @@ const serviceItemSchema = new mongoose.Schema({
         default: 30,
     },
     image: String,
+    images: [{
+        type: String,
+        trim: true,
+    }],
+    video: String,
+    videos: [{
+        type: String,
+        trim: true,
+    }],
 });
 
 const professionalAdSchema = new mongoose.Schema(
@@ -123,6 +132,14 @@ const professionalAdSchema = new mongoose.Schema(
             enum: ["image", "video", "none"],
             default: "none",
         },
+        portfolioImages: [{
+            type: String,
+            trim: true,
+        }],
+        portfolioVideos: [{
+            type: String,
+            trim: true,
+        }],
     },
     {
         timestamps: true,

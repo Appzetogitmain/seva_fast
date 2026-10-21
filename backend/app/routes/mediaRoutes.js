@@ -11,7 +11,23 @@ import {
 import logger from "../services/logger.js";
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20 MB maximum size
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES }
+});
+
+const uploadSingleFile = (req, res, next) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return handleResponse(res, 400, "File size exceeds the 20 MB limit. Please upload a video or photo under 20 MB.");
+      }
+      return handleResponse(res, 400, err.message || "File upload failed");
+    }
+    next();
+  });
+};
 
 const VALID_ENTITY_TYPES = [
   "product",
@@ -100,7 +116,7 @@ router.post("/upload-intent", verifyToken, handleCreateUploadIntent);
 // Backward compatibility alias
 router.post("/upload-url", verifyToken, handleCreateUploadIntent);
 
-router.post("/upload", verifyToken, upload.single("file"), async (req, res) => {
+router.post("/upload", verifyToken, uploadSingleFile, async (req, res) => {
   try {
     const uploadedByModel = resolveUploadedByModel(req.user?.role);
     if (!uploadedByModel) {

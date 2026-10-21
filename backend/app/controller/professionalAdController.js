@@ -10,7 +10,7 @@ import crypto from "crypto";
 export const createAd = async (req, res) => {
     try {
         const ownerId = req.user.id;
-        const { name, phone, email, profession, categoryId, categoryIds, experienceYears, description, address, city, lat, lng, mediaUrl, mediaType } = req.body;
+        const { name, phone, email, profession, categoryId, categoryIds, experienceYears, description, address, city, lat, lng, mediaUrl, mediaType, portfolioImages, portfolioVideos } = req.body;
 
         const ids = Array.isArray(categoryIds) && categoryIds.length > 0 ? categoryIds : [categoryId].filter(Boolean);
         if (ids.length === 0) {
@@ -66,6 +66,8 @@ export const createAd = async (req, res) => {
             isPublished: false,
             mediaUrl: mediaUrl || "",
             mediaType: mediaType || "none",
+            portfolioImages: Array.isArray(portfolioImages) ? portfolioImages.filter(Boolean).map(String) : [],
+            portfolioVideos: Array.isArray(portfolioVideos) ? portfolioVideos.filter(Boolean).map(String) : [],
         });
 
         return handleResponse(res, 201, "Service provider profile created successfully and submitted for admin review.", newAd);
@@ -93,7 +95,7 @@ export const getMyAd = async (req, res) => {
 export const updateMyAd = async (req, res) => {
     try {
         const ownerId = req.user.id;
-        const { name, phone, email, profession, categoryId, categoryIds, experienceYears, description, address, city, lat, lng, mediaUrl, mediaType } = req.body;
+        const { name, phone, email, profession, categoryId, categoryIds, experienceYears, description, address, city, lat, lng, mediaUrl, mediaType, portfolioImages, portfolioVideos } = req.body;
 
         const ad = await ProfessionalAd.findOne({ owner: ownerId });
         if (!ad) {
@@ -130,6 +132,8 @@ export const updateMyAd = async (req, res) => {
         if (city) ad.city = city.trim();
         if (mediaUrl !== undefined) ad.mediaUrl = mediaUrl;
         if (mediaType !== undefined) ad.mediaType = mediaType;
+        if (Array.isArray(portfolioImages)) ad.portfolioImages = portfolioImages.filter(Boolean).map(String);
+        if (Array.isArray(portfolioVideos)) ad.portfolioVideos = portfolioVideos.filter(Boolean).map(String);
         if (lat !== undefined && lng !== undefined) {
             ad.location = {
                 type: "Point",
@@ -163,12 +167,27 @@ export const updateMyServices = async (req, res) => {
             return handleResponse(res, 404, "Professional profile not found");
         }
 
-        ad.services = services.map(s => ({
-            name: s.name?.trim() || "",
-            description: s.description?.trim() || "",
-            price: Number(s.price) || 0,
-            durationMinutes: Number(s.durationMinutes) || 30,
-        }));
+        ad.services = services.map(s => {
+            const images = Array.isArray(s.images)
+                ? s.images.filter(Boolean).map(img => String(img).trim())
+                : (s.image ? [String(s.image).trim()] : []);
+            const videos = Array.isArray(s.videos)
+                ? s.videos.filter(Boolean).map(v => String(v).trim())
+                : (s.video ? [String(s.video).trim()] : []);
+            const primaryImage = s.image?.trim() || (images.length > 0 ? images[0] : "");
+            const primaryVideo = s.video?.trim() || (videos.length > 0 ? videos[0] : "");
+
+            return {
+                name: s.name?.trim() || "",
+                description: s.description?.trim() || "",
+                price: Number(s.price) || 0,
+                durationMinutes: Number(s.durationMinutes) || 30,
+                image: primaryImage,
+                images: images,
+                video: primaryVideo,
+                videos: videos,
+            };
+        });
 
         // Updating catalog resets approval state
         ad.approvalStatus = "pending";
@@ -342,6 +361,7 @@ export const searchAds = async (req, res) => {
 
         const ads = await ProfessionalAd.find(query)
             .populate("category", "name")
+            .populate("categories", "name")
             .lean();
 
         return handleResponse(res, 200, "Advertisements fetched successfully", ads);

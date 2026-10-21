@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from "react-router-dom";
-import { ExternalLink, Volume2, VolumeX } from "lucide-react";
+import { ExternalLink, Volume2, VolumeX, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PlatformBannerSliderInner = ({ ads = [] }) => {
@@ -44,8 +44,10 @@ const PlatformBannerSliderInner = ({ ads = [] }) => {
       <div className="relative w-full overflow-hidden">
         <div className="ad-marquee-track">
           {duplicatedAds.map((adItem, idx) => {
+            const hasExternal = Boolean(adItem?.hasExternalUrl && adItem?.targetUrl?.trim());
+
             const handleAdClick = () => {
-              if (adItem?.targetUrl) {
+              if (hasExternal) {
                 const target = adItem.targetUrl.trim();
                 if (/^https?:\/\//i.test(target)) {
                   window.open(target, "_blank", "noopener,noreferrer");
@@ -55,6 +57,9 @@ const PlatformBannerSliderInner = ({ ads = [] }) => {
                   const targetPath = target.startsWith("/") ? target : `/${target}`;
                   navigate(targetPath);
                 }
+              } else if (adItem?._id) {
+                // Navigate to internal showcase page on our platform
+                navigate(`/promotions/${adItem._id}`);
               }
             };
 
@@ -63,8 +68,7 @@ const PlatformBannerSliderInner = ({ ads = [] }) => {
                 key={idx}
                 onClick={handleAdClick}
                 className={cn(
-                  "ad-card relative shrink-0 h-[135px] sm:h-[160px] md:h-[200px] w-[calc(50vw-22px)] md:w-[calc(50vw-62px)] max-w-[620px] rounded-[16px] md:rounded-[24px] overflow-hidden shadow-md border border-slate-100 bg-slate-900 group select-none transition-all duration-300 hover:shadow-lg flex items-center justify-center",
-                  adItem?.targetUrl ? "cursor-pointer" : ""
+                  "ad-card relative shrink-0 h-[135px] sm:h-[160px] md:h-[200px] w-[calc(50vw-22px)] md:w-[calc(50vw-62px)] max-w-[620px] rounded-[16px] md:rounded-[24px] overflow-hidden shadow-md border border-slate-100 bg-slate-900 group select-none transition-all duration-300 hover:shadow-lg flex items-center justify-center cursor-pointer"
                 )}
               >
                 {/* Media Rendering */}
@@ -92,9 +96,9 @@ const PlatformBannerSliderInner = ({ ads = [] }) => {
                       {isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
                     </button>
                   </div>
-                ) : adItem.imageUrl || adItem.mediaUrl ? (
+                ) : adItem.imageUrl || adItem.mediaUrl || (Array.isArray(adItem.posters) && adItem.posters[0]) ? (
                   <img
-                    src={adItem.imageUrl || adItem.mediaUrl}
+                    src={adItem.imageUrl || adItem.mediaUrl || adItem.posters[0]}
                     alt={adItem.title}
                     className="w-full h-full object-cover pointer-events-none"
                     loading="eager"
@@ -120,21 +124,26 @@ const PlatformBannerSliderInner = ({ ads = [] }) => {
                       )}
                     </div>
                     <h3 className="text-xxs sm:text-xs md:text-sm font-black text-white uppercase tracking-tight leading-tight">
-                      {adItem.title}
+                      {adItem.businessName || adItem.title}
                     </h3>
                     <p className="text-[7px] sm:text-[8px] md:text-[9px] text-slate-300 font-bold opacity-90 line-clamp-1 leading-normal">
                       {adItem.content}
                     </p>
                   </div>
 
-                  {adItem.targetUrl && (
-                    <div className="shrink-0 flex items-center mt-2">
+                  <div className="shrink-0 flex items-center mt-2">
+                    {hasExternal ? (
                       <button className="flex items-center gap-1 px-2.5 py-1 bg-white text-black hover:bg-brand-50 rounded-full text-[7px] md:text-[8px] font-black uppercase tracking-wider shadow-md transition-all active:scale-95">
-                        {t('home.visit')}
+                        {t('home.visit', { defaultValue: 'Visit' })}
                         <ExternalLink className="h-2 w-2 text-black" />
                       </button>
-                    </div>
-                  )}
+                    ) : (
+                      <button className="flex items-center gap-1 px-2.5 py-1 bg-brand-500 hover:bg-brand-600 text-white rounded-full text-[7px] md:text-[8px] font-black uppercase tracking-wider shadow-md transition-all active:scale-95">
+                        <span>Showcase</span>
+                        <ChevronRight className="h-2.5 w-2.5 text-white" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );

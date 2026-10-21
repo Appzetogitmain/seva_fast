@@ -205,6 +205,7 @@ export const customerApi = {
   initiatePayPlatformAd: (id) => axiosInstance.post(`/professionals/platform-ads/${id}/pay/initiate`),
   verifyPayPlatformAd: (id, data) => axiosInstance.post(`/professionals/platform-ads/${id}/pay/verify`, data),
   getActivePlatformAds: (params) => axiosInstance.get("/professionals/platform-ads/active", { params }),
+  getPlatformAdById: (id) => axiosInstance.get(`/professionals/platform-ads/${id}`),
 
   // Product Demands
   registerProductDemand: (data) => axiosInstance.post("/product-demands/register", data),

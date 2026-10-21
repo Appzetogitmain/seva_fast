@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { customerApi } from '../services/customerApi';
 import { useToast } from '@shared/components/ui/Toast';
 import {
+    Image as ImageIcon,
     Search,
     MapPin,
     Briefcase,
@@ -14,6 +15,7 @@ import {
     Calendar,
     ChevronDown,
     ChevronLeft,
+    ChevronRight,
     X,
     Grid,
     List,
@@ -27,6 +29,202 @@ const getWhatsAppUrl = (phone, name) => {
     const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
     const text = encodeURIComponent(`Hello ${name || 'Sir'}, I found your profile on SevaFast and would like to inquire about your services.`);
     return `https://wa.me/${fullPhone}?text=${text}`;
+};
+
+const ProfessionalCard = ({ pro, onOpenCatalog, t, getWhatsAppUrl, categories }) => {
+    const resolveCategoryName = (c) => {
+        if (!c) return null;
+        if (typeof c === 'object' && c.name) return c.name;
+        const id = typeof c === 'string' ? c : (c._id || c.id);
+        const found = categories?.find(cat => String(cat._id || cat.id) === String(id));
+        if (found?.name) return found.name;
+        if (typeof c === 'string' && /^[0-9a-fA-F]{24}$/.test(c)) return null;
+        return typeof c === 'string' ? c : null;
+    };
+    const photos = React.useMemo(() => {
+        const list = [];
+        if (pro.mediaUrl) list.push(pro.mediaUrl);
+        if (Array.isArray(pro.portfolioImages)) {
+            pro.portfolioImages.forEach(img => {
+                if (img && !list.includes(img)) list.push(img);
+            });
+        }
+        if (Array.isArray(pro.services)) {
+            pro.services.forEach(svc => {
+                if (Array.isArray(svc.images)) {
+                    svc.images.forEach(img => {
+                        if (img && !list.includes(img)) list.push(img);
+                    });
+                } else if (svc.image && !list.includes(svc.image)) {
+                    list.push(svc.image);
+                }
+            });
+        }
+        return list;
+    }, [pro]);
+
+    const [photoIndex, setPhotoIndex] = useState(0);
+
+    const handlePrevPhoto = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        setPhotoIndex(prev => (prev - 1 + photos.length) % photos.length);
+    };
+
+    const handleNextPhoto = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        setPhotoIndex(prev => (prev + 1) % photos.length);
+    };
+
+    return (
+        <div className="bg-white rounded-[32px] border border-slate-100 hover:shadow-xl transition-all overflow-hidden flex flex-col justify-between group">
+            <div>
+                {/* 1ST ROW: PHOTOS CAROUSEL */}
+                <div className="relative aspect-[16/10] w-full bg-slate-100 overflow-hidden select-none">
+                    {photos.length > 0 ? (
+                        <>
+                            <img
+                                src={photos[photoIndex] || photos[0]}
+                                alt={pro.name}
+                                className="w-full h-full object-cover transition-all duration-300"
+                            />
+                            {photos.length > 1 && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={handlePrevPhoto}
+                                        className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md transition-all active:scale-90 shadow-lg z-10"
+                                        title="Previous Photo"
+                                        aria-label="Previous"
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleNextPhoto}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white backdrop-blur-md transition-all active:scale-90 shadow-lg z-10"
+                                        title="Next Photo"
+                                        aria-label="Next"
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </button>
+                                    <div className="absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[9px] font-black text-white uppercase tracking-wider shadow-sm z-10">
+                                        {photoIndex + 1} / {photos.length}
+                                    </div>
+                                </>
+                            )}
+                        </>
+                    ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 text-slate-400 p-4 text-center">
+                            <div className="h-14 w-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-brand-600 font-black text-2xl mb-1 border border-slate-200/60">
+                                {pro.name?.charAt(0)?.toUpperCase() || 'P'}
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{pro.profession}</span>
+                        </div>
+                    )}
+
+                    {/* Rating Pill overlay */}
+                    <div className="absolute top-3 right-3 flex items-center gap-1 text-amber-500 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-xl shadow-sm border border-slate-100 z-10">
+                        <Star className="h-3.5 w-3.5 fill-amber-500" />
+                        <span className="text-xs font-black text-slate-900">4.9</span>
+                    </div>
+
+                    {/* Profession Tag overlay */}
+                    <div className="absolute top-3 left-3 flex items-center gap-1 z-10">
+                        <span className="px-2.5 py-1 rounded-xl bg-black/75 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-wider shadow-sm">
+                            {pro.profession}
+                        </span>
+                    </div>
+                </div>
+
+                {/* 2ND ROW: DETAILS BELOW THE CAROUSEL */}
+                <div className="p-5 md:p-6 space-y-4">
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-lg font-black text-slate-955 leading-tight truncate">{pro.name}</h3>
+                            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                                {(() => {
+                                    const catsList = (Array.isArray(pro.categories) && pro.categories.length > 0)
+                                        ? pro.categories
+                                        : (pro.category ? [pro.category] : []);
+                                    const names = catsList
+                                        .map(resolveCategoryName)
+                                        .filter(Boolean);
+                                    if (names.length === 0) return null;
+                                    return names.map((catName, idx) => (
+                                        <span key={idx} className="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                                            {catName}
+                                        </span>
+                                    ));
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 text-xs font-bold text-slate-500">
+                        <span className="flex items-center gap-1.5 truncate">
+                            <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" /> {pro.city} ({pro.address})
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" /> {pro.experienceYears} Years Experience
+                        </span>
+                    </div>
+
+                    <p className="text-sm text-slate-600 font-semibold line-clamp-2 leading-relaxed bg-slate-50/70 p-3 rounded-2xl">
+                        {pro.description}
+                    </p>
+
+                    {/* Featured Services */}
+                    {pro.services?.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('directory.featured')}</span>
+                            <div className="flex flex-wrap gap-1.5">
+                                {pro.services.slice(0, 2).map((svc, idx) => (
+                                    <span key={idx} className="text-[11px] font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
+                                        {svc.name} ({svc.price === 0 || svc.price === '0' ? t('directory.free') : '₹' + svc.price})
+                                    </span>
+                                ))}
+                                {pro.services.length > 2 && (
+                                    <span className="text-[10px] font-black text-brand-600 bg-brand-50 px-2 py-1 rounded-lg">
+                                        {t('directory.more', { count: pro.services.length - 2 })}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="p-5 md:p-6 pt-0">
+                <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
+                    <button
+                        onClick={() => onOpenCatalog(pro)}
+                        className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center"
+                    >
+                        {t('directory.viewCatalog')}
+                    </button>
+                    <a
+                        href={`tel:${pro.phone}`}
+                        className="p-3 bg-black hover:bg-slate-900 transition-all text-white rounded-xl flex items-center justify-center shadow-sm"
+                        title="Call Service Provider"
+                    >
+                        <Phone className="h-4 w-4" />
+                    </a>
+                    <a
+                        href={getWhatsAppUrl(pro.phone, pro.name)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-3 bg-emerald-600 hover:bg-emerald-700 transition-all text-white rounded-xl flex items-center justify-center shadow-sm"
+                        title="Chat on WhatsApp"
+                    >
+                        <MessageCircle className="h-4 w-4" />
+                    </a>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const LocalProfessionalsDirectory = () => {
@@ -57,7 +255,8 @@ const LocalProfessionalsDirectory = () => {
 
     // Selected professional catalog view modal state
     const [activeCatalogProfessional, setActiveCatalogProfessional] = useState(null);
-    useLockBodyScroll(Boolean(activeCatalogProfessional));
+    const [activeVideoPreview, setActiveVideoPreview] = useState(null);
+    useLockBodyScroll(Boolean(activeCatalogProfessional || activeVideoPreview));
 
     const loadData = async () => {
         try {
@@ -292,88 +491,33 @@ const LocalProfessionalsDirectory = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {professionals.map((pro) => (
-                        <div key={pro._id} className="bg-white p-6 rounded-[32px] border border-slate-100 hover:shadow-lg transition-all flex flex-col justify-between">
-                            <div>
-                                <div className="flex justify-between items-start gap-4">
-                                    <div>
-                                        <h3 className="text-lg font-black text-slate-950 leading-tight">{pro.name}</h3>
-                                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                                            <span className="text-xs font-black text-brand-600 uppercase tracking-wider">{pro.profession}</span>
-                                            {pro.categories && pro.categories.length > 0 ? (
-                                                pro.categories.map((c) => (
-                                                    <span key={c._id} className="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase tracking-wider">
-                                                        {c.name}
-                                                    </span>
-                                                ))
-                                            ) : pro.category?.name ? (
-                                                <span className="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase tracking-wider">
-                                                    {pro.category.name}
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1 text-amber-500 bg-amber-50 px-2.5 py-1 rounded-xl">
-                                        <Star className="h-3.5 w-3.5 fill-amber-500" />
-                                        <span className="text-xs font-black">4.9</span>
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 flex flex-col gap-2 text-xs font-bold text-slate-500">
-                                    <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-slate-400" /> {pro.city} ({pro.address})</span>
-                                    <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-slate-400" /> {pro.experienceYears} Years Experience</span>
-                                </div>
-
-                                <p className="text-sm text-slate-600 font-semibold mt-4 line-clamp-3 leading-relaxed bg-slate-50/50 p-3 rounded-2xl">
-                                    {pro.description}
-                                </p>
-                            </div>
-
-                            <div className="mt-6 border-t border-slate-50 pt-4 space-y-3">
-                                {pro.services?.length > 0 && (
-                                    <div className="space-y-1">
-                                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('directory.featured')}</span>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {pro.services.slice(0, 2).map((svc, idx) => (
-                                                <span key={idx} className="text-[11px] font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
-                                                    {svc.name} ({svc.price === 0 || svc.price === '0' ? t('directory.free') : '₹' + svc.price})
-                                                </span>
-                                            ))}
-                                            {pro.services.length > 2 && (
-                                                <span className="text-[10px] font-black text-brand-600 bg-brand-50 px-2 py-1 rounded-lg">
-                                                    {t('directory.more', { count: pro.services.length - 2 })}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="flex items-center gap-2 pt-1">
-                                    <button
-                                        onClick={() => setActiveCatalogProfessional(pro)}
-                                        className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-center"
-                                    >
-                                        {t('directory.viewCatalog')}
-                                    </button>
-                                    <a
-                                        href={`tel:${pro.phone}`}
-                                        className="p-3 bg-black hover:bg-slate-900 transition-all text-white rounded-xl flex items-center justify-center shadow-sm"
-                                        title="Call Service Provider"
-                                    >
-                                        <Phone className="h-4 w-4" />
-                                    </a>
-                                    <a
-                                        href={getWhatsAppUrl(pro.phone, pro.name)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="p-3 bg-emerald-600 hover:bg-emerald-700 transition-all text-white rounded-xl flex items-center justify-center shadow-sm"
-                                        title="Chat on WhatsApp"
-                                    >
-                                        <MessageCircle className="h-4 w-4" />
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
+                        <ProfessionalCard
+                            key={pro._id}
+                            pro={pro}
+                            onOpenCatalog={setActiveCatalogProfessional}
+                            t={t}
+                            getWhatsAppUrl={getWhatsAppUrl}
+                            categories={categories}
+                        />
                     ))}
+                </div>
+            )}
+
+            {/* VIDEO PREVIEW MODAL */}
+            {activeVideoPreview && (
+                <div
+                    className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
+                    onClick={() => setActiveVideoPreview(null)}
+                >
+                    <button
+                        onClick={() => setActiveVideoPreview(null)}
+                        className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all"
+                    >
+                        <X className="h-6 w-6" />
+                    </button>
+                    <div className="max-w-2xl w-full rounded-2xl overflow-hidden shadow-2xl bg-black" onClick={(e) => e.stopPropagation()}>
+                        <video src={activeVideoPreview} controls autoPlay className="w-full aspect-video object-contain" />
+                    </div>
                 </div>
             )}
 
@@ -389,22 +533,45 @@ const LocalProfessionalsDirectory = () => {
                         className="bg-white rounded-[45px] p-8 max-w-lg w-full shadow-2xl space-y-6"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h2 className="text-xl font-black text-slate-950">{activeCatalogProfessional.name}</h2>
-                                <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        <div className="flex justify-between items-start gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
+                                {activeCatalogProfessional.mediaUrl ? (
+                                    <img
+                                        src={activeCatalogProfessional.mediaUrl}
+                                        alt={activeCatalogProfessional.name}
+                                        className="h-12 w-12 rounded-2xl object-cover border border-slate-200 shrink-0 shadow-sm"
+                                    />
+                                ) : (
+                                    <div className="h-12 w-12 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0 text-brand-600 font-black text-lg">
+                                        {activeCatalogProfessional.name?.charAt(0)?.toUpperCase() || 'P'}
+                                    </div>
+                                )}
+                                <div className="min-w-0">
+                                    <h2 className="text-xl font-black text-slate-955 truncate">{activeCatalogProfessional.name}</h2>
+                                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
                                     <span className="text-xs font-black text-brand-600 uppercase tracking-wider">{activeCatalogProfessional.profession}</span>
-                                    {activeCatalogProfessional.categories && activeCatalogProfessional.categories.length > 0 ? (
-                                        activeCatalogProfessional.categories.map((c) => (
-                                            <span key={c._id} className="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase tracking-wider">
-                                                {c.name}
+                                    {(() => {
+                                        const catsList = (Array.isArray(activeCatalogProfessional.categories) && activeCatalogProfessional.categories.length > 0)
+                                            ? activeCatalogProfessional.categories
+                                            : (activeCatalogProfessional.category ? [activeCatalogProfessional.category] : []);
+                                        const names = catsList
+                                            .map(c => {
+                                                if (!c) return null;
+                                                if (typeof c === 'object' && c.name) return c.name;
+                                                const id = typeof c === 'string' ? c : (c._id || c.id);
+                                                const found = categories?.find(cat => String(cat._id || cat.id) === String(id));
+                                                if (found?.name) return found.name;
+                                                if (typeof c === 'string' && /^[0-9a-fA-F]{24}$/.test(c)) return null;
+                                                return typeof c === 'string' ? c : null;
+                                            })
+                                            .filter(Boolean);
+                                        return names.map((catName, idx) => (
+                                            <span key={idx} className="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                                                {catName}
                                             </span>
-                                        ))
-                                    ) : activeCatalogProfessional.category?.name ? (
-                                        <span className="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black text-slate-500 uppercase tracking-wider">
-                                            {activeCatalogProfessional.category.name}
-                                        </span>
-                                    ) : null}
+                                        ));
+                                    })()}
+                                    </div>
                                 </div>
                             </div>
                             <button onClick={() => setActiveCatalogProfessional(null)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition-all">
@@ -419,15 +586,38 @@ const LocalProfessionalsDirectory = () => {
                         >
                             <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">{t('directory.catalog')}</h3>
                             {activeCatalogProfessional.services?.length > 0 ? (
-                                activeCatalogProfessional.services.map((svc, i) => (
-                                    <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
-                                        <div>
-                                            <h4 className="text-sm font-black text-slate-900">{svc.name}</h4>
-                                            {svc.description && <p className="text-xs text-slate-500 font-bold mt-1">{svc.description}</p>}
+                                activeCatalogProfessional.services.map((svc, i) => {
+                                    const servicePhotos = Array.isArray(svc.images) && svc.images.length > 0
+                                        ? svc.images
+                                        : (svc.image ? [svc.image] : []);
+                                    return (
+                                        <div key={i} className="p-3 sm:p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                                            <div className="flex items-start sm:items-center gap-3 min-w-0">
+                                                {servicePhotos.length > 0 ? (
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        {servicePhotos.map((pUrl, pIdx) => (
+                                                            <img
+                                                                key={pIdx}
+                                                                src={pUrl}
+                                                                alt={`${svc.name} ${pIdx + 1}`}
+                                                                className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl object-cover border border-slate-200 shadow-sm"
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-slate-400">
+                                                        <ImageIcon className="h-5 w-5" />
+                                                    </div>
+                                                )}
+                                                <div className="min-w-0">
+                                                    <h4 className="text-sm font-black text-slate-900 truncate">{svc.name}</h4>
+                                                    {svc.description && <p className="text-xs text-slate-500 font-bold mt-0.5 line-clamp-2">{svc.description}</p>}
+                                                </div>
+                                            </div>
+                                            <span className="text-sm font-black text-emerald-600 shrink-0 self-end sm:self-auto">{svc.price === 0 || svc.price === '0' ? 'FREE' : '₹' + svc.price}</span>
                                         </div>
-                                        <span className="text-sm font-black text-emerald-600">{svc.price === 0 || svc.price === '0' ? 'FREE' : '₹' + svc.price}</span>
-                                    </div>
-                                ))
+                                    );
+                                })
                             ) : (
                                 <p className="text-xs text-slate-400 italic font-bold py-6 text-center">{t('directory.noCatalog')}</p>
                             )}

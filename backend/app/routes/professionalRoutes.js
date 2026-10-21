@@ -17,6 +17,7 @@ import {
     getMyPlatformAds,
     payPlatformAd,
     getActivePlatformAds,
+    getPlatformAdById,
     initiatePayPlatformAd,
     verifyPayPlatformAd
 } from "../controller/platformAdController.js";
@@ -27,6 +28,7 @@ const router = express.Router();
 router.get("/categories", getCategories);
 router.get("/search", searchAds);
 router.get("/platform-ads/active", getActivePlatformAds);
+router.get("/platform-ads/:id", getPlatformAdById);
 
 // Protected professional profile routes
 router.post("/profile", verifyToken, createAd);
@@ -46,4 +48,3 @@ router.post("/platform-ads/:id/pay/initiate", verifyToken, initiatePayPlatformAd
 router.post("/platform-ads/:id/pay/verify", verifyToken, verifyPayPlatformAd);
 
 export default router;
-

@@ -21,7 +21,13 @@ import {
     Edit2,
     X,
     Upload,
-    ChevronLeft
+    ChevronLeft,
+    ExternalLink,
+    Briefcase,
+    Image as ImageIcon,
+    Video as VideoIcon,
+    Play,
+    MessageCircle
 } from 'lucide-react';
 import { useSettings } from '@core/context/SettingsContext';
 import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
@@ -83,6 +89,12 @@ const ProfessionalProfilePanel = () => {
         });
     };
 
+    // Profile photo states
+    const [regProfileImage, setRegProfileImage] = useState('');
+    const [isUploadingRegImage, setIsUploadingRegImage] = useState(false);
+    const [editMediaUrl, setEditMediaUrl] = useState('');
+    const [isUploadingEditImage, setIsUploadingEditImage] = useState(false);
+
     // Profile edit state
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [editName, setEditName] = useState('');
@@ -113,6 +125,23 @@ const ProfessionalProfilePanel = () => {
     const [platTargetUrl, setPlatTargetUrl] = useState('');
     const [platCity, setPlatCity] = useState('');
     const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+
+    // Platform Ad destination & showcase state
+    const [platDestinationType, setPlatDestinationType] = useState('showcase'); // 'showcase' or 'website'
+    const [platBusinessName, setPlatBusinessName] = useState('');
+    const [platContactPhone, setPlatContactPhone] = useState('');
+    const [platWhatsapp, setPlatWhatsapp] = useState('');
+    const [platAddress, setPlatAddress] = useState('');
+    const [platPosters, setPlatPosters] = useState([]);
+    const [platVideos, setPlatVideos] = useState([]);
+    const [isUploadingPoster, setIsUploadingPoster] = useState(false);
+    const [isUploadingBannerVideo, setIsUploadingBannerVideo] = useState(false);
+
+    // Service catalog photo & video state
+    const [newServiceImages, setNewServiceImages] = useState([]);
+    const [newServiceVideo, setNewServiceVideo] = useState('');
+    const [isUploadingServiceMedia, setIsUploadingServiceMedia] = useState(false);
+    const [activeVideoModal, setActiveVideoModal] = useState(null);
 
     // Categories edit state
     const [isEditingCategories, setIsEditingCategories] = useState(false);
@@ -179,13 +208,175 @@ const ProfessionalProfilePanel = () => {
         loadPlatformAds();
     }, []);
 
-    useLockBodyScroll(Boolean(isEditingCategories || isConfirmingPayment || isEditingProfile || isSubmittingPlatformAd));
+    useLockBodyScroll(Boolean(isEditingCategories || isConfirmingPayment || isEditingProfile || isSubmittingPlatformAd || activeVideoModal));
+
+    const handleUploadProfilePhoto = async (e, setUrl, setLoading) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select a valid image file (JPEG, PNG, WEBP)', 'error');
+            e.target.value = '';
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            const sizeInMb = (file.size / (1024 * 1024)).toFixed(1);
+            showToast(`Photo exceeds 10 MB limit (Selected: ${sizeInMb} MB)`, 'error');
+            e.target.value = '';
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await customerApi.uploadMedia(formData);
+            const url = res.data?.result?.secureUrl || res.data?.result?.url || res.data?.secureUrl || res.data?.url;
+            if (url) {
+                setUrl(url);
+                showToast('Profile photo uploaded successfully', 'success');
+            } else {
+                showToast('Failed to upload photo', 'error');
+            }
+        } catch (error) {
+            console.error('Photo upload error:', error);
+            showToast(error.response?.data?.message || 'Error uploading photo', 'error');
+        } finally {
+            setLoading(false);
+            e.target.value = '';
+        }
+    };
+
+    const handleUploadServiceImage = async (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        for (const file of files) {
+            if (!file.type.startsWith('image/')) {
+                showToast('Please select only image files (JPEG, PNG, WEBP)', 'error');
+                continue;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                const sizeInMb = (file.size / (1024 * 1024)).toFixed(1);
+                showToast(`Image ${file.name} exceeds 10 MB limit (${sizeInMb} MB)`, 'error');
+                continue;
+            }
+
+            try {
+                setIsUploadingServiceMedia(true);
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const res = await customerApi.uploadMedia(formData);
+                const url = res.data?.result?.secureUrl || res.data?.result?.url || res.data?.secureUrl || res.data?.url;
+                if (url) {
+                    setNewServiceImages(prev => [...prev, url]);
+                    showToast('Service photo added successfully', 'success');
+                } else {
+                    showToast(t('pro.msg.mediaFailed') || 'Failed to upload photo', 'error');
+                }
+            } catch (error) {
+                console.error('Service photo upload error:', error);
+                showToast(error.response?.data?.message || t('pro.msg.mediaError') || 'Upload failed', 'error');
+            } finally {
+                setIsUploadingServiceMedia(false);
+            }
+        }
+        e.target.value = '';
+    };
+
+    const handleRemoveNewServiceImage = (index) => {
+        setNewServiceImages(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const handleUploadPosterFile = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 10 * 1024 * 1024) {
+            const sizeInMb = (file.size / (1024 * 1024)).toFixed(1);
+            showToast(`Poster image exceeds 10 MB limit (Selected: ${sizeInMb} MB).`, 'error');
+            e.target.value = '';
+            return;
+        }
+
+        try {
+            setIsUploadingPoster(true);
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await customerApi.uploadMedia(formData);
+            const url = res.data?.result?.secureUrl || res.data?.result?.url || res.data?.secureUrl || res.data?.url;
+            if (url) {
+                setPlatPosters(prev => [...prev, url]);
+                setPlatImageUrl(prev => prev || url);
+                clearBannerError('media');
+                showToast('Poster uploaded successfully', 'success');
+            } else {
+                showToast(t('pro.msg.mediaFailed'), 'error');
+            }
+        } catch (error) {
+            console.error('Poster upload error:', error);
+            showToast(error.response?.data?.message || t('pro.msg.mediaError'), 'error');
+        } finally {
+            setIsUploadingPoster(false);
+        }
+    };
+
+    const handleUploadBannerVideoFile = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 20 * 1024 * 1024) {
+            const sizeInMb = (file.size / (1024 * 1024)).toFixed(1);
+            showToast(`Promotional video exceeds 20 MB limit (Selected: ${sizeInMb} MB). Please choose a video under 20 MB.`, 'error');
+            e.target.value = '';
+            return;
+        }
+
+        try {
+            setIsUploadingBannerVideo(true);
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await customerApi.uploadMedia(formData);
+            const url = res.data?.result?.secureUrl || res.data?.result?.url || res.data?.secureUrl || res.data?.url;
+            if (url) {
+                setPlatVideos(prev => [...prev, url]);
+                setPlatVideoUrl(prev => prev || url);
+                clearBannerError('media');
+                showToast('Promotional video uploaded successfully', 'success');
+            } else {
+                showToast(t('pro.msg.mediaFailed'), 'error');
+            }
+        } catch (error) {
+            console.error('Banner video upload error:', error);
+            showToast(error.response?.data?.message || t('pro.msg.mediaError'), 'error');
+        } finally {
+            setIsUploadingBannerVideo(false);
+        }
+    };
+
+    const handleRemovePoster = (index) => {
+        setPlatPosters(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const handleRemoveBannerVideo = (index) => {
+        setPlatVideos(prev => prev.filter((_, idx) => idx !== index));
+    };
 
     const handleUploadMediaFile = async (e, targetSetUrl, targetSetType) => {
         const file = e.target.files[0];
         if (!file) return;
 
         const type = file.type.startsWith('video/') ? 'video' : 'image';
+        const maxBytes = type === 'video' ? 20 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxBytes) {
+            const sizeInMb = (file.size / (1024 * 1024)).toFixed(1);
+            showToast(`${type === 'video' ? 'Video' : 'Photo'} exceeds limit (Selected: ${sizeInMb} MB). Maximum allowed is ${type === 'video' ? '20 MB' : '10 MB'}.`, 'error');
+            e.target.value = '';
+            return;
+        }
 
         try {
             setIsUploadingMedia(true);
@@ -211,125 +402,6 @@ const ProfessionalProfilePanel = () => {
             showToast(error.response?.data?.message || t('pro.msg.mediaError'), 'error');
         } finally {
             setIsUploadingMedia(false);
-        }
-    };
-
-    const handleOpenEditProfile = () => {
-        if (!ad) return;
-        setEditName(ad.name || '');
-        setEditPhone(ad.phone || '');
-        setEditEmail(ad.email || '');
-        setEditProfession(ad.profession || '');
-        setEditExperienceYears(ad.experienceYears || '0');
-        setEditDescription(ad.description || '');
-        setEditAddress(ad.address || '');
-        setEditCity(ad.city || '');
-        setEditLat(ad.location?.coordinates?.[1] || '22.7196');
-        setEditLng(ad.location?.coordinates?.[0] || '75.8577');
-        setEditErrors({});
-        setIsEditingProfile(true);
-    };
-
-    const validateEditProfileForm = () => {
-        const errs = {};
-        const trimmedName = String(editName || '').trim();
-        const trimmedPhone = String(editPhone || '').trim();
-        const trimmedEmail = String(editEmail || '').trim();
-        const trimmedProfession = String(editProfession || '').trim();
-        const trimmedCity = String(editCity || '').trim();
-        const trimmedAddress = String(editAddress || '').trim();
-        const trimmedDesc = String(editDescription || '').trim();
-
-        if (!trimmedName) {
-            errs.name = "Full Name is required";
-        } else if (trimmedName.length < 2) {
-            errs.name = "Full Name must be at least 2 characters";
-        }
-
-        if (!trimmedPhone) {
-            errs.phone = "Mobile Number is required";
-        } else if (!/^[6-9]\d{9}$/.test(trimmedPhone)) {
-            errs.phone = "Enter a valid 10-digit mobile number (starts with 6-9)";
-        }
-
-        if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-            errs.email = "Please enter a valid email address";
-        }
-
-        if (!trimmedProfession) {
-            errs.profession = "Profession title is required";
-        } else if (trimmedProfession.length < 2) {
-            errs.profession = "Profession must be at least 2 characters";
-        }
-
-        if (editExperienceYears === '' || editExperienceYears === null || editExperienceYears === undefined) {
-            errs.experienceYears = "Experience in years is required (enter 0 for beginner)";
-        } else if (Number(editExperienceYears) < 0 || Number(editExperienceYears) > 70) {
-            errs.experienceYears = "Enter valid experience years (0-70)";
-        }
-
-        if (!trimmedCity) {
-            errs.city = "City is required";
-        } else if (trimmedCity.length < 2) {
-            errs.city = "City name must be at least 2 characters";
-        }
-
-        if (!trimmedAddress) {
-            errs.address = "Address is required";
-        } else if (trimmedAddress.length < 4) {
-            errs.address = "Address must be at least 4 characters";
-        }
-
-        if (!trimmedDesc) {
-            errs.description = "Service description is required";
-        } else if (trimmedDesc.length < 10) {
-            errs.description = "Please describe your services in at least 10 characters";
-        }
-
-        return errs;
-    };
-
-    const handleUpdateProfileSubmit = async (e) => {
-        e.preventDefault();
-        const errs = validateEditProfileForm();
-        setEditErrors(errs);
-
-        if (Object.keys(errs).length > 0) {
-            const firstKey = Object.keys(errs)[0];
-            showToast(errs[firstKey], "error");
-            const el = document.querySelector(`[name="edit-${firstKey}"]`) || document.querySelector(`#edit-${firstKey}`);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                if (typeof el.focus === 'function') el.focus();
-            }
-            return;
-        }
-
-        try {
-            setIsLoading(true);
-            const payload = {
-                name: String(editName).trim(),
-                phone: String(editPhone).trim(),
-                email: String(editEmail).trim(),
-                profession: String(editProfession).trim(),
-                experienceYears: Number(editExperienceYears) || 0,
-                description: String(editDescription).trim(),
-                address: String(editAddress).trim(),
-                city: String(editCity).trim(),
-                lat: parseFloat(editLat) || 22.7196,
-                lng: parseFloat(editLng) || 75.8577
-            };
-            const res = await customerApi.updateProfessionalProfile(payload);
-            if (res.data?.success) {
-                showToast(t('pro.msg.profileUpdated'), "success");
-                setEditErrors({});
-                setIsEditingProfile(false);
-                loadProfile();
-            }
-        } catch (error) {
-            showToast(error.response?.data?.message || t('pro.msg.profileFailed'), "error");
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -464,15 +536,142 @@ const ProfessionalProfilePanel = () => {
         }
     };
 
+    const handleOpenEditProfile = () => {
+        if (!ad) return;
+        setEditName(ad.name || '');
+        setEditPhone(ad.phone || '');
+        setEditEmail(ad.email || '');
+        setEditProfession(ad.profession || '');
+        setEditExperienceYears(ad.experienceYears || '0');
+        setEditDescription(ad.description || '');
+        setEditAddress(ad.address || '');
+        setEditCity(ad.city || '');
+        setEditLat(ad.location?.coordinates?.[1] || '22.7196');
+        setEditLng(ad.location?.coordinates?.[0] || '75.8577');
+        setEditMediaUrl(ad.mediaUrl || (Array.isArray(ad.portfolioImages) ? ad.portfolioImages[0] : '') || '');
+        setEditErrors({});
+        setIsEditingProfile(true);
+    };
+
+    const validateEditProfileForm = () => {
+        const errs = {};
+        const trimmedName = String(editName || '').trim();
+        const trimmedPhone = String(editPhone || '').trim();
+        const trimmedEmail = String(editEmail || '').trim();
+        const trimmedProfession = String(editProfession || '').trim();
+        const trimmedCity = String(editCity || '').trim();
+        const trimmedAddress = String(editAddress || '').trim();
+        const trimmedDesc = String(editDescription || '').trim();
+
+        if (!trimmedName) {
+            errs.name = "Full Name is required";
+        } else if (trimmedName.length < 2) {
+            errs.name = "Full Name must be at least 2 characters";
+        }
+
+        if (!trimmedPhone) {
+            errs.phone = "Mobile Number is required";
+        } else if (!/^[6-9]\d{9}$/.test(trimmedPhone)) {
+            errs.phone = "Enter a valid 10-digit mobile number (starts with 6-9)";
+        }
+
+        if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+            errs.email = "Please enter a valid email address";
+        }
+
+        if (!trimmedProfession) {
+            errs.profession = "Profession title is required";
+        } else if (trimmedProfession.length < 2) {
+            errs.profession = "Profession must be at least 2 characters";
+        }
+
+        if (editExperienceYears === '' || editExperienceYears === null || editExperienceYears === undefined) {
+            errs.experienceYears = "Experience in years is required (enter 0 for beginner)";
+        } else if (Number(editExperienceYears) < 0 || Number(editExperienceYears) > 70) {
+            errs.experienceYears = "Enter valid experience years (0-70)";
+        }
+
+        if (!trimmedCity) {
+            errs.city = "City is required";
+        } else if (trimmedCity.length < 2) {
+            errs.city = "City name must be at least 2 characters";
+        }
+
+        if (!trimmedAddress) {
+            errs.address = "Address is required";
+        } else if (trimmedAddress.length < 4) {
+            errs.address = "Address must be at least 4 characters";
+        }
+
+        if (!trimmedDesc) {
+            errs.description = "Service description is required";
+        } else if (trimmedDesc.length < 10) {
+            errs.description = "Please describe your services in at least 10 characters";
+        }
+
+        return errs;
+    };
+
+    const handleUpdateProfileSubmit = async (e) => {
+        e.preventDefault();
+        const errs = validateEditProfileForm();
+        setEditErrors(errs);
+
+        if (Object.keys(errs).length > 0) {
+            const firstKey = Object.keys(errs)[0];
+            showToast(errs[firstKey], "error");
+            const el = document.querySelector(`[name="edit-${firstKey}"]`) || document.querySelector(`#edit-${firstKey}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (typeof el.focus === 'function') el.focus();
+            }
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            const payload = {
+                name: String(editName).trim(),
+                phone: String(editPhone).trim(),
+                email: String(editEmail).trim(),
+                profession: String(editProfession).trim(),
+                experienceYears: Number(editExperienceYears) || 0,
+                description: String(editDescription).trim(),
+                address: String(editAddress).trim(),
+                city: String(editCity).trim(),
+                lat: parseFloat(editLat) || 22.7196,
+                lng: parseFloat(editLng) || 75.8577
+            };
+            const res = await customerApi.updateProfessionalProfile(payload);
+            if (res.data?.success) {
+                showToast(t('pro.msg.profileUpdated'), "success");
+                setIsEditingProfile(false);
+                setEditErrors({});
+                loadProfile();
+            }
+        } catch (error) {
+            showToast(error.response?.data?.message || t('pro.msg.updateFailed'), "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleEditPlatformAd = (adItem) => {
         setPlatTitle(adItem.title || '');
         setPlatContent(adItem.content || '');
         setPlatMediaUrl(adItem.mediaUrl || '');
         setPlatMediaType(adItem.mediaType || 'none');
-        setPlatImageUrl(adItem.imageUrl || '');
-        setPlatVideoUrl(adItem.videoUrl || '');
+        setPlatImageUrl(adItem.imageUrl || (Array.isArray(adItem.posters) ? adItem.posters[0] : '') || '');
+        setPlatVideoUrl(adItem.videoUrl || (Array.isArray(adItem.videos) ? adItem.videos[0] : '') || '');
         setPlatTargetUrl(adItem.targetUrl || '');
         setPlatCity(adItem.city || '');
+        setPlatDestinationType(adItem.hasExternalUrl ? 'website' : 'showcase');
+        setPlatBusinessName(adItem.businessName || '');
+        setPlatContactPhone(adItem.contactPhone || '');
+        setPlatWhatsapp(adItem.whatsapp || '');
+        setPlatAddress(adItem.address || '');
+        setPlatPosters(Array.isArray(adItem.posters) ? adItem.posters : (adItem.imageUrl ? [adItem.imageUrl] : []));
+        setPlatVideos(Array.isArray(adItem.videos) ? adItem.videos : (adItem.videoUrl ? [adItem.videoUrl] : []));
         setEditingPlatformAdId(adItem._id);
         setBannerErrors({});
         setIsSubmittingPlatformAd(true);
@@ -489,6 +688,13 @@ const ProfessionalProfilePanel = () => {
         setPlatVideoUrl('');
         setPlatTargetUrl('');
         setPlatCity('');
+        setPlatDestinationType('showcase');
+        setPlatBusinessName('');
+        setPlatContactPhone('');
+        setPlatWhatsapp('');
+        setPlatAddress('');
+        setPlatPosters([]);
+        setPlatVideos([]);
         setBannerErrors({});
     };
 
@@ -516,12 +722,12 @@ const ProfessionalProfilePanel = () => {
         }
 
         if (trimmedTargetUrl) {
-            if (!/^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i.test(trimmedTargetUrl)) {
+            if (!/^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([\/\w .-]*)*\/?$/i.test(trimmedTargetUrl)) {
                 errs.targetUrl = "Please enter a valid website link (e.g. https://example.com)";
             }
         }
 
-        if (!platImageUrl && !platVideoUrl) {
+        if (!platImageUrl && !platVideoUrl && platPosters.length === 0 && platVideos.length === 0) {
             errs.media = "Please upload a promotional photo or video";
         }
 
@@ -541,16 +747,37 @@ const ProfessionalProfilePanel = () => {
         }
         try {
             setIsLoading(true);
+            const finalPosters = [...platPosters];
+            if (platImageUrl && !finalPosters.includes(platImageUrl)) {
+                finalPosters.unshift(platImageUrl);
+            }
+            const finalVideos = [...platVideos];
+            if (platVideoUrl && !finalVideos.includes(platVideoUrl)) {
+                finalVideos.unshift(platVideoUrl);
+            }
+
+            const effectiveMediaUrl = platVideoUrl || finalVideos[0] || platImageUrl || finalPosters[0] || '';
+            const effectiveMediaType = (platVideoUrl || finalVideos.length > 0) ? 'video' : (effectiveMediaUrl ? 'image' : 'none');
+
             const payload = {
                 title: platTitle.trim(),
                 content: platContent.trim(),
-                mediaUrl: platVideoUrl || platImageUrl || '',
-                mediaType: platVideoUrl ? 'video' : (platImageUrl ? 'image' : 'none'),
-                imageUrl: platImageUrl,
-                videoUrl: platVideoUrl,
-                targetUrl: platTargetUrl.trim(),
+                mediaUrl: effectiveMediaUrl,
+                mediaType: effectiveMediaType,
+                imageUrl: platImageUrl || finalPosters[0] || '',
+                videoUrl: platVideoUrl || finalVideos[0] || '',
+                targetUrl: platDestinationType === 'website' ? platTargetUrl.trim() : '',
+                hasExternalUrl: platDestinationType === 'website' && Boolean(platTargetUrl.trim()),
+                businessName: platBusinessName.trim() || platTitle.trim(),
+                contactPhone: platContactPhone.trim(),
+                whatsapp: platWhatsapp.trim(),
+                address: platAddress.trim(),
+                posters: finalPosters,
+                videos: finalVideos,
+                callToActionText: platDestinationType === 'website' ? 'Visit Website' : 'Contact Us',
                 city: platCity.trim()
             };
+
             let res;
             if (editingPlatformAdId) {
                 res = await customerApi.updatePlatformAd(editingPlatformAdId, payload);
@@ -810,16 +1037,20 @@ const ProfessionalProfilePanel = () => {
         if (!newServiceName.trim() || !newServicePrice) {
             return showToast(t('pro.msg.serviceRequired'), "error");
         }
+        const finalImages = [...newServiceImages];
         const newItem = {
             name: newServiceName.trim(),
             price: parseFloat(newServicePrice) || 0,
             description: newServiceDesc.trim(),
+            images: finalImages,
+            image: finalImages[0] || '',
             durationMinutes: 30
         };
         setServicesList([...servicesList, newItem]);
         setNewServiceName('');
         setNewServicePrice('');
         setNewServiceDesc('');
+        setNewServiceImages([]);
     };
 
     const handleRemoveServiceItem = (index) => {
@@ -831,16 +1062,20 @@ const ProfessionalProfilePanel = () => {
             setIsLoading(true);
             let finalServices = [...servicesList];
             if (newServiceName.trim() && newServicePrice) {
+                const finalImages = [...newServiceImages];
                 finalServices.push({
                     name: newServiceName.trim(),
                     price: parseFloat(newServicePrice) || 0,
                     description: newServiceDesc.trim(),
+                    images: finalImages,
+                    image: finalImages[0] || '',
                     durationMinutes: 30
                 });
                 setServicesList(finalServices);
                 setNewServiceName('');
                 setNewServicePrice('');
                 setNewServiceDesc('');
+                setNewServiceImages([]);
             }
             const res = await customerApi.updateProfessionalServices({ services: finalServices });
             if (res.data?.success) {
@@ -976,7 +1211,19 @@ const ProfessionalProfilePanel = () => {
 
                         {/* Header profile block */}
                         <div className="bg-white p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-[32px] md:rounded-[40px] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                            <div className="space-y-3 min-w-0 flex-1">
+                            <div className="flex items-start gap-4 min-w-0 flex-1">
+                                {(ad.mediaUrl || (Array.isArray(ad.portfolioImages) && ad.portfolioImages[0])) ? (
+                                    <img
+                                        src={ad.mediaUrl || ad.portfolioImages[0]}
+                                        alt={ad.name}
+                                        className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl object-cover border-2 border-slate-200 shadow-sm shrink-0"
+                                    />
+                                ) : (
+                                    <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl sm:rounded-3xl bg-brand-50 border-2 border-brand-100 flex items-center justify-center shrink-0 text-brand-600 font-black text-xl sm:text-2xl">
+                                        {ad.name?.charAt(0)?.toUpperCase() || 'P'}
+                                    </div>
+                                )}
+                                <div className="space-y-3 min-w-0 flex-1">
                                 <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
                                     <h1 className="text-xl sm:text-2xl font-black text-slate-955 break-words">{ad.name}</h1>
                                     <span className="px-3 py-1 bg-brand-50 rounded-full text-xs font-black text-brand-600 uppercase tracking-wider shrink-0">{ad.profession}</span>
@@ -1034,6 +1281,7 @@ const ProfessionalProfilePanel = () => {
                                         <Plus className="h-3 w-3" /> Add / Edit Service
                                     </button>
                                 </div>
+                            </div>
                             </div>
                             <div className="flex flex-col items-start md:items-end gap-1 bg-slate-50 p-4 rounded-3xl border border-slate-100 w-full md:w-auto min-w-[150px]">
                                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">{t('pro.walletBalance')}</span>
@@ -1126,45 +1374,92 @@ const ProfessionalProfilePanel = () => {
                             {isEditingCatalog ? (
                                 <div className="space-y-6">
                                     {/* Editing Catalog Inputs */}
-                                    <div className="p-6 bg-slate-50 rounded-[28px] border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                        <div className="space-y-1 md:col-span-4">
-                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('pro.serviceTitle')}</label>
-                                            <input
-                                                type="text"
-                                                value={newServiceName}
-                                                onChange={(e) => setNewServiceName(e.target.value)}
-                                                placeholder={t('pro.serviceTitlePlaceholder')}
-                                                className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
-                                            />
+                                    <div className="p-5 md:p-6 bg-slate-50 rounded-[28px] border border-slate-100 space-y-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                                            <div className="space-y-1 sm:col-span-7">
+                                                <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('pro.serviceTitle')}</label>
+                                                <input
+                                                    type="text"
+                                                    value={newServiceName}
+                                                    onChange={(e) => setNewServiceName(e.target.value)}
+                                                    placeholder={t('pro.serviceTitlePlaceholder')}
+                                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
+                                                />
+                                            </div>
+                                            <div className="space-y-1 sm:col-span-5">
+                                                <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('pro.pricing')}</label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={newServicePrice}
+                                                    onChange={(e) => setNewServicePrice(e.target.value.replace(/[^0-9]/g, ''))}
+                                                    placeholder="e.g. 199"
+                                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
+                                                />
+                                            </div>
+                                            <div className="space-y-1 sm:col-span-12">
+                                                <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Description</label>
+                                                <input
+                                                    type="text"
+                                                    value={newServiceDesc}
+                                                    onChange={(e) => setNewServiceDesc(e.target.value)}
+                                                    placeholder={t('pro.summaryPlaceholder')}
+                                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
+                                                />
+                                            </div>
                                         </div>
-                                        <div className="space-y-1 md:col-span-3">
-                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">{t('pro.pricing')}</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                value={newServicePrice}
-                                                onChange={(e) => setNewServicePrice(e.target.value.replace(/[^0-9]/g, ''))}
-                                                placeholder="e.g. 199"
-                                                className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
-                                            />
+
+                                        {/* Multi-Photo Picker for Service */}
+                                        <div className="space-y-2 pt-2 border-t border-slate-200/60">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-700">
+                                                    Service Photos ({newServiceImages.length}) <span className="text-slate-400 font-normal">(Multiple photos allowed)</span>
+                                                </label>
+                                                <span className="text-[9px] text-slate-400 font-bold">Max 10 MB each</span>
+                                            </div>
+                                            <div className="flex items-center gap-2.5 flex-wrap">
+                                                {newServiceImages.map((imgUrl, imgIdx) => (
+                                                    <div key={imgIdx} className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-xl overflow-hidden bg-slate-200 border border-slate-300 group shrink-0">
+                                                        <img src={imgUrl} alt={`Service photo ${imgIdx + 1}`} className="w-full h-full object-cover" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveNewServiceImage(imgIdx)}
+                                                            className="absolute top-1 right-1 p-1 bg-black/75 hover:bg-black text-white rounded-full transition-all"
+                                                            title="Remove photo"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <label className="cursor-pointer flex flex-col items-center justify-center h-16 w-20 sm:h-20 sm:w-24 bg-white hover:bg-slate-100/80 border border-dashed border-slate-300 rounded-xl transition-all shrink-0">
+                                                    {isUploadingServiceMedia ? (
+                                                        <Loader2 className="h-5 w-5 animate-spin text-brand-500" />
+                                                    ) : (
+                                                        <>
+                                                            <Upload className="h-4 w-4 text-slate-500" />
+                                                            <span className="text-[9px] font-black uppercase text-slate-700 mt-1">+ Photo</span>
+                                                        </>
+                                                    )}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        multiple
+                                                        className="hidden"
+                                                        onChange={handleUploadServiceImage}
+                                                        disabled={isUploadingServiceMedia}
+                                                    />
+                                                </label>
+                                            </div>
                                         </div>
-                                        <div className="space-y-1 md:col-span-4">
-                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-400">Description</label>
-                                            <input
-                                                type="text"
-                                                value={newServiceDesc}
-                                                onChange={(e) => setNewServiceDesc(e.target.value)}
-                                                placeholder={t('pro.summaryPlaceholder')}
-                                                className="w-full px-4 py-3 bg-white border border-slate-100 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-1 focus:ring-brand-500/20"
-                                            />
-                                        </div>
-                                        <div className="md:col-span-1">
+
+                                        <div className="flex justify-end pt-2">
                                             <button
                                                 type="button"
                                                 onClick={handleAddServiceItem}
-                                                className="w-full h-[46px] bg-black hover:bg-slate-900 text-white rounded-xl transition-all flex items-center justify-center shadow-lg shadow-black/10"
+                                                className="px-6 py-2.5 bg-black hover:bg-slate-900 text-white rounded-xl transition-all flex items-center justify-center gap-2 shadow-md text-xs font-black uppercase tracking-wider"
                                             >
-                                                <Plus className="h-5 w-5" />
+                                                <Plus className="h-4 w-4" />
+                                                <span>Add Service to List</span>
                                             </button>
                                         </div>
                                     </div>
@@ -1174,12 +1469,32 @@ const ProfessionalProfilePanel = () => {
                                             <p className="text-xs text-slate-400 italic text-center py-6 font-bold">{t('pro.noServices')}</p>
                                         ) : (
                                             servicesList.map((svc, i) => (
-                                                <div key={i} className="flex justify-between items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-                                                    <div>
-                                                        <h4 className="text-sm font-black text-slate-900">{svc.name}</h4>
-                                                        {svc.description && <p className="text-xs text-slate-400 font-bold">{svc.description}</p>}
+                                                <div key={i} className="flex justify-between items-center p-3 sm:p-4 bg-slate-50/50 rounded-2xl border border-slate-100 gap-3">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        {Array.isArray(svc.images) && svc.images.length > 0 ? (
+                                                            <div className="flex items-center -space-x-4 shrink-0">
+                                                                {svc.images.slice(0, 3).map((imgUrl, sIdx) => (
+                                                                    <img key={sIdx} src={imgUrl} alt={svc.name} className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl object-cover border-2 border-white shadow-sm" />
+                                                                ))}
+                                                                {svc.images.length > 3 && (
+                                                                    <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-black/80 text-white font-black text-[10px] flex items-center justify-center border-2 border-white shadow-sm">
+                                                                        +{svc.images.length - 3}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : svc.image ? (
+                                                            <img src={svc.image} alt={svc.name} className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl object-cover border border-slate-200 shrink-0" />
+                                                        ) : (
+                                                            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-slate-400">
+                                                                <ImageIcon className="h-5 w-5" />
+                                                            </div>
+                                                        )}
+                                                        <div className="min-w-0">
+                                                            <h4 className="text-sm font-black text-slate-900 truncate">{svc.name}</h4>
+                                                            {svc.description && <p className="text-xs text-slate-400 font-bold line-clamp-1">{svc.description}</p>}
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-4">
+                                                    <div className="flex items-center gap-4 shrink-0">
                                                         <span className="text-sm font-black text-emerald-600">{svc.price === 0 || svc.price === '0' ? 'FREE' : '₹' + svc.price}</span>
                                                         <button
                                                             onClick={() => handleRemoveServiceItem(i)}
@@ -1198,12 +1513,32 @@ const ProfessionalProfilePanel = () => {
                                     {/* Ready Catalog View Only */}
                                     {ad.services?.length > 0 ? (
                                         ad.services.map((svc, i) => (
-                                            <div key={i} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex justify-between items-center">
-                                                <div>
-                                                    <h4 className="text-sm font-black text-slate-900">{svc.name}</h4>
-                                                    {svc.description && <p className="text-xs text-slate-400 font-bold mt-0.5">{svc.description}</p>}
+                                            <div key={i} className="p-3 sm:p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex justify-between items-center gap-3">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    {Array.isArray(svc.images) && svc.images.length > 0 ? (
+                                                        <div className="flex items-center -space-x-4 shrink-0">
+                                                            {svc.images.slice(0, 3).map((imgUrl, sIdx) => (
+                                                                <img key={sIdx} src={imgUrl} alt={svc.name} className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl object-cover border-2 border-white shadow-sm" />
+                                                            ))}
+                                                            {svc.images.length > 3 && (
+                                                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-black/80 text-white font-black text-[10px] flex items-center justify-center border-2 border-white shadow-sm">
+                                                                    +{svc.images.length - 3}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : svc.image ? (
+                                                        <img src={svc.image} alt={svc.name} className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl object-cover border border-slate-200 shrink-0" />
+                                                    ) : (
+                                                        <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 text-slate-400">
+                                                            <ImageIcon className="h-5 w-5" />
+                                                        </div>
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <h4 className="text-sm font-black text-slate-900 truncate">{svc.name}</h4>
+                                                        {svc.description && <p className="text-xs text-slate-400 font-bold mt-0.5 line-clamp-2">{svc.description}</p>}
+                                                    </div>
                                                 </div>
-                                                <span className="text-sm font-black text-emerald-600">{svc.price === 0 || svc.price === '0' ? 'FREE' : '₹' + svc.price}</span>
+                                                <span className="text-sm font-black text-emerald-600 shrink-0">{svc.price === 0 || svc.price === '0' ? 'FREE' : '₹' + svc.price}</span>
                                             </div>
                                         ))
                                     ) : (
@@ -1239,6 +1574,48 @@ const ProfessionalProfilePanel = () => {
                         </div>
 
                         <form onSubmit={handleRegister} noValidate className="space-y-6">
+                            {/* Business / Profile Photo */}
+                            <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                                <div className="relative h-20 w-20 rounded-2xl overflow-hidden bg-slate-200 border-2 border-dashed border-slate-300 flex items-center justify-center shrink-0">
+                                    {regProfileImage ? (
+                                        <>
+                                            <img src={regProfileImage} alt="Profile preview" className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => setRegProfileImage('')}
+                                                className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-all"
+                                                title="Remove"
+                                            >
+                                                <X className="h-2.5 w-2.5" />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center text-slate-400">
+                                            <ImageIcon className="h-6 w-6" />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1 text-center sm:text-left space-y-1">
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-700">
+                                        Business / Profile Photo (Optional)
+                                    </label>
+                                    <p className="text-[10px] text-slate-400 font-bold">
+                                        Upload your shop board, work photo, or profile picture (Max 10 MB • JPG, PNG, WEBP)
+                                    </p>
+                                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-700 cursor-pointer shadow-sm">
+                                        {isUploadingRegImage ? <Loader2 className="h-3 w-3 animate-spin text-brand-500" /> : <Upload className="h-3 w-3" />}
+                                        <span>{regProfileImage ? 'Change Photo' : 'Upload Photo'}</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleUploadProfilePhoto(e, setRegProfileImage, setIsUploadingRegImage)}
+                                            disabled={isUploadingRegImage}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-1">
                                     <div className="flex items-center justify-between">
@@ -1776,6 +2153,58 @@ const ProfessionalProfilePanel = () => {
                             data-lenis-prevent-wheel
                             className="flex-1 overflow-y-auto px-6 md:px-8 py-4 space-y-4 overscroll-contain touch-pan-y"
                         >
+                            {/* PROMOTION DESTINATION SELECTOR */}
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 block">
+                                    Promotion Destination <span className="text-rose-500">*</span>
+                                </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPlatDestinationType('showcase')}
+                                        className={`p-3.5 rounded-xl border text-left transition-all relative ${
+                                            platDestinationType === 'showcase'
+                                                ? 'border-brand-500 bg-brand-50/40 ring-2 ring-brand-500/20 shadow-sm'
+                                                : 'border-slate-200 bg-white hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                                                <Sparkles className="h-3.5 w-3.5 text-brand-600" /> Showcase on SevaFast
+                                            </span>
+                                            <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase rounded">
+                                                No Website
+                                            </span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 font-bold leading-normal">
+                                            SevaFast hosts your posters, business videos, and direct Call/WhatsApp contact buttons.
+                                        </p>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setPlatDestinationType('website')}
+                                        className={`p-3.5 rounded-xl border text-left transition-all relative ${
+                                            platDestinationType === 'website'
+                                                ? 'border-brand-500 bg-brand-50/40 ring-2 ring-brand-500/20 shadow-sm'
+                                                : 'border-slate-200 bg-white hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                                                <ExternalLink className="h-3.5 w-3.5 text-slate-700" /> External Website
+                                            </span>
+                                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[8px] font-black uppercase rounded">
+                                                Have URL
+                                            </span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 font-bold leading-normal">
+                                            Clicking your promotional banner opens your external website or online store link.
+                                        </p>
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <div className="flex items-center justify-between">
@@ -1803,33 +2232,8 @@ const ProfessionalProfilePanel = () => {
                                         }`}
                                     />
                                 </div>
+
                                 <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                                            {t('pro.adLink')} <span className="text-slate-400 font-normal">({t('common.optional', { defaultValue: 'Optional' })})</span>
-                                        </label>
-                                        {bannerErrors.targetUrl && (
-                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
-                                                <AlertCircle size={11} /> {bannerErrors.targetUrl}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <input
-                                        type="url"
-                                        value={platTargetUrl}
-                                        onChange={(e) => {
-                                            setPlatTargetUrl(e.target.value);
-                                            clearBannerError('targetUrl');
-                                        }}
-                                        placeholder="https://example.com/promo"
-                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
-                                            bannerErrors.targetUrl
-                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
-                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
-                                        }`}
-                                    />
-                                </div>
-                                <div className="space-y-1 md:col-span-2">
                                     <div className="flex items-center justify-between">
                                         <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                                             {t('pro.adCity')} <span className="text-rose-500">*</span>
@@ -1856,6 +2260,170 @@ const ProfessionalProfilePanel = () => {
                                     />
                                 </div>
                             </div>
+
+                            {/* IF EXTERNAL WEBSITE SELECTED */}
+                            {platDestinationType === 'website' && (
+                                <div className="space-y-1 animate-in fade-in">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                            Website URL <span className="text-rose-500">*</span>
+                                        </label>
+                                        {bannerErrors.targetUrl && (
+                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
+                                                <AlertCircle size={11} /> {bannerErrors.targetUrl}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <input
+                                        type="url"
+                                        value={platTargetUrl}
+                                        onChange={(e) => {
+                                            setPlatTargetUrl(e.target.value);
+                                            clearBannerError('targetUrl');
+                                        }}
+                                        placeholder="https://example.com/promo"
+                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
+                                            bannerErrors.targetUrl
+                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
+                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
+                                        }`}
+                                    />
+                                </div>
+                            )}
+
+                            {/* IF SHOWCASE ON SEVAFAST (NO WEBSITE) SELECTED */}
+                            {platDestinationType === 'showcase' && (
+                                <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100 space-y-4 animate-in fade-in">
+                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                        <Sparkles className="h-3.5 w-3.5 text-brand-500" /> Business Details For Showcase Page
+                                    </h4>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-500">Business / Store Name</label>
+                                            <input
+                                                type="text"
+                                                value={platBusinessName}
+                                                onChange={(e) => setPlatBusinessName(e.target.value)}
+                                                placeholder="e.g. Verma Electronics & Services"
+                                                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-500">Store / Shop Address</label>
+                                            <input
+                                                type="text"
+                                                value={platAddress}
+                                                onChange={(e) => setPlatAddress(e.target.value)}
+                                                placeholder="e.g. Shop 14, Main Market, Indore"
+                                                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-500">Contact Phone (For Customer Calls)</label>
+                                            <input
+                                                type="tel"
+                                                value={platContactPhone}
+                                                onChange={(e) => setPlatContactPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+                                                placeholder="10-digit mobile number"
+                                                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-500">WhatsApp Number</label>
+                                            <input
+                                                type="tel"
+                                                value={platWhatsapp}
+                                                onChange={(e) => setPlatWhatsapp(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+                                                placeholder="10-digit WhatsApp number"
+                                                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Multiple Business Posters Manager */}
+                                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                                                    <ImageIcon className="h-3 w-3 text-slate-500" /> Business Posters ({platPosters.length})
+                                                </h5>
+                                                <p className="text-[8px] text-slate-400 font-bold">Posters of offers, rate charts, or banner flyers</p>
+                                            </div>
+                                            <label className="cursor-pointer px-3 py-1.5 bg-black hover:bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                                                {isUploadingPoster ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                                                <span>Add Poster</span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={handleUploadPosterFile}
+                                                    disabled={isUploadingPoster}
+                                                />
+                                            </label>
+                                        </div>
+
+                                        {platPosters.length > 0 && (
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1">
+                                                {platPosters.map((posterUrl, pIdx) => (
+                                                    <div key={pIdx} className="relative aspect-video rounded-lg overflow-hidden bg-slate-100 border border-slate-200 group">
+                                                        <img src={posterUrl} alt="" className="w-full h-full object-cover" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemovePoster(pIdx)}
+                                                            className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-all"
+                                                            title="Remove poster"
+                                                        >
+                                                            <X className="h-2.5 w-2.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Multiple Business Videos Manager */}
+                                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                                                    <VideoIcon className="h-3 w-3 text-slate-500" /> Business Promotional Videos ({platVideos.length})
+                                                </h5>
+                                                <p className="text-[8px] text-slate-400 font-bold">Short promotional videos or work demos (Max 20 MB • MP4, MOV, WEBM)</p>
+                                            </div>
+                                            <label className="cursor-pointer px-3 py-1.5 bg-black hover:bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                                                {isUploadingBannerVideo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                                                <span>Add Video</span>
+                                                <input
+                                                    type="file"
+                                                    accept="video/*"
+                                                    className="hidden"
+                                                    onChange={handleUploadBannerVideoFile}
+                                                    disabled={isUploadingBannerVideo}
+                                                />
+                                            </label>
+                                        </div>
+
+                                        {platVideos.length > 0 && (
+                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                                {platVideos.map((vidUrl, vIdx) => (
+                                                    <div key={vIdx} className="relative aspect-video rounded-lg overflow-hidden bg-black border border-slate-200 group flex items-center justify-center">
+                                                        <video src={vidUrl} className="w-full h-full object-contain" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveBannerVideo(vIdx)}
+                                                            className="absolute top-1 right-1 p-1 bg-black/80 hover:bg-black text-white rounded-full transition-all z-10"
+                                                            title="Remove video"
+                                                        >
+                                                            <X className="h-2.5 w-2.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="space-y-1">
                                 <div className="flex items-center justify-between">
@@ -1887,10 +2455,11 @@ const ProfessionalProfilePanel = () => {
                                 </p>
                             </div>
 
+                            {/* PRIMARY BANNER MEDIA */}
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs font-black uppercase tracking-wider text-slate-700">{t('pro.mediaType')} <span className="text-rose-500">*</span></span>
+                                        <span className="text-xs font-black uppercase tracking-wider text-slate-700">Primary Slider Media <span className="text-rose-500">*</span></span>
                                         {bannerErrors.media && (
                                             <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
                                                 <AlertCircle size={11} /> {bannerErrors.media}
@@ -1906,7 +2475,7 @@ const ProfessionalProfilePanel = () => {
                                                     : "text-slate-500 hover:text-slate-800"
                                                 }`}
                                         >
-                                            {t('pro.image')} {platImageUrl && "✓"}
+                                            {t('pro.image')} {(platImageUrl || platPosters.length > 0) && "✓"}
                                         </button>
                                         <button
                                             type="button"
@@ -1916,7 +2485,7 @@ const ProfessionalProfilePanel = () => {
                                                     : "text-slate-500 hover:text-slate-800"
                                                 }`}
                                         >
-                                            {t('pro.video')} {platVideoUrl && "✓"}
+                                            {t('pro.video')} {(platVideoUrl || platVideos.length > 0) && "✓"}
                                         </button>
                                     </div>
                                 </div>
@@ -1925,7 +2494,7 @@ const ProfessionalProfilePanel = () => {
                                     {/* PHOTO UPLOAD */}
                                     {activeMediaTab === 'image' && (
                                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 relative animate-in fade-in duration-200">
-                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">{t('pro.bannerPhoto')}</h4>
+                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">Banner Slider Image</h4>
                                             <label className={`cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border rounded-xl transition-all relative overflow-hidden group ${
                                                 bannerErrors.media
                                                     ? 'border-2 border-dashed border-rose-500 bg-rose-50/20 ring-2 ring-rose-500/10'
@@ -1933,8 +2502,8 @@ const ProfessionalProfilePanel = () => {
                                             }`}>
                                                 {isUploadingMedia ? (
                                                     <Loader2 className="h-5 w-5 text-brand-500 animate-spin" />
-                                                ) : platImageUrl ? (
-                                                    <img src={platImageUrl} alt={t('photoOrder.preview')} className="h-full w-full object-cover" />
+                                                ) : (platImageUrl || platPosters[0]) ? (
+                                                    <img src={platImageUrl || platPosters[0]} alt={t('photoOrder.preview')} className="h-full w-full object-cover" />
                                                 ) : (
                                                     <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-slate-600">
                                                         <Upload className="h-5 w-5" />
@@ -1967,7 +2536,7 @@ const ProfessionalProfilePanel = () => {
                                     {/* VIDEO UPLOAD */}
                                     {activeMediaTab === 'video' && (
                                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 relative animate-in fade-in duration-200">
-                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">{t('pro.bannerVideo')}</h4>
+                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">Banner Slider Video</h4>
                                             <label className={`cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border rounded-xl transition-all relative overflow-hidden group ${
                                                 bannerErrors.media
                                                     ? 'border-2 border-dashed border-rose-500 bg-rose-50/20 ring-2 ring-rose-500/10'
@@ -1975,8 +2544,8 @@ const ProfessionalProfilePanel = () => {
                                             }`}>
                                                 {isUploadingMedia ? (
                                                     <Loader2 className="h-5 w-5 text-brand-500 animate-spin" />
-                                                ) : platVideoUrl ? (
-                                                    <video src={platVideoUrl} className="h-full w-full object-cover" controls />
+                                                ) : (platVideoUrl || platVideos[0]) ? (
+                                                    <video src={platVideoUrl || platVideos[0]} className="h-full w-full object-cover" controls />
                                                 ) : (
                                                     <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-slate-600">
                                                         <Upload className="h-5 w-5" />
@@ -2213,6 +2782,48 @@ const ProfessionalProfilePanel = () => {
                             </button>
                         </div>
                         <form onSubmit={handleUpdateProfileSubmit} noValidate className="space-y-4">
+                            {/* Business / Profile Photo */}
+                            <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                                <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-2xl overflow-hidden bg-slate-200 border-2 border-dashed border-slate-300 flex items-center justify-center shrink-0">
+                                    {editMediaUrl ? (
+                                        <>
+                                            <img src={editMediaUrl} alt="Profile preview" className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditMediaUrl('')}
+                                                className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-all"
+                                                title="Remove"
+                                            >
+                                                <X className="h-2.5 w-2.5" />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center text-slate-400">
+                                            <ImageIcon className="h-6 w-6" />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1 text-center sm:text-left space-y-1">
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-700">
+                                        Business / Profile Photo (Optional)
+                                    </label>
+                                    <p className="text-[10px] text-slate-400 font-bold">
+                                        Upload your shop board, work photo, or profile picture (Max 10 MB • JPG, PNG, WEBP)
+                                    </p>
+                                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-700 cursor-pointer shadow-sm">
+                                        {isUploadingEditImage ? <Loader2 className="h-3 w-3 animate-spin text-brand-500" /> : <Upload className="h-3 w-3" />}
+                                        <span>{editMediaUrl ? 'Change Photo' : 'Upload Photo'}</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleUploadProfilePhoto(e, setEditMediaUrl, setIsUploadingEditImage)}
+                                            disabled={isUploadingEditImage}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <div className="flex items-center justify-between">
@@ -2482,6 +3093,23 @@ const ProfessionalProfilePanel = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {/* VIDEO PLAYER PREVIEW MODAL */}
+            {activeVideoModal && (
+                <div
+                    className="fixed inset-0 z-[600] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in"
+                    onClick={() => setActiveVideoModal(null)}
+                >
+                    <button
+                        onClick={() => setActiveVideoModal(null)}
+                        className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all"
+                    >
+                        <X className="h-6 w-6" />
+                    </button>
+                    <div className="max-w-2xl w-full rounded-2xl overflow-hidden shadow-2xl bg-black" onClick={(e) => e.stopPropagation()}>
+                        <video src={activeVideoModal} controls autoPlay className="w-full aspect-video object-contain" />
                     </div>
                 </div>
             )}

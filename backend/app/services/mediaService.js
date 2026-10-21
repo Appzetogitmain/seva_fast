@@ -4,8 +4,8 @@ import MediaMetadata from "../models/mediaMetadata.js";
 import logger from "./logger.js";
 
 function getMaxUploadBytes() {
-  const raw = parseInt(process.env.MEDIA_MAX_FILE_SIZE || "10485760", 10);
-  return Number.isFinite(raw) && raw > 0 ? raw : 10485760;
+  const raw = parseInt(process.env.MEDIA_MAX_FILE_SIZE || "20971520", 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 20971520;
 }
 
 function getSignedUrlExpirySeconds() {
@@ -16,7 +16,7 @@ function getSignedUrlExpirySeconds() {
 function getAllowedMimeTypes() {
   return (
     process.env.MEDIA_ALLOWED_MIME_TYPES ||
-    "image/jpeg,image/png,image/webp,image/gif,application/pdf"
+    "image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/m4v"
   )
     .split(",")
     .map((mime) => mime.trim().toLowerCase())
