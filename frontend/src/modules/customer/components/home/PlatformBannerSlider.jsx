@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from "react-router-dom";
 import { ExternalLink, Volume2, VolumeX, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trackAdInteraction } from "../../../../core/utils/analyticsTracker";
 
 const PlatformBannerSliderInner = ({ ads = [] }) => {
   const { t } = useTranslation('customer');
@@ -47,7 +48,13 @@ const PlatformBannerSliderInner = ({ ads = [] }) => {
             const hasExternal = Boolean(adItem?.hasExternalUrl && adItem?.targetUrl?.trim());
 
             const handleAdClick = () => {
+              if (adItem?._id) {
+                trackAdInteraction({ targetType: 'PlatformAd', targetId: adItem._id, interactionType: 'visit' });
+              }
               if (hasExternal) {
+                if (adItem?._id) {
+                  trackAdInteraction({ targetType: 'PlatformAd', targetId: adItem._id, interactionType: 'contact' });
+                }
                 const target = adItem.targetUrl.trim();
                 if (/^https?:\/\//i.test(target)) {
                   window.open(target, "_blank", "noopener,noreferrer");
@@ -58,7 +65,6 @@ const PlatformBannerSliderInner = ({ ads = [] }) => {
                   navigate(targetPath);
                 }
               } else if (adItem?._id) {
-                // Navigate to internal showcase page on our platform
                 navigate(`/promotions/${adItem._id}`);
               }
             };

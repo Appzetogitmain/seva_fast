@@ -140,6 +140,26 @@ const professionalAdSchema = new mongoose.Schema(
             type: String,
             trim: true,
         }],
+        visitsCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        contactsCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        callClicksCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        whatsappClicksCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
     },
     {
         timestamps: true,

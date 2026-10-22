@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { customerApi } from '../services/customerApi';
 import { useToast } from '@shared/components/ui/Toast';
+import { trackAdInteraction } from '../../../core/utils/analyticsTracker';
 
 const PromotionDetailPage = () => {
     const { id } = useParams();
@@ -54,10 +55,12 @@ const PromotionDetailPage = () => {
                 setError(null);
                 const res = await customerApi.getPlatformAdById(id);
                 if (isMounted) {
-                    if (res.data?.success && res.data?.result) {
-                        setAd(res.data.result);
-                    } else if (res.data?.result) {
-                        setAd(res.data.result);
+                    const foundAd = (res.data?.success && res.data?.result) ? res.data.result : res.data?.result;
+                    if (foundAd) {
+                        setAd(foundAd);
+                        if (foundAd._id) {
+                            trackAdInteraction({ targetType: 'PlatformAd', targetId: foundAd._id, interactionType: 'visit' });
+                        }
                     } else {
                         setError('Promotion not found or has expired.');
                     }
@@ -491,6 +494,7 @@ const PromotionDetailPage = () => {
                                 {contactPhone && (
                                     <a
                                         href={`tel:${contactPhone}`}
+                                        onClick={() => trackAdInteraction({ targetType: 'PlatformAd', targetId: ad._id, interactionType: 'call' })}
                                         className="px-6 py-4 rounded-2xl bg-black hover:bg-slate-900 text-white font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md active:scale-95"
                                     >
                                         <Phone className="h-4 w-4 text-white" />
@@ -503,6 +507,7 @@ const PromotionDetailPage = () => {
                                         href={`https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(`Hello, I saw your "${ad.title}" promotional video on SevaFast!`)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
+                                        onClick={() => trackAdInteraction({ targetType: 'PlatformAd', targetId: ad._id, interactionType: 'whatsapp' })}
                                         className="px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95"
                                     >
                                         <MessageCircle className="h-4 w-4" />
@@ -516,6 +521,7 @@ const PromotionDetailPage = () => {
                                     href={ad.targetUrl.startsWith('http') ? ad.targetUrl : `https://${ad.targetUrl}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    onClick={() => trackAdInteraction({ targetType: 'PlatformAd', targetId: ad._id, interactionType: 'contact' })}
                                     className="w-full px-4 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 border border-slate-200"
                                 >
                                     <span>Visit Official Website</span>
@@ -583,6 +589,7 @@ const PromotionDetailPage = () => {
                     {contactPhone && (
                         <a
                             href={`tel:${contactPhone}`}
+                            onClick={() => trackAdInteraction({ targetType: 'PlatformAd', targetId: ad._id, interactionType: 'call' })}
                             className="flex-1 py-3.5 rounded-2xl bg-black text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md active:scale-95 text-center"
                         >
                             <Phone className="h-4 w-4 text-white" />
@@ -595,6 +602,7 @@ const PromotionDetailPage = () => {
                             href={`https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(`Hello, I saw your "${ad.title}" promotional video on SevaFast!`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={() => trackAdInteraction({ targetType: 'PlatformAd', targetId: ad._id, interactionType: 'whatsapp' })}
                             className="flex-1 py-3.5 rounded-2xl bg-emerald-600 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95 text-center"
                         >
                             <MessageCircle className="h-4 w-4" />

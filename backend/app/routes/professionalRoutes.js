@@ -1,5 +1,6 @@
 import express from "express";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyToken, optionalVerifyToken } from "../middleware/authMiddleware.js";
+import { trackAdInteraction, getAdInteractionStats } from "../controller/adAnalyticsController.js";
 import {
     createAd,
     getMyAd,
@@ -29,6 +30,10 @@ router.get("/categories", getCategories);
 router.get("/search", searchAds);
 router.get("/platform-ads/active", getActivePlatformAds);
 router.get("/platform-ads/:id", getPlatformAdById);
+
+// Analytics tracking routes (Supports guest & logged-in users with 24-hr deduplication)
+router.post("/track-interaction", optionalVerifyToken, trackAdInteraction);
+router.get("/stats/:targetType/:targetId", optionalVerifyToken, getAdInteractionStats);
 
 // Protected professional profile routes
 router.post("/profile", verifyToken, createAd);

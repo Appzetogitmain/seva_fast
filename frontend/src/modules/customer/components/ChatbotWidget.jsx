@@ -93,6 +93,43 @@ export default function ChatbotWidget() {
     }
   }, [isOpen]);
 
+  // Handle hardware/browser back button & Escape key to close the chatbot modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const pushChatbotEntry = () =>
+      window.history.pushState({ ...window.history.state, aiChatbotModal: true }, '');
+
+    if (!window.history.state?.aiChatbotModal) {
+      pushChatbotEntry();
+    }
+
+    const handlePopState = () => {
+      setIsOpen(false);
+      stopSpeaking();
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+        stopSpeaking();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleKeyDown);
+      setTimeout(() => {
+        if (!isOpenRef.current && window.history.state?.aiChatbotModal) {
+          window.history.back();
+        }
+      }, 0);
+    };
+  }, [isOpen]);
+
   const prompts = [
     "Upload a grocery list / photo 📝",
     "Kya dhoondh rahe hain? 🔍",
@@ -1014,10 +1051,22 @@ export default function ChatbotWidget() {
   }
 
   return (
-    <div
-      className="fixed bottom-20 md:bottom-6 right-3 sm:right-6 w-[94vw] sm:w-[440px] bg-white rounded-2xl shadow-2xl border border-slate-200/90 flex flex-col overflow-hidden z-[999] transition-all"
-      style={{ height: "600px", maxHeight: "82vh" }}
-    >
+    <>
+      {/* Tap-outside Backdrop overlay */}
+      <div
+        onClick={() => {
+          setIsOpen(false);
+          stopSpeaking();
+        }}
+        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[998] transition-opacity animate-in fade-in"
+        aria-label="Close AI Assistant"
+      />
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="fixed bottom-20 md:bottom-6 right-3 sm:right-6 w-[94vw] sm:w-[440px] bg-white rounded-2xl shadow-2xl border border-slate-200/90 flex flex-col overflow-hidden z-[999] transition-all"
+        style={{ height: "600px", maxHeight: "82vh" }}
+      >
       {/* Sleek Header */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white px-4 py-3 flex justify-between items-center shadow-md">
         <div className="flex items-center gap-2.5">
@@ -1583,6 +1632,7 @@ export default function ChatbotWidget() {
           </button>
         )}
       </form>
-    </div>
+      </div>
+    </>
   );
 }

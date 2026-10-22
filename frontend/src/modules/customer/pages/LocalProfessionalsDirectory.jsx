@@ -23,6 +23,7 @@ import {
     Loader2
 } from 'lucide-react';
 import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
+import { trackAdInteraction } from '../../../core/utils/analyticsTracker';
 
 const getWhatsAppUrl = (phone, name) => {
     const cleanPhone = String(phone || '').replace(/\D/g, '');
@@ -207,6 +208,7 @@ const ProfessionalCard = ({ pro, onOpenCatalog, t, getWhatsAppUrl, categories })
                     </button>
                     <a
                         href={`tel:${pro.phone}`}
+                        onClick={() => trackAdInteraction({ targetType: 'ProfessionalAd', targetId: pro._id, interactionType: 'call' })}
                         className="p-3 bg-black hover:bg-slate-900 transition-all text-white rounded-xl flex items-center justify-center shadow-sm"
                         title="Call Service Provider"
                     >
@@ -216,6 +218,7 @@ const ProfessionalCard = ({ pro, onOpenCatalog, t, getWhatsAppUrl, categories })
                         href={getWhatsAppUrl(pro.phone, pro.name)}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => trackAdInteraction({ targetType: 'ProfessionalAd', targetId: pro._id, interactionType: 'whatsapp' })}
                         className="p-3 bg-emerald-600 hover:bg-emerald-700 transition-all text-white rounded-xl flex items-center justify-center shadow-sm"
                         title="Chat on WhatsApp"
                     >
@@ -255,6 +258,13 @@ const LocalProfessionalsDirectory = () => {
 
     // Selected professional catalog view modal state
     const [activeCatalogProfessional, setActiveCatalogProfessional] = useState(null);
+
+    const handleOpenCatalog = (pro) => {
+        setActiveCatalogProfessional(pro);
+        if (pro?._id) {
+            trackAdInteraction({ targetType: 'ProfessionalAd', targetId: pro._id, interactionType: 'visit' });
+        }
+    };
     const [activeVideoPreview, setActiveVideoPreview] = useState(null);
     useLockBodyScroll(Boolean(activeCatalogProfessional || activeVideoPreview));
 
@@ -494,7 +504,7 @@ const LocalProfessionalsDirectory = () => {
                         <ProfessionalCard
                             key={pro._id}
                             pro={pro}
-                            onOpenCatalog={setActiveCatalogProfessional}
+                            onOpenCatalog={handleOpenCatalog}
                             t={t}
                             getWhatsAppUrl={getWhatsAppUrl}
                             categories={categories}
@@ -626,6 +636,7 @@ const LocalProfessionalsDirectory = () => {
                         <div className="flex gap-3 border-t border-slate-100 pt-5">
                             <a
                                 href={`tel:${activeCatalogProfessional.phone}`}
+                                onClick={() => trackAdInteraction({ targetType: 'ProfessionalAd', targetId: activeCatalogProfessional._id, interactionType: 'call' })}
                                 className="flex-1 py-3.5 bg-black hover:bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2"
                             >
                                 <Phone className="h-4 w-4" /> Call Provider
@@ -634,6 +645,7 @@ const LocalProfessionalsDirectory = () => {
                                 href={getWhatsAppUrl(activeCatalogProfessional.phone, activeCatalogProfessional.name)}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                onClick={() => trackAdInteraction({ targetType: 'ProfessionalAd', targetId: activeCatalogProfessional._id, interactionType: 'whatsapp' })}
                                 className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2"
                             >
                                 <MessageCircle className="h-4 w-4" /> WhatsApp

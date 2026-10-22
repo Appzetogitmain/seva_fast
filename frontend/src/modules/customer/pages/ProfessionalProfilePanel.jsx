@@ -27,7 +27,9 @@ import {
     Image as ImageIcon,
     Video as VideoIcon,
     Play,
-    MessageCircle
+    MessageCircle,
+    Eye,
+    PhoneCall
 } from 'lucide-react';
 import { useSettings } from '@core/context/SettingsContext';
 import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
@@ -1289,6 +1291,69 @@ const ProfessionalProfilePanel = () => {
                             </div>
                         </div>
 
+                        {/* PERFORMANCE & VISITOR INSIGHTS (Instagram-style 24h metrics) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {/* Card 1: Unique Profile Visits */}
+                            <div className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-4">
+                                <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl shrink-0">
+                                    <Eye className="h-6 w-6" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">Profile Visits</span>
+                                    <div className="flex items-baseline gap-2">
+                                        <h4 className="text-2xl font-black text-slate-900">{ad.visitsCount || 0}</h4>
+                                        <span className="text-[10px] font-bold text-slate-400">views</span>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">Unique 24h visitors</p>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Total Customer Inquiries */}
+                            <div className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-4">
+                                <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl shrink-0">
+                                    <PhoneCall className="h-6 w-6" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">Total Inquiries</span>
+                                    <div className="flex items-baseline gap-2">
+                                        <h4 className="text-2xl font-black text-slate-900">{ad.contactsCount || 0}</h4>
+                                        <span className="text-[10px] font-bold text-slate-400">leads</span>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">Direct customer clicks</p>
+                                </div>
+                            </div>
+
+                            {/* Card 3: Phone Calls Initiated */}
+                            <div className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-4">
+                                <div className="p-3.5 bg-sky-50 text-sky-600 rounded-2xl shrink-0">
+                                    <Phone className="h-6 w-6" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">Call Clicks</span>
+                                    <div className="flex items-baseline gap-2">
+                                        <h4 className="text-2xl font-black text-slate-900">{ad.callClicksCount || 0}</h4>
+                                        <span className="text-[10px] font-bold text-slate-400">calls</span>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">Direct phone inquiries</p>
+                                </div>
+                            </div>
+
+                            {/* Card 4: WhatsApp Chats Initiated */}
+                            <div className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-4">
+                                <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl shrink-0">
+                                    <MessageCircle className="h-6 w-6" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">WhatsApp Chats</span>
+                                    <div className="flex items-baseline gap-2">
+                                        <h4 className="text-2xl font-black text-slate-900">{ad.whatsappClicksCount || 0}</h4>
+                                        <span className="text-[10px] font-bold text-slate-400">chats</span>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">WhatsApp conversations</p>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Verification & Subscription Status Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Approval Status Card */}
@@ -2100,6 +2165,16 @@ const ProfessionalProfilePanel = () => {
                                                 {t('pro.payToSubmit', { amount: adItem.price || settings?.platformAdListingFee || 999 })}
                                             </button>
                                         )}
+                                        {/* Engagement Analytics Pills */}
+                                        <div className="flex items-center gap-1.5 w-full justify-start md:justify-end flex-wrap mt-1">
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-black" title="Unique views (24h refresh)">
+                                                <Eye className="h-3 w-3" /> {adItem.visitsCount || 0} Views
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black" title="Direct contacts & clicks">
+                                                <PhoneCall className="h-3 w-3" /> {adItem.contactsCount || 0} Inquiries
+                                            </span>
+                                        </div>
+
                                         <button
                                             onClick={() => handleEditPlatformAd(adItem)}
                                             className="w-full px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all text-center mt-1 flex items-center justify-center gap-1.5"

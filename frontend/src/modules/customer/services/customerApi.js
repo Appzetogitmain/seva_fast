@@ -207,6 +207,10 @@ export const customerApi = {
   getActivePlatformAds: (params) => axiosInstance.get("/professionals/platform-ads/active", { params }),
   getPlatformAdById: (id) => axiosInstance.get(`/professionals/platform-ads/${id}`),
 
+  // Analytics Tracking
+  trackAdInteraction: (data) => axiosInstance.post("/professionals/track-interaction", data),
+  getAdInteractionStats: (targetType, targetId) => axiosInstance.get(`/professionals/stats/${targetType}/${targetId}`),
+
   // Product Demands
   registerProductDemand: (data) => axiosInstance.post("/product-demands/register", data),
 };
