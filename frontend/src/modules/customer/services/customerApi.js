@@ -207,6 +207,12 @@ export const customerApi = {
   getActivePlatformAds: (params) => axiosInstance.get("/professionals/platform-ads/active", { params }),
   getPlatformAdById: (id) => axiosInstance.get(`/professionals/platform-ads/${id}`),
 
+  // Professional Ratings & Reviews (Verified Contact Model)
+  getProfessionalReviews: (providerId, params) => axiosInstance.get('/professionals/' + providerId + '/reviews', { params }),
+  checkCanReviewProfessional: (providerId, params) => axiosInstance.get('/professionals/' + providerId + '/can-review', { params }),
+  submitProfessionalReview: (providerId, data) => axiosInstance.post('/professionals/' + providerId + '/reviews', data),
+  deleteProfessionalReview: (providerId, reviewId) => axiosInstance.delete('/professionals/' + providerId + '/reviews/' + reviewId),
+
   // Analytics Tracking
   trackAdInteraction: (data) => axiosInstance.post("/professionals/track-interaction", data),
   getAdInteractionStats: (targetType, targetId) => axiosInstance.get(`/professionals/stats/${targetType}/${targetId}`),
