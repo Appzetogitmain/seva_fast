@@ -1299,12 +1299,12 @@ const ProfessionalProfilePanel = () => {
                                     <Eye className="h-6 w-6" />
                                 </div>
                                 <div className="min-w-0">
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">Profile Visits</span>
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">Total Profile Visits</span>
                                     <div className="flex items-baseline gap-2">
                                         <h4 className="text-2xl font-black text-slate-900">{ad.visitsCount || 0}</h4>
                                         <span className="text-[10px] font-bold text-slate-400">views</span>
                                     </div>
-                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">Unique 24h visitors</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">All-Time Total (Lifetime)</p>
                                 </div>
                             </div>
 
@@ -1319,7 +1319,7 @@ const ProfessionalProfilePanel = () => {
                                         <h4 className="text-2xl font-black text-slate-900">{ad.contactsCount || 0}</h4>
                                         <span className="text-[10px] font-bold text-slate-400">leads</span>
                                     </div>
-                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">Direct customer clicks</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">All-Time Leads (Lifetime)</p>
                                 </div>
                             </div>
 
@@ -1334,7 +1334,7 @@ const ProfessionalProfilePanel = () => {
                                         <h4 className="text-2xl font-black text-slate-900">{ad.callClicksCount || 0}</h4>
                                         <span className="text-[10px] font-bold text-slate-400">calls</span>
                                     </div>
-                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">Direct phone inquiries</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">All-Time Direct Calls</p>
                                 </div>
                             </div>
 
@@ -1349,7 +1349,7 @@ const ProfessionalProfilePanel = () => {
                                         <h4 className="text-2xl font-black text-slate-900">{ad.whatsappClicksCount || 0}</h4>
                                         <span className="text-[10px] font-bold text-slate-400">chats</span>
                                     </div>
-                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">WhatsApp conversations</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">All-Time WhatsApp Chats</p>
                                 </div>
                             </div>
                         </div>
@@ -2167,7 +2167,7 @@ const ProfessionalProfilePanel = () => {
                                         )}
                                         {/* Engagement Analytics Pills */}
                                         <div className="flex items-center gap-1.5 w-full justify-start md:justify-end flex-wrap mt-1">
-                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-black" title="Unique views (24h refresh)">
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-black" title="Total unique views">
                                                 <Eye className="h-3 w-3" /> {adItem.visitsCount || 0} Views
                                             </span>
                                             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black" title="Direct contacts & clicks">

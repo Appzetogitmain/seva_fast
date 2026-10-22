@@ -563,7 +563,7 @@ const ProfessionalAdsManagement = () => {
                                                 }`}>
                                                     {adItem.paymentStatus}
                                                 </span>
-                                                <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Unique views (24h refresh)">
+                                                <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Total views from campaign start till now">
                                                     <Eye className="h-3 w-3" /> {adItem.visitsCount || 0} Views
                                                 </span>
                                                 <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Customer clicks & inquiries">
@@ -675,7 +675,7 @@ const ProfessionalAdsManagement = () => {
                                             }`}>
                                                 {ad.paymentStatus}
                                             </span>
-                                            <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Unique profile visits (24h refresh)">
+                                            <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Total profile visits from creation till now">
                                                 <Eye className="h-3 w-3" /> {ad.visitsCount || 0} Visits
                                             </span>
                                             <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Total calls and WhatsApp inquiries">
@@ -878,7 +878,7 @@ const ProfessionalAdsManagement = () => {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-3xl border border-slate-100">
                                 <div className="bg-white p-3.5 rounded-2xl border border-slate-100/80">
                                     <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                                        <Eye className="h-3.5 w-3.5 text-indigo-500" /> Visits (24h)
+                                        <Eye className="h-3.5 w-3.5 text-indigo-500" /> Total Visits (All-Time)
                                     </span>
                                     <h4 className="text-xl font-black text-slate-900 mt-1">{selectedAdForDetail.visitsCount || 0}</h4>
                                 </div>
@@ -1104,7 +1104,7 @@ const ProfessionalAdsManagement = () => {
                             <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-3xl border border-slate-100">
                                 <div className="bg-white p-3.5 rounded-2xl border border-slate-100/80">
                                     <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                                        <Eye className="h-3.5 w-3.5 text-indigo-500" /> Total Views (24h)
+                                        <Eye className="h-3.5 w-3.5 text-indigo-500" /> Total Views (All-Time)
                                     </span>
                                     <h4 className="text-xl font-black text-slate-900 mt-1">{selectedPlatAdForDetail.visitsCount || 0}</h4>
                                 </div>
