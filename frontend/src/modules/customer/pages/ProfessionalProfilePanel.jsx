@@ -29,7 +29,8 @@ import {
     Play,
     MessageCircle,
     Eye,
-    PhoneCall
+    PhoneCall,
+    Star
 } from 'lucide-react';
 import { useSettings } from '@core/context/SettingsContext';
 import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
@@ -1292,7 +1293,7 @@ const ProfessionalProfilePanel = () => {
                         </div>
 
                         {/* PERFORMANCE & VISITOR INSIGHTS (Instagram-style 24h metrics) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                             {/* Card 1: Unique Profile Visits */}
                             <div className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-4">
                                 <div className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl shrink-0">
@@ -1350,6 +1351,25 @@ const ProfessionalProfilePanel = () => {
                                         <span className="text-[10px] font-bold text-slate-400">chats</span>
                                     </div>
                                     <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">All-Time WhatsApp Chats</p>
+                                </div>
+                            </div>
+
+                            {/* Card 5: Verified Customer Rating */}
+                            <div className="bg-white p-5 rounded-[28px] border border-slate-100 shadow-sm flex items-center gap-4">
+                                <div className="p-3.5 bg-amber-50 text-amber-500 rounded-2xl shrink-0">
+                                    <Star className="h-6 w-6 fill-amber-400 text-amber-500" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block truncate">Customer Rating</span>
+                                    <div className="flex items-baseline gap-2">
+                                        <h4 className="text-2xl font-black text-slate-900">
+                                            {ad.ratingCount > 0 ? Number(ad.rating || 5.0).toFixed(1) : '5.0'}
+                                        </h4>
+                                        <span className="text-[10px] font-bold text-slate-400">
+                                            {ad.ratingCount > 0 ? `(${ad.ratingCount} reviews)` : 'new'}
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5 truncate">Verified Client Ratings</p>
                                 </div>
                             </div>
                         </div>

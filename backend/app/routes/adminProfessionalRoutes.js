@@ -16,6 +16,11 @@ import {
     adminApprovePlatformAd,
     adminRejectPlatformAd,
 } from "../controller/platformAdController.js";
+import {
+    adminGetAllReviews,
+    adminModerateReview,
+    adminDeleteReview,
+} from "../controller/professionalReviewController.js";
 
 const router = express.Router();
 
@@ -39,5 +44,9 @@ router.get("/platform-ads", adminGetPlatformAds);
 router.patch("/platform-ads/:id/approve", adminApprovePlatformAd);
 router.patch("/platform-ads/:id/reject", adminRejectPlatformAd);
 
-export default router;
+// Review moderation routes
+router.get("/reviews", adminGetAllReviews);
+router.patch("/reviews/:reviewId/status", adminModerateReview);
+router.delete("/reviews/:reviewId", adminDeleteReview);
 
+export default router;

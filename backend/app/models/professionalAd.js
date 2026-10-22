@@ -160,6 +160,17 @@ const professionalAdSchema = new mongoose.Schema(
             default: 0,
             min: 0,
         },
+        rating: {
+            type: Number,
+            default: 5.0,
+            min: 1,
+            max: 5,
+        },
+        ratingCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
     },
     {
         timestamps: true,
