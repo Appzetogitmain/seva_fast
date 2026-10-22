@@ -27,7 +27,8 @@ import {
     Crop,
     FileSpreadsheet,
     Eye,
-    PhoneCall
+    PhoneCall,
+    Star
 } from 'lucide-react';
 import ImageCropperModal from '@shared/components/ui/ImageCropperModal';
 
@@ -681,6 +682,10 @@ const ProfessionalAdsManagement = () => {
                                             <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Total calls and WhatsApp inquiries">
                                                 <PhoneCall className="h-3 w-3" /> {ad.contactsCount || 0} Contacts
                                             </span>
+                                            <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Customer Rating">
+                                                <Star className="h-3 w-3 fill-amber-400 text-amber-500" />
+                                                {ad.ratingCount > 0 ? `${Number(ad.rating || 5.0).toFixed(1)} (${ad.ratingCount})` : 'New'}
+                                            </span>
                                         </div>
                                         <div className="flex items-center gap-4 text-xs font-bold text-slate-500 flex-wrap">
                                             <span className="flex items-center gap-1">
@@ -875,7 +880,7 @@ const ProfessionalAdsManagement = () => {
                             data-lenis-prevent-wheel
                         >
                             {/* Performance Analytics Strip (24h unique tracking) */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-50 p-4 rounded-3xl border border-slate-100">
                                 <div className="bg-white p-3.5 rounded-2xl border border-slate-100/80">
                                     <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                                         <Eye className="h-3.5 w-3.5 text-indigo-500" /> Total Visits (All-Time)
@@ -899,6 +904,17 @@ const ProfessionalAdsManagement = () => {
                                         <Sparkles className="h-3.5 w-3.5 text-emerald-500" /> WhatsApp
                                     </span>
                                     <h4 className="text-xl font-black text-slate-900 mt-1">{selectedAdForDetail.whatsappClicksCount || 0}</h4>
+                                </div>
+                                <div className="bg-white p-3.5 rounded-2xl border border-slate-100/80">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" /> Rating
+                                    </span>
+                                    <h4 className="text-xl font-black text-slate-900 mt-1">
+                                        {selectedAdForDetail.ratingCount > 0 ? `${Number(selectedAdForDetail.rating || 5.0).toFixed(1)} ★` : '5.0 (New)'}
+                                    </h4>
+                                    <span className="text-[10px] text-slate-400 font-bold">
+                                        {selectedAdForDetail.ratingCount || 0} reviews
+                                    </span>
                                 </div>
                             </div>
 

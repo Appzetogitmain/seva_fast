@@ -22,6 +22,12 @@ import {
     initiatePayPlatformAd,
     verifyPayPlatformAd
 } from "../controller/platformAdController.js";
+import {
+    getProviderReviews,
+    checkCanReview,
+    submitProviderReview,
+    deleteProviderReview,
+} from "../controller/professionalReviewController.js";
 
 const router = express.Router();
 
@@ -43,6 +49,12 @@ router.put("/profile/services", verifyToken, updateMyServices);
 router.post("/profile/pay", verifyToken, payMyAd);
 router.post("/profile/pay/initiate", verifyToken, initiatePayMyAd);
 router.post("/profile/pay/verify", verifyToken, verifyPayMyAd);
+
+// Reviews & Dynamic Ratings (Verified Contact Model)
+router.get("/:providerId/reviews", optionalVerifyToken, getProviderReviews);
+router.get("/:providerId/can-review", optionalVerifyToken, checkCanReview);
+router.post("/:providerId/reviews", verifyToken, submitProviderReview);
+router.delete("/:providerId/reviews/:reviewId", verifyToken, deleteProviderReview);
 
 // Separated Platform Ad Requests routes
 router.post("/platform-ads", verifyToken, createPlatformAd);

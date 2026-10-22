@@ -186,6 +186,11 @@ export const adminApi = {
     approveProfessionalAd: (id) => axiosInstance.patch(`/admin/professionals/ads/${id}/approve`),
     rejectProfessionalAd: (id, data) => axiosInstance.patch(`/admin/professionals/ads/${id}/reject`, data),
 
+    // Professional Reviews Moderation
+    getProfessionalReviews: (params) => axiosInstance.get('/admin/professionals/reviews', { params }),
+    moderateProfessionalReview: (reviewId, data) => axiosInstance.patch('/admin/professionals/reviews/' + reviewId + '/status', data),
+    deleteProfessionalReview: (reviewId) => axiosInstance.delete('/admin/professionals/reviews/' + reviewId),
+
     // Platform Ads Management
     getPlatformAds: (params) => axiosInstance.get('/admin/professionals/platform-ads', { params }),
     approvePlatformAd: (id) => axiosInstance.patch(`/admin/professionals/platform-ads/${id}/approve`),
