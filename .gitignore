@@ -5,5 +5,3 @@ temp_interactive_push.bat
 # Ignore bugsheet
 bugsheet
 bugsheet.*
-config.bat
-node_modules
