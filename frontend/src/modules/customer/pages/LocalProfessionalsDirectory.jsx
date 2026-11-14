@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { customerApi } from '../services/customerApi';
@@ -25,7 +25,8 @@ import {
     AlertCircle,
     Edit3,
     Trash2,
-    ShieldCheck
+    ShieldCheck,
+    Sparkles
 } from 'lucide-react';
 import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 import { trackAdInteraction, getVisitorId } from '../../../core/utils/analyticsTracker';
@@ -302,6 +303,23 @@ const LocalProfessionalsDirectory = () => {
     const [ratingScore, setRatingScore] = useState(5);
     const [ratingHover, setRatingHover] = useState(0);
     const [reviewComment, setReviewComment] = useState('');
+
+    const featuredScrollRef = useRef(null);
+    const categoriesPillRef = useRef(null);
+
+    const scrollTrack = (ref, direction) => {
+        if (ref.current) {
+            const amount = direction === 'left' ? -280 : 280;
+            ref.current.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+    };
+
+    const topFeaturedProfessionals = useMemo(() => {
+        if (!professionals || professionals.length === 0) return [];
+        return [...professionals]
+            .sort((a, b) => (b.ratingCount || 0) - (a.ratingCount || 0) || (b.rating || 5) - (a.rating || 5))
+            .slice(0, 6);
+    }, [professionals]);
 
     const formatReviewDate = (dateStr) => {
         if (!dateStr) return '';
@@ -623,34 +641,196 @@ const LocalProfessionalsDirectory = () => {
                     </div>
                 </form>
 
-                {/* Categories Pills Carousel */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-t border-slate-50 pt-4">
+                {/* Categories Pills Carousel (Smooth Horizontal Swipe) */}
+                <div className="relative group/pills pt-4 border-t border-slate-50">
                     <button
-                        onClick={() => setSelectedCategoryId('')}
-                        className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${!selectedCategoryId ? 'bg-black text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                            }`}
+                        type="button"
+                        aria-label="Scroll categories left"
+                        onClick={() => scrollTrack(categoriesPillRef, 'left')}
+                        className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-white/95 border border-slate-200 shadow-md items-center justify-center text-slate-700 hover:text-black hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/pills:opacity-100 cursor-pointer"
                     >
-                        {t('directory.allCategories')}
+                        <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
-                    {categories.map((cat) => (
+
+                    <div
+                        ref={categoriesPillRef}
+                        role="region"
+                        aria-label="Filter by category"
+                        className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth snap-x touch-pan-x px-0.5"
+                        style={{ WebkitOverflowScrolling: 'touch' }}
+                    >
                         <button
-                            key={cat._id}
-                            onClick={() => setSelectedCategoryId(cat._id)}
-                            className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${selectedCategoryId === cat._id ? 'bg-black text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                            onClick={() => setSelectedCategoryId('')}
+                            className={`snap-start px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 cursor-pointer ${!selectedCategoryId ? 'bg-black text-white shadow-xs' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
                                 }`}
                         >
-                            {cat.icon && (
-                                cat.icon.startsWith('http') ? (
-                                    <img src={cat.icon} alt="" className="h-4.5 w-4.5 rounded-md object-cover inline-block align-middle" />
-                                ) : (
-                                    <span>{cat.icon}</span>
-                                )
-                            )}
-                            {cat.name}
+                            {t('directory.allCategories', { defaultValue: 'All Categories' })}
                         </button>
-                    ))}
+                        {categories.map((cat) => (
+                            <button
+                                key={cat._id}
+                                onClick={() => setSelectedCategoryId(cat._id)}
+                                className={`snap-start px-4.5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 cursor-pointer ${selectedCategoryId === cat._id ? 'bg-black text-white shadow-xs' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                    }`}
+                            >
+                                {cat.icon && (
+                                    cat.icon.startsWith('http') ? (
+                                        <img src={cat.icon} alt="" className="h-4.5 w-4.5 rounded-md object-cover inline-block align-middle" />
+                                    ) : (
+                                        <span>{cat.icon}</span>
+                                    )
+                                )}
+                                <span>{cat.name}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    <button
+                        type="button"
+                        aria-label="Scroll categories right"
+                        onClick={() => scrollTrack(categoriesPillRef, 'right')}
+                        className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-20 h-7 w-7 rounded-full bg-white/95 border border-slate-200 shadow-md items-center justify-center text-slate-700 hover:text-black hover:scale-105 active:scale-95 transition-all opacity-0 group-hover/pills:opacity-100 cursor-pointer"
+                    >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
                 </div>
             </div>
+
+            {/* Top Featured Professionals Horizontal Slider (Left-to-Right Swipe on Mobile) */}
+            {!isLoading && topFeaturedProfessionals.length > 1 && !searchQuery && (
+                <div className="mb-6 p-4 sm:p-5 bg-gradient-to-br from-amber-50/60 via-white to-orange-50/30 rounded-3xl border border-amber-100/80 shadow-xs relative group/feat">
+                    <div className="flex items-center justify-between mb-3 px-1">
+                        <div className="flex items-center gap-2">
+                            <span className="p-1.5 rounded-lg bg-amber-100 text-amber-700">
+                                <Sparkles className="h-4 w-4" />
+                            </span>
+                            <div>
+                                <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider">
+                                    {t('directory.featuredExperts', { defaultValue: 'Top Rated Experts' })}
+                                </h3>
+                                <p className="text-[10px] sm:text-[11px] font-bold text-slate-400">
+                                    {t('directory.swipeToExplore', { defaultValue: 'Swipe horizontally to browse top verified providers' })}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Desktop Prev/Next Buttons */}
+                        <div className="hidden md:flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                aria-label="Scroll featured providers left"
+                                onClick={() => scrollTrack(featuredScrollRef, 'left')}
+                                className="h-7 w-7 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-600 hover:text-black hover:border-slate-300 transition-all cursor-pointer active:scale-95"
+                            >
+                                <ChevronLeft className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                aria-label="Scroll featured providers right"
+                                onClick={() => scrollTrack(featuredScrollRef, 'right')}
+                                className="h-7 w-7 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-600 hover:text-black hover:border-slate-300 transition-all cursor-pointer active:scale-95"
+                            >
+                                <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Horizontal Scroll Track */}
+                    <div
+                        ref={featuredScrollRef}
+                        role="region"
+                        aria-label="Top rated providers slider"
+                        className="flex items-stretch gap-3.5 overflow-x-auto no-scrollbar scroll-smooth snap-x touch-pan-x py-1 px-1"
+                        style={{ WebkitOverflowScrolling: 'touch' }}
+                    >
+                        {topFeaturedProfessionals.map((pro) => (
+                            <div
+                                key={pro._id}
+                                className="snap-start shrink-0 w-[260px] sm:w-[285px] bg-white rounded-2xl border border-slate-200/80 p-3.5 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-amber-300 transition-all select-none"
+                            >
+                                <div>
+                                    <div className="flex items-start gap-2.5">
+                                        {pro.mediaUrl ? (
+                                            <img
+                                                src={pro.mediaUrl}
+                                                alt={pro.name}
+                                                className="h-12 w-12 rounded-xl object-cover border border-slate-100 shrink-0"
+                                            />
+                                        ) : (
+                                            <div className="h-12 w-12 rounded-xl bg-orange-50 border border-orange-100 text-[#FF5A00] font-black text-lg flex items-center justify-center shrink-0">
+                                                {pro.name?.charAt(0)?.toUpperCase() || 'P'}
+                                            </div>
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1">
+                                                <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate leading-tight">
+                                                    {pro.name}
+                                                </h4>
+                                                <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-brand-600 block truncate uppercase tracking-wider mt-0.5">
+                                                {pro.profession}
+                                            </span>
+                                            <div className="flex items-center gap-1 mt-1">
+                                                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded-md text-[10px] font-black border border-amber-200/50">
+                                                    <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-500" />
+                                                    <span>
+                                                        {pro.ratingCount > 0 ? Number(pro.rating || 5.0).toFixed(1) : '5.0'}
+                                                    </span>
+                                                </div>
+                                                {pro.ratingCount > 0 && (
+                                                    <span className="text-[9px] text-slate-400 font-bold">
+                                                        ({pro.ratingCount})
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 text-[10.5px] font-bold text-slate-500 mt-2.5 pt-2 border-t border-slate-50">
+                                        <span className="flex items-center gap-1 truncate">
+                                            <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
+                                            {pro.city}
+                                        </span>
+                                        <span className="text-slate-300">•</span>
+                                        <span className="truncate">
+                                            {pro.experienceYears || 1}+ Yrs Exp
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-50">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenCatalog(pro)}
+                                        className="flex-1 py-2 bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all text-center cursor-pointer"
+                                    >
+                                        {t('directory.viewCatalog', { defaultValue: 'Catalog' })}
+                                    </button>
+                                    <a
+                                        href={`tel:${pro.phone}`}
+                                        onClick={() => trackAdInteraction({ targetType: 'ProfessionalAd', targetId: pro._id, interactionType: 'call' })}
+                                        className="p-2 bg-black hover:bg-slate-900 text-white rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                                        title="Call Provider"
+                                    >
+                                        <Phone className="h-3.5 w-3.5" />
+                                    </a>
+                                    <a
+                                        href={getWhatsAppUrl(pro.phone, pro.name)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={() => trackAdInteraction({ targetType: 'ProfessionalAd', targetId: pro._id, interactionType: 'whatsapp' })}
+                                        className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                                        title="WhatsApp Provider"
+                                    >
+                                        <MessageCircle className="h-3.5 w-3.5" />
+                                    </a>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Results Grid */}
             {isLoading ? (
