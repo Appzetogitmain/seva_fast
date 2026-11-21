@@ -29,7 +29,7 @@ export const createAd = async (req, res) => {
         }
 
         // Only one ad profile per user
-        const existing = await ProfessionalAd.findOne({ owner: ownerId });
+        const existing = await ProfessionalAd.findOne({ owner: ownerId, isArchived: { $ne: true } });
         if (existing) {
             return handleResponse(res, 400, "You already have a professional profile listing");
         }
@@ -80,7 +80,7 @@ export const createAd = async (req, res) => {
 export const getMyAd = async (req, res) => {
     try {
         const ownerId = req.user.id;
-        const ad = await ProfessionalAd.findOne({ owner: ownerId })
+        const ad = await ProfessionalAd.findOne({ owner: ownerId, isArchived: { $ne: true } })
             .populate("category", "name priceType price")
             .populate("categories", "name priceType price")
             .lean();
@@ -98,7 +98,7 @@ export const updateMyAd = async (req, res) => {
         const ownerId = req.user.id;
         const { name, phone, email, profession, categoryId, categoryIds, experienceYears, description, address, city, lat, lng, mediaUrl, mediaType, portfolioImages, portfolioVideos } = req.body;
 
-        const ad = await ProfessionalAd.findOne({ owner: ownerId });
+        const ad = await ProfessionalAd.findOne({ owner: ownerId, isArchived: { $ne: true } });
         if (!ad) {
             return handleResponse(res, 404, "Professional profile not found");
         }
@@ -163,7 +163,7 @@ export const updateMyServices = async (req, res) => {
             return handleResponse(res, 400, "Services must be an array of items");
         }
 
-        const ad = await ProfessionalAd.findOne({ owner: ownerId });
+        const ad = await ProfessionalAd.findOne({ owner: ownerId, isArchived: { $ne: true } });
         if (!ad) {
             return handleResponse(res, 404, "Professional profile not found");
         }
@@ -205,7 +205,7 @@ export const updateMyServices = async (req, res) => {
 export const payMyAd = async (req, res) => {
     try {
         const ownerId = req.user.id;
-        const ad = await ProfessionalAd.findOne({ owner: ownerId });
+        const ad = await ProfessionalAd.findOne({ owner: ownerId, isArchived: { $ne: true } });
         if (!ad) {
             return handleResponse(res, 404, "Professional profile not found");
         }
@@ -314,6 +314,7 @@ export const searchAds = async (req, res) => {
         const query = {
             approvalStatus: "approved",
             isPublished: true,
+            isArchived: { $ne: true },
             $or: [
                 { expiresAt: { $exists: false } },
                 { expiresAt: { $gt: new Date() } }
@@ -375,7 +376,7 @@ export const searchAds = async (req, res) => {
 export const adminGetAds = async (req, res) => {
     try {
         const { status, paymentStatus } = req.query;
-        const query = {};
+        const query = { isArchived: { $ne: true } };
 
         if (status) query.approvalStatus = status;
         if (paymentStatus) query.paymentStatus = paymentStatus;
@@ -475,7 +476,7 @@ const getRazorpayInstance = () => {
 export const initiatePayMyAd = async (req, res) => {
     try {
         const ownerId = req.user.id;
-        const ad = await ProfessionalAd.findOne({ owner: ownerId });
+        const ad = await ProfessionalAd.findOne({ owner: ownerId, isArchived: { $ne: true } });
         if (!ad) {
             return handleResponse(res, 404, "Professional profile not found");
         }
@@ -527,7 +528,7 @@ export const verifyPayMyAd = async (req, res) => {
             return handleResponse(res, 400, "Missing required Razorpay parameters");
         }
 
-        const ad = await ProfessionalAd.findOne({ owner: ownerId });
+        const ad = await ProfessionalAd.findOne({ owner: ownerId, isArchived: { $ne: true } });
         if (!ad) {
             return handleResponse(res, 404, "Professional profile not found");
         }
@@ -575,6 +576,21 @@ export const verifyPayMyAd = async (req, res) => {
         return handleResponse(res, 200, "Listing payment verified and activated successfully", ad);
     } catch (error) {
         console.error("verifyPayMyAd error:", error);
+        return handleResponse(res, 500, error.message);
+    }
+};
+
+// Admin: remove (archive) a service provider listing — hidden everywhere, record kept
+export const adminArchiveAd = async (req, res) => {
+    try {
+        const ad = await ProfessionalAd.findByIdAndUpdate(
+            req.params.id,
+            { $set: { isArchived: true, archivedAt: new Date(), isPublished: false } },
+            { new: true }
+        );
+        if (!ad) return handleResponse(res, 404, "Professional listing not found");
+        return handleResponse(res, 200, "Professional listing removed", ad);
+    } catch (error) {
         return handleResponse(res, 500, error.message);
     }
 };

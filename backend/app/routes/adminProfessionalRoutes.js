@@ -10,6 +10,7 @@ import {
     adminGetAds,
     adminApproveAd,
     adminRejectAd,
+    adminArchiveAd,
 } from "../controller/professionalAdController.js";
 import {
     adminGetPlatformAds,
@@ -40,6 +41,7 @@ router.delete("/categories/:id", deleteCategory);
 router.get("/ads", adminGetAds);
 router.patch("/ads/:id/approve", adminApproveAd);
 router.patch("/ads/:id/reject", adminRejectAd);
+router.patch("/ads/:id/archive", adminArchiveAd);
 
 // Separated Platform Ad moderation routes
 router.get("/platform-ads", adminGetPlatformAds);

@@ -23,7 +23,6 @@ import { buildAppReferUrl, buildPlayStoreReferUrl, buildSellerReferUrl } from '.
 import ReferEarnCard from '../components/profile/ReferEarnCard';
 import { CustomPhotoOrderModal } from '../components/shared/CustomPhotoOrderModal';
 import { CustomerNotificationsModal } from '../components/shared/CustomerNotificationsModal';
-import MainLocationHeader from '../components/shared/MainLocationHeader';
 import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
 const TEST_PUSH_STATUS_POLL_INTERVAL_MS = 1500;
@@ -349,11 +348,9 @@ const ProfilePage = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 pb-24 md:pb-12 font-sans">
-            {/* Mount Existing Navbar (Header with location, search, cart, wishlist) */}
-            <MainLocationHeader />
-
-            {/* Profile Subheader with Safe Back Navigation & Language Switcher */}
-            <div className="pt-[140px] md:pt-[115px] max-w-2xl mx-auto px-4 pb-2 flex items-center justify-between gap-2">
+            {/* Profile top bar: back, title, language switcher (no home header on this page) */}
+            <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur pt-[env(safe-area-inset-top)]">
+            <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
@@ -368,30 +365,34 @@ const ProfilePage = () => {
                 </div>
                 <LanguageSwitcher />
             </div>
+            </div>
 
             <div className="max-w-2xl mx-auto px-4 pt-1 relative z-20 space-y-4">
                 {/* Service Provider Mode Switcher Banner */}
                 <div 
                     onClick={() => navigate('/professionals/panel')}
-                    className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden cursor-pointer hover:border-indigo-400/40 transition-all duration-200"
+                    style={{ backgroundColor: 'var(--primary)' }}
+                    className="rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden cursor-pointer active:scale-[0.99] transition-all duration-200"
                 >
-                    <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+                    {/* Soft depth on top of the app's theme colour */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/15 pointer-events-none" />
+                    <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full pointer-events-none" />
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 relative z-10">
                         <div className="flex items-start sm:items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
-                            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0 mt-0.5 sm:mt-0">
+                            <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl bg-white/20 border border-white/30 flex items-center justify-center text-white shrink-0 mt-0.5 sm:mt-0">
                                 <Briefcase size={22} className="w-5 h-5 sm:w-[22px] sm:h-[22px]" />
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-white/85">
                                         {proProfile ? "Service Provider Mode" : "Service Provider Mode"}
                                     </span>
                                     {proProfile && (
                                         <span className={cn(
                                             "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border",
-                                            proProfile.approvalStatus === 'approved' ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" :
-                                            proProfile.approvalStatus === 'rejected' ? "bg-red-500/20 text-red-300 border-red-500/30" :
-                                            "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                            proProfile.approvalStatus === 'approved' ? "bg-white text-emerald-700 border-white" :
+                                            proProfile.approvalStatus === 'rejected' ? "bg-white text-red-600 border-white" :
+                                            "bg-white text-amber-700 border-white"
                                         )}>
                                             {proProfile.approvalStatus === 'approved' ? "Live" : proProfile.approvalStatus === 'rejected' ? "Rejected" : "In Review"}
                                         </span>
@@ -400,7 +401,7 @@ const ProfilePage = () => {
                                 <h3 className="text-sm sm:text-base font-black text-white mt-1 tracking-tight break-words">
                                     {proProfile ? `Provider: ${proProfile.profession || proProfile.name}` : "Switch to Service Provider"}
                                 </h3>
-                                <p className="text-[11px] sm:text-xs text-slate-300 font-medium leading-relaxed mt-0.5 line-clamp-2 sm:line-clamp-1">
+                                <p className="text-[11px] sm:text-xs text-white/90 font-medium leading-relaxed mt-0.5 line-clamp-2 sm:line-clamp-1">
                                     {proProfile 
                                         ? (proProfile.approvalStatus === 'approved' 
                                             ? "Profile active — customers near you can call & contact you" 
@@ -417,7 +418,8 @@ const ProfilePage = () => {
                                 e.stopPropagation();
                                 navigate('/professionals/panel');
                             }}
-                            className="w-full sm:w-auto px-4 py-2.5 bg-white text-slate-950 hover:bg-slate-100 font-black text-xs uppercase tracking-wider rounded-xl transition shadow-md active:scale-95 shrink-0 whitespace-nowrap flex items-center justify-center gap-1.5"
+                            style={{ color: 'var(--primary)' }}
+                            className="w-full sm:w-auto px-4 py-2.5 bg-white hover:bg-white/90 font-black text-xs uppercase tracking-wider rounded-xl transition shadow-md active:scale-95 shrink-0 whitespace-nowrap flex items-center justify-center gap-1.5"
                         >
                             {proProfile ? "Dashboard →" : "Register Free →"}
                         </button>

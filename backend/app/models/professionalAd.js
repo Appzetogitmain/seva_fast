@@ -140,6 +140,10 @@ const professionalAdSchema = new mongoose.Schema(
             type: String,
             trim: true,
         }],
+        // Soft delete by admin: hidden from customers, the provider and the
+        // admin list; the provider may register a fresh listing afterwards.
+        isArchived: { type: Boolean, default: false, index: true },
+        archivedAt: { type: Date, default: null },
         visitsCount: {
             type: Number,
             default: 0,

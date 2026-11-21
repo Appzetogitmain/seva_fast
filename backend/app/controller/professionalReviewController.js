@@ -72,8 +72,8 @@ export const checkCanReview = async (req, res) => {
             return handleResponse(res, 400, "Invalid provider ID");
         }
 
-        const provider = await ProfessionalAd.findById(providerId).select("name owner").lean();
-        if (!provider) {
+        const provider = await ProfessionalAd.findById(providerId).select("name owner isArchived").lean();
+        if (!provider || provider.isArchived) {
             return handleResponse(res, 404, "Professional profile not found");
         }
 
@@ -156,7 +156,7 @@ export const submitProviderReview = async (req, res) => {
         const cleanRating = Math.round(parsedRating);
 
         const provider = await ProfessionalAd.findById(providerId);
-        if (!provider) {
+        if (!provider || provider.isArchived) {
             return handleResponse(res, 404, "Professional profile not found");
         }
 

@@ -235,6 +235,19 @@ const ProfessionalAdsManagement = () => {
     };
 
     // Moderation Logic
+    const handleRemoveAd = async (ad) => {
+        const label = ad.name || ad.profession || 'this listing';
+        if (!window.confirm(`Remove "${label}"? It will disappear from the app and this list. The provider can register again later.`)) return;
+        try {
+            await adminApi.archiveProfessionalAd(ad._id);
+            setAds((prev) => prev.filter((a) => a._id !== ad._id));
+            setSelectedAdForDetail((prev) => (prev?._id === ad._id ? null : prev));
+            showToast('Listing removed', 'success');
+        } catch (error) {
+            showToast(error?.response?.data?.message || 'Failed to remove listing', 'error');
+        }
+    };
+
     const handleApproveAd = async (id) => {
         if (!window.confirm('Approve this professional advertisement? It will be published once payment is validated.')) return;
         try {
@@ -737,6 +750,12 @@ const ProfessionalAdsManagement = () => {
                                         >
                                             View Details
                                         </button>
+                                        <button
+                                            onClick={() => handleRemoveAd(ad)}
+                                            className="flex-1 lg:flex-none px-6 py-3 bg-white hover:bg-rose-50 text-rose-600 ring-1 ring-rose-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                                        >
+                                            Remove
+                                        </button>
                                         {ad.approvalStatus === 'pending' && (
                                             <>
                                                 <button
@@ -1054,6 +1073,12 @@ const ProfessionalAdsManagement = () => {
                                 className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-[20px] text-xs font-black uppercase tracking-widest transition-all"
                             >
                                 Close View
+                            </button>
+                            <button
+                                onClick={() => handleRemoveAd(selectedAdForDetail)}
+                                className="flex-1 py-4 bg-white hover:bg-rose-50 text-rose-600 ring-1 ring-rose-200 rounded-[20px] text-xs font-black uppercase tracking-widest transition-all"
+                            >
+                                Remove Listing
                             </button>
                             {selectedAdForDetail.approvalStatus === 'pending' && (
                                 <>

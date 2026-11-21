@@ -185,6 +185,7 @@ export const adminApi = {
     getProfessionalAds: (params) => axiosInstance.get('/admin/professionals/ads', { params }),
     approveProfessionalAd: (id) => axiosInstance.patch(`/admin/professionals/ads/${id}/approve`),
     rejectProfessionalAd: (id, data) => axiosInstance.patch(`/admin/professionals/ads/${id}/reject`, data),
+    archiveProfessionalAd: (id) => axiosInstance.patch(`/admin/professionals/ads/${id}/archive`),
 
     // Professional Reviews Moderation
     getProfessionalReviews: (params) => axiosInstance.get('/admin/professionals/reviews', { params }),
