@@ -36,6 +36,7 @@ import sellerAiRoute from "./sellerAiRoutes.js";
 import adminAiRoute from "./adminAiRoutes.js";
 import deliveryAiRoute from "./deliveryAiRoutes.js";
 import adminChatbotRoute from "./adminChatbotRoutes.js";
+import adminReferralRewardRoute from "./adminReferralRewardRoutes.js";
 
 import express from "express";
 import { ensureDatabaseConnected } from "../middleware/databaseMiddleware.js";
@@ -60,6 +61,7 @@ const setupRoutes = (app) => {
     router.use("/auth/otp", authOtpRoute);
     router.use("/delivery", deliveryRoute);
     router.use("/admin/categories", categoryRoute);
+    router.use("/admin/referral-rewards", adminReferralRewardRoute);
     router.use("/admin", adminRoute);
     router.use("/seller", sellerRoute);
     router.use("/settings", settingsRoute);

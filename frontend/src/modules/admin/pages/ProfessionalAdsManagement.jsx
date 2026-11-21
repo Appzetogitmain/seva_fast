@@ -31,6 +31,8 @@ import {
     Star
 } from 'lucide-react';
 import ImageCropperModal from '@shared/components/ui/ImageCropperModal';
+import PlatformAdScheduleForm from '../components/PlatformAdScheduleForm';
+import { getScheduleState } from '../utils/platformAdSchedule';
 
 const ProfessionalAdsManagement = () => {
     const { showToast } = useToast();
@@ -564,9 +566,20 @@ const ProfessionalAdsManagement = () => {
                                                 }`}>
                                                     {adItem.paymentStatus}
                                                 </span>
-                                                <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Total views from campaign start till now">
-                                                    <Eye className="h-3 w-3" /> {adItem.visitsCount || 0} Views
+                                                <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Times the banner was shown on screen (unique viewers in brackets)">
+                                                    <Eye className="h-3 w-3" /> {adItem.impressionsCount || 0} Views ({adItem.uniqueViewsCount || 0} unique)
                                                 </span>
+                                                <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-black uppercase tracking-wider" title="Banner taps">
+                                                    {adItem.visitsCount || 0} Clicks
+                                                </span>
+                                                <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-black uppercase tracking-wider" title="Display priority — higher shows first">
+                                                    Priority {adItem.priority || 0}
+                                                </span>
+                                                {getScheduleState(adItem) && (
+                                                    <span className={`px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${getScheduleState(adItem).className}`}>
+                                                        {getScheduleState(adItem).label}
+                                                    </span>
+                                                )}
                                                 <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1" title="Customer clicks & inquiries">
                                                     <PhoneCall className="h-3 w-3" /> {adItem.contactsCount || 0} Inquiries
                                                 </span>
@@ -1122,6 +1135,18 @@ const ProfessionalAdsManagement = () => {
                                     <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                                         <Eye className="h-3.5 w-3.5 text-indigo-500" /> Total Views (All-Time)
                                     </span>
+                                    <h4 className="text-xl font-black text-slate-900 mt-1">{selectedPlatAdForDetail.impressionsCount || 0}</h4>
+                                </div>
+                                <div className="bg-white p-3.5 rounded-2xl border border-slate-100/80">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                        <Eye className="h-3.5 w-3.5 text-violet-500" /> Unique Viewers (per 24h)
+                                    </span>
+                                    <h4 className="text-xl font-black text-slate-900 mt-1">{selectedPlatAdForDetail.uniqueViewsCount || 0}</h4>
+                                </div>
+                                <div className="bg-white p-3.5 rounded-2xl border border-slate-100/80">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                        <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Banner Clicks
+                                    </span>
                                     <h4 className="text-xl font-black text-slate-900 mt-1">{selectedPlatAdForDetail.visitsCount || 0}</h4>
                                 </div>
                                 <div className="bg-white p-3.5 rounded-2xl border border-slate-100/80">
@@ -1131,6 +1156,16 @@ const ProfessionalAdsManagement = () => {
                                     <h4 className="text-xl font-black text-slate-900 mt-1">{selectedPlatAdForDetail.contactsCount || 0}</h4>
                                 </div>
                             </div>
+
+                            <PlatformAdScheduleForm
+                                ad={selectedPlatAdForDetail}
+                                showToast={showToast}
+                                onSaved={(updated) => {
+                                    if (!updated?._id) return;
+                                    setPlatformAds((prev) => prev.map((a) => (a._id === updated._id ? { ...a, ...updated, owner: a.owner } : a)));
+                                    setSelectedPlatAdForDetail((prev) => (prev ? { ...prev, ...updated, owner: prev.owner } : prev));
+                                }}
+                            />
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-4">

@@ -252,7 +252,10 @@ export async function dispatchWhatsAppForEvent(eventType, payload = {}) {
     await handleBirthdayEvent(payload);
     return;
   }
-  if (eventType === NOTIFICATION_EVENTS.WALLET_UPDATED) {
+  if (
+    eventType === NOTIFICATION_EVENTS.WALLET_UPDATED ||
+    eventType === NOTIFICATION_EVENTS.REFERRAL_CASHBACK_CREDITED
+  ) {
     await handleWalletEvent(payload);
     return;
   }

@@ -22,11 +22,47 @@ const PlatformBannerSliderInner = ({ ads = [] }) => {
     const targetIdx = (index + totalAds) % totalAds;
     const container = sliderRef.current;
     const cards = container.querySelectorAll('.ad-card');
-    if (cards[targetIdx]) {
-      cards[targetIdx].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    const card = cards[targetIdx];
+    if (card) {
+      // Scroll only the slider track horizontally. scrollIntoView() also
+      // scrolls the page vertically on some mobile browsers, which made the
+      // whole home page jump every time the banner auto-advanced.
+      const containerRect = container.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const left =
+        container.scrollLeft +
+        (cardRect.left - containerRect.left) -
+        (containerRect.width - cardRect.width) / 2;
+      container.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
       setActiveIndex(targetIdx);
     }
   }, [totalAds]);
+
+  // Impression tracking: count an ad as "viewed" once at least 60% of it is
+  // on screen while the tab is visible. Once per ad per page visit here; the
+  // server also dedupes unique viewers per 24h.
+  const viewedAdIds = useRef(new Set());
+  useEffect(() => {
+    const container = sliderRef.current;
+    if (!container || totalAds === 0 || typeof IntersectionObserver === 'undefined') return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting || entry.intersectionRatio < 0.6) return;
+          if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+          const adId = entry.target.getAttribute('data-ad-id');
+          if (!adId || viewedAdIds.current.has(adId)) return;
+          viewedAdIds.current.add(adId);
+          trackAdInteraction({ targetType: 'PlatformAd', targetId: adId, interactionType: 'impression' });
+        });
+      },
+      { threshold: [0.6] }
+    );
+
+    container.querySelectorAll('.ad-card[data-ad-id]').forEach((card) => observer.observe(card));
+    return () => observer.disconnect();
+  }, [ads, totalAds]);
 
   const handleScroll = () => {
     if (!sliderRef.current || totalAds === 0) return;
@@ -114,6 +150,7 @@ const PlatformBannerSliderInner = ({ ads = [] }) => {
           return (
             <div
               key={adItem._id || idx}
+              data-ad-id={adItem._id || undefined}
               onClick={handleAdClick}
               className={cn(
                 "ad-card relative shrink-0 h-[145px] sm:h-[170px] md:h-[210px] w-[84vw] sm:w-[380px] md:w-[480px] lg:w-[560px] max-w-[620px] rounded-[20px] md:rounded-[24px] overflow-hidden shadow-sm hover:shadow-lg border border-slate-100 bg-slate-900 group select-none transition-all duration-300 flex items-center justify-center cursor-pointer snap-center"

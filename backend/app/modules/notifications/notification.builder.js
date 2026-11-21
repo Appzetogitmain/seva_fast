@@ -202,6 +202,17 @@ function eventDefinition(eventType) {
         title: () => "Refund Initiated",
         body: () => "Refund has been initiated for your order.",
       };
+    case NOTIFICATION_EVENTS.REFERRAL_CASHBACK_CREDITED:
+      return {
+        role: NOTIFICATION_ROLES.CUSTOMER,
+        recipientIds: (payload) => normalizeIdList(payload.userId || payload.customerId),
+        title: () => "Referral Cashback Credited 🎉",
+        body: (payload) => {
+          const amount = Number(payload?.data?.amount || 0);
+          const friend = String(payload?.data?.friendName || "your friend");
+          return `₹${amount.toLocaleString("en-IN")} has been added to your wallet because ${friend} completed their first order.`;
+        },
+      };
     case NOTIFICATION_EVENTS.REFUND_COMPLETED:
       return {
         role: NOTIFICATION_ROLES.CUSTOMER,
@@ -659,6 +670,14 @@ function eventData(eventType, payload = {}, role) {
       orderId,
       link: buildSellerPhotoOrderLink(orderId),
       ...(payload.data || {}),
+    };
+  }
+
+  if (eventType === NOTIFICATION_EVENTS.REFERRAL_CASHBACK_CREDITED) {
+    return {
+      eventType,
+      link: buildAppPath("/wallet"),
+      amount: String(payload?.data?.amount ?? ""),
     };
   }
 

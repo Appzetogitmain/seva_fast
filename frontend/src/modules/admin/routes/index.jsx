@@ -81,6 +81,7 @@ const CustomerManagement = React.lazy(
 );
 const CustomerDetail = React.lazy(() => import("../pages/CustomerDetail"));
 const ReferralsAndSubscriptions = React.lazy(() => import("../pages/ReferralsAndSubscriptions"));
+const ReferralRewards = React.lazy(() => import("../pages/ReferralRewards"));
 const UserManagement = React.lazy(() => import("../pages/UserManagement"));
 const ZoneManagement = React.lazy(() => import("../pages/ZoneManagement"));
 const Profile = React.lazy(() => import("@/pages/Profile"));
@@ -247,6 +248,7 @@ const navItems = [
     color: "rose",
   },
   { label: "Referrals & Plans", path: "/admin/referrals-plans", icon: Sparkles, color: "amber" },
+  { label: "Referral Cashback", path: "/admin/referral-rewards", icon: Sparkles, color: "emerald", permission: "Referrals & Plans" },
   { label: "FAQs", path: "/admin/faqs", icon: HelpCircle, color: "pink" },
   {
     label: "Orders",
@@ -333,7 +335,7 @@ const AdminRoutes = () => {
       const allowedPerms = Array.isArray(user.allowedPermissions) ? user.allowedPermissions : [];
       filteredItems = navItems.filter(item => {
         if (item.label === "My Profile") return true;
-        return allowedPerms.includes(item.label);
+        return allowedPerms.includes(item.permission || item.label);
       });
     }
 
@@ -397,6 +399,7 @@ const AdminRoutes = () => {
         <Route path="/customers" element={<SubadminRoute permission="Customers"><CustomerManagement /></SubadminRoute>} />
         <Route path="/customers/:id" element={<SubadminRoute permission="Customers"><CustomerDetail /></SubadminRoute>} />
         <Route path="/referrals-plans" element={<SubadminRoute permission="Referrals & Plans"><ReferralsAndSubscriptions /></SubadminRoute>} />
+        <Route path="/referral-rewards" element={<SubadminRoute permission="Referrals & Plans"><ReferralRewards /></SubadminRoute>} />
         <Route path="/faqs" element={<SubadminRoute permission="FAQs"><FAQManagement /></SubadminRoute>} />
         <Route path="/orders/:status" element={<SubadminRoute permission="Orders"><OrdersList /></SubadminRoute>} />
         <Route path="/orders/view/:orderId" element={<SubadminRoute permission="Orders"><OrderDetail /></SubadminRoute>} />

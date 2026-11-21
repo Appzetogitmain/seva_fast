@@ -95,6 +95,7 @@ export async function issueCustomerOtp({
   flow,
   ipAddress = "unknown",
   referralCode = "",
+  deviceId = "",
 }) {
   const phone = normalizeAndValidatePhone(rawPhone);
   const now = new Date();
@@ -183,6 +184,8 @@ export async function issueCustomerOtp({
       isVerified: false,
       referralCode: crypto.randomBytes(4).toString('hex').toUpperCase(),
       referredBy,
+      signupIp: ipAddress && ipAddress !== "unknown" ? String(ipAddress) : "",
+      signupDeviceId: String(deviceId || "").trim().slice(0, 100),
     });
     customer = await Customer.findById(customer._id).select(
       "+otpHash +otpExpiresAt +otpFailedAttempts +otpLockedUntil +otpLastSentAt +otpSessionVersion +otp +otpExpiry",
