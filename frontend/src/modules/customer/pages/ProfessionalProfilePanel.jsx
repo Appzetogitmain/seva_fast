@@ -360,12 +360,48 @@ const ProfessionalProfilePanel = () => {
         }
     };
 
+    // The main banner image/video and the gallery lists must stay in sync:
+    // the main slot falls back to the first gallery item, and on save the main
+    // item is put back into the gallery. Removing or replacing a file therefore
+    // has to update BOTH, otherwise the "removed" file reappears.
     const handleRemovePoster = (index) => {
+        const removed = platPosters[index];
         setPlatPosters(prev => prev.filter((_, idx) => idx !== index));
+        if (removed && removed === platImageUrl) setPlatImageUrl('');
     };
 
     const handleRemoveBannerVideo = (index) => {
+        const removed = platVideos[index];
         setPlatVideos(prev => prev.filter((_, idx) => idx !== index));
+        if (removed && removed === platVideoUrl) setPlatVideoUrl('');
+    };
+
+    const primaryBannerImage = platImageUrl || platPosters[0] || '';
+    const primaryBannerVideo = platVideoUrl || platVideos[0] || '';
+
+    // Replace the main image: drop the previous main one from the gallery too.
+    const replacePrimaryBannerImage = (newUrl) => {
+        const previous = primaryBannerImage;
+        if (previous) setPlatPosters(prev => prev.filter(u => u !== previous));
+        setPlatImageUrl(newUrl);
+    };
+
+    const removePrimaryBannerImage = () => {
+        const previous = primaryBannerImage;
+        if (previous) setPlatPosters(prev => prev.filter(u => u !== previous));
+        setPlatImageUrl('');
+    };
+
+    const replacePrimaryBannerVideo = (newUrl) => {
+        const previous = primaryBannerVideo;
+        if (previous) setPlatVideos(prev => prev.filter(u => u !== previous));
+        setPlatVideoUrl(newUrl);
+    };
+
+    const removePrimaryBannerVideo = () => {
+        const previous = primaryBannerVideo;
+        if (previous) setPlatVideos(prev => prev.filter(u => u !== previous));
+        setPlatVideoUrl('');
     };
 
     const handleUploadMediaFile = async (e, targetSetUrl, targetSetType) => {
@@ -2115,26 +2151,54 @@ const ProfessionalProfilePanel = () => {
                             platformAds.map((adItem) => (
                                 <div key={adItem._id} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                                     {/* Media preview */}
-                                    <div className="md:col-span-4 grid grid-cols-2 gap-2">
-                                        {(adItem.imageUrl || (adItem.mediaUrl && adItem.mediaType === 'image')) ? (
-                                            <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100 relative aspect-video flex items-center justify-center">
-                                                <img src={adItem.imageUrl || adItem.mediaUrl} alt={adItem.title} className="w-full h-full object-cover" />
+                                    {(() => {
+                                        // Every image and video on the ad (main item first, no duplicates).
+                                        const seen = new Set();
+                                        const media = [
+                                            ...[adItem.imageUrl, ...(adItem.posters || [])].map((src) => ({ type: 'image', src })),
+                                            ...[adItem.videoUrl, ...(adItem.videos || [])].map((src) => ({ type: 'video', src })),
+                                            { type: adItem.mediaType === 'video' ? 'video' : 'image', src: adItem.mediaUrl },
+                                        ].filter((m) => m.src && !seen.has(m.src) && seen.add(m.src));
+                                        const main = media[0];
+                                        const thumbs = media.length > 1 ? media.slice(0, 4) : [];
+                                        const extra = media.length - thumbs.length;
+                                        const imageCount = media.filter((m) => m.type === 'image').length;
+                                        const videoCount = media.length - imageCount;
+                                        return (
+                                            <div className="md:col-span-4 space-y-2">
+                                                <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100 relative aspect-video flex items-center justify-center">
+                                                    {!main ? (
+                                                        <span className="text-[9px] font-black uppercase text-slate-400">{t('pro.noImage')}</span>
+                                                    ) : main.type === 'video' ? (
+                                                        <video src={main.src} controls className="w-full h-full object-contain bg-black" />
+                                                    ) : (
+                                                        <img src={main.src} alt={adItem.title} className="w-full h-full object-cover" />
+                                                    )}
+                                                    {media.length > 1 && (
+                                                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-bold">
+                                                            {[imageCount && `${imageCount} photo${imageCount > 1 ? 's' : ''}`, videoCount && `${videoCount} video${videoCount > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {thumbs.length > 0 && (
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {thumbs.map((m, idx) => (
+                                                            <div key={m.src} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-100">
+                                                                {m.type === 'video' ? (
+                                                                    <video src={m.src} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <img src={m.src} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                                                )}
+                                                                {idx === thumbs.length - 1 && extra > 0 && (
+                                                                    <span className="absolute inset-0 bg-black/55 text-white text-xs font-bold flex items-center justify-center">+{extra}</span>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
-                                        ) : (
-                                            <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100 relative aspect-video flex items-center justify-center">
-                                                <span className="text-[9px] font-black uppercase text-slate-400">{t('pro.noImage')}</span>
-                                            </div>
-                                        )}
-                                        {(adItem.videoUrl || (adItem.mediaUrl && adItem.mediaType === 'video')) ? (
-                                            <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100 relative aspect-video flex items-center justify-center">
-                                                <video src={adItem.videoUrl || adItem.mediaUrl} controls className="w-full h-full object-contain" />
-                                            </div>
-                                        ) : (
-                                            <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100 relative aspect-video flex items-center justify-center">
-                                                <span className="text-[9px] font-black uppercase text-slate-400">{t('pro.noVideo')}</span>
-                                            </div>
-                                        )}
-                                    </div>
+                                        );
+                                    })()}
 
                                     {/* Ad Details */}
                                     <div className="md:col-span-5 space-y-2">
@@ -2210,108 +2274,157 @@ const ProfessionalProfilePanel = () => {
             )}
 
             {/* CREATE PLATFORM AD MODAL */}
-            {isSubmittingPlatformAd && (
-                <div 
-                    className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[550] p-4 animate-in fade-in overscroll-contain"
+            {isSubmittingPlatformAd && (() => {
+                const inputCls = (hasError) =>
+                    `w-full h-11 px-3.5 rounded-xl bg-white text-sm text-slate-900 placeholder:text-slate-400 outline-none transition border ${
+                        hasError
+                            ? 'border-rose-400 ring-2 ring-rose-100'
+                            : 'border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-100'
+                    }`;
+                const labelCls = 'block text-[13px] font-medium text-slate-700 mb-1.5';
+                const sectionTitleCls = 'text-sm font-semibold text-slate-900';
+                const fieldError = (msg) =>
+                    msg ? (
+                        <p className="mt-1 text-xs text-rose-600 flex items-center gap-1">
+                            <AlertCircle size={12} /> {msg}
+                        </p>
+                    ) : null;
+                const contentLen = platContent.trim().length;
+                const isVideoTab = activeMediaTab === 'video';
+                const primaryPreview = isVideoTab ? primaryBannerVideo : primaryBannerImage;
+                const destinations = [
+                    { id: 'showcase', title: 'SevaFast page', desc: 'We create a page with your photos, videos and Call / WhatsApp buttons.' },
+                    { id: 'website', title: 'Your website', desc: 'Tapping the banner opens your own website or online store.' },
+                ];
+
+                return (
+                <div
+                    className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[550] sm:p-4 animate-in fade-in overscroll-contain"
                     onWheel={preventBackdropScroll}
                     onTouchMove={preventBackdropScroll}
                     onClick={(e) => {
                         if (e.target === e.currentTarget) resetPlatformAdForm();
                     }}
                 >
-                    <div 
+                    <div
                         data-lenis-prevent
                         data-lenis-prevent-wheel
-                        className="bg-white rounded-[32px] md:rounded-[40px] max-w-xl w-full shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col overscroll-contain" 
-                        style={{ maxHeight: '90vh' }}
+                        className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overscroll-contain animate-in slide-in-from-bottom-4 duration-200"
+                        style={{ maxHeight: '92vh' }}
                     >
-                        {/* STICKY HEADER */}
-                        <div className="flex justify-between items-center p-6 md:p-8 pb-4 border-b border-slate-100 shrink-0">
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-4 border-b border-slate-100 shrink-0">
                             <div>
-                                <h2 className="text-xl font-black text-slate-900">{editingPlatformAdId ? t('pro.editBanner') : t('pro.newBanner')}</h2>
-                                <p className="text-xs text-slate-400 font-bold mt-1">{t('pro.bannerFormSub')}</p>
+                                <h2 className="text-lg font-bold text-slate-900">
+                                    {editingPlatformAdId ? t('pro.editBanner') : 'Create a banner ad'}
+                                </h2>
+                                <p className="text-[13px] text-slate-500 mt-0.5">Shown in the home page banner slider</p>
                             </div>
                             <button
+                                type="button"
                                 onClick={resetPlatformAdForm}
-                                className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition-all shrink-0 ml-4"
+                                className="h-9 w-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center shrink-0"
+                                aria-label="Close"
                             >
-                                <X className="h-4 w-4" />
+                                <X className="h-4 w-4 text-slate-600" />
                             </button>
                         </div>
 
-                        {/* SCROLLABLE BODY */}
-                        <form 
-                            onSubmit={handleSubmitPlatformAd} 
-                            id="banner-ad-form" 
+                        <form
+                            onSubmit={handleSubmitPlatformAd}
+                            id="banner-ad-form"
                             noValidate
                             data-lenis-prevent
                             data-lenis-prevent-wheel
-                            className="flex-1 overflow-y-auto px-6 md:px-8 py-4 space-y-4 overscroll-contain touch-pan-y"
+                            className="flex-1 overflow-y-auto px-5 py-5 space-y-6 overscroll-contain touch-pan-y"
                         >
-                            {/* PROMOTION DESTINATION SELECTOR */}
-                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                                <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 block">
-                                    Promotion Destination <span className="text-rose-500">*</span>
-                                </label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                    <button
-                                        type="button"
-                                        onClick={() => setPlatDestinationType('showcase')}
-                                        className={`p-3.5 rounded-xl border text-left transition-all relative ${
-                                            platDestinationType === 'showcase'
-                                                ? 'border-brand-500 bg-brand-50/40 ring-2 ring-brand-500/20 shadow-sm'
-                                                : 'border-slate-200 bg-white hover:bg-slate-50'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                                                <Sparkles className="h-3.5 w-3.5 text-brand-600" /> Showcase on SevaFast
-                                            </span>
-                                            <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase rounded">
-                                                No Website
-                                            </span>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 font-bold leading-normal">
-                                            SevaFast hosts your posters, business videos, and direct Call/WhatsApp contact buttons.
-                                        </p>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setPlatDestinationType('website')}
-                                        className={`p-3.5 rounded-xl border text-left transition-all relative ${
-                                            platDestinationType === 'website'
-                                                ? 'border-brand-500 bg-brand-50/40 ring-2 ring-brand-500/20 shadow-sm'
-                                                : 'border-slate-200 bg-white hover:bg-slate-50'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                                                <ExternalLink className="h-3.5 w-3.5 text-slate-700" /> External Website
-                                            </span>
-                                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[8px] font-black uppercase rounded">
-                                                Have URL
-                                            </span>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 font-bold leading-normal">
-                                            Clicking your promotional banner opens your external website or online store link.
-                                        </p>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                                            {t('pro.adTitle')} <span className="text-rose-500">*</span>
-                                        </label>
-                                        {bannerErrors.title && (
-                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
-                                                <AlertCircle size={11} /> {bannerErrors.title}
-                                            </span>
-                                        )}
+                            {/* 1. Banner image / video */}
+                            <section className="space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h3 className={sectionTitleCls}>Banner <span className="text-rose-500">*</span></h3>
+                                    <div className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
+                                        {[
+                                            { id: 'image', label: t('pro.image'), done: Boolean(primaryBannerImage) },
+                                            { id: 'video', label: t('pro.video'), done: Boolean(primaryBannerVideo) },
+                                        ].map((tab) => (
+                                            <button
+                                                key={tab.id}
+                                                type="button"
+                                                onClick={() => setActiveMediaTab(tab.id)}
+                                                className={`px-3 py-1.5 rounded-md transition ${
+                                                    activeMediaTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                                                }`}
+                                            >
+                                                {tab.label}{tab.done ? ' ✓' : ''}
+                                            </button>
+                                        ))}
                                     </div>
+                                </div>
+
+                                <label
+                                    className={`relative flex items-center justify-center w-full aspect-[16/9] rounded-2xl overflow-hidden cursor-pointer transition border-2 border-dashed ${
+                                        bannerErrors.media
+                                            ? 'border-rose-300 bg-rose-50/40'
+                                            : primaryPreview
+                                                ? 'border-transparent bg-slate-100'
+                                                : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    {isUploadingMedia ? (
+                                        <Loader2 className="h-6 w-6 text-slate-400 animate-spin" />
+                                    ) : primaryPreview ? (
+                                        isVideoTab ? (
+                                            <video src={primaryPreview} className="h-full w-full object-cover" controls />
+                                        ) : (
+                                            <img src={primaryPreview} alt="" className="h-full w-full object-cover" />
+                                        )
+                                    ) : (
+                                        <div className="text-center px-6">
+                                            <div className="mx-auto h-10 w-10 rounded-full bg-white shadow-sm flex items-center justify-center mb-2">
+                                                <Upload className="h-4 w-4 text-slate-600" />
+                                            </div>
+                                            <p className="text-sm font-medium text-slate-700">
+                                                {isVideoTab ? t('pro.uploadVideo') : t('pro.uploadPhoto')}
+                                            </p>
+                                            <p className="text-xs text-slate-400 mt-0.5">
+                                                {isVideoTab ? t('pro.videoHint') : 'A wide image works best (16:9)'}
+                                            </p>
+                                        </div>
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept={isVideoTab ? 'video/*' : 'image/*'}
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            handleUploadMediaFile(
+                                                e,
+                                                isVideoTab ? replacePrimaryBannerVideo : replacePrimaryBannerImage,
+                                                () => { }
+                                            );
+                                            clearBannerError('media');
+                                        }}
+                                        disabled={isUploadingMedia}
+                                    />
+                                </label>
+                                <div className="flex items-center justify-between">
+                                    {fieldError(bannerErrors.media)}
+                                    {primaryPreview && !isUploadingMedia && (
+                                        <button
+                                            type="button"
+                                            onClick={isVideoTab ? removePrimaryBannerVideo : removePrimaryBannerImage}
+                                            className="ml-auto text-xs font-medium text-rose-600"
+                                        >
+                                            {isVideoTab ? t('pro.removeVideo') : t('pro.removePhoto')}
+                                        </button>
+                                    )}
+                                </div>
+                            </section>
+
+                            {/* 2. Ad details */}
+                            <section className="space-y-4">
+                                <h3 className={sectionTitleCls}>Ad details</h3>
+                                <div>
+                                    <label className={labelCls}>{t('pro.adTitle')} <span className="text-rose-500">*</span></label>
                                     <input
                                         type="text"
                                         value={platTitle}
@@ -2320,25 +2433,12 @@ const ProfessionalProfilePanel = () => {
                                             clearBannerError('title');
                                         }}
                                         placeholder={t('pro.adTitlePlaceholder')}
-                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
-                                            bannerErrors.title
-                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
-                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
-                                        }`}
+                                        className={inputCls(bannerErrors.title)}
                                     />
+                                    {fieldError(bannerErrors.title)}
                                 </div>
-
-                                <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                                            {t('pro.adCity')} <span className="text-rose-500">*</span>
-                                        </label>
-                                        {bannerErrors.city && (
-                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
-                                                <AlertCircle size={11} /> {bannerErrors.city}
-                                            </span>
-                                        )}
-                                    </div>
+                                <div>
+                                    <label className={labelCls}>{t('pro.adCity')} <span className="text-rose-500">*</span></label>
                                     <input
                                         type="text"
                                         value={platCity}
@@ -2347,362 +2447,209 @@ const ProfessionalProfilePanel = () => {
                                             clearBannerError('city');
                                         }}
                                         placeholder={t('pro.cityPlaceholder')}
-                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
-                                            bannerErrors.city
-                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
-                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
-                                        }`}
+                                        className={inputCls(bannerErrors.city)}
                                     />
+                                    {fieldError(bannerErrors.city)}
                                 </div>
-                            </div>
-
-                            {/* IF EXTERNAL WEBSITE SELECTED */}
-                            {platDestinationType === 'website' && (
-                                <div className="space-y-1 animate-in fade-in">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                                            Website URL <span className="text-rose-500">*</span>
-                                        </label>
-                                        {bannerErrors.targetUrl && (
-                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
-                                                <AlertCircle size={11} /> {bannerErrors.targetUrl}
-                                            </span>
+                                <div>
+                                    <label className={labelCls}>{t('pro.adContent')} <span className="text-rose-500">*</span></label>
+                                    <textarea
+                                        value={platContent}
+                                        onChange={(e) => {
+                                            setPlatContent(e.target.value);
+                                            clearBannerError('content');
+                                        }}
+                                        placeholder="Describe your offer: what it is, the price or discount, and how long it runs."
+                                        rows={4}
+                                        className={`${inputCls(bannerErrors.content)} h-auto py-3 resize-none leading-relaxed`}
+                                    />
+                                    <div className="flex items-start justify-between gap-2">
+                                        {fieldError(bannerErrors.content)}
+                                        {contentLen < 10 && !bannerErrors.content && (
+                                            <p className="mt-1 ml-auto text-xs text-slate-400">{10 - contentLen} more characters needed</p>
                                         )}
                                     </div>
-                                    <input
-                                        type="url"
-                                        value={platTargetUrl}
-                                        onChange={(e) => {
-                                            setPlatTargetUrl(e.target.value);
-                                            clearBannerError('targetUrl');
-                                        }}
-                                        placeholder="https://example.com/promo"
-                                        className={`w-full px-4 py-3 rounded-xl text-sm font-bold text-slate-900 outline-none transition-all ${
-                                            bannerErrors.targetUrl
-                                                ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
-                                                : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
-                                        }`}
-                                    />
                                 </div>
-                            )}
+                            </section>
 
-                            {/* IF SHOWCASE ON SEVAFAST (NO WEBSITE) SELECTED */}
+                            {/* 3. Where the banner opens */}
+                            <section className="space-y-3">
+                                <h3 className={sectionTitleCls}>When customers tap the banner</h3>
+                                <div className="space-y-2">
+                                    {destinations.map((opt) => {
+                                        const active = platDestinationType === opt.id;
+                                        return (
+                                            <button
+                                                key={opt.id}
+                                                type="button"
+                                                onClick={() => setPlatDestinationType(opt.id)}
+                                                className={`w-full flex items-start gap-3 p-3.5 rounded-xl border text-left transition ${
+                                                    active ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                <span className={`mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center ${active ? 'border-slate-900' : 'border-slate-300'}`}>
+                                                    {active && <span className="h-2 w-2 rounded-full bg-slate-900" />}
+                                                </span>
+                                                <span>
+                                                    <span className="block text-sm font-medium text-slate-900">{opt.title}</span>
+                                                    <span className="block text-xs text-slate-500 mt-0.5 leading-snug">{opt.desc}</span>
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {platDestinationType === 'website' && (
+                                    <div className="animate-in fade-in">
+                                        <label className={labelCls}>Website link <span className="text-rose-500">*</span></label>
+                                        <input
+                                            type="url"
+                                            inputMode="url"
+                                            value={platTargetUrl}
+                                            onChange={(e) => {
+                                                setPlatTargetUrl(e.target.value);
+                                                clearBannerError('targetUrl');
+                                            }}
+                                            placeholder="https://yourstore.com"
+                                            className={inputCls(bannerErrors.targetUrl)}
+                                        />
+                                        {fieldError(bannerErrors.targetUrl)}
+                                    </div>
+                                )}
+                            </section>
+
+                            {/* 4. SevaFast page details */}
                             {platDestinationType === 'showcase' && (
-                                <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-100 space-y-4 animate-in fade-in">
-                                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                                        <Sparkles className="h-3.5 w-3.5 text-brand-500" /> Business Details For Showcase Page
-                                    </h4>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-500">Business / Store Name</label>
+                                <section className="space-y-4 animate-in fade-in">
+                                    <div>
+                                        <h3 className={sectionTitleCls}>Your SevaFast page</h3>
+                                        <p className="text-xs text-slate-500 mt-0.5">Optional, but customers trust pages with contact details.</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className={labelCls}>Business name</label>
                                             <input
                                                 type="text"
                                                 value={platBusinessName}
                                                 onChange={(e) => setPlatBusinessName(e.target.value)}
-                                                placeholder="e.g. Verma Electronics & Services"
-                                                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20"
+                                                placeholder="e.g. Verma Electronics"
+                                                className={inputCls(false)}
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-500">Store / Shop Address</label>
+                                        <div>
+                                            <label className={labelCls}>Shop address</label>
                                             <input
                                                 type="text"
                                                 value={platAddress}
                                                 onChange={(e) => setPlatAddress(e.target.value)}
-                                                placeholder="e.g. Shop 14, Main Market, Indore"
-                                                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20"
+                                                placeholder="e.g. Shop 14, Main Market"
+                                                className={inputCls(false)}
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-500">Contact Phone (For Customer Calls)</label>
+                                        <div>
+                                            <label className={labelCls}>Phone</label>
                                             <input
                                                 type="tel"
+                                                inputMode="numeric"
                                                 value={platContactPhone}
                                                 onChange={(e) => setPlatContactPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
-                                                placeholder="10-digit mobile number"
-                                                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20"
+                                                placeholder="10-digit number"
+                                                className={inputCls(false)}
                                             />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black uppercase tracking-wider text-slate-500">WhatsApp Number</label>
+                                        <div>
+                                            <label className={labelCls}>WhatsApp</label>
                                             <input
                                                 type="tel"
+                                                inputMode="numeric"
                                                 value={platWhatsapp}
                                                 onChange={(e) => setPlatWhatsapp(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
-                                                placeholder="10-digit WhatsApp number"
-                                                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20"
+                                                placeholder="10-digit number"
+                                                className={inputCls(false)}
                                             />
                                         </div>
                                     </div>
 
-                                    {/* Multiple Business Posters Manager */}
-                                    <div className="space-y-2 pt-2 border-t border-slate-100">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                                                    <ImageIcon className="h-3 w-3 text-slate-500" /> Business Posters ({platPosters.length})
-                                                </h5>
-                                                <p className="text-[8px] text-slate-400 font-bold">Posters of offers, rate charts, or banner flyers</p>
-                                            </div>
-                                            <label className="cursor-pointer px-3 py-1.5 bg-black hover:bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
-                                                {isUploadingPoster ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                                                <span>Add Poster</span>
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    className="hidden"
-                                                    onChange={handleUploadPosterFile}
-                                                    disabled={isUploadingPoster}
-                                                />
+                                    <div>
+                                        <label className={labelCls}>
+                                            More photos &amp; videos
+                                            <span className="font-normal text-slate-400"> · {platPosters.length + platVideos.length} added</span>
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {platPosters.map((posterUrl, pIdx) => (
+                                                <div key={`p-${posterUrl}-${pIdx}`} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100">
+                                                    <img src={posterUrl} alt="" className="w-full h-full object-cover" />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemovePoster(pIdx)}
+                                                        className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                                                        aria-label="Remove photo"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            {platVideos.map((vidUrl, vIdx) => (
+                                                <div key={`v-${vidUrl}-${vIdx}`} className="relative aspect-square rounded-xl overflow-hidden bg-black">
+                                                    <video src={vidUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+                                                    <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] flex items-center gap-1">
+                                                        <VideoIcon className="h-3 w-3" /> Video
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveBannerVideo(vIdx)}
+                                                        className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                                                        aria-label="Remove video"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                            <label className="aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center gap-1 cursor-pointer text-slate-500">
+                                                {isUploadingPoster ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                                                <span className="text-xs font-medium">Add photo</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={handleUploadPosterFile} disabled={isUploadingPoster} />
+                                            </label>
+                                            <label className="aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center gap-1 cursor-pointer text-slate-500">
+                                                {isUploadingBannerVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <VideoIcon className="h-4 w-4" />}
+                                                <span className="text-xs font-medium">Add video</span>
+                                                <input type="file" accept="video/*" className="hidden" onChange={handleUploadBannerVideoFile} disabled={isUploadingBannerVideo} />
                                             </label>
                                         </div>
-
-                                        {platPosters.length > 0 && (
-                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1">
-                                                {platPosters.map((posterUrl, pIdx) => (
-                                                    <div key={pIdx} className="relative aspect-video rounded-lg overflow-hidden bg-slate-100 border border-slate-200 group">
-                                                        <img src={posterUrl} alt="" className="w-full h-full object-cover" />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemovePoster(pIdx)}
-                                                            className="absolute top-1 right-1 p-1 bg-black/70 hover:bg-black text-white rounded-full transition-all"
-                                                            title="Remove poster"
-                                                        >
-                                                            <X className="h-2.5 w-2.5" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                        <p className="text-xs text-slate-400 mt-1.5">Offer posters, rate cards or work videos (video max 20 MB).</p>
                                     </div>
-
-                                    {/* Multiple Business Videos Manager */}
-                                    <div className="space-y-2 pt-2 border-t border-slate-100">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h5 className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                                                    <VideoIcon className="h-3 w-3 text-slate-500" /> Business Promotional Videos ({platVideos.length})
-                                                </h5>
-                                                <p className="text-[8px] text-slate-400 font-bold">Short promotional videos or work demos (Max 20 MB • MP4, MOV, WEBM)</p>
-                                            </div>
-                                            <label className="cursor-pointer px-3 py-1.5 bg-black hover:bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
-                                                {isUploadingBannerVideo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                                                <span>Add Video</span>
-                                                <input
-                                                    type="file"
-                                                    accept="video/*"
-                                                    className="hidden"
-                                                    onChange={handleUploadBannerVideoFile}
-                                                    disabled={isUploadingBannerVideo}
-                                                />
-                                            </label>
-                                        </div>
-
-                                        {platVideos.length > 0 && (
-                                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                                {platVideos.map((vidUrl, vIdx) => (
-                                                    <div key={vIdx} className="relative aspect-video rounded-lg overflow-hidden bg-black border border-slate-200 group flex items-center justify-center">
-                                                        <video src={vidUrl} className="w-full h-full object-contain" />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemoveBannerVideo(vIdx)}
-                                                            className="absolute top-1 right-1 p-1 bg-black/80 hover:bg-black text-white rounded-full transition-all z-10"
-                                                            title="Remove video"
-                                                        >
-                                                            <X className="h-2.5 w-2.5" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                </section>
                             )}
-
-                            <div className="space-y-1">
-                                <div className="flex items-center justify-between">
-                                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                                        {t('pro.adContent')} <span className="text-rose-500">*</span>
-                                    </label>
-                                    {bannerErrors.content && (
-                                        <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
-                                            <AlertCircle size={11} /> {bannerErrors.content}
-                                        </span>
-                                    )}
-                                </div>
-                                <textarea
-                                    value={platContent}
-                                    onChange={(e) => {
-                                        setPlatContent(e.target.value);
-                                        clearBannerError('content');
-                                    }}
-                                    placeholder={t('pro.adContentPlaceholder')}
-                                    rows="3"
-                                    className={`w-full px-4 py-3.5 rounded-xl text-sm font-bold text-slate-900 outline-none resize-none transition-all ${
-                                        bannerErrors.content
-                                            ? 'bg-rose-50/30 border-2 border-rose-500 ring-2 ring-rose-500/10'
-                                            : 'bg-slate-50 border border-slate-200/80 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500'
-                                    }`}
-                                />
-                                <p className="text-[10px] text-slate-400 font-bold text-right">
-                                    {platContent.trim().length}/10 characters minimum
-                                </p>
-                            </div>
-
-                            {/* PRIMARY BANNER MEDIA */}
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-black uppercase tracking-wider text-slate-700">Primary Slider Media <span className="text-rose-500">*</span></span>
-                                        {bannerErrors.media && (
-                                            <span className="text-[10px] font-bold text-rose-500 flex items-center gap-1 animate-in fade-in">
-                                                <AlertCircle size={11} /> {bannerErrors.media}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex bg-slate-200/60 p-1 rounded-xl gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => setActiveMediaTab('image')}
-                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeMediaTab === 'image'
-                                                    ? "bg-white text-black shadow-sm"
-                                                    : "text-slate-500 hover:text-slate-800"
-                                                }`}
-                                        >
-                                            {t('pro.image')} {(platImageUrl || platPosters.length > 0) && "✓"}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setActiveMediaTab('video')}
-                                            className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${activeMediaTab === 'video'
-                                                    ? "bg-white text-black shadow-sm"
-                                                    : "text-slate-500 hover:text-slate-800"
-                                                }`}
-                                        >
-                                            {t('pro.video')} {(platVideoUrl || platVideos.length > 0) && "✓"}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-4">
-                                    {/* PHOTO UPLOAD */}
-                                    {activeMediaTab === 'image' && (
-                                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 relative animate-in fade-in duration-200">
-                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">Banner Slider Image</h4>
-                                            <label className={`cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border rounded-xl transition-all relative overflow-hidden group ${
-                                                bannerErrors.media
-                                                    ? 'border-2 border-dashed border-rose-500 bg-rose-50/20 ring-2 ring-rose-500/10'
-                                                    : 'border-slate-200 border-dashed'
-                                            }`}>
-                                                {isUploadingMedia ? (
-                                                    <Loader2 className="h-5 w-5 text-brand-500 animate-spin" />
-                                                ) : (platImageUrl || platPosters[0]) ? (
-                                                    <img src={platImageUrl || platPosters[0]} alt={t('photoOrder.preview')} className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-slate-600">
-                                                        <Upload className="h-5 w-5" />
-                                                        <span className="text-[8px] font-black uppercase mt-1">{t('pro.uploadPhoto')}</span>
-                                                        <span className="text-[7px] text-slate-400 font-bold mt-0.5">{t('pro.photoHint')}</span>
-                                                    </div>
-                                                )}
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    className="hidden"
-                                                    onChange={(e) => {
-                                                        handleUploadMediaFile(e, setPlatImageUrl, () => { });
-                                                    }}
-                                                    disabled={isUploadingMedia}
-                                                />
-                                            </label>
-                                            {platImageUrl && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setPlatImageUrl(''); }}
-                                                    className="text-[8px] font-black uppercase text-rose-500 hover:text-rose-700"
-                                                >
-                                                    {t('pro.removePhoto')}
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* VIDEO UPLOAD */}
-                                    {activeMediaTab === 'video' && (
-                                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center space-y-2 relative animate-in fade-in duration-200">
-                                            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-500">Banner Slider Video</h4>
-                                            <label className={`cursor-pointer flex flex-col items-center justify-center h-32 w-full bg-white hover:bg-slate-50 border rounded-xl transition-all relative overflow-hidden group ${
-                                                bannerErrors.media
-                                                    ? 'border-2 border-dashed border-rose-500 bg-rose-50/20 ring-2 ring-rose-500/10'
-                                                    : 'border-slate-200 border-dashed'
-                                            }`}>
-                                                {isUploadingMedia ? (
-                                                    <Loader2 className="h-5 w-5 text-brand-500 animate-spin" />
-                                                ) : (platVideoUrl || platVideos[0]) ? (
-                                                    <video src={platVideoUrl || platVideos[0]} className="h-full w-full object-cover" controls />
-                                                ) : (
-                                                    <div className="flex flex-col items-center justify-center text-slate-400 group-hover:text-slate-600">
-                                                        <Upload className="h-5 w-5" />
-                                                        <span className="text-[8px] font-black uppercase mt-1">{t('pro.uploadVideo')}</span>
-                                                        <span className="text-[7px] text-slate-400 font-bold mt-0.5">{t('pro.videoHint')}</span>
-                                                    </div>
-                                                )}
-                                                <input
-                                                    type="file"
-                                                    accept="video/*"
-                                                    className="hidden"
-                                                    onChange={(e) => {
-                                                        handleUploadMediaFile(e, setPlatVideoUrl, () => { });
-                                                    }}
-                                                    disabled={isUploadingMedia}
-                                                />
-                                            </label>
-                                            {platVideoUrl && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setPlatVideoUrl(''); }}
-                                                    className="text-[8px] font-black uppercase text-rose-500 hover:text-rose-700"
-                                                >
-                                                    {t('pro.removeVideo')}
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-100 flex items-start gap-3">
-                                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                                <div className="space-y-0.5">
-                                    <h4 className="text-[10px] font-black uppercase tracking-wider text-amber-800">Advertisement Price: ₹{settings?.platformAdListingFee ?? 999}</h4>
-                                    <p className="text-[10px] text-amber-700 font-bold leading-normal">
-                                        {t('pro.subscriptionNote')}
-                                    </p>
-                                </div>
-                            </div>
                         </form>
 
-                        {/* STICKY FOOTER - ALWAYS VISIBLE */}
-                        <div className="flex gap-3 p-6 md:p-8 pt-4 border-t border-slate-100 shrink-0">
-                            <button
-                                type="button"
-                                onClick={resetPlatformAdForm}
-                                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider text-center transition-all"
-                            >
-                                {t('common:actions.cancel')}
-                            </button>
-                            <button
-                                type="submit"
-                                form="banner-ad-form"
-                                disabled={isLoading || isUploadingMedia}
-                                className="flex-1 py-3.5 bg-black hover:bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-wider text-center transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isLoading ? t('orderDetail.submitting') : (editingPlatformAdId ? t('pro.updateContinue') : t('pro.submitPay'))}
-                            </button>
+                        {/* Footer: price + actions */}
+                        <div className="shrink-0 border-t border-slate-100 px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3">
+                            <div className="flex items-baseline justify-between gap-3">
+                                <span className="text-[13px] text-slate-500">30 days · reviewed by admin after payment</span>
+                                <span className="text-base font-bold text-slate-900">₹{settings?.platformAdListingFee ?? 999}</span>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={resetPlatformAdForm}
+                                    className="flex-1 h-12 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                                >
+                                    {t('common:actions.cancel')}
+                                </button>
+                                <button
+                                    type="submit"
+                                    form="banner-ad-form"
+                                    disabled={isLoading || isUploadingMedia}
+                                    className="flex-[1.4] h-12 rounded-xl bg-slate-900 hover:bg-black text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {isLoading ? t('orderDetail.submitting') : (editingPlatformAdId ? t('pro.updateContinue') : t('pro.submitPay'))}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* EDIT CATEGORIES MODAL */}
             {isEditingCategories && (
