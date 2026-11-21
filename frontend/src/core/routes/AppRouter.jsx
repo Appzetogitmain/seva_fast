@@ -50,6 +50,7 @@ const WalletPage = lazy(() => import('../../modules/customer/pages/WalletPage'))
 const PlansPage = lazy(() => import('../../modules/customer/pages/PlansPage'));
 const LocalProfessionalsDirectory = lazy(() => import('../../modules/customer/pages/LocalProfessionalsDirectory'));
 const ProfessionalProfilePanel = lazy(() => import('../../modules/customer/pages/ProfessionalProfilePanel'));
+const PromotionDetailPage = lazy(() => import('../../modules/customer/pages/PromotionDetailPage'));
 
 
 // Lazy load heavy modules
@@ -238,6 +239,14 @@ const router = createBrowserRouter([
                         <ServiceUnavailableSection
                             description="Our service is temporarily down for maintenance. Please check back shortly."
                         />
+                    ),
+                },
+                {
+                    path: 'promotions/:id',
+                    element: (
+                        <Suspense fallback={<div className="flex h-screen items-center justify-center font-sans">Loading...</div>}>
+                            <PromotionDetailPage />
+                        </Suspense>
                     ),
                 },
                 {

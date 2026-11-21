@@ -20,6 +20,15 @@ const serviceItemSchema = new mongoose.Schema({
         default: 30,
     },
     image: String,
+    images: [{
+        type: String,
+        trim: true,
+    }],
+    video: String,
+    videos: [{
+        type: String,
+        trim: true,
+    }],
 });
 
 const professionalAdSchema = new mongoose.Schema(
@@ -122,6 +131,45 @@ const professionalAdSchema = new mongoose.Schema(
             type: String,
             enum: ["image", "video", "none"],
             default: "none",
+        },
+        portfolioImages: [{
+            type: String,
+            trim: true,
+        }],
+        portfolioVideos: [{
+            type: String,
+            trim: true,
+        }],
+        visitsCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        contactsCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        callClicksCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        whatsappClicksCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        rating: {
+            type: Number,
+            default: 5.0,
+            min: 1,
+            max: 5,
+        },
+        ratingCount: {
+            type: Number,
+            default: 0,
+            min: 0,
         },
     },
     {

@@ -10,7 +10,24 @@ import crypto from "crypto";
 export const createPlatformAd = async (req, res) => {
     try {
         const ownerId = req.user.id;
-        const { title, content, mediaUrl, mediaType, targetUrl, city, imageUrl, videoUrl } = req.body;
+        const {
+            title,
+            content,
+            mediaUrl,
+            mediaType,
+            targetUrl,
+            city,
+            imageUrl,
+            videoUrl,
+            hasExternalUrl,
+            businessName,
+            contactPhone,
+            whatsapp,
+            address,
+            posters,
+            videos,
+            callToActionText
+        } = req.body;
 
         if (!title || !content || !city) {
             return handleResponse(res, 400, "Title, content, and city are required fields");
@@ -19,15 +36,46 @@ export const createPlatformAd = async (req, res) => {
         const settings = await Setting.findOne({}) || {};
         const fee = settings.platformAdListingFee ?? settings.platformAdFeePhoto ?? 999;
 
+        // Process posters array
+        let finalPosters = Array.isArray(posters)
+            ? posters.filter(Boolean).map(p => String(p).trim())
+            : [];
+        if (imageUrl && !finalPosters.includes(imageUrl.trim())) {
+            finalPosters.unshift(imageUrl.trim());
+        } else if (mediaUrl && mediaType === "image" && !finalPosters.includes(mediaUrl.trim())) {
+            finalPosters.unshift(mediaUrl.trim());
+        }
+
+        // Process videos array
+        let finalVideos = Array.isArray(videos)
+            ? videos.filter(Boolean).map(v => String(v).trim())
+            : [];
+        if (videoUrl && !finalVideos.includes(videoUrl.trim())) {
+            finalVideos.unshift(videoUrl.trim());
+        } else if (mediaUrl && mediaType === "video" && !finalVideos.includes(mediaUrl.trim())) {
+            finalVideos.unshift(mediaUrl.trim());
+        }
+
+        const effectiveTargetUrl = targetUrl?.trim() || "";
+        const effectiveHasExternalUrl = Boolean(hasExternalUrl && effectiveTargetUrl);
+
         const newAd = await PlatformAd.create({
             owner: ownerId,
             title: title.trim(),
             content: content.trim(),
-            mediaUrl: mediaUrl || "",
-            mediaType: mediaType || "none",
-            imageUrl: imageUrl || "",
-            videoUrl: videoUrl || "",
-            targetUrl: targetUrl || "",
+            mediaUrl: mediaUrl || (finalPosters[0] || finalVideos[0] || ""),
+            mediaType: mediaType || (finalVideos.length > 0 ? "video" : (finalPosters.length > 0 ? "image" : "none")),
+            imageUrl: imageUrl || (finalPosters[0] || ""),
+            videoUrl: videoUrl || (finalVideos[0] || ""),
+            targetUrl: effectiveTargetUrl,
+            hasExternalUrl: effectiveHasExternalUrl,
+            businessName: businessName?.trim() || title.trim(),
+            contactPhone: contactPhone?.trim() || "",
+            whatsapp: whatsapp?.trim() || "",
+            address: address?.trim() || "",
+            posters: finalPosters,
+            videos: finalVideos,
+            callToActionText: callToActionText?.trim() || "Contact Us",
             city: city.trim(),
             approvalStatus: "pending",
             paymentStatus: "unpaid",
@@ -45,7 +93,24 @@ export const updatePlatformAd = async (req, res) => {
     try {
         const ownerId = req.user.id;
         const { id } = req.params;
-        const { title, content, mediaUrl, mediaType, targetUrl, city, imageUrl, videoUrl } = req.body;
+        const {
+            title,
+            content,
+            mediaUrl,
+            mediaType,
+            targetUrl,
+            city,
+            imageUrl,
+            videoUrl,
+            hasExternalUrl,
+            businessName,
+            contactPhone,
+            whatsapp,
+            address,
+            posters,
+            videos,
+            callToActionText
+        } = req.body;
 
         if (!title || !content || !city) {
             return handleResponse(res, 400, "Title, content, and city are required fields");
@@ -62,8 +127,17 @@ export const updatePlatformAd = async (req, res) => {
         if (mediaType !== undefined) ad.mediaType = mediaType;
         if (imageUrl !== undefined) ad.imageUrl = imageUrl;
         if (videoUrl !== undefined) ad.videoUrl = videoUrl;
-        if (targetUrl !== undefined) ad.targetUrl = targetUrl;
+        if (targetUrl !== undefined) ad.targetUrl = targetUrl.trim();
         ad.city = city.trim();
+
+        if (hasExternalUrl !== undefined) ad.hasExternalUrl = Boolean(hasExternalUrl && ad.targetUrl);
+        if (businessName !== undefined) ad.businessName = businessName.trim();
+        if (contactPhone !== undefined) ad.contactPhone = contactPhone.trim();
+        if (whatsapp !== undefined) ad.whatsapp = whatsapp.trim();
+        if (address !== undefined) ad.address = address.trim();
+        if (callToActionText !== undefined) ad.callToActionText = callToActionText.trim();
+        if (Array.isArray(posters)) ad.posters = posters.filter(Boolean).map(p => String(p).trim());
+        if (Array.isArray(videos)) ad.videos = videos.filter(Boolean).map(v => String(v).trim());
 
         // Reset approval status since content changed
         ad.approvalStatus = "pending";
@@ -240,6 +314,20 @@ export const getActivePlatformAds = async (req, res) => {
 
         const ads = await PlatformAd.find(query).sort({ createdAt: -1 });
         return handleResponse(res, 200, "Active platform ads fetched successfully", ads);
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
+    }
+};
+
+// Get single platform ad by ID (public view for internal showcase)
+export const getPlatformAdById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const ad = await PlatformAd.findById(id).populate("owner", "name phone email").lean();
+        if (!ad) {
+            return handleResponse(res, 404, "Advertisement not found");
+        }
+        return handleResponse(res, 200, "Advertisement fetched successfully", ad);
     } catch (error) {
         return handleResponse(res, 500, error.message);
     }

@@ -594,7 +594,22 @@ export default function DeliveryChatbotWidget() {
   }
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 right-3 sm:right-6 w-[94vw] sm:w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200/90 flex flex-col overflow-hidden z-[999] transition-all" style={{ height: "550px", maxHeight: "78vh" }}>
+    <>
+      {/* Tap-outside Backdrop overlay */}
+      <div
+        onClick={() => {
+          setIsOpen(false);
+          stopSpeaking();
+        }}
+        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[998] transition-opacity animate-in fade-in"
+        aria-label="Close AI Assistant"
+      />
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="fixed bottom-20 md:bottom-6 right-3 sm:right-6 w-[94vw] sm:w-[420px] bg-white rounded-2xl shadow-2xl border border-slate-200/90 flex flex-col overflow-hidden z-[999] transition-all"
+        style={{ height: "550px", maxHeight: "78vh" }}
+      >
       {/* Sleek Gemini-style Header */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white px-4 py-3 flex justify-between items-center shadow-md">
         <div className="flex items-center gap-2.5">
@@ -855,6 +870,7 @@ export default function DeliveryChatbotWidget() {
           </button>
         )}
       </form>
-    </div>
+      </div>
+    </>
   );
 }
