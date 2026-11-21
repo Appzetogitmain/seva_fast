@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { getDateLocale } from '@core/i18n';
 import { customerApi } from '../services/customerApi';
+import AdMediaPreview from '../components/pro/AdMediaPreview';
 import { useToast } from '@shared/components/ui/Toast';
 import {
     Loader2,
@@ -2151,54 +2152,9 @@ const ProfessionalProfilePanel = () => {
                             platformAds.map((adItem) => (
                                 <div key={adItem._id} className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                                     {/* Media preview */}
-                                    {(() => {
-                                        // Every image and video on the ad (main item first, no duplicates).
-                                        const seen = new Set();
-                                        const media = [
-                                            ...[adItem.imageUrl, ...(adItem.posters || [])].map((src) => ({ type: 'image', src })),
-                                            ...[adItem.videoUrl, ...(adItem.videos || [])].map((src) => ({ type: 'video', src })),
-                                            { type: adItem.mediaType === 'video' ? 'video' : 'image', src: adItem.mediaUrl },
-                                        ].filter((m) => m.src && !seen.has(m.src) && seen.add(m.src));
-                                        const main = media[0];
-                                        const thumbs = media.length > 1 ? media.slice(0, 4) : [];
-                                        const extra = media.length - thumbs.length;
-                                        const imageCount = media.filter((m) => m.type === 'image').length;
-                                        const videoCount = media.length - imageCount;
-                                        return (
-                                            <div className="md:col-span-4 space-y-2">
-                                                <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-100 relative aspect-video flex items-center justify-center">
-                                                    {!main ? (
-                                                        <span className="text-[9px] font-black uppercase text-slate-400">{t('pro.noImage')}</span>
-                                                    ) : main.type === 'video' ? (
-                                                        <video src={main.src} controls className="w-full h-full object-contain bg-black" />
-                                                    ) : (
-                                                        <img src={main.src} alt={adItem.title} className="w-full h-full object-cover" />
-                                                    )}
-                                                    {media.length > 1 && (
-                                                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-bold">
-                                                            {[imageCount && `${imageCount} photo${imageCount > 1 ? 's' : ''}`, videoCount && `${videoCount} video${videoCount > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {thumbs.length > 0 && (
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {thumbs.map((m, idx) => (
-                                                            <div key={m.src} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-100">
-                                                                {m.type === 'video' ? (
-                                                                    <video src={m.src} muted playsInline preload="metadata" className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <img src={m.src} alt="" loading="lazy" className="w-full h-full object-cover" />
-                                                                )}
-                                                                {idx === thumbs.length - 1 && extra > 0 && (
-                                                                    <span className="absolute inset-0 bg-black/55 text-white text-xs font-bold flex items-center justify-center">+{extra}</span>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })()}
+                                    <div className="md:col-span-4">
+                                        <AdMediaPreview ad={adItem} emptyLabel={t('pro.noImage')} />
+                                    </div>
 
                                     {/* Ad Details */}
                                     <div className="md:col-span-5 space-y-2">
