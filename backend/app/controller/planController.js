@@ -9,6 +9,7 @@ import { resolvePlanPurchaseReferrer } from "../services/referralService.js";
 import { upsertPlanSubscription } from "../services/planSubscriptionService.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
+import { getRazorpayKeySecret } from "../config/secrets.js";
 
 function emitPlanPurchasedWhatsApp({ userId, plan, expiryDate, dedupeKey }) {
   emitNotificationEvent(NOTIFICATION_EVENTS.PLAN_PURCHASED, {
@@ -156,7 +157,7 @@ export const createPlanOrder = async (req, res) => {
 
         const razorpay = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID || "dummy_key",
-            key_secret: process.env.RAZORPAY_KEY_SECRET || "dummy_secret"
+            key_secret: getRazorpayKeySecret()
         });
 
         const options = {
@@ -194,7 +195,7 @@ export const verifyPlanPayment = async (req, res) => {
         }
 
         const generated_signature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "dummy_secret")
+            .createHmac("sha256", getRazorpayKeySecret())
             .update(razorpay_order_id + "|" + razorpay_payment_id)
             .digest("hex");
 

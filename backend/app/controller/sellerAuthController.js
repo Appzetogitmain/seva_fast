@@ -18,13 +18,14 @@ import {
     normalizeIndian10DigitPhone,
     getPhoneLookupCandidates,
 } from "../utils/phone.js";
+import { getJwtSecret } from "../config/secrets.js";
 
 /* ===============================
    Utils
 ================================ */
 
 const generateToken = (seller) =>
-    jwt.sign({ id: seller._id, role: "seller" }, process.env.JWT_SECRET || "default_jwt_secret", {
+    jwt.sign({ id: seller._id, role: "seller" }, getJwtSecret(), {
         expiresIn: "7d",
     });
 

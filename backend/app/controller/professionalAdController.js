@@ -6,6 +6,7 @@ import Transaction from "../models/transaction.js";
 import handleResponse from "../utils/helper.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import { getRazorpayKeyId, getRazorpayKeySecret } from "../config/secrets.js";
 
 export const createAd = async (req, res) => {
     try {
@@ -466,8 +467,8 @@ const calculateListingFee = async (ad, settings) => {
 
 const getRazorpayInstance = () => {
     return new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_S2tOuYBZiOuLb4',
-        key_secret: process.env.RAZORPAY_KEY_SECRET || 'tiR3NbQKSBa5mrdKyZbsnh7x'
+        key_id: getRazorpayKeyId(),
+        key_secret: getRazorpayKeySecret()
     });
 };
 
@@ -509,7 +510,7 @@ export const initiatePayMyAd = async (req, res) => {
             isFree: false,
             orderId: order.id,
             amount: order.amount,
-            keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_S2tOuYBZiOuLb4'
+            keyId: getRazorpayKeyId()
         });
     } catch (error) {
         console.error("initiatePayMyAd error:", error);
@@ -532,7 +533,7 @@ export const verifyPayMyAd = async (req, res) => {
         }
 
         // Verify signature
-        const secret = process.env.RAZORPAY_KEY_SECRET || 'tiR3NbQKSBa5mrdKyZbsnh7x';
+        const secret = getRazorpayKeySecret();
         const hmac = crypto.createHmac('sha256', secret);
         hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
         const generatedSignature = hmac.digest('hex');

@@ -4,6 +4,7 @@ import { sendSmsIndiaHubOtp } from "./smsIndiaHubService.js";
 import { generateOTP, useRealSMS } from "../utils/otp.js";
 import { getRedisClient } from "../config/redis.js";
 import { isValidE164Phone, maskPhone, normalizePhoneNumber } from "../utils/phone.js";
+import { getOtpHashSecret } from "../config/secrets.js";
 
 const OTP_EXPIRY_MINUTES = () => parseInt(process.env.OTP_EXPIRY_MINUTES || "5", 10);
 const OTP_RESEND_COOLDOWN_SECONDS = () =>
@@ -21,7 +22,7 @@ const OTP_VERIFY_LIMIT_WINDOW_SECONDS = () =>
 const OTP_VERIFY_LIMIT_PER_WINDOW = () =>
   parseInt(process.env.OTP_VERIFY_LIMIT_PER_WINDOW || "20", 10);
 function otpHashSecret() {
-  return process.env.OTP_HASH_SECRET || process.env.JWT_SECRET || "unsafe-dev-secret";
+  return getOtpHashSecret();
 }
 
 function hashOtp(phone, otp) {

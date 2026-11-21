@@ -16,6 +16,7 @@ import {
     adminApprovePlatformAd,
     adminRejectPlatformAd,
     adminUpdatePlatformAdSchedule,
+    adminArchivePlatformAd,
 } from "../controller/platformAdController.js";
 import {
     adminGetAllReviews,
@@ -45,6 +46,7 @@ router.get("/platform-ads", adminGetPlatformAds);
 router.patch("/platform-ads/:id/approve", adminApprovePlatformAd);
 router.patch("/platform-ads/:id/reject", adminRejectPlatformAd);
 router.patch("/platform-ads/:id/schedule", adminUpdatePlatformAdSchedule);
+router.patch("/platform-ads/:id/archive", adminArchivePlatformAd);
 
 // Review moderation routes
 router.get("/reviews", adminGetAllReviews);

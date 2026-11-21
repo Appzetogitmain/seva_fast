@@ -129,6 +129,11 @@ const platformAdSchema = new mongoose.Schema(
             default: null,
         },
 
+        // Soft delete: archived ads are hidden from customers, the
+        // advertiser and the admin list, but kept for payment records.
+        isArchived: { type: Boolean, default: false, index: true },
+        archivedAt: { type: Date, default: null },
+
         // Analytics counters. The click counters were already being
         // incremented by adAnalyticsController but were missing from this
         // schema, so Mongoose silently dropped every update.

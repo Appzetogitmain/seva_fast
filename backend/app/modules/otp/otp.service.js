@@ -15,6 +15,7 @@ import {
   getOtpLength,
   normalizeMobile,
 } from "../../utils/smsHelpers.js";
+import { getOtpHashSecret } from "../../config/secrets.js";
 
 const SUPPORTED_USER_TYPES = ["Admin", "Seller", "Customer", "Delivery"];
 const SUPPORTED_PURPOSES = ["LOGIN", "SIGNUP", "PASSWORD_RESET"];
@@ -26,7 +27,7 @@ const USER_TYPE_CONFIG = {
 };
 
 function otpHashSecret() {
-  return process.env.OTP_HASH_SECRET || process.env.JWT_SECRET || "unsafe-dev-secret";
+  return getOtpHashSecret();
 }
 
 function hashOtp(mobile, otp, userType, purpose) {

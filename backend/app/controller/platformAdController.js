@@ -5,6 +5,7 @@ import Setting from "../models/setting.js";
 import handleResponse from "../utils/helper.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import { getRazorpayKeyId, getRazorpayKeySecret } from "../config/secrets.js";
 
 // Create platform ad request
 export const createPlatformAd = async (req, res) => {
@@ -155,7 +156,7 @@ export const updatePlatformAd = async (req, res) => {
 export const getMyPlatformAds = async (req, res) => {
     try {
         const ownerId = req.user.id;
-        const ads = await PlatformAd.find({ owner: ownerId }).sort({ createdAt: -1 });
+        const ads = await PlatformAd.find({ owner: ownerId, isArchived: { $ne: true } }).sort({ createdAt: -1 });
         return handleResponse(res, 200, "My platform advertisements fetched successfully", ads);
     } catch (error) {
         return handleResponse(res, 500, error.message);
@@ -231,7 +232,7 @@ export const payPlatformAd = async (req, res) => {
 export const adminGetPlatformAds = async (req, res) => {
     try {
         const { status } = req.query;
-        const query = { paymentStatus: "paid" };
+        const query = { paymentStatus: "paid", isArchived: { $ne: true } };
 
         if (status) query.approvalStatus = status;
 
@@ -307,6 +308,7 @@ export const getActivePlatformAds = async (req, res) => {
             approvalStatus: "approved",
             paymentStatus: "paid",
             isPublished: true,
+            isArchived: { $ne: true },
             // Respect the optional schedule window set by admin.
             $and: [
                 { $or: [{ startDate: null }, { startDate: { $lte: now } }] },
@@ -330,7 +332,7 @@ export const getPlatformAdById = async (req, res) => {
     try {
         const { id } = req.params;
         const ad = await PlatformAd.findById(id).populate("owner", "name phone email").lean();
-        if (!ad) {
+        if (!ad || ad.isArchived) {
             return handleResponse(res, 404, "Advertisement not found");
         }
         return handleResponse(res, 200, "Advertisement fetched successfully", ad);
@@ -341,8 +343,8 @@ export const getPlatformAdById = async (req, res) => {
 
 const getRazorpayInstance = () => {
     return new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_S2tOuYBZiOuLb4',
-        key_secret: process.env.RAZORPAY_KEY_SECRET || 'tiR3NbQKSBa5mrdKyZbsnh7x'
+        key_id: getRazorpayKeyId(),
+        key_secret: getRazorpayKeySecret()
     });
 };
 
@@ -383,7 +385,7 @@ export const initiatePayPlatformAd = async (req, res) => {
         return handleResponse(res, 200, "Razorpay order initiated successfully", {
             orderId: order.id,
             amount: order.amount,
-            keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_S2tOuYBZiOuLb4'
+            keyId: getRazorpayKeyId()
         });
     } catch (error) {
         console.error("initiatePayPlatformAd error:", error);
@@ -407,7 +409,7 @@ export const verifyPayPlatformAd = async (req, res) => {
         }
 
         // Verify signature
-        const secret = process.env.RAZORPAY_KEY_SECRET || 'tiR3NbQKSBa5mrdKyZbsnh7x';
+        const secret = getRazorpayKeySecret();
         const hmac = crypto.createHmac('sha256', secret);
         hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
         const generatedSignature = hmac.digest('hex');
@@ -496,5 +498,20 @@ export const adminUpdatePlatformAdSchedule = async (req, res) => {
         return handleResponse(res, 200, "Platform advertisement schedule updated", ad);
     } catch (error) {
         return handleResponse(res, error.statusCode || 500, error.message);
+    }
+};
+
+// Admin: archive (soft delete) a platform ad — hides it everywhere, keeps the record
+export const adminArchivePlatformAd = async (req, res) => {
+    try {
+        const ad = await PlatformAd.findByIdAndUpdate(
+            req.params.id,
+            { $set: { isArchived: true, archivedAt: new Date(), isPublished: false } },
+            { new: true }
+        );
+        if (!ad) return handleResponse(res, 404, "Platform advertisement not found");
+        return handleResponse(res, 200, "Platform advertisement removed", ad);
+    } catch (error) {
+        return handleResponse(res, 500, error.message);
     }
 };

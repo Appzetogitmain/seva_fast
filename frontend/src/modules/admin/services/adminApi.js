@@ -196,6 +196,7 @@ export const adminApi = {
     approvePlatformAd: (id) => axiosInstance.patch(`/admin/professionals/platform-ads/${id}/approve`),
     rejectPlatformAd: (id, data) => axiosInstance.patch(`/admin/professionals/platform-ads/${id}/reject`, data),
     updatePlatformAdSchedule: (id, data) => axiosInstance.patch(`/admin/professionals/platform-ads/${id}/schedule`, data),
+    archivePlatformAd: (id) => axiosInstance.patch(`/admin/professionals/platform-ads/${id}/archive`),
 
     // Referral cashback rewards
     getReferralRewards: (params) => axiosInstance.get('/admin/referral-rewards', { params }),

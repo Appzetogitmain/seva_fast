@@ -7,6 +7,7 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import { debitWallet } from "../services/finance/walletService.js";
 import { OWNER_TYPE } from "../constants/finance.js";
+import { getRazorpayKeySecret } from "../config/secrets.js";
 
 function resolveId(id) {
     const sId = String(id || "").trim();
@@ -194,7 +195,7 @@ export const initiatePromotionPurchase = async (req, res) => {
 
         const razorpay = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID || "dummy_key",
-            key_secret: process.env.RAZORPAY_KEY_SECRET || "dummy_secret",
+            key_secret: getRazorpayKeySecret(),
         });
 
         const options = {
@@ -229,7 +230,7 @@ export const verifyPromotionPurchase = async (req, res) => {
         if (!planId) return handleResponse(res, 400, "Valid planId is required");
 
         const generated_signature = crypto
-            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "dummy_secret")
+            .createHmac("sha256", getRazorpayKeySecret())
             .update(razorpay_order_id + "|" + razorpay_payment_id)
             .digest("hex");
 

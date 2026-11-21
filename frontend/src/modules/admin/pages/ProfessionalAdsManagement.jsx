@@ -272,6 +272,18 @@ const ProfessionalAdsManagement = () => {
     };
 
     // Platform Ads Moderation Logic
+    const handleRemovePlatAd = async (adItem) => {
+        if (!window.confirm(`Remove "${adItem.title}"? It will disappear from the app and this list. Payment records are kept.`)) return;
+        try {
+            await adminApi.archivePlatformAd(adItem._id);
+            setPlatformAds((prev) => prev.filter((a) => a._id !== adItem._id));
+            setSelectedPlatAdForDetail((prev) => (prev?._id === adItem._id ? null : prev));
+            showToast('Banner removed', 'success');
+        } catch (error) {
+            showToast(error?.response?.data?.message || 'Failed to remove banner', 'error');
+        }
+    };
+
     const handleApprovePlatAd = async (id) => {
         if (!window.confirm('Approve this platform promotional banner? It will be active once payment is made.')) return;
         try {
@@ -598,6 +610,12 @@ const ProfessionalAdsManagement = () => {
                                             className="flex-1 lg:flex-none px-6 py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                                         >
                                             View Details
+                                        </button>
+                                        <button
+                                            onClick={() => handleRemovePlatAd(adItem)}
+                                            className="flex-1 lg:flex-none px-6 py-3 bg-white hover:bg-rose-50 text-rose-600 ring-1 ring-rose-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                                        >
+                                            Remove
                                         </button>
                                         {adItem.approvalStatus === 'pending' && (
                                             <>
