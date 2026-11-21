@@ -263,6 +263,19 @@ async function startScheduler() {
     getReturnWindowReleaseJobHandler()
   );
 
+  // Register referral cashback job (pays the referrer once a referred
+  // friend's first delivered order is past its return window). No-op until
+  // the admin enables Referral Cashback in settings.
+  const {
+    getReferralCashbackJobInterval,
+    getReferralCashbackJobHandler,
+  } = await import("./app/jobs/referralCashbackJob.js");
+  registerScheduledJob(
+    'referralCashbackJob',
+    getReferralCashbackJobInterval(),
+    getReferralCashbackJobHandler()
+  );
+
   // Register seller plan expiry housekeeping job (auto-reverts an expired
   // PLAN_BASED seller back to CATEGORY_WISE commission)
   const {

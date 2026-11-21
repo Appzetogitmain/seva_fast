@@ -10,6 +10,7 @@ import {
     checkFirstOrderEligibility,
 } from "../controller/customerAuthController.js";
 import { verifyToken, optionalVerifyToken } from "../middleware/authMiddleware.js";
+import { getMyReferralRewards } from "../controller/referralRewardController.js";
 import {
     authRouteRateLimiter,
     createContentLengthGuard,
@@ -30,6 +31,7 @@ router.get("/first-order-eligibility", optionalVerifyToken, checkFirstOrderEligi
 router.get("/profile", verifyToken, getCustomerProfile);
 router.put("/profile", verifyToken, updateCustomerProfile);
 router.get("/referrals/tree", verifyToken, getCustomerReferralTree);
+router.get("/referrals/rewards", verifyToken, getMyReferralRewards);
 
 // Wallet
 router.get("/transactions", verifyToken, getCustomerTransactions);

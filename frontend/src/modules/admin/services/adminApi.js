@@ -195,6 +195,12 @@ export const adminApi = {
     getPlatformAds: (params) => axiosInstance.get('/admin/professionals/platform-ads', { params }),
     approvePlatformAd: (id) => axiosInstance.patch(`/admin/professionals/platform-ads/${id}/approve`),
     rejectPlatformAd: (id, data) => axiosInstance.patch(`/admin/professionals/platform-ads/${id}/reject`, data),
+    updatePlatformAdSchedule: (id, data) => axiosInstance.patch(`/admin/professionals/platform-ads/${id}/schedule`, data),
+
+    // Referral cashback rewards
+    getReferralRewards: (params) => axiosInstance.get('/admin/referral-rewards', { params }),
+    approveReferralReward: (id, data) => axiosInstance.patch(`/admin/referral-rewards/${id}/approve`, data),
+    rejectReferralReward: (id, data) => axiosInstance.patch(`/admin/referral-rewards/${id}/reject`, data),
 
     // Sub-Admin Management
     // Payloads support: assignedZones, assignedCategories, categoryCommissionRate, allowedPermissions

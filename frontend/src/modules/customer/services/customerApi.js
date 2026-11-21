@@ -15,6 +15,7 @@ export const customerApi = {
   getWalletTransactions: (params) =>
     getWithDedupe("/customer/transactions", params),
   getReferralTree: () => getWithDedupe("/customer/referrals/tree"),
+  getMyReferralRewards: () => getWithDedupe("/customer/referrals/rewards"),
   getCategories: (params) =>
     getWithDedupe("/categories", params, { ttl: 60 * 1000 }), // 1 min for categories
   getProducts: (params) => getWithDedupe("/products", params),

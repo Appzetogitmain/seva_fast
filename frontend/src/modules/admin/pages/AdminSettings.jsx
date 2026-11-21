@@ -22,8 +22,30 @@ import {
     X,
     Award,
     Gift,
-    Sparkles
+    Sparkles,
+    Wallet
 } from 'lucide-react';
+import ReferralCashbackSettings from '../components/ReferralCashbackSettings';
+
+const DEFAULT_REFERRAL_CASHBACK = {
+    enabled: false,
+    rewardType: 'fixed',
+    rewardValue: 0,
+    maxRewardAmount: 0,
+    minOrderValue: 0,
+    maxRewardsPerReferrerPerMonth: 0,
+};
+
+// Only the admin-editable fields — effectiveFrom is server-managed and the
+// settings validator rejects unknown keys.
+const pickReferralCashback = (cfg = {}) => ({
+    enabled: Boolean(cfg.enabled),
+    rewardType: cfg.rewardType === 'percent' ? 'percent' : 'fixed',
+    rewardValue: Math.max(0, Number(cfg.rewardValue) || 0),
+    maxRewardAmount: Math.max(0, Number(cfg.maxRewardAmount) || 0),
+    minOrderValue: Math.max(0, Number(cfg.minOrderValue) || 0),
+    maxRewardsPerReferrerPerMonth: Math.max(0, Math.floor(Number(cfg.maxRewardsPerReferrerPerMonth) || 0)),
+});
 import { cn } from '@/lib/utils';
 import { useToast } from '@shared/components/ui/Toast';
 import { adminApi } from '../services/adminApi';
@@ -103,6 +125,7 @@ const AdminSettings = () => {
         firstOrderFreeDelivery: true,
         welcomeScratchCardEnabled: true,
         showQuickCategoriesSection: true,
+        referralCashback: { ...DEFAULT_REFERRAL_CASHBACK },
         mlmPromo: {
             enabled: true,
             badgeText: "SEVAFAST MLM",
@@ -138,6 +161,7 @@ const AdminSettings = () => {
                         welcomeScratchCardEnabled: data.welcomeScratchCardEnabled ?? true,
                         showQuickCategoriesSection: data.showQuickCategoriesSection ?? true,
                         mlmPromo: data.mlmPromo || prev.mlmPromo,
+                        referralCashback: { ...DEFAULT_REFERRAL_CASHBACK, ...(data.referralCashback || {}) },
                     }));
                 }
             } catch (error) {
@@ -162,6 +186,7 @@ const AdminSettings = () => {
                 platformAdFeePhoto: settings.platformAdListingFee,
                 platformAdFeeVideo: settings.platformAdListingFee,
                 keywords: Array.isArray(settings.keywords) ? settings.keywords : (settings.metaKeywords ? settings.metaKeywords.split(',').map(k => k.trim()).filter(Boolean) : []),
+                referralCashback: pickReferralCashback(settings.referralCashback),
             };
             const res = await adminApi.updateSettings(payload);
             const updatedData = res.data?.result ?? res.data;
@@ -185,6 +210,17 @@ const AdminSettings = () => {
 
     const handleInputChange = (field, value) => {
         setSettings(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleReferralCashbackChange = (field, value) => {
+        setSettings(prev => ({
+            ...prev,
+            referralCashback: {
+                ...DEFAULT_REFERRAL_CASHBACK,
+                ...(prev.referralCashback || {}),
+                [field]: value,
+            },
+        }));
     };
 
     const handleMlmPromoChange = (field, value) => {
@@ -355,6 +391,7 @@ const AdminSettings = () => {
         { id: 'general', label: 'General', icon: Settings },
         { id: 'mlmPromo', label: 'MLM Promo Banner', icon: Sparkles },
         { id: 'welcomeOffer', label: 'Welcome Scratch Card & Offer', icon: Gift },
+        { id: 'referralCashback', label: 'Referral Cashback', icon: Wallet },
         { id: 'branding', label: 'Branding', icon: Globe },
         { id: 'certificate', label: 'Seller Certificate', icon: Award },
         { id: 'payments', label: 'COD Payments', icon: CreditCard },
@@ -1212,6 +1249,13 @@ const AdminSettings = () => {
                                 </div>
                             </div>
                         </Card>
+                    )}
+
+                    {activeTab === 'referralCashback' && (
+                        <ReferralCashbackSettings
+                            value={{ ...DEFAULT_REFERRAL_CASHBACK, ...(settings.referralCashback || {}) }}
+                            onChange={handleReferralCashbackChange}
+                        />
                     )}
 
                     {/* MLM Promo Banner Settings */}

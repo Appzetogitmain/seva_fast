@@ -53,6 +53,7 @@ export const signupCustomer = async (req, res) => {
             flow: "signup",
             ipAddress: req.ip,
             referralCode: payload.referralCode,
+            deviceId: payload.deviceId,
         });
 
         return handleResponse(res, 200, "OTP sent successfully");

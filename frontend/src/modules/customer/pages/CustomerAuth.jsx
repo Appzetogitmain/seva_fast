@@ -28,6 +28,7 @@ import { customerApi } from '../services/customerApi';
 import { isValidIndianPhone } from '../utils/phoneValidation';
 import LanguageSwitcher from '@shared/components/LanguageSwitcher';
 import { buildPlayStoreReferUrl } from '../utils/referralLinks';
+import { getVisitorId } from '@/core/utils/analyticsTracker';
 import BgImage from '@/assets/image.png';
 import PlanCard from '@/shared/components/ui/PlanCard';
 import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
@@ -250,6 +251,8 @@ const CustomerAuth = () => {
                     name: formData.name.trim(),
                     phone: formData.phone,
                     referralCode: referralCode.trim() || undefined,
+                    // Anonymous per-browser id, used only for referral fraud checks.
+                    deviceId: getVisitorId(),
                 });
                 toast.success(res.data?.message || t('auth.otpSent'));
             }

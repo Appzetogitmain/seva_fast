@@ -20,6 +20,7 @@ import {
 import { formatDate } from '@shared/utils/formatDate';
 import LanguageSwitcher from '@shared/components/LanguageSwitcher';
 import { buildAppReferUrl, buildPlayStoreReferUrl, buildSellerReferUrl } from '../utils/referralLinks';
+import ReferEarnCard from '../components/profile/ReferEarnCard';
 import { CustomPhotoOrderModal } from '../components/shared/CustomPhotoOrderModal';
 import { CustomerNotificationsModal } from '../components/shared/CustomerNotificationsModal';
 import MainLocationHeader from '../components/shared/MainLocationHeader';
@@ -422,6 +423,13 @@ const ProfilePage = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Refer & Earn cashback — hidden unless enabled by admin */}
+                <ReferEarnCard
+                    config={settings?.referralCashback}
+                    referUrl={siteReferUrl}
+                    appName={settings?.appName}
+                />
 
                 {/* User Identity Card — SEVAFAST membership layout */}
                 <div

@@ -4,6 +4,7 @@ export const sendSignupOtpSchema = Joi.object({
   name: Joi.string().trim().min(2).max(80).required(),
   phone: Joi.string().trim().min(7).max(24).required(),
   referralCode: Joi.string().trim().max(50).optional().allow("", null),
+  deviceId: Joi.string().trim().max(100).optional().allow("", null),
 });
 
 export const sendLoginOtpSchema = Joi.object({

@@ -302,17 +302,23 @@ export const adminRejectPlatformAd = async (req, res) => {
 export const getActivePlatformAds = async (req, res) => {
     try {
         const { city } = req.query;
+        const now = new Date();
         const query = {
             approvalStatus: "approved",
             paymentStatus: "paid",
-            isPublished: true
+            isPublished: true,
+            // Respect the optional schedule window set by admin.
+            $and: [
+                { $or: [{ startDate: null }, { startDate: { $lte: now } }] },
+                { $or: [{ endDate: null }, { endDate: { $gte: now } }] },
+            ],
         };
 
         if (city) {
             query.city = new RegExp(city.trim(), "i");
         }
 
-        const ads = await PlatformAd.find(query).sort({ createdAt: -1 });
+        const ads = await PlatformAd.find(query).sort({ priority: -1, createdAt: -1 });
         return handleResponse(res, 200, "Active platform ads fetched successfully", ads);
     } catch (error) {
         return handleResponse(res, 500, error.message);
@@ -446,5 +452,49 @@ export const verifyPayPlatformAd = async (req, res) => {
     } catch (error) {
         console.error("verifyPayPlatformAd error:", error);
         return handleResponse(res, 500, error.message);
+    }
+};
+
+// Admin: set display priority and optional start/end schedule for a platform ad
+export const adminUpdatePlatformAdSchedule = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { priority, startDate, endDate } = req.body || {};
+        const update = {};
+
+        if (priority !== undefined) {
+            const p = Number(priority);
+            if (!Number.isFinite(p) || p < 0 || p > 9999) {
+                return handleResponse(res, 400, "Priority must be a number between 0 and 9999");
+            }
+            update.priority = Math.round(p);
+        }
+
+        const parseDate = (value, label) => {
+            if (value === null || value === "") return null;
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) {
+                const err = new Error(`Invalid ${label}`);
+                err.statusCode = 400;
+                throw err;
+            }
+            return d;
+        };
+        if (startDate !== undefined) update.startDate = parseDate(startDate, "start date");
+        if (endDate !== undefined) update.endDate = parseDate(endDate, "end date");
+
+        const existing = await PlatformAd.findById(id).select("startDate endDate").lean();
+        if (!existing) return handleResponse(res, 404, "Platform advertisement not found");
+
+        const effStart = update.startDate !== undefined ? update.startDate : existing.startDate;
+        const effEnd = update.endDate !== undefined ? update.endDate : existing.endDate;
+        if (effStart && effEnd && effEnd < effStart) {
+            return handleResponse(res, 400, "End date must be after start date");
+        }
+
+        const ad = await PlatformAd.findByIdAndUpdate(id, { $set: update }, { new: true });
+        return handleResponse(res, 200, "Platform advertisement schedule updated", ad);
+    } catch (error) {
+        return handleResponse(res, error.statusCode || 500, error.message);
     }
 };

@@ -20,8 +20,12 @@ export const trackAdInteraction = async (req, res) => {
             return handleResponse(res, 400, "Invalid targetType. Must be 'ProfessionalAd' or 'PlatformAd'");
         }
 
-        if (!["visit", "contact", "call", "whatsapp"].includes(interactionType)) {
-            return handleResponse(res, 400, "Invalid interactionType. Must be 'visit', 'contact', 'call', or 'whatsapp'");
+        if (!["visit", "contact", "call", "whatsapp", "impression"].includes(interactionType)) {
+            return handleResponse(res, 400, "Invalid interactionType. Must be 'visit', 'contact', 'call', 'whatsapp', or 'impression'");
+        }
+
+        if (interactionType === "impression" && targetType !== "PlatformAd") {
+            return handleResponse(res, 400, "Impressions are tracked for PlatformAd only");
         }
 
         // Determine effective visitor identifier:
@@ -50,6 +54,30 @@ export const trackAdInteraction = async (req, res) => {
             visitorId: effectiveVisitorId,
             lastInteractedAt: { $gte: twentyFourHoursAgo },
         });
+
+        if (interactionType === "impression") {
+            // Every view counts toward total impressions; only the first view
+            // per visitor in 24h counts as a unique view.
+            const incUpdate = { impressionsCount: 1 };
+            if (!existingLog) {
+                incUpdate.uniqueViewsCount = 1;
+                await AdInteractionLog.findOneAndUpdate(
+                    { targetType, targetId, interactionType, visitorId: effectiveVisitorId },
+                    { lastInteractedAt: new Date() },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+            }
+            const updatedAd = await PlatformAd.findByIdAndUpdate(
+                targetId,
+                { $inc: incUpdate },
+                { new: true, select: "impressionsCount uniqueViewsCount" }
+            );
+            return handleResponse(res, 200, "Impression recorded", {
+                counted: true,
+                unique: !existingLog,
+                counts: updatedAd,
+            });
+        }
 
         if (existingLog) {
             // Already counted within the 24-hour window
@@ -124,7 +152,7 @@ export const getAdInteractionStats = async (req, res) => {
                 .lean();
         } else {
             ad = await PlatformAd.findById(targetId)
-                .select("visitsCount contactsCount callClicksCount whatsappClicksCount title")
+                .select("visitsCount contactsCount callClicksCount whatsappClicksCount impressionsCount uniqueViewsCount title")
                 .lean();
         }
 
@@ -137,6 +165,8 @@ export const getAdInteractionStats = async (req, res) => {
             contactsCount: ad.contactsCount || 0,
             callClicksCount: ad.callClicksCount || 0,
             whatsappClicksCount: ad.whatsappClicksCount || 0,
+            impressionsCount: ad.impressionsCount || 0,
+            uniqueViewsCount: ad.uniqueViewsCount || 0,
             target: ad,
         });
     } catch (error) {

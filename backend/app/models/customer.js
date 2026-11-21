@@ -173,6 +173,20 @@ const userSchema = new mongoose.Schema(
             trim: true,
             uppercase: true,
         },
+        // Captured once at account creation, used only by referral fraud
+        // checks (same device / same network as the referrer). Hidden from
+        // normal queries.
+        signupIp: {
+            type: String,
+            default: "",
+            select: false,
+        },
+        signupDeviceId: {
+            type: String,
+            default: "",
+            select: false,
+            index: true,
+        },
         permissions: [{
             type: String,
         }],

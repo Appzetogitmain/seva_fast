@@ -475,6 +475,12 @@ const orderSchema = new mongoose.Schema(
     returnWindowExpiresAt: {
       type: Date,
     },
+    // Set once the referral-cashback job has evaluated this order (whatever
+    // the outcome), so it is never scanned twice.
+    referralCashbackCheckedAt: {
+      type: Date,
+      default: null,
+    },
     returnDeadline: {
       type: Date,
     },
@@ -622,6 +628,7 @@ orderSchema.index({ couponId: 1, status: 1, customer: 1 });
 orderSchema.index({ couponCode: 1, status: 1, customer: 1 });
 orderSchema.index({ status: 1, expiresAt: 1 });
 orderSchema.index({ seller: 1, returnStatus: 1, returnRequestedAt: -1 });
+orderSchema.index({ status: 1, referralCashbackCheckedAt: 1, returnWindowExpiresAt: 1 });
 orderSchema.index({ workflowStatus: 1, sellerPendingExpiresAt: 1 });
 orderSchema.index({ workflowStatus: 1, deliverySearchExpiresAt: 1 });
 orderSchema.index({ deliveryBoy: 1, workflowStatus: 1 });

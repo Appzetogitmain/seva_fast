@@ -111,11 +111,39 @@ const platformAdSchema = new mongoose.Schema(
         price: {
             type: Number,
             default: 999, // Fixed subscription price for platform banner ad
-        }
+        },
+
+        // Admin-controlled display order — higher shows first in the home
+        // banner slider. Ties fall back to newest first.
+        priority: {
+            type: Number,
+            default: 0,
+        },
+        // Optional schedule window. Empty means "no limit" on that side.
+        startDate: {
+            type: Date,
+            default: null,
+        },
+        endDate: {
+            type: Date,
+            default: null,
+        },
+
+        // Analytics counters. The click counters were already being
+        // incremented by adAnalyticsController but were missing from this
+        // schema, so Mongoose silently dropped every update.
+        impressionsCount: { type: Number, default: 0 },
+        uniqueViewsCount: { type: Number, default: 0 },
+        visitsCount: { type: Number, default: 0 },
+        contactsCount: { type: Number, default: 0 },
+        callClicksCount: { type: Number, default: 0 },
+        whatsappClicksCount: { type: Number, default: 0 },
     },
     {
         timestamps: true,
     }
 );
+
+platformAdSchema.index({ approvalStatus: 1, paymentStatus: 1, isPublished: 1, priority: -1, createdAt: -1 });
 
 export default mongoose.model("PlatformAd", platformAdSchema);

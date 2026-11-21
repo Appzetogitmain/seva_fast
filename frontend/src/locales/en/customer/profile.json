@@ -108,5 +108,22 @@
     "copyCode": "Copy Code ({{code}})",
     "me": "Me",
     "you": "{{name}} (You)"
+  },
+  "referEarn": {
+    "title": "Refer & Earn",
+    "offerFixed": "Get ₹{{amount}} cashback for every friend who joins with your link",
+    "offerPercent": "Get {{percent}}% of your friend's first order as cashback",
+    "offerPercentCap": "Get {{percent}}% (up to ₹{{cap}}) of your friend's first order as cashback",
+    "minOrder": "Friend's first order must be at least ₹{{amount}}.",
+    "howItWorks": "Paid to your wallet once your friend's first order is delivered and the return period ends.",
+    "share": "Share link",
+    "copied": "Referral link copied!",
+    "shareText": "Join me on {{app}}! Sign up with my link:",
+    "earned": "Total earned",
+    "history": "Your referral cashback",
+    "pending": "Pending",
+    "credited": "Credited",
+    "notEligible": "Not eligible",
+    "empty": "No referral cashback yet. Share your link to start earning!"
   }
 }

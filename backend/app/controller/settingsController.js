@@ -101,6 +101,7 @@ const ALLOWED_KEYS = [
   "riderExtraEarningPerKmBeyondSlabs",
   "sellerDeliveryFeeSharePercent",
   "mlmPromo",
+  "referralCashback",
 ];
 
 function flattenForMongoSet(prefix, value, target) {
@@ -259,6 +260,17 @@ const updateSettingsSchema = Joi.object({
       })
     ),
   }).unknown(true),
+  referralCashback: Joi.object({
+    enabled: Joi.boolean(),
+    rewardType: Joi.string().valid("fixed", "percent"),
+    rewardValue: Joi.number().min(0).when("rewardType", {
+      is: "percent",
+      then: Joi.number().max(100),
+    }),
+    maxRewardAmount: Joi.number().min(0),
+    minOrderValue: Joi.number().min(0),
+    maxRewardsPerReferrerPerMonth: Joi.number().integer().min(0),
+  }),
 }).unknown(false);
 
 /**
@@ -279,7 +291,7 @@ export const getPublicSettings = async (req, res) => {
       async () => {
         const existing = await Setting.findOne(filter)
           .select(
-            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName playStoreLink sellerPlayStoreLink appStoreLink returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled showQuickCategoriesSection deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo createdAt updatedAt",
+            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName playStoreLink sellerPlayStoreLink appStoreLink returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled showQuickCategoriesSection deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo referralCashback createdAt updatedAt",
           )
           .lean();
         return existing || null;
@@ -353,6 +365,14 @@ export const updateSettings = async (req, res) => {
     for (const [key, v] of Object.entries(value)) {
       if (v === undefined) continue;
       flattenForMongoSet(key, v, toSet);
+    }
+    if (value.referralCashback?.enabled === true) {
+      // Switching referral cashback on (off -> on) starts a fresh eligibility
+      // window, so orders delivered while it was off are never paid later.
+      const current = await Setting.findOne(filter).select("referralCashback").lean();
+      if (!current?.referralCashback?.enabled) {
+        toSet["referralCashback.effectiveFrom"] = new Date();
+      }
     }
     if (Object.keys(toSet).length === 0) {
       const current = await Setting.findOne(filter).lean();

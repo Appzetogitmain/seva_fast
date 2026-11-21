@@ -434,6 +434,24 @@ const settingSchema = new mongoose.Schema(
             default: true,
         },
 
+        // Refer & Earn cashback — runs alongside the MLM level commission.
+        // Disabled by default so deploying this changes nothing until the
+        // admin switches it on.
+        referralCashback: {
+            enabled: { type: Boolean, default: false },
+            rewardType: { type: String, enum: ["fixed", "percent"], default: "fixed" },
+            rewardValue: { type: Number, default: 0, min: 0 },
+            // Only applies to "percent" — 0 means no cap.
+            maxRewardAmount: { type: Number, default: 0, min: 0 },
+            minOrderValue: { type: Number, default: 0, min: 0 },
+            // 0 means unlimited.
+            maxRewardsPerReferrerPerMonth: { type: Number, default: 0, min: 0 },
+            // Only orders delivered on/after this date qualify — stamped the
+            // first time the admin enables the feature so switching it on
+            // never pays out retroactively for old orders.
+            effectiveFrom: { type: Date, default: null },
+        },
+
         // MLM Promotional Section Configuration
         mlmPromo: {
             enabled: {

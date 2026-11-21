@@ -15,7 +15,7 @@ const adInteractionLogSchema = new mongoose.Schema(
         },
         interactionType: {
             type: String,
-            enum: ["visit", "contact", "call", "whatsapp"],
+            enum: ["visit", "contact", "call", "whatsapp", "impression"],
             required: true,
             index: true,
         },
