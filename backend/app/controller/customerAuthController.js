@@ -103,7 +103,10 @@ export const verifyCustomerOTP = async (req, res) => {
             ipAddress: req.ip,
         });
 
-        if (payload.referralCode && !customer.referredBy) {
+        // Referral codes apply to brand-new signups only. An existing customer
+        // logging in through someone's referral link must not become their
+        // referral (and earn them cashback).
+        if (payload.referralCode && !customer.referredBy && customer.$locals?.isNewSignup === true) {
             const referrerId = await resolveReferrerIdByCode(payload.referralCode);
             if (referrerId && !isSelfReferral(customer._id, referrerId)) {
                 customer.referredBy = referrerId;

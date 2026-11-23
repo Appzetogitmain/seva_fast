@@ -338,6 +338,11 @@ export async function verifyCustomerOtpCode({
     throw err;
   }
 
+  // A customer who was not yet verified is completing signup now; anyone
+  // already verified is an existing customer logging in. Callers use this to
+  // apply referral codes to new signups only. ($locals is never saved.)
+  customer.$locals.isNewSignup = customer.isVerified !== true;
+
   customer.isVerified = true;
   customer.otpHash = undefined;
   customer.otpExpiresAt = undefined;
