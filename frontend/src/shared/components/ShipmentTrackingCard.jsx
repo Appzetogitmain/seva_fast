@@ -159,6 +159,16 @@ const ShipmentTrackingCard = ({ orderId, fallback = null, className }) => {
                 </div>
             )}
 
+            {(tracking?.cancelError || fallback?.cancelError) && (
+                <p className="rounded-lg bg-rose-50 px-2.5 py-2 text-[11px] font-semibold text-rose-700">
+                    This order was cancelled, but Shiprocket did not cancel the shipment:{' '}
+                    {tracking?.cancelError || fallback?.cancelError}. Please cancel it from the Shiprocket dashboard.
+                </p>
+            )}
+            {(tracking?.cancelledOnShiprocket || fallback?.cancelledOnShiprocket) && (
+                <p className="text-[11px] font-bold text-emerald-700">Shipment cancelled on Shiprocket</p>
+            )}
+
             {error && !tracking && <p className="text-[11px] font-semibold text-rose-600">{error}</p>}
 
             {tracking?.trackingUrl && (

@@ -768,10 +768,26 @@ export async function cancelShiprocketShipmentForOrder(orderId) {
     return null;
   }
 
-  const result = await cancelOrders([srOrderId]);
+  let result;
+  try {
+    result = await cancelOrders([srOrderId]);
+  } catch (err) {
+    // Shiprocket refuses cancellation once a courier has picked the parcel up.
+    // Keep the reason on the order: it is cancelled here but the shipment may
+    // still be live, so someone has to cancel it from the Shiprocket dashboard.
+    await Order.findByIdAndUpdate(order._id, {
+      $set: {
+        "shipmentDetails.cancelledOnShiprocket": false,
+        "shipmentDetails.cancelError": err.message,
+        "shipmentDetails.cancelErrorAt": new Date(),
+      },
+    });
+    throw err;
+  }
 
   await Order.findByIdAndUpdate(order._id, {
     $set: { "shipmentDetails.cancelledOnShiprocket": true },
+    $unset: { "shipmentDetails.cancelError": 1, "shipmentDetails.cancelErrorAt": 1 },
   });
 
   return result;
@@ -950,6 +966,8 @@ export async function getFormattedShiprocketTracking(orderOrId) {
     activities,
     trackingUrl,
     pickupLocation: shipmentDetails.pickupLocation || null,
+    cancelledOnShiprocket: shipmentDetails.cancelledOnShiprocket === true,
+    cancelError: shipmentDetails.cancelError || null,
     lastError: awbCode ? null : shipmentDetails.lastError || null,
     lastErrorAt: awbCode ? null : shipmentDetails.lastErrorAt || null,
     lastSyncedAt: new Date(),
