@@ -50,6 +50,11 @@ jest.unstable_mockModule("../app/services/logger.js", () => ({
   default: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
 }));
 
+// ORDER_PLACED also notifies admins; keep the admin lookup off the database.
+jest.unstable_mockModule("../app/utils/adminIds.js", () => ({
+  getAdminIds: jest.fn(async () => []),
+}));
+
 jest.unstable_mockModule("../app/services/metrics.js", () => ({
   incrementCounter: jest.fn(),
   setGauge: jest.fn(),

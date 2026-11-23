@@ -275,7 +275,7 @@ describe("checkout atomic service", () => {
         customerId: "67f0000000000000000000c1",
         payload: {
           items: [{ product: "67f000000000000000000011", quantity: 2, price: 1 }],
-          address: { city: "Indore" },
+          address: { address: "12 MG Road", city: "Indore", state: "Madhya Pradesh", pincode: "452001" },
           paymentMode: "ONLINE",
         },
         idempotencyKey: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -311,7 +311,7 @@ describe("checkout atomic service", () => {
       customerId: "67f0000000000000000000c1",
       payload: {
         items: [{ product: "67f000000000000000000011", quantity: 1 }],
-        address: { city: "Indore" },
+        address: { address: "12 MG Road", city: "Indore", state: "Madhya Pradesh", pincode: "452001" },
         paymentMode: "ONLINE",
       },
       idempotencyKey: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -397,7 +397,7 @@ describe("checkout atomic service", () => {
           { product: "p1", quantity: 1 },
           { product: "p2", quantity: 2 },
         ],
-        address: { city: "Indore" },
+        address: { address: "12 MG Road", city: "Indore", state: "Madhya Pradesh", pincode: "452001" },
         paymentMode: "ONLINE",
       },
       idempotencyKey: null,

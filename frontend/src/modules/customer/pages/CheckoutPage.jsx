@@ -90,8 +90,61 @@ const createEmptyAddress = () => ({
   address: "",
   landmark: "",
   city: "",
+  state: "",
+  pincode: "",
   phone: "",
 });
+
+const PINCODE_RE = /^\d{6}$/;
+const PHONE_RE = /^\d{10}$/;
+
+// Older addresses kept "City, State, 123456" in the city field. Split it so the
+// separate City / State / Pincode inputs start filled in.
+const splitCityStatePincode = (addr = {}) => {
+  const raw = String(addr.city || "").trim();
+  const pincode = String(addr.pincode || "").trim() || (raw.match(/\b\d{6}\b/) || [""])[0];
+  let city = raw;
+  let state = String(addr.state || "").trim();
+  if (raw.includes(",") || /\d{6}/.test(raw)) {
+    const parts = raw.replace(/\b\d{6}\b/, "").split(",").map((p) => p.trim()).filter(Boolean);
+    city = parts[0] || "";
+    if (!state) state = parts[1] || "";
+  }
+  return { city, state, pincode };
+};
+
+// Renders "Label*" with the asterisk in red so required fields stand out.
+const RequiredLabel = ({ text }) => {
+  const clean = String(text || "").replace(/\*\s*$/, "");
+  return (
+    <>
+      {clean}
+      <span className="ml-0.5 text-rose-500" aria-hidden="true">*</span>
+    </>
+  );
+};
+
+const FieldError = ({ error }) => {
+  const { t } = useTranslation("customer");
+  if (!error) return null;
+  return (
+    <p className="text-[11px] font-semibold text-rose-600">
+      {t(`checkout.form.errors.${error}`)}
+    </p>
+  );
+};
+
+// Returns { field: messageKey } for every missing / invalid required field.
+const validateAddressFields = (data, fields) => {
+  const errors = {};
+  for (const field of fields) {
+    const value = String(data[field] || "").trim();
+    if (!value) errors[field] = "required";
+    else if (field === "pincode" && !PINCODE_RE.test(value)) errors[field] = "pincode";
+    else if (field === "phone" && !PHONE_RE.test(value.replace(/\D/g, "").slice(-10))) errors[field] = "phone";
+  }
+  return errors;
+};
 
 const getInitialCheckoutAddress = (storageKey) => {
   try {
@@ -233,10 +286,14 @@ const CheckoutPage = () => {
   const [recipientData, setRecipientData] = useState({
     completeAddress: "",
     landmark: "",
+    city: "",
+    state: "",
     pincode: "",
     name: "",
     phone: "",
   });
+  const [recipientErrors, setRecipientErrors] = useState({});
+  const [editAddressErrors, setEditAddressErrors] = useState({});
   const [savedRecipient, setSavedRecipient] = useState(null);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
   const [coupons, setCoupons] = useState([]);
@@ -292,7 +349,9 @@ const CheckoutPage = () => {
   const displayPhone =
     savedRecipient?.phone || currentAddress.phone || registeredPhone;
   const displayAddress = savedRecipient
-    ? `${savedRecipient.completeAddress}${savedRecipient.landmark ? `, ${savedRecipient.landmark}` : ""}${savedRecipient.pincode ? ` - ${savedRecipient.pincode}` : ""}`
+    ? [savedRecipient.completeAddress, savedRecipient.landmark, savedRecipient.city, savedRecipient.state]
+        .filter(Boolean)
+        .join(", ") + (savedRecipient.pincode ? ` - ${savedRecipient.pincode}` : "")
     : `${currentAddress.address || ""}${currentAddress.landmark ? `, ${currentAddress.landmark}` : ""}${currentAddress.city ? `, ${currentAddress.city}` : ""}`;
 
   // Sync currentAddress changes to persistent storage
@@ -529,7 +588,9 @@ const CheckoutPage = () => {
         name: savedRecipient.name,
         address: savedRecipient.completeAddress,
         landmark: savedRecipient.landmark || "",
-        city: savedRecipient.pincode ? `${savedRecipient.pincode}` : "",
+        city: savedRecipient.city || "",
+        state: savedRecipient.state || "",
+        pincode: savedRecipient.pincode || "",
         phone: savedRecipient.phone,
         location:
           currentLocation?.latitude && currentLocation?.longitude
@@ -548,6 +609,7 @@ const CheckoutPage = () => {
 
     return {
       ...currentAddress,
+      ...splitCityStatePincode(currentAddress),
       name: registeredName || currentAddress.name,
       phone: registeredPhone || currentAddress.phone,
       location: hasAddrLoc ? { lat: addrLoc.lat, lng: addrLoc.lng } : undefined,
@@ -555,11 +617,16 @@ const CheckoutPage = () => {
   };
 
   const handleSaveRecipient = () => {
-    if (
-      !recipientData.completeAddress ||
-      !recipientData.name ||
-      recipientData.phone.length !== 10
-    ) {
+    const errors = validateAddressFields(recipientData, [
+      "completeAddress",
+      "city",
+      "state",
+      "pincode",
+      "name",
+      "phone",
+    ]);
+    setRecipientErrors(errors);
+    if (Object.keys(errors).length > 0) {
       showToast(t('checkout.errors.fillRequired'), "error");
       return;
     }
@@ -590,8 +657,9 @@ const CheckoutPage = () => {
       phone: currentAddress.phone || registeredPhone || "",
       address: currentAddress.address || "",
       landmark: currentAddress.landmark || "",
-      city: currentAddress.city || "",
+      ...splitCityStatePincode(currentAddress),
     });
+    setEditAddressErrors({});
     setIsEditAddressOpen(true);
   };
 
@@ -705,25 +773,40 @@ const CheckoutPage = () => {
   };
 
   const handleSaveEditedAddress = async () => {
-    if (
-      !editAddressForm.name?.trim() ||
-      !editAddressForm.address?.trim() ||
-      !editAddressForm.city?.trim()
-    ) {
-      showToast(t('checkout.errors.fillAddress'), "error");
+    const errors = validateAddressFields(editAddressForm, [
+      "name",
+      "phone",
+      "address",
+      "city",
+      "state",
+      "pincode",
+    ]);
+    setEditAddressErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      showToast(t('checkout.errors.fillRequired'), "error");
       return;
     }
 
     let location = null;
     let placeId = null;
     let formattedAddress = null;
-    const fullAddressString = `${editAddressForm.address}${editAddressForm.landmark ? `, ${editAddressForm.landmark}` : ""}, ${editAddressForm.city}`;
+    const fullAddressString = [
+      editAddressForm.address,
+      editAddressForm.landmark,
+      editAddressForm.city,
+      editAddressForm.state,
+      editAddressForm.pincode,
+    ]
+      .filter(Boolean)
+      .join(", ");
 
     try {
       const query = [
         editAddressForm.address,
         editAddressForm.landmark,
         editAddressForm.city,
+        editAddressForm.state,
+        editAddressForm.pincode,
       ]
         .filter(Boolean)
         .join(", ");
@@ -775,6 +858,8 @@ const CheckoutPage = () => {
         fullAddress: editAddressForm.address,
         landmark: editAddressForm.landmark || "",
         city: editAddressForm.city || "",
+        state: editAddressForm.state || "",
+        pincode: editAddressForm.pincode || "",
         ...(location ? { location } : {}),
         ...(placeId ? { placeId } : {}),
         ...(formattedAddress ? { formattedAddress } : {}),
@@ -802,8 +887,8 @@ const CheckoutPage = () => {
         name: formattedAddress || fullAddressString,
         time: currentLocation?.time || "12-15 mins",
         city: editAddressForm.city || currentLocation?.city,
-        state: currentLocation?.state,
-        pincode: currentLocation?.pincode,
+        state: editAddressForm.state || currentLocation?.state,
+        pincode: editAddressForm.pincode || currentLocation?.pincode,
         latitude: location?.lat ?? currentLocation?.latitude,
         longitude: location?.lng ?? currentLocation?.longitude,
       },
@@ -1085,10 +1170,40 @@ const CheckoutPage = () => {
       return;
     }
 
+    if (savedRecipient) {
+      const missing = validateAddressFields(savedRecipient, ["completeAddress", "city", "state", "pincode", "name", "phone"]);
+      if (Object.keys(missing).length > 0) {
+        setRecipientData({ ...recipientData, ...savedRecipient });
+        setRecipientErrors(missing);
+        setShowRecipientForm(true);
+        showToast(t('checkout.errors.fillRequired'), "error");
+        return;
+      }
+    }
     if (!savedRecipient && !currentAddress?.address) {
       showToast(t('checkout.errors.addAddress'), "error");
       setIsAddressModalOpen(true);
       return;
+    }
+    if (!savedRecipient) {
+      // Existing users may have an older address saved without city / state /
+      // pincode. Ask for the full address before placing the order.
+      const prefill = {
+        ...currentAddress,
+        name: currentAddress.name || registeredName || "",
+        phone: currentAddress.phone || registeredPhone || "",
+        address: currentAddress.address || "",
+        landmark: currentAddress.landmark || "",
+        ...splitCityStatePincode(currentAddress),
+      };
+      const missing = validateAddressFields(prefill, ["name", "phone", "address", "city", "state", "pincode"]);
+      if (Object.keys(missing).length > 0) {
+        setEditAddressForm(prefill);
+        setEditAddressErrors(missing);
+        setIsEditAddressOpen(true);
+        showToast(t('checkout.errors.completeAddress'), "error");
+        return;
+      }
     }
 
     setIsPlacingOrder(true);
@@ -1566,7 +1681,18 @@ const CheckoutPage = () => {
               showRecipientForm={showRecipientForm}
               onToggleRecipientForm={() => setShowRecipientForm((v) => !v)}
               recipientData={recipientData}
-              onRecipientDataChange={setRecipientData}
+              recipientErrors={recipientErrors}
+              onRecipientDataChange={(next) => {
+                setRecipientData(next);
+                // Clear a field's error as soon as the user edits it.
+                setRecipientErrors((prev) => {
+                  const cleared = { ...prev };
+                  for (const key of Object.keys(prev)) {
+                    if (next[key] !== recipientData[key]) delete cleared[key];
+                  }
+                  return cleared;
+                });
+              }}
               onSaveRecipient={handleSaveRecipient}
               onRemoveRecipient={handleRemoveRecipient}
               displayName={displayName}
@@ -1767,39 +1893,62 @@ const CheckoutPage = () => {
             <div className="grid gap-3 py-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="grid gap-1">
-                  <Label htmlFor="edit-name" className="text-xs font-semibold text-slate-700">{t('checkout.form.contactName')}</Label>
+                  <Label htmlFor="edit-name" className="text-xs font-semibold text-slate-700">
+                    <RequiredLabel text={t('checkout.form.contactName')} />
+                  </Label>
                   <Input
                     id="edit-name"
                     value={editAddressForm.name || ""}
-                    onChange={(e) => setEditAddressForm((prev) => ({ ...prev, name: e.target.value }))}
-                    className="h-10 text-sm"
+                    onChange={(e) => {
+                      setEditAddressForm((prev) => ({ ...prev, name: e.target.value }));
+                      setEditAddressErrors((prev) => ({ ...prev, name: undefined }));
+                    }}
+                    aria-invalid={Boolean(editAddressErrors.name)}
+                    className={cn("h-10 text-sm", editAddressErrors.name && "border-rose-400 focus-visible:ring-rose-200")}
                     placeholder={t('checkout.form.receiverName')}
                   />
+                  <FieldError error={editAddressErrors.name} />
                 </div>
                 <div className="grid gap-1">
-                  <Label htmlFor="edit-phone" className="text-xs font-semibold text-slate-700">{t('checkout.form.phoneNumber')}</Label>
+                  <Label htmlFor="edit-phone" className="text-xs font-semibold text-slate-700">
+                    <RequiredLabel text={t('checkout.form.phoneNumber')} />
+                  </Label>
                   <Input
                     id="edit-phone"
                     value={editAddressForm.phone || ""}
-                    onChange={(e) => setEditAddressForm((prev) => ({ ...prev, phone: e.target.value }))}
-                    className="h-10 text-sm"
+                    onChange={(e) => {
+                      setEditAddressForm((prev) => ({ ...prev, phone: e.target.value }));
+                      setEditAddressErrors((prev) => ({ ...prev, phone: undefined }));
+                    }}
+                    aria-invalid={Boolean(editAddressErrors.phone)}
+                    className={cn("h-10 text-sm", editAddressErrors.phone && "border-rose-400 focus-visible:ring-rose-200")}
                     placeholder={t('checkout.form.mobile10')}
+                    inputMode="numeric"
+                    maxLength={10}
                   />
+                  <FieldError error={editAddressErrors.phone} />
                 </div>
               </div>
-              <div className="grid gap-1">
-                <Label htmlFor="edit-address" className="text-xs font-semibold text-slate-700">{t('checkout.form.completeAddress')}</Label>
-                <Input
-                  id="edit-address"
-                  value={editAddressForm.address || ""}
-                  onChange={(e) => setEditAddressForm((prev) => ({ ...prev, address: e.target.value }))}
-                  className="h-10 text-sm"
-                  placeholder={t('checkout.form.houseStreet')}
-                />
-              </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="edit-address" className="text-xs font-semibold text-slate-700">
+                    <RequiredLabel text={t('checkout.form.completeAddress')} />
+                  </Label>
+                  <Input
+                    id="edit-address"
+                    value={editAddressForm.address || ""}
+                    onChange={(e) => {
+                      setEditAddressForm((prev) => ({ ...prev, address: e.target.value }));
+                      setEditAddressErrors((prev) => ({ ...prev, address: undefined }));
+                    }}
+                    aria-invalid={Boolean(editAddressErrors.address)}
+                    className={cn("h-10 text-sm", editAddressErrors.address && "border-rose-400 focus-visible:ring-rose-200")}
+                    placeholder={t('checkout.form.houseStreet')}
+                  />
+                  <FieldError error={editAddressErrors.address} />
+                </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="grid gap-1">
-                  <Label htmlFor="edit-landmark" className="text-xs font-semibold text-slate-700">{t('checkout.form.landmark')}</Label>
+                  <Label htmlFor="edit-landmark" className="text-xs font-semibold text-slate-700">{t('checkout.form.landmark')} <span className="font-normal text-slate-400">({t('checkout.form.optional')})</span></Label>
                   <Input
                     id="edit-landmark"
                     value={editAddressForm.landmark || ""}
@@ -1809,16 +1958,64 @@ const CheckoutPage = () => {
                   />
                 </div>
                 <div className="grid gap-1">
-                  <Label htmlFor="edit-city" className="text-xs font-semibold text-slate-700">{t('checkout.form.cityPincode')}</Label>
+                  <Label htmlFor="edit-city" className="text-xs font-semibold text-slate-700">
+                    <RequiredLabel text={t('checkout.form.city')} />
+                  </Label>
                   <Input
                     id="edit-city"
                     value={editAddressForm.city || ""}
-                    onChange={(e) => setEditAddressForm((prev) => ({ ...prev, city: e.target.value }))}
-                    className="h-10 text-sm"
-                    placeholder={t('checkout.form.cityStatePin')}
+                    onChange={(e) => {
+                      setEditAddressForm((prev) => ({ ...prev, city: e.target.value }));
+                      setEditAddressErrors((prev) => ({ ...prev, city: undefined }));
+                    }}
+                    aria-invalid={Boolean(editAddressErrors.city)}
+                    className={cn("h-10 text-sm", editAddressErrors.city && "border-rose-400 focus-visible:ring-rose-200")}
+                    placeholder={t('checkout.form.cityExample')}
                   />
+                  <FieldError error={editAddressErrors.city} />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid gap-1">
+                  <Label htmlFor="edit-state" className="text-xs font-semibold text-slate-700">
+                    <RequiredLabel text={t('checkout.form.state')} />
+                  </Label>
+                  <Input
+                    id="edit-state"
+                    value={editAddressForm.state || ""}
+                    onChange={(e) => {
+                      setEditAddressForm((prev) => ({ ...prev, state: e.target.value }));
+                      setEditAddressErrors((prev) => ({ ...prev, state: undefined }));
+                    }}
+                    aria-invalid={Boolean(editAddressErrors.state)}
+                    className={cn("h-10 text-sm", editAddressErrors.state && "border-rose-400 focus-visible:ring-rose-200")}
+                    placeholder={t('checkout.form.stateExample')}
+                  />
+                  <FieldError error={editAddressErrors.state} />
+                </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="edit-pincode" className="text-xs font-semibold text-slate-700">
+                    <RequiredLabel text={t('checkout.form.pincode')} />
+                  </Label>
+                  <Input
+                    id="edit-pincode"
+                    value={editAddressForm.pincode || ""}
+                    onChange={(e) => {
+                      setEditAddressForm((prev) => ({ ...prev, pincode: e.target.value }));
+                      setEditAddressErrors((prev) => ({ ...prev, pincode: undefined }));
+                    }}
+                    aria-invalid={Boolean(editAddressErrors.pincode)}
+                    className={cn("h-10 text-sm", editAddressErrors.pincode && "border-rose-400 focus-visible:ring-rose-200")}
+                    placeholder={t('checkout.form.pincodeExample')}
+                    inputMode="numeric"
+                    maxLength={6}
+                  />
+                  <FieldError error={editAddressErrors.pincode} />
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                <span className="text-rose-500 font-bold">*</span> {t('checkout.form.requiredNote')}
+              </p>
             </div>
             <DialogFooter className="mt-2">
               <Button

@@ -31,6 +31,7 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
   showRecipientForm,
   onToggleRecipientForm,
   recipientData,
+  recipientErrors = {},
   onRecipientDataChange,
   onSaveRecipient,
   onRemoveRecipient,
@@ -101,14 +102,22 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
                   {t('checkout.address.enterAddress')}
                 </h4>
                 <div className="space-y-3">
-                  <Input
-                    placeholder={t('checkout.address.completeAddress')}
-                    value={recipientData.completeAddress}
-                    onChange={(e) =>
-                      onRecipientDataChange({ ...recipientData, completeAddress: e.target.value })
-                    }
-                    className="h-12 rounded-xl border-slate-200 focus:ring-primary focus:border-primary text-sm"
-                  />
+                  <div>
+                    <Input
+                      placeholder={t('checkout.address.completeAddress')}
+                      value={recipientData.completeAddress || ""}
+                      onChange={(e) =>
+                        onRecipientDataChange({ ...recipientData, completeAddress: e.target.value })
+                      }
+                      aria-invalid={Boolean(recipientErrors.completeAddress)}
+                      className={`h-12 rounded-xl text-sm focus:ring-primary focus:border-primary ${recipientErrors.completeAddress ? "border-rose-400" : "border-slate-200"}`}
+                    />
+                    {recipientErrors.completeAddress && (
+                      <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                        {t(`checkout.form.errors.${recipientErrors.completeAddress}`)}
+                      </p>
+                    )}
+                  </div>
                   <Input
                     placeholder={t('checkout.address.landmark')}
                     value={recipientData.landmark}
@@ -117,14 +126,58 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
                     }
                     className="h-12 rounded-xl border-slate-200 focus:ring-primary focus:border-primary text-sm"
                   />
-                  <Input
-                    placeholder={t('checkout.address.pincode')}
-                    value={recipientData.pincode}
-                    onChange={(e) =>
-                      onRecipientDataChange({ ...recipientData, pincode: e.target.value })
-                    }
-                    className="h-12 rounded-xl border-slate-200 focus:ring-primary focus:border-primary text-sm"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Input
+                      placeholder={t('checkout.address.city')}
+                      value={recipientData.city || ""}
+                      onChange={(e) =>
+                        onRecipientDataChange({ ...recipientData, city: e.target.value })
+                      }
+                      aria-invalid={Boolean(recipientErrors.city)}
+                      className={`h-12 rounded-xl text-sm focus:ring-primary focus:border-primary ${recipientErrors.city ? "border-rose-400" : "border-slate-200"}`}
+                    />
+                    {recipientErrors.city && (
+                      <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                        {t(`checkout.form.errors.${recipientErrors.city}`)}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Input
+                      placeholder={t('checkout.address.state')}
+                      value={recipientData.state || ""}
+                      onChange={(e) =>
+                        onRecipientDataChange({ ...recipientData, state: e.target.value })
+                      }
+                      aria-invalid={Boolean(recipientErrors.state)}
+                      className={`h-12 rounded-xl text-sm focus:ring-primary focus:border-primary ${recipientErrors.state ? "border-rose-400" : "border-slate-200"}`}
+                    />
+                    {recipientErrors.state && (
+                      <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                        {t(`checkout.form.errors.${recipientErrors.state}`)}
+                      </p>
+                    )}
+                  </div>
+                  </div>
+                  <div>
+                    <Input
+                      placeholder={t('checkout.address.pincode')}
+                      value={recipientData.pincode || ""}
+                      onChange={(e) =>
+                        onRecipientDataChange({ ...recipientData, pincode: e.target.value })
+                      }
+                      aria-invalid={Boolean(recipientErrors.pincode)}
+                      className={`h-12 rounded-xl text-sm focus:ring-primary focus:border-primary ${recipientErrors.pincode ? "border-rose-400" : "border-slate-200"}`}
+                      inputMode="numeric"
+                      maxLength={6}
+                    />
+                    {recipientErrors.pincode && (
+                      <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                        {t(`checkout.form.errors.${recipientErrors.pincode}`)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -136,28 +189,47 @@ const CheckoutAddressSection = React.memo(function CheckoutAddressSection({
                   {t('checkout.address.contactReceiver')}
                 </p>
                 <div className="space-y-3">
-                  <Input
-                    placeholder={t('checkout.address.receiverName')}
-                    value={recipientData.name}
-                    onChange={(e) =>
-                      onRecipientDataChange({ ...recipientData, name: e.target.value })
-                    }
-                    className="h-12 rounded-xl border-slate-200 focus:ring-primary focus:border-primary text-sm"
-                  />
-                  <div className="relative">
+                  <div>
                     <Input
-                      placeholder={t('checkout.address.receiverPhone')}
-                      value={recipientData.phone}
+                      placeholder={t('checkout.address.receiverName')}
+                      value={recipientData.name || ""}
                       onChange={(e) =>
-                        onRecipientDataChange({ ...recipientData, phone: e.target.value })
+                        onRecipientDataChange({ ...recipientData, name: e.target.value })
                       }
-                      className="h-12 rounded-xl border-slate-200 focus:ring-primary focus:border-primary text-sm pr-10"
+                      aria-invalid={Boolean(recipientErrors.name)}
+                      className={`h-12 rounded-xl text-sm focus:ring-primary focus:border-primary ${recipientErrors.name ? "border-rose-400" : "border-slate-200"}`}
                     />
-                    <Contact2
-                      size={18}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
+                    {recipientErrors.name && (
+                      <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                        {t(`checkout.form.errors.${recipientErrors.name}`)}
+                      </p>
+                    )}
                   </div>
+                  <div>
+                    <div className="relative">
+                      <Input
+                        placeholder={t('checkout.address.receiverPhone')}
+                        value={recipientData.phone || ""}
+                        onChange={(e) =>
+                          onRecipientDataChange({ ...recipientData, phone: e.target.value })
+                        }
+                        inputMode="numeric"
+                        maxLength={10}
+                        aria-invalid={Boolean(recipientErrors.phone)}
+                        className={`h-12 rounded-xl text-sm pr-10 focus:ring-primary focus:border-primary ${recipientErrors.phone ? "border-rose-400" : "border-slate-200"}`}
+                      />
+                      <Contact2
+                        size={18}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+                    </div>
+                    {recipientErrors.phone && (
+                      <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                        {t(`checkout.form.errors.${recipientErrors.phone}`)}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">{t('checkout.form.requiredNote')}</p>
                 </div>
               </div>
 

@@ -360,6 +360,20 @@ export async function placeOrderAtomic({
   // "undeliverable" rejection also now surfaces before any stock/coupon work
   // begins, instead of aborting a partially-built transaction.
   const preCheckAddress = normalizeAddress(normalizedPayload.address);
+  {
+    const missing = [];
+    if (!String(preCheckAddress.address || "").trim()) missing.push("address");
+    if (!String(preCheckAddress.city || "").trim() || /^\d+$/.test(String(preCheckAddress.city).trim())) missing.push("city");
+    if (!/^\d{6}$/.test(String(preCheckAddress.pincode || "").trim())) missing.push("pincode");
+    if (missing.length) {
+      const err = new Error(
+        `Delivery address is incomplete (missing ${missing.join(", ")}). Please update your address and try again.`,
+      );
+      err.statusCode = 400;
+      err.code = "ADDRESS_INCOMPLETE";
+      throw err;
+    }
+  }
   const { orderItemsInput: preCheckItemsInput } = await resolveOrderItemsInput({
     payload: normalizedPayload,
     customerId,

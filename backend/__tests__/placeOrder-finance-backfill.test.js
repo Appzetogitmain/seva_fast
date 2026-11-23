@@ -185,7 +185,7 @@ describe("placeOrder legacy route finance backfill", () => {
     const req = {
       user: { id: "cust-1", role: "customer" },
       body: {
-        address: {},
+        address: { address: "12 MG Road", city: "Indore", state: "Madhya Pradesh", pincode: "452001" },
         payment: { method: "cash" },
         pricing: { subtotal: 100, deliveryFee: 20, platformFee: 3, gst: 0, discount: 0, total: 123 },
         timeSlot: "now",

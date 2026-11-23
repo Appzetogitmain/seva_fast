@@ -80,7 +80,20 @@
     "mobile10": "10-digit mobile number",
     "houseStreet": "House, street, area",
     "landmarkExample": "e.g. Near City Mall",
-    "cityStatePin": "City, State, Pincode"
+    "cityStatePin": "City, State, Pincode",
+    "city": "City*",
+    "state": "State*",
+    "pincode": "Pincode*",
+    "optional": "optional",
+    "cityExample": "e.g. Indore",
+    "stateExample": "e.g. Madhya Pradesh",
+    "pincodeExample": "6-digit pincode",
+    "requiredNote": "Fields marked * are required",
+    "errors": {
+      "required": "This field is required",
+      "pincode": "Enter a valid 6-digit pincode",
+      "phone": "Enter a valid 10-digit mobile number"
+    }
   },
   "errors": {
     "fillRequired": "Please fill all required fields",
@@ -94,7 +107,8 @@
     "paymentVerify": "Payment verification failed",
     "placeFailed": "Could not place order.",
     "placeFailedRetry": "Failed to place order. Please try again.",
-    "sellerTimeout": "Order cancelled — seller did not accept in time."
+    "sellerTimeout": "Order cancelled — seller did not accept in time.",
+    "completeAddress": "Please complete your delivery address before placing the order"
   },
   "recommended": "You might also like",
   "yourWishlist": "Your wishlist",
@@ -105,7 +119,7 @@
     "enterAddress": "Enter delivery address details",
     "completeAddress": "Enter complete address*",
     "landmark": "Find landmark (optional)",
-    "pincode": "Enter pin code (optional)",
+    "pincode": "Enter pin code*",
     "enterReceiver": "Enter receiver details",
     "contactReceiver": "We'll contact receiver to get the exact delivery address",
     "receiverName": "Receiver's name*",
@@ -117,7 +131,9 @@
     "detecting": "Detecting live location...",
     "useLive": "Use current live location",
     "confirmed": "Delivery address confirmed",
-    "confirmedSub": "We'll deliver to the address you've entered above."
+    "confirmedSub": "We'll deliver to the address you've entered above.",
+    "city": "City*",
+    "state": "State*"
   },
   "summary": {
     "moveToWishlist": "Move to wishlist",

@@ -256,7 +256,10 @@ const OrderDetailPage = () => {
         }
 
         // Fetch live shipping tracking if nationwide Shiprocket order
-        if (ord?.deliveryType === "scheduled" || ord?.shipmentDetails?.provider === "shiprocket") {
+        if (
+          (ord?.deliveryType === "scheduled" || ord?.shipmentDetails?.provider === "shiprocket") &&
+          getLegacyStatusFromOrder(ord) !== "cancelled"
+        ) {
           fetchShippingTracking(ord.orderId || orderId);
         }
       } catch (error) {
@@ -1095,8 +1098,9 @@ const OrderDetailPage = () => {
           </motion.div>
         )}
 
-        {/* Shiprocket Delivery Details Card */}
-        {order.deliveryType === "scheduled" && (
+        {/* Shiprocket Delivery Details Card — hidden once the order is cancelled
+            (courier name / ETA / dispatch status no longer apply) */}
+        {order.deliveryType === "scheduled" && getLegacyStatusFromOrder(order) !== "cancelled" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
