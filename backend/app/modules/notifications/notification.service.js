@@ -36,6 +36,7 @@ function dedupeKeyForNotification(eventType, notification, payload = {}) {
   }
 
   const orderRef =
+    payload.dedupeRef ||
     payload.messageId ||
     payload.messageCreatedAt ||
     payload.ticketId ||
@@ -106,6 +107,8 @@ function isOrderUpdateEvent(eventType) {
     NOTIFICATION_EVENTS.RETURN_APPROVED,
     NOTIFICATION_EVENTS.RETURN_REJECTED,
     NOTIFICATION_EVENTS.RETURN_COMPLETED,
+    NOTIFICATION_EVENTS.SHIPMENT_AWB_ASSIGNED,
+    NOTIFICATION_EVENTS.SHIPMENT_STATUS_UPDATE,
   ].includes(eventType);
 }
 

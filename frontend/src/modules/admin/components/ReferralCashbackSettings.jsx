@@ -69,25 +69,59 @@ const ReferralCashbackSettings = ({ value: rc, onChange }) => {
 
                 <div className="space-y-3">
                     <label className={labelCls}>Cashback Type</label>
-                    <div className="flex gap-3 flex-wrap">
+                    <div role="radiogroup" aria-label="Cashback type" className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
                         {[
-                            { id: 'fixed', label: 'Fixed amount (₹)' },
-                            { id: 'percent', label: '% of order value' },
-                        ].map((opt) => (
-                            <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => onChange('rewardType', opt.id)}
-                                className={cn(
-                                    'px-5 py-3 rounded-2xl text-xs font-black border transition-all',
-                                    rc.rewardType === opt.id
-                                        ? 'bg-brand-600 text-white border-brand-600'
-                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                                )}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
+                            {
+                                id: 'fixed',
+                                symbol: '₹',
+                                label: 'Fixed amount',
+                                hint: 'Same cashback on every referral, e.g. ₹50',
+                            },
+                            {
+                                id: 'percent',
+                                symbol: '%',
+                                label: 'Percentage of order',
+                                hint: "A share of the friend's first order, e.g. 5%",
+                            },
+                        ].map((opt) => {
+                            const selected = rc.rewardType === opt.id;
+                            return (
+                                <button
+                                    key={opt.id}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={selected}
+                                    onClick={() => onChange('rewardType', opt.id)}
+                                    className={cn(
+                                        'flex items-center gap-3 p-4 rounded-2xl border-2 text-left transition-all',
+                                        selected
+                                            ? 'border-emerald-500 bg-emerald-50'
+                                            : 'border-slate-200 bg-white hover:border-slate-300'
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black',
+                                            selected ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                                        )}
+                                    >
+                                        {opt.symbol}
+                                    </span>
+                                    <span className="flex-1 min-w-0">
+                                        <span className="block text-sm font-black text-slate-900">{opt.label}</span>
+                                        <span className="block text-[11px] font-medium text-slate-500 mt-0.5">{opt.hint}</span>
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2',
+                                            selected ? 'border-emerald-500' : 'border-slate-300'
+                                        )}
+                                    >
+                                        {selected && <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 

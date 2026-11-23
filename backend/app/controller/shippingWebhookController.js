@@ -127,6 +127,61 @@ async function handleReturnShipmentWebhook({ order, rawStatus, awbCode }) {
  * (delivery) and reverse (return) shipments.
  * Mounted at: POST /api/orders/shipping/shiprocket/webhook
  */
+// Customer/seller copy for Shiprocket statuses that have no dedicated event.
+// DELIVERED and CANCELLED/RTO keep their own ORDER_DELIVERED / ORDER_CANCELLED events.
+const SHIPMENT_STATUS_MESSAGES = {
+  "PICKUP SCHEDULED": {
+    customerTitle: "Pickup Scheduled",
+    customerBody: "The courier will pick up your order from the seller soon.",
+  },
+  "PICKED UP": {
+    customerTitle: "Order Picked Up 🚚",
+    customerBody: "The courier has picked up your order from the seller.",
+    notifySeller: true,
+    sellerTitle: "Package Picked Up",
+  },
+  SHIPPED: {
+    customerTitle: "Order Shipped 🚚",
+    customerBody: "Your order has been shipped and is on its way.",
+  },
+  "IN TRANSIT": {
+    customerTitle: "In Transit",
+    customerBody: "Your order is in transit to your city.",
+  },
+  "REACHED AT DESTINATION HUB": {
+    customerTitle: "Reached Your City",
+    customerBody: "Your order has reached the delivery hub near you.",
+  },
+  "OUT FOR DELIVERY": {
+    customerTitle: "Out For Delivery 🛵",
+    customerBody: "Your order will be delivered today.",
+  },
+  "UNDELIVERED": {
+    customerTitle: "Delivery Attempt Failed",
+    customerBody: "The courier couldn't deliver your order. They will try again.",
+    notifySeller: true,
+    sellerTitle: "Delivery Attempt Failed",
+  },
+  "DELAYED": {
+    customerTitle: "Shipment Delayed",
+    customerBody: "Your order is delayed. We'll keep you updated.",
+  },
+};
+
+function notifyShipmentStatus(order, rawStatus) {
+  const copy = SHIPMENT_STATUS_MESSAGES[rawStatus];
+  if (!copy) return;
+  emitNotificationEvent(NOTIFICATION_EVENTS.SHIPMENT_STATUS_UPDATE, {
+    orderId: order.orderId,
+    customerId: order.customer,
+    userId: order.customer,
+    sellerId: order.seller,
+    shipmentStatus: rawStatus,
+    dedupeRef: `${order.orderId}:${rawStatus}`,
+    ...copy,
+  });
+}
+
 export async function handleShiprocketWebhook(req, res) {
   try {
     const payload = req.body || {};
@@ -223,6 +278,16 @@ export async function handleShiprocketWebhook(req, res) {
     // these after order creation, so this is the main way the customer sees them.
     const webhookCourier = payload.courier_name || payload.courier || null;
     const sd = order.shipmentDetails || {};
+    if (awbCode && !sd.awbCode) {
+      emitNotificationEvent(NOTIFICATION_EVENTS.SHIPMENT_AWB_ASSIGNED, {
+        orderId: order.orderId,
+        customerId: order.customer,
+        userId: order.customer,
+        sellerId: order.seller,
+        awbCode: String(awbCode),
+        courierName: webhookCourier || sd.courierName || null,
+      });
+    }
     if ((awbCode && sd.awbCode !== String(awbCode)) || (webhookCourier && sd.courierName !== webhookCourier)) {
       order.shipmentDetails = {
         ...sd,
@@ -303,14 +368,7 @@ export async function handleShiprocketWebhook(req, res) {
         order._id,
       );
 
-      if (newStatus === "out_for_delivery") {
-        emitNotificationEvent(NOTIFICATION_EVENTS.OUT_FOR_DELIVERY, {
-          orderId: order.orderId,
-          customerId: order.customer,
-          userId: order.customer,
-          sellerId: order.seller,
-        });
-      } else if (newStatus === "cancelled") {
+      if (newStatus === "cancelled") {
         emitNotificationEvent(NOTIFICATION_EVENTS.ORDER_CANCELLED, {
           orderId: order.orderId,
           customerId: order.customer,
@@ -321,6 +379,8 @@ export async function handleShiprocketWebhook(req, res) {
     } else {
       await order.save();
     }
+
+    notifyShipmentStatus(order, rawStatus);
 
     return res.status(200).json({ success: true, message: "Webhook processed successfully" });
   } catch (error) {

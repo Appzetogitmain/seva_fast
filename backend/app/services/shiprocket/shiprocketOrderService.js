@@ -1,4 +1,6 @@
 import Order from "../../models/order.js";
+import { emitNotificationEvent } from "../../modules/notifications/notification.emitter.js";
+import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
 import Seller from "../../models/seller.js";
 import Customer from "../../models/customer.js";
 import Product from "../../models/product.js";
@@ -518,6 +520,17 @@ export async function createShiprocketShipmentForOrder(orderId) {
 
   order.shipmentDetails = shipmentDetails;
   await order.save();
+
+  if (awbCode) {
+    emitNotificationEvent(NOTIFICATION_EVENTS.SHIPMENT_AWB_ASSIGNED, {
+      orderId: order.orderId,
+      customerId: order.customer,
+      userId: order.customer,
+      sellerId: order.seller,
+      awbCode,
+      courierName: courierName || null,
+    });
+  }
 
   return shipmentDetails;
 }

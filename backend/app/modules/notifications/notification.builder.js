@@ -332,6 +332,51 @@ function eventDefinition(eventType) {
             ? `Order #${payload.orderId} is ready for pickup.`
             : "An order is ready for pickup.",
       };
+    case NOTIFICATION_EVENTS.SHIPMENT_AWB_ASSIGNED:
+      return {
+        multi: true,
+        definitions: [
+          {
+            role: NOTIFICATION_ROLES.CUSTOMER,
+            recipientIds: (payload) => normalizeIdList(payload.userId || payload.customerId),
+            title: () => "Order Shipped 📦",
+            body: (payload) => {
+              const via = payload.courierName ? ` via ${payload.courierName}` : "";
+              const awb = payload.awbCode ? ` AWB: ${payload.awbCode}.` : "";
+              return `Your order${payload.orderId ? ` #${payload.orderId}` : ""} is being shipped${via}.${awb}`;
+            },
+          },
+          {
+            role: NOTIFICATION_ROLES.SELLER,
+            recipientIds: (payload) => normalizeIdList(payload.sellerId),
+            title: () => "Shipment Created 📦",
+            body: (payload) => {
+              const via = payload.courierName ? ` with ${payload.courierName}` : "";
+              const awb = payload.awbCode ? ` (AWB ${payload.awbCode})` : "";
+              return `Order #${payload.orderId} is booked${via}${awb}. Keep the package ready for pickup.`;
+            },
+          },
+        ],
+      };
+    case NOTIFICATION_EVENTS.SHIPMENT_STATUS_UPDATE:
+      return {
+        multi: true,
+        definitions: [
+          {
+            role: NOTIFICATION_ROLES.CUSTOMER,
+            recipientIds: (payload) => normalizeIdList(payload.userId || payload.customerId),
+            title: (payload) => payload.customerTitle || "Shipment Update",
+            body: (payload) => payload.customerBody || `Your order is now: ${payload.shipmentStatus}.`,
+          },
+          {
+            role: NOTIFICATION_ROLES.SELLER,
+            recipientIds: (payload) => (payload.notifySeller ? normalizeIdList(payload.sellerId) : []),
+            title: (payload) => payload.sellerTitle || "Shipment Update",
+            body: (payload) =>
+              payload.sellerBody || `Order #${payload.orderId} shipment status: ${payload.shipmentStatus}.`,
+          },
+        ],
+      };
     case NOTIFICATION_EVENTS.RIDER_ARRIVED_AT_STORE:
       return {
         multi: true,
