@@ -176,6 +176,15 @@ export const registerPushToken = async (req, res) => {
       },
     ).lean();
 
+    // Push to sellers/riders is gated on isLoggedIn, which is set only at login
+    // and cleared by any logout. An authenticated app registering its token
+    // proves an active session, so restore the flag; otherwise sessions that
+    // predate the flag, or a logout on another device, silently block pushes.
+    if (role === "seller" || role === "delivery") {
+      const Model = role === "seller" ? Seller : Delivery;
+      await Model.updateOne({ _id: userId, isLoggedIn: { $ne: true } }, { $set: { isLoggedIn: true } });
+    }
+
     const bearerToken = resolveBearerToken(req);
     const userModelName = ROLE_TO_USER_MODEL[role];
     const userDoc = await fetchLoginUser(userModelName, userId);

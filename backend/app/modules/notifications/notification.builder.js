@@ -59,6 +59,13 @@ function buildSellerInventoryLink(productId) {
     : buildAppPath("/seller/inventory");
 }
 
+function buildAdminOrderLink(orderId) {
+  const id = String(orderId || "").trim();
+  return id
+    ? buildAppPath(`/admin/orders/view/${encodeURIComponent(id)}`)
+    : buildAppPath("/admin/orders/all");
+}
+
 function buildAdminReturnsLink(orderId) {
   const id = String(orderId || "").trim();
   return id
@@ -110,10 +117,24 @@ function eventDefinition(eventType) {
   switch (eventType) {
     case NOTIFICATION_EVENTS.ORDER_PLACED:
       return {
-        role: NOTIFICATION_ROLES.CUSTOMER,
-        recipientIds: (payload) => normalizeIdList(payload.userId || payload.customerId),
-        title: () => "Order Placed",
-        body: () => "Your order has been placed successfully.",
+        multi: true,
+        definitions: [
+          {
+            role: NOTIFICATION_ROLES.CUSTOMER,
+            recipientIds: (payload) => normalizeIdList(payload.userId || payload.customerId),
+            title: () => "Order Placed",
+            body: () => "Your order has been placed successfully.",
+          },
+          {
+            role: NOTIFICATION_ROLES.ADMIN,
+            recipientIds: (payload) => normalizeIdList(payload.adminIds),
+            title: () => "New Order Placed 🛒",
+            body: (payload) =>
+              payload.orderId
+                ? `A customer placed order #${payload.orderId}.`
+                : "A customer placed a new order.",
+          },
+        ],
       };
     case NOTIFICATION_EVENTS.PAYMENT_SUCCESS:
       return {
@@ -170,6 +191,15 @@ function eventDefinition(eventType) {
               payload.orderId
                 ? `You have successfully delivered order #${payload.orderId}.`
                 : "Delivery completed successfully.",
+          },
+          {
+            role: NOTIFICATION_ROLES.ADMIN,
+            recipientIds: (payload) => normalizeIdList(payload.adminIds),
+            title: () => "Order Delivered ✅",
+            body: (payload) =>
+              payload.orderId
+                ? `Order #${payload.orderId} has been delivered to the customer.`
+                : "An order has been delivered to the customer.",
           },
         ],
       };
@@ -301,6 +331,27 @@ function eventDefinition(eventType) {
           payload.orderId
             ? `Order #${payload.orderId} is ready for pickup.`
             : "An order is ready for pickup.",
+      };
+    case NOTIFICATION_EVENTS.RIDER_ARRIVED_AT_STORE:
+      return {
+        multi: true,
+        definitions: [
+          {
+            role: NOTIFICATION_ROLES.SELLER,
+            recipientIds: (payload) => normalizeIdList(payload.sellerId),
+            title: () => "Delivery Partner Arrived 🛵",
+            body: (payload) =>
+              payload.orderId
+                ? `The delivery partner has reached your shop for order #${payload.orderId}. Please hand over the order.`
+                : "The delivery partner has reached your shop. Please hand over the order.",
+          },
+          {
+            role: NOTIFICATION_ROLES.CUSTOMER,
+            recipientIds: (payload) => normalizeIdList(payload.userId || payload.customerId),
+            title: () => "Picking Up Your Order",
+            body: () => "Your delivery partner has reached the store to pick up your order.",
+          },
+        ],
       };
     // ── Return Workflow Events ──────────────────────────────────────────────
     case NOTIFICATION_EVENTS.RETURN_REQUESTED:
@@ -697,6 +748,8 @@ function eventData(eventType, payload = {}, role) {
       (eventType === NOTIFICATION_EVENTS.RETURN_REQUESTED ||
         eventType === NOTIFICATION_EVENTS.RETURN_COMPLETED)
       ? buildAdminReturnsLink(orderId)
+      : role === NOTIFICATION_ROLES.ADMIN
+        ? buildAdminOrderLink(orderId)
       : role === NOTIFICATION_ROLES.SELLER &&
           (eventType === NOTIFICATION_EVENTS.RETURN_REQUESTED ||
             eventType === NOTIFICATION_EVENTS.RETURN_COMPLETED)

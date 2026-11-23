@@ -42,6 +42,19 @@ import { getSellerOrderEarning, getSellerEarningBreakdown, getCustomerOrderBill 
 import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
 import { formatDate, formatTime } from '@shared/utils/formatDate';
 
+const FINAL_ORDER_STATUSES = ["delivered", "cancelled"];
+const ORDER_STATUS_RANK = { pending: 0, confirmed: 1, packed: 2, out_for_delivery: 3, delivered: 4, cancelled: 99 };
+const isFinalOrderStatus = (status) =>
+  FINAL_ORDER_STATUSES.includes(String(status || "").toLowerCase());
+// Locked if the order is finalized (delivered/cancelled) or the option would move it backwards.
+const isStatusOptionLocked = (current, option) => {
+  const cur = String(current || "").toLowerCase();
+  if (option === cur) return false;
+  if (isFinalOrderStatus(cur)) return true;
+  if (option === "cancelled") return false;
+  return (ORDER_STATUS_RANK[option] ?? 0) < (ORDER_STATUS_RANK[cur] ?? 0);
+};
+
 
 const Orders = () => {
     const [orders, setOrders] = useState([]);
@@ -743,6 +756,11 @@ const Orders = () => {
     const STATUS_RANK = { pending: 0, confirmed: 1, packed: 2, out_for_delivery: 3, delivered: 4, cancelled: 99 };
 
     const handleStatusUpdate = async (orderId, newStatus) => {
+        const currentOrder = orders.find((o) => o.id === orderId) || selectedOrder;
+        if (currentOrder && isFinalOrderStatus(currentOrder.status)) {
+            showToast("Delivered or cancelled orders cannot be changed", "error");
+            return;
+        }
         const normalizedStatus = String(newStatus || "")
             .toLowerCase()
             .trim()
@@ -1094,6 +1112,7 @@ const Orders = () => {
                                                             </Badge>
                                                             <select
                                                                 value={order.status}
+                                                                disabled={isFinalOrderStatus(order.status)}
                                                                 onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 className={cn(
@@ -1103,12 +1122,12 @@ const Orders = () => {
                                                                             order.status === 'cancelled' ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"
                                                                 )}
                                                             >
-                                                                <option value="pending">Pending</option>
-                                                                <option value="confirmed">Confirmed</option>
-                                                                <option value="packed">Packed</option>
-                                                                <option value="out_for_delivery">Out</option>
-                                                                <option value="delivered">Delivered</option>
-                                                                <option value="cancelled">Cancelled</option>
+                                                                <option value="pending" disabled={isStatusOptionLocked(order.status, "pending")}>Pending</option>
+                                                                <option value="confirmed" disabled={isStatusOptionLocked(order.status, "confirmed")}>Confirmed</option>
+                                                                <option value="packed" disabled={isStatusOptionLocked(order.status, "packed")}>Packed</option>
+                                                                <option value="out_for_delivery" disabled={isStatusOptionLocked(order.status, "out_for_delivery")}>Out</option>
+                                                                <option value="delivered" disabled={isStatusOptionLocked(order.status, "delivered")}>Delivered</option>
+                                                                <option value="cancelled" disabled={isStatusOptionLocked(order.status, "cancelled")}>Cancelled</option>
                                                             </select>
                                                             <div className="flex items-center gap-1">
                                                                 <button
@@ -1203,6 +1222,7 @@ const Orders = () => {
                                                             <div className="relative inline-block w-36">
                                                                 <select
                                                                     value={order.status}
+                                                                    disabled={isFinalOrderStatus(order.status)}
                                                                     onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
                                                                     className={cn(
                                                                         "w-full text-[10px] pl-2.5 pr-8 py-1.5 rounded-full font-black uppercase tracking-widest cursor-pointer appearance-none focus:ring-2 focus:ring-offset-1 transition-all border-none outline-none shadow-sm",
@@ -1215,12 +1235,12 @@ const Orders = () => {
                                                                                                 "bg-slate-100 text-slate-700 focus:ring-slate-200"
                                                                     )}
                                                                 >
-                                                                    <option value="pending">Pending</option>
-                                                                    <option value="confirmed">Confirmed</option>
-                                                                    <option value="packed">Packed</option>
-                                                                    <option value="out_for_delivery">Out for Delivery</option>
-                                                                    <option value="delivered">Delivered</option>
-                                                                    <option value="cancelled">Cancelled</option>
+                                                                    <option value="pending" disabled={isStatusOptionLocked(order.status, "pending")}>Pending</option>
+                                                                    <option value="confirmed" disabled={isStatusOptionLocked(order.status, "confirmed")}>Confirmed</option>
+                                                                    <option value="packed" disabled={isStatusOptionLocked(order.status, "packed")}>Packed</option>
+                                                                    <option value="out_for_delivery" disabled={isStatusOptionLocked(order.status, "out_for_delivery")}>Out for Delivery</option>
+                                                                    <option value="delivered" disabled={isStatusOptionLocked(order.status, "delivered")}>Delivered</option>
+                                                                    <option value="cancelled" disabled={isStatusOptionLocked(order.status, "cancelled")}>Cancelled</option>
                                                                 </select>
                                                                 <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
                                                             </div>
@@ -1724,6 +1744,7 @@ const Orders = () => {
                                                 <div className="relative inline-block w-40">
                                                     <select
                                                         value={selectedOrder.status.toLowerCase()}
+                                                        disabled={isFinalOrderStatus(selectedOrder.status.toLowerCase())}
                                                         onChange={(e) => handleStatusUpdate(selectedOrder.id, e.target.value)}
                                                         className={cn(
                                                             "w-full text-xs pl-3 pr-8 py-2 rounded-xl font-black uppercase tracking-wider border appearance-none cursor-pointer focus:ring-2 focus:ring-offset-1 transition-all outline-none shadow-sm",
@@ -1736,12 +1757,12 @@ const Orders = () => {
                                                                                     "bg-slate-100 text-slate-700 focus:ring-slate-200"
                                                         )}
                                                     >
-                                                        <option value="pending">Pending</option>
-                                                        <option value="confirmed">Confirmed</option>
-                                                        <option value="packed">Packed</option>
-                                                        <option value="out_for_delivery">Out for Delivery</option>
-                                                        <option value="delivered">Delivered</option>
-                                                        <option value="cancelled">Cancelled</option>
+                                                        <option value="pending" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "pending")}>Pending</option>
+                                                        <option value="confirmed" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "confirmed")}>Confirmed</option>
+                                                        <option value="packed" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "packed")}>Packed</option>
+                                                        <option value="out_for_delivery" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "out_for_delivery")}>Out for Delivery</option>
+                                                        <option value="delivered" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "delivered")}>Delivered</option>
+                                                        <option value="cancelled" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "cancelled")}>Cancelled</option>
                                                     </select>
                                                     <HiOutlineChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
                                                 </div>

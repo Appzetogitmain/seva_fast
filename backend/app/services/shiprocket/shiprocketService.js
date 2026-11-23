@@ -202,6 +202,13 @@ export async function trackByShipmentId(shipmentId) {
   });
 }
 
+export async function getShipmentDetails(shipmentId) {
+  return request({
+    method: "get",
+    path: `/shipments/${shipmentId}`,
+  });
+}
+
 export async function cancelOrders(shiprocketOrderIds) {
   return request({
     method: "post",

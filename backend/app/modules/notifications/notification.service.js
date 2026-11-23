@@ -12,6 +12,12 @@ import { getRedisClient } from "../../config/redis.js";
 import logger from "../../services/logger.js";
 import { incrementCounter, setGauge } from "../../services/metrics.js";
 import { deliverNotificationById } from "./notification.worker.js";
+import { getAdminIds } from "../../utils/adminIds.js";
+
+const ADMIN_ORDER_EVENTS = new Set([
+  NOTIFICATION_EVENTS.ORDER_PLACED,
+  NOTIFICATION_EVENTS.ORDER_DELIVERED,
+]);
 
 const notificationEmitter = new EventEmitter();
 const localDedupeStore = new Map();
@@ -107,6 +113,7 @@ function isDeliveryUpdateEvent(eventType) {
   return [
     NOTIFICATION_EVENTS.DELIVERY_ASSIGNED,
     NOTIFICATION_EVENTS.ORDER_READY,
+    NOTIFICATION_EVENTS.RIDER_ARRIVED_AT_STORE,
     NOTIFICATION_EVENTS.RETURN_PICKUP_ASSIGNED,
     NOTIFICATION_EVENTS.RETURN_PICKUP_OTP,
   ].includes(eventType);
@@ -153,6 +160,20 @@ async function refreshQueueMetrics() {
 export async function notify(eventType, payload = {}) {
   if (!NOTIFICATIONS_ENABLED()) {
     return { enqueued: 0, skipped: 0, duplicates: 0, notificationIds: [] };
+  }
+
+  // Admins receive these order events; resolve them here so every emit site
+  // (placement, payments, rider app, seller panel, Shiprocket webhook)
+  // notifies admins without each having to look them up.
+  if (
+    ADMIN_ORDER_EVENTS.has(eventType) &&
+    !(Array.isArray(payload.adminIds) && payload.adminIds.length)
+  ) {
+    try {
+      payload = { ...payload, adminIds: await getAdminIds() };
+    } catch (error) {
+      logger.warn("Failed to resolve admin recipients", { eventType, message: error.message });
+    }
   }
 
   const notifications = buildNotification(eventType, payload);

@@ -421,6 +421,17 @@ const settingSchema = new mongoose.Schema(
             min: 0,
             max: 100,
         },
+        // "percent" uses firstOrderDiscountPercent; "flat" uses firstOrderDiscountFlatAmount (₹ off).
+        firstOrderDiscountType: {
+            type: String,
+            enum: ["percent", "flat"],
+            default: "percent",
+        },
+        firstOrderDiscountFlatAmount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
         firstOrderFreeDelivery: {
             type: Boolean,
             default: true,

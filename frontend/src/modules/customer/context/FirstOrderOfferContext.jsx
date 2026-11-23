@@ -5,6 +5,8 @@ import { useAuth } from '@core/context/AuthContext';
 const FirstOrderOfferContext = createContext({
     isFirstOrder: false,
     firstOrderDiscountPercent: 10,
+    firstOrderDiscountType: 'percent',
+    firstOrderDiscountFlatAmount: 0,
     firstOrderFreeDelivery: true,
     welcomeScratchCardEnabled: true,
     isLoading: false,
@@ -16,6 +18,8 @@ export const FirstOrderOfferProvider = ({ children }) => {
     const [offerState, setOfferState] = useState({
         isFirstOrder: false,
         firstOrderDiscountPercent: 10,
+        firstOrderDiscountType: 'percent',
+        firstOrderDiscountFlatAmount: 0,
         firstOrderFreeDelivery: true,
         welcomeScratchCardEnabled: true,
         isLoading: true,
@@ -26,6 +30,8 @@ export const FirstOrderOfferProvider = ({ children }) => {
             setOfferState({
                 isFirstOrder: false,
                 firstOrderDiscountPercent: 10,
+                firstOrderDiscountType: 'percent',
+                firstOrderDiscountFlatAmount: 0,
                 firstOrderFreeDelivery: true,
                 welcomeScratchCardEnabled: true,
                 isLoading: false,
@@ -40,7 +46,11 @@ export const FirstOrderOfferProvider = ({ children }) => {
             if (data) {
                 setOfferState({
                     isFirstOrder: Boolean(data.isFirstOrder),
-                    firstOrderDiscountPercent: Number(data.firstOrderDiscountPercent ?? 10),
+                    // Flat offers don't change per-product prices, so the percent is 0 then.
+                    firstOrderDiscountPercent:
+                        data.firstOrderDiscountType === 'flat' ? 0 : Number(data.firstOrderDiscountPercent ?? 10),
+                    firstOrderDiscountType: data.firstOrderDiscountType === 'flat' ? 'flat' : 'percent',
+                    firstOrderDiscountFlatAmount: Number(data.firstOrderDiscountFlatAmount ?? 0),
                     firstOrderFreeDelivery: data.firstOrderFreeDelivery !== false,
                     welcomeScratchCardEnabled: data.welcomeScratchCardEnabled !== false,
                     isLoading: false,

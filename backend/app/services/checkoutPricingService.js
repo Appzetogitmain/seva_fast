@@ -367,6 +367,7 @@ export async function buildCheckoutPricingSnapshot({
       membershipTier,
       isFirstOrder,
       isExpressDelivery,
+      firstOrderShareRatio: sellerRatio,
     });
 
     if (cashbackPercentage > 0) {

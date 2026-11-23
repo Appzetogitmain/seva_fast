@@ -12,6 +12,7 @@ import {
   cancelOrders,
   trackByShipmentId,
   trackByAWB,
+  getShipmentDetails,
   addPickupLocation,
   ShiprocketError,
 } from "./shiprocketService.js";
@@ -821,10 +822,18 @@ export async function getFormattedShiprocketTracking(orderOrId) {
     }
   }
 
+  // /courier/track/shipment/{id} wraps the payload keyed by shipment id
+  // (sometimes inside an array): [{ "123": { tracking_data } }] / { "123": { tracking_data } }.
+  let unwrapped = Array.isArray(trackingRaw) ? trackingRaw[0] : trackingRaw;
+  if (unwrapped && !unwrapped.tracking_data && !unwrapped.track_status) {
+    const keyed = Object.values(unwrapped).find((v) => v && typeof v === "object" && v.tracking_data);
+    if (keyed) unwrapped = keyed;
+  }
+
   const trackData =
-    trackingRaw?.tracking_data ||
-    trackingRaw?.response?.tracking_data ||
-    (trackingRaw?.track_status ? trackingRaw : {});
+    unwrapped?.tracking_data ||
+    unwrapped?.response?.tracking_data ||
+    (unwrapped?.track_status ? unwrapped : {});
 
   const trackItem = Array.isArray(trackData.shipment_track)
     ? trackData.shipment_track[0]
@@ -841,13 +850,48 @@ export async function getFormattedShiprocketTracking(orderOrId) {
       }))
     : [];
 
+  // If AWB wasn't returned at creation (async assignment), ask Shiprocket's
+  // shipment endpoint directly.
+  let shipmentInfo = null;
+  if (!trackItem?.awb_code && !shipmentDetails.awbCode && shipmentDetails.shiprocketShipmentId) {
+    try {
+      const res = await getShipmentDetails(shipmentDetails.shiprocketShipmentId);
+      shipmentInfo = res?.data || res || null;
+    } catch (err) {
+      console.warn("[Shiprocket] Shipment details lookup failed:", err.message);
+    }
+  }
+
   const courierName =
     trackItem?.courier_name ||
     shipmentDetails.courierName ||
+    shipmentInfo?.courier ||
+    shipmentInfo?.courier_name ||
     deliveryEta.courierName ||
     "Shiprocket Courier Partner";
 
-  const awbCode = trackItem?.awb_code || shipmentDetails.awbCode || null;
+  const awbCode =
+    trackItem?.awb_code || shipmentDetails.awbCode || shipmentInfo?.awb || shipmentInfo?.awb_code || null;
+
+  // Persist newly discovered AWB / courier so the order document (and every
+  // screen reading shipmentDetails) shows them from now on.
+  const discoveredCourier =
+    trackItem?.courier_name || shipmentInfo?.courier || shipmentInfo?.courier_name || null;
+  if (
+    order._id &&
+    ((awbCode && awbCode !== shipmentDetails.awbCode) ||
+      (discoveredCourier && discoveredCourier !== shipmentDetails.courierName))
+  ) {
+    Order.updateOne(
+      { _id: order._id },
+      {
+        $set: {
+          ...(awbCode ? { "shipmentDetails.awbCode": String(awbCode), "shipmentDetails.awbAssigned": true } : {}),
+          ...(discoveredCourier ? { "shipmentDetails.courierName": discoveredCourier } : {}),
+        },
+      },
+    ).catch((err) => console.warn("[Shiprocket] Failed to persist AWB:", err.message));
+  }
 
   // Expected Delivery Date: check track item EDD, then deliveryEta, then fallback days
   let expectedDeliveryDate =

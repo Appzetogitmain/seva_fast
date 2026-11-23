@@ -46,6 +46,19 @@ import { getSellerOrderEarning, getSellerEarningBreakdown, getCustomerOrderBill 
 import { getLegacyStatusFromOrder } from "@/shared/utils/orderStatus";
 import { useLockBodyScroll, preventBackdropScroll } from "@/shared/hooks/useLockBodyScroll";
 
+const FINAL_ORDER_STATUSES = ["delivered", "cancelled"];
+const ORDER_STATUS_RANK = { pending: 0, confirmed: 1, packed: 2, out_for_delivery: 3, delivered: 4, cancelled: 99 };
+const isFinalOrderStatus = (status) =>
+  FINAL_ORDER_STATUSES.includes(String(status || "").toLowerCase());
+// Locked if the order is finalized (delivered/cancelled) or the option would move it backwards.
+const isStatusOptionLocked = (current, option) => {
+  const cur = String(current || "").toLowerCase();
+  if (option === cur) return false;
+  if (isFinalOrderStatus(cur)) return true;
+  if (option === "cancelled") return false;
+  return (ORDER_STATUS_RANK[option] ?? 0) < (ORDER_STATUS_RANK[cur] ?? 0);
+};
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { orders: ordersFromContext, ordersLoading, refreshOrders } =
@@ -283,6 +296,10 @@ const Dashboard = () => {
   };
 
   const handleStatusUpdate = async (orderId, newStatus) => {
+    if (selectedOrder?.id === orderId && isFinalOrderStatus(selectedOrder.status)) {
+      toast.error("Delivered or cancelled orders cannot be changed");
+      return;
+    }
     const normalizedStatus = String(newStatus || "")
       .toLowerCase()
       .trim()
@@ -1029,6 +1046,7 @@ const Dashboard = () => {
                       <div className="relative inline-block w-40">
                         <select
                           value={selectedOrder.status.toLowerCase()}
+                          disabled={isFinalOrderStatus(selectedOrder.status.toLowerCase())}
                           onChange={(e) =>
                             handleStatusUpdate(selectedOrder.id, e.target.value)
                           }
@@ -1052,12 +1070,12 @@ const Dashboard = () => {
                                         : "bg-slate-100 text-slate-700 focus:ring-slate-200"
                           )}
                         >
-                          <option value="pending">Pending</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="packed">Packed</option>
-                          <option value="out_for_delivery">Out for Delivery</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="cancelled">Cancelled</option>
+                          <option value="pending" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "pending")}>Pending</option>
+                          <option value="confirmed" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "confirmed")}>Confirmed</option>
+                          <option value="packed" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "packed")}>Packed</option>
+                          <option value="out_for_delivery" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "out_for_delivery")}>Out for Delivery</option>
+                          <option value="delivered" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "delivered")}>Delivered</option>
+                          <option value="cancelled" disabled={isStatusOptionLocked(selectedOrder.status.toLowerCase(), "cancelled")}>Cancelled</option>
                         </select>
                       </div>
                     )}

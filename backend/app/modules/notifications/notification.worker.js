@@ -212,6 +212,7 @@ export async function deliverNotificationById(notificationId) {
     "NEW_RETURN_BROADCAST",
     "DELIVERY_ASSIGNED",
     "ORDER_READY",
+    "RIDER_ARRIVED_AT_STORE",
     "SELLER_TIMEOUT_ALERT",
     "NO_RIDER_ALERT",
     "NEW_PHOTO_ORDER",

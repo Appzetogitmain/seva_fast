@@ -219,6 +219,20 @@ export async function handleShiprocketWebhook(req, res) {
       return res.status(200).json({ success: true, message: "Return webhook processed successfully" });
     }
 
+    // Persist AWB / courier carried by the webhook — Shiprocket often assigns
+    // these after order creation, so this is the main way the customer sees them.
+    const webhookCourier = payload.courier_name || payload.courier || null;
+    const sd = order.shipmentDetails || {};
+    if ((awbCode && sd.awbCode !== String(awbCode)) || (webhookCourier && sd.courierName !== webhookCourier)) {
+      order.shipmentDetails = {
+        ...sd,
+        ...(awbCode ? { awbCode: String(awbCode), awbAssigned: true } : {}),
+        ...(webhookCourier ? { courierName: webhookCourier } : {}),
+      };
+      order.markModified("shipmentDetails");
+      await order.save();
+    }
+
     // Idempotency guard — skip if we've already applied this exact status to
     // this forward shipment (webhook re-delivery is expected/common).
     if (order.shipmentDetails?.lastSyncedStatus === rawStatus) {

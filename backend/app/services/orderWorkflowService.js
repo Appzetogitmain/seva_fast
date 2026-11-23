@@ -936,6 +936,13 @@ export async function markArrivedAtStoreAtomic(deliveryId, orderId, lat, lng) {
     deliveryId: updated.deliveryBoy,
     sellerId: updated.seller,
   });
+  emitNotificationEvent(NOTIFICATION_EVENTS.RIDER_ARRIVED_AT_STORE, {
+    orderId: updated.orderId,
+    sellerId: updated.seller,
+    customerId: updated.customer,
+    userId: updated.customer,
+    deliveryId: updated.deliveryBoy,
+  });
   return updated;
 }
 

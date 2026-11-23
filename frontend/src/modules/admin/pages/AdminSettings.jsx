@@ -122,6 +122,8 @@ const AdminSettings = () => {
         adminUpiId: '',
         adminUpiName: '',
         firstOrderDiscountPercent: 10,
+        firstOrderDiscountType: 'percent',
+        firstOrderDiscountFlatAmount: 0,
         firstOrderFreeDelivery: true,
         welcomeScratchCardEnabled: true,
         showQuickCategoriesSection: true,
@@ -157,6 +159,8 @@ const AdminSettings = () => {
                         keywords: Array.isArray(data.keywords) ? data.keywords : (data.metaKeywords ? data.metaKeywords.split(',').map(k => k.trim()).filter(Boolean) : []),
                         returnDeliveryCommission: data.returnDeliveryCommission ?? 0,
                         firstOrderDiscountPercent: data.firstOrderDiscountPercent ?? 10,
+                        firstOrderDiscountType: data.firstOrderDiscountType === 'flat' ? 'flat' : 'percent',
+                        firstOrderDiscountFlatAmount: data.firstOrderDiscountFlatAmount ?? 0,
                         firstOrderFreeDelivery: data.firstOrderFreeDelivery ?? true,
                         welcomeScratchCardEnabled: data.welcomeScratchCardEnabled ?? true,
                         showQuickCategoriesSection: data.showQuickCategoriesSection ?? true,
@@ -1230,6 +1234,52 @@ const AdminSettings = () => {
 
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        First Order Discount Type
+                                    </label>
+                                    <div className="inline-flex rounded-2xl bg-slate-100 p-1">
+                                        {[
+                                            { value: 'percent', label: 'Percentage (%)' },
+                                            { value: 'flat', label: 'Flat Amount (₹)' },
+                                        ].map((opt) => (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => handleInputChange('firstOrderDiscountType', opt.value)}
+                                                className={cn(
+                                                    "px-4 py-2 rounded-xl text-xs font-black transition-all",
+                                                    (settings.firstOrderDiscountType || 'percent') === opt.value
+                                                        ? "bg-white text-slate-900 shadow-sm"
+                                                        : "text-slate-500 hover:text-slate-700"
+                                                )}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {settings.firstOrderDiscountType === 'flat' ? (
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        First Order Flat Discount (₹)
+                                    </label>
+                                    <div className="relative group max-w-sm">
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={settings.firstOrderDiscountFlatAmount}
+                                            onChange={(e) => handleInputChange('firstOrderDiscountFlatAmount', Math.max(0, Number(e.target.value) || 0))}
+                                            className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                        />
+                                        <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹ OFF</span>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 italic">
+                                        This fixed amount is taken off the first order's product total (never more than the total itself).
+                                    </p>
+                                </div>
+                                ) : (
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                         First Order Discount Percentage (%)
                                     </label>
                                     <div className="relative group max-w-sm">
@@ -1247,6 +1297,7 @@ const AdminSettings = () => {
                                         Fallback default is 10%. If a product already has a discount, this percentage applies extra on top of the discounted price.
                                     </p>
                                 </div>
+                                )}
                             </div>
                         </Card>
                     )}

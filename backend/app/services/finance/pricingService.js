@@ -703,6 +703,9 @@ export async function generateOrderPaymentBreakdown({
   membershipTier = "none",
   isFirstOrder = false,
   isExpressDelivery = false,
+  // This seller's share of a multi-seller checkout, so a flat first-order
+  // discount is split across sellers instead of applied once per seller.
+  firstOrderShareRatio = 1,
 }) {
   const normalizedItems = Array.isArray(preHydratedItems) && preHydratedItems.length > 0
     ? preHydratedItems
@@ -950,8 +953,20 @@ export async function generateOrderPaymentBreakdown({
     handling.handlingFeeCharged = 0;
   }
 
-  const firstOrderDiscountPercent = isFirstOrder ? Number(effectiveSettings.firstOrderDiscountPercent ?? 10) : 0;
-  const firstOrderDiscountAmount = isFirstOrder ? roundCurrency((productSubtotal * firstOrderDiscountPercent) / 100) : 0;
+  const isFlatFirstOrder = effectiveSettings.firstOrderDiscountType === "flat";
+  const firstOrderDiscountPercent =
+    isFirstOrder && !isFlatFirstOrder ? Number(effectiveSettings.firstOrderDiscountPercent ?? 10) : 0;
+  let firstOrderDiscountAmount = 0;
+  if (isFirstOrder) {
+    firstOrderDiscountAmount = isFlatFirstOrder
+      ? roundCurrency(
+          Math.min(
+            productSubtotal,
+            Number(effectiveSettings.firstOrderDiscountFlatAmount || 0) * Number(firstOrderShareRatio ?? 1),
+          ),
+        )
+      : roundCurrency((productSubtotal * firstOrderDiscountPercent) / 100);
+  }
 
   const finalDiscountTotal = roundCurrency(discountTotal + membershipDiscountAmount + firstOrderDiscountAmount);
   const normalizedTax = roundCurrency(taxTotal || 0);

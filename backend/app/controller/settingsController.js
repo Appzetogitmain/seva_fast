@@ -85,6 +85,8 @@ const ALLOWED_KEYS = [
   "professionalAdValidityDays",
   "professionalAdSearchRadiusKm",
   "firstOrderDiscountPercent",
+  "firstOrderDiscountType",
+  "firstOrderDiscountFlatAmount",
   "firstOrderFreeDelivery",
   "welcomeScratchCardEnabled",
   "showQuickCategoriesSection",
@@ -214,6 +216,8 @@ const updateSettingsSchema = Joi.object({
   "professionalAdValidityDays": Joi.number().min(1),
   "professionalAdSearchRadiusKm": Joi.number().min(1),
   "firstOrderDiscountPercent": Joi.number().min(0).max(100),
+  "firstOrderDiscountType": Joi.string().valid("percent", "flat"),
+  "firstOrderDiscountFlatAmount": Joi.number().min(0),
   "firstOrderFreeDelivery": Joi.boolean(),
   "welcomeScratchCardEnabled": Joi.boolean(),
   "showQuickCategoriesSection": Joi.boolean(),
@@ -291,7 +295,7 @@ export const getPublicSettings = async (req, res) => {
       async () => {
         const existing = await Setting.findOne(filter)
           .select(
-            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName playStoreLink sellerPlayStoreLink appStoreLink returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled showQuickCategoriesSection deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo referralCashback createdAt updatedAt",
+            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName playStoreLink sellerPlayStoreLink appStoreLink returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderDiscountType firstOrderDiscountFlatAmount firstOrderFreeDelivery welcomeScratchCardEnabled showQuickCategoriesSection deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo referralCashback createdAt updatedAt",
           )
           .lean();
         return existing || null;
@@ -307,6 +311,8 @@ export const getPublicSettings = async (req, res) => {
 
     settings.productApproval = normalizeProductApprovalConfig(settings || {});
     settings.firstOrderDiscountPercent = settings.firstOrderDiscountPercent ?? 10;
+    settings.firstOrderDiscountType = settings.firstOrderDiscountType || "percent";
+    settings.firstOrderDiscountFlatAmount = settings.firstOrderDiscountFlatAmount ?? 0;
     settings.firstOrderFreeDelivery = settings.firstOrderFreeDelivery ?? true;
     settings.welcomeScratchCardEnabled = settings.welcomeScratchCardEnabled ?? true;
     settings.showQuickCategoriesSection = settings.showQuickCategoriesSection ?? true;

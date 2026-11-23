@@ -46,6 +46,8 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                         setWelcomeOffer({
                             isOpen: true,
                             discountPercent: data.firstOrderDiscountPercent ?? 10,
+                            discountType: data.firstOrderDiscountType === 'flat' ? 'flat' : 'percent',
+                            discountFlatAmount: Number(data.firstOrderDiscountFlatAmount ?? 0),
                             freeDelivery: data.firstOrderFreeDelivery !== false,
                         });
                     }
@@ -275,6 +277,8 @@ const CustomerLayout = ({ children, showHeader: showHeaderProp, fullHeight = fal
                 isOpen={welcomeOffer.isOpen}
                 onClose={() => setWelcomeOffer((prev) => ({ ...prev, isOpen: false }))}
                 discountPercent={welcomeOffer.discountPercent}
+                discountType={welcomeOffer.discountType}
+                discountFlatAmount={welcomeOffer.discountFlatAmount}
                 freeDelivery={welcomeOffer.freeDelivery}
                 userId={user?._id || user?.id || 'guest'}
             />

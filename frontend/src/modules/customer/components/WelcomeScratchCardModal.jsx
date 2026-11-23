@@ -8,6 +8,8 @@ const WelcomeScratchCardModal = ({
     isOpen = false,
     onClose,
     discountPercent = 10,
+    discountType = 'percent',
+    discountFlatAmount = 0,
     freeDelivery = true,
     userId = 'guest',
 }) => {
@@ -192,7 +194,9 @@ const WelcomeScratchCardModal = ({
                             <Gift className="w-8 h-8 animate-pulse" />
                         </div>
                         <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-white to-amber-300">
-                            {t('product.percentOff', { percent: discountPercent })}
+                            {discountType === 'flat'
+                                ? `₹${discountFlatAmount} OFF`
+                                : t('product.percentOff', { percent: discountPercent })}
                         </div>
                         {freeDelivery && (
                             <div className="text-xs font-black text-amber-400 uppercase tracking-widest mt-1">

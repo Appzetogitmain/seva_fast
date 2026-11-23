@@ -399,10 +399,12 @@ export const getCustomerTransactions = async (req, res) => {
 export const checkFirstOrderEligibility = async (req, res) => {
     try {
         const settings = await Setting.findOne()
-            .select("firstOrderDiscountPercent firstOrderFreeDelivery welcomeScratchCardEnabled")
+            .select("firstOrderDiscountPercent firstOrderDiscountType firstOrderDiscountFlatAmount firstOrderFreeDelivery welcomeScratchCardEnabled")
             .lean();
 
         const firstOrderDiscountPercent = settings?.firstOrderDiscountPercent ?? 10;
+        const firstOrderDiscountType = settings?.firstOrderDiscountType === "flat" ? "flat" : "percent";
+        const firstOrderDiscountFlatAmount = Number(settings?.firstOrderDiscountFlatAmount ?? 0);
         const firstOrderFreeDelivery = settings?.firstOrderFreeDelivery ?? true;
         const welcomeScratchCardEnabled = settings?.welcomeScratchCardEnabled ?? true;
 
@@ -418,6 +420,8 @@ export const checkFirstOrderEligibility = async (req, res) => {
         return handleResponse(res, 200, "First order eligibility checked", {
             isFirstOrder,
             firstOrderDiscountPercent,
+            firstOrderDiscountType,
+            firstOrderDiscountFlatAmount,
             firstOrderFreeDelivery,
             welcomeScratchCardEnabled,
         });
