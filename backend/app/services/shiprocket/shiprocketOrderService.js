@@ -950,6 +950,8 @@ export async function getFormattedShiprocketTracking(orderOrId) {
     activities,
     trackingUrl,
     pickupLocation: shipmentDetails.pickupLocation || null,
+    lastError: awbCode ? null : shipmentDetails.lastError || null,
+    lastErrorAt: awbCode ? null : shipmentDetails.lastErrorAt || null,
     lastSyncedAt: new Date(),
   };
 }

@@ -385,6 +385,17 @@ export async function sellerAcceptAtomic(sellerId, orderId) {
           `[Shiprocket] Background create failed for order ${updated.orderId}:`,
           shiprocketErr.message,
         );
+        // Keep the reason on the order so seller/admin can see why no AWB exists.
+        await Order.updateOne(
+          { _id: updated._id },
+          {
+            $set: {
+              "shipmentDetails.provider": "shiprocket",
+              "shipmentDetails.lastError": shiprocketErr.message,
+              "shipmentDetails.lastErrorAt": new Date(),
+            },
+          },
+        ).catch(() => {});
       }
     });
   }

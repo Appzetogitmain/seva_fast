@@ -97,7 +97,43 @@ const persistCustomerDraft = (data) => {
     }
 };
 
+// Remembers that an OTP was sent, so reloading the page (common when the user
+// switches to the SMS app and the browser/webview drops the page) returns to
+// the OTP screen instead of the first step.
+const OTP_STEP_KEY = 'customer_auth_otp_step';
+const OTP_STEP_TTL_MS = 10 * 60 * 1000;
+const OTP_RESEND_SECONDS = 60;
+
+const getStoredOtpStep = (mode) => {
+    try {
+        const raw = localStorage.getItem(OTP_STEP_KEY);
+        const step = raw ? JSON.parse(raw) : null;
+        if (!step || step.mode !== mode || !step.sentAt) return null;
+        if (Date.now() - step.sentAt > OTP_STEP_TTL_MS) return null;
+        return step;
+    } catch {
+        return null;
+    }
+};
+
+const persistOtpStep = (mode, phone) => {
+    try {
+        localStorage.setItem(OTP_STEP_KEY, JSON.stringify({ mode, phone, sentAt: Date.now() }));
+    } catch {
+        // ignore
+    }
+};
+
+const clearOtpStep = () => {
+    try {
+        localStorage.removeItem(OTP_STEP_KEY);
+    } catch {
+        // ignore
+    }
+};
+
 const removeCustomerDraft = () => {
+    clearOtpStep();
     try {
         localStorage.removeItem(CUSTOMER_AUTH_DRAFT_KEY);
         sessionStorage.removeItem(CUSTOMER_AUTH_DRAFT_KEY);
@@ -111,8 +147,15 @@ const CustomerAuth = () => {
     const { t } = useTranslation('customer');
     const [isLogin, setIsLogin] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
-    const [showOtp, setShowOtp] = useState(false);
-    const [timer, setTimer] = useState(0);
+    const [showOtp, setShowOtp] = useState(
+        () => Boolean(getStoredOtpStep(window.location.pathname === '/signup' ? 'signup' : 'login')),
+    );
+    const [timer, setTimer] = useState(() => {
+        const step = getStoredOtpStep(window.location.pathname === '/signup' ? 'signup' : 'login');
+        if (!step) return 0;
+        const elapsed = Math.floor((Date.now() - step.sentAt) / 1000);
+        return Math.max(0, OTP_RESEND_SECONDS - elapsed);
+    });
     const [carouselIndex, setCarouselIndex] = useState(0);
     const [showPlansModal, setShowPlansModal] = useState(false);
     useLockBodyScroll(Boolean(showPlansModal));
@@ -194,6 +237,10 @@ const CustomerAuth = () => {
     }, [isSignupRoute]);
 
     useEffect(() => {
+        if (!showOtp) clearOtpStep();
+    }, [showOtp]);
+
+    useEffect(() => {
         if (location.state?.phone) {
             setFormData((prev) => ({
                 ...prev,
@@ -256,8 +303,9 @@ const CustomerAuth = () => {
                 });
                 toast.success(res.data?.message || t('auth.otpSent'));
             }
+            persistOtpStep(isLogin ? 'login' : 'signup', formData.phone);
             setShowOtp(true);
-            setTimer(60);
+            setTimer(OTP_RESEND_SECONDS);
         } catch (error) {
             console.error('SMS OTP send error:', error);
             const status = error?.response?.status;

@@ -48,6 +48,7 @@ import { createFinanceOrderSchema } from "../validation/financeValidation.js";
 import { placeOrderAtomic } from "../services/orderPlacementService.js";
 import {
   cancelShiprocketShipmentForOrder,
+  createShiprocketShipmentForOrder,
   getFormattedShiprocketTracking,
   createShiprocketReturnShipmentForOrder,
 } from "../services/shiprocket/shiprocketOrderService.js";
@@ -1109,8 +1110,33 @@ export const updateOrderStatus = async (req, res) => {
 
     const oldStatus = order.status;
     if (nextStatus) {
-      // Shiprocket create runs on seller accept for scheduled orders (see orderWorkflowService).
-      // Do not create again on packed — avoids double Shiprocket orders in multi-vendor flow.
+      // Shiprocket create normally runs on seller accept (see orderWorkflowService).
+      // If that attempt failed, retry once the order is packed. This cannot create
+      // a duplicate: the create call returns early when a shipment id is already saved.
+      if (
+        nextStatus === "packed" &&
+        order.deliveryType === "scheduled" &&
+        !order.shipmentDetails?.shiprocketShipmentId
+      ) {
+        try {
+          await createShiprocketShipmentForOrder(order._id);
+        } catch (shiprocketErr) {
+          console.warn(
+            `[Shiprocket] Retry on packed failed for order ${order.orderId}:`,
+            shiprocketErr.message,
+          );
+          await Order.updateOne(
+            { _id: order._id },
+            {
+              $set: {
+                "shipmentDetails.provider": "shiprocket",
+                "shipmentDetails.lastError": shiprocketErr.message,
+                "shipmentDetails.lastErrorAt": new Date(),
+              },
+            },
+          ).catch(() => {});
+        }
+      }
       order.status = nextStatus;
       order.orderStatus = nextStatus;
       if (order.workflowVersion >= 2) {

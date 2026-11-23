@@ -116,9 +116,16 @@ const ShipmentTrackingCard = ({ orderId, fallback = null, className }) => {
                     )}
                 </div>
             ) : (
-                <p className="text-xs font-medium text-slate-500">
-                    {loading ? 'Checking Shiprocket…' : 'AWB not assigned yet. It is created once the order is packed.'}
-                </p>
+                <div className="space-y-1.5 text-xs">
+                    <p className="font-medium text-slate-500">
+                        {loading ? 'Checking Shiprocket…' : 'AWB not assigned yet.'}
+                    </p>
+                    {(tracking?.lastError || fallback?.lastError) && !loading && (
+                        <p className="rounded-lg bg-rose-50 px-2.5 py-2 font-semibold text-rose-700">
+                            Shiprocket could not create this shipment: {tracking?.lastError || fallback?.lastError}
+                        </p>
+                    )}
+                </div>
             )}
 
             {(tracking?.origin || tracking?.destination) && (
