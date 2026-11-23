@@ -169,6 +169,7 @@
     "totalPayable": "Total Payable",
     "paidWallet": "Paid via Wallet",
     "safePayment": "Safe & Secure Payment",
-    "calculating": "Calculating..."
+    "calculating": "Calculating...",
+    "cashbackWhen": "{{amount}} will be added to your wallet after the order is delivered."
   }
 }

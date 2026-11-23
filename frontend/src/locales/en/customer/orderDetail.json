@@ -113,5 +113,10 @@
     "ARRIVED_TOO_LATE": "Arrived too late",
     "CHANGED_MY_MIND": "Changed my mind",
     "OTHER": "Other"
-  }
+  },
+  "cashbackCredited": "{{amount}} cashback credited",
+  "cashbackCreditedHint": "Added to your wallet. Use it on your next order.",
+  "cashbackPending": "{{amount}} cashback on this order",
+  "cashbackProcessingHint": "Your order is delivered. Cashback is being added to your wallet.",
+  "cashbackPendingHint": "Will be added to your wallet as soon as this order is delivered."
 }

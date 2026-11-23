@@ -1521,7 +1521,7 @@ const OrderDetailPage = () => {
                     : delivered
                       ? t("orderDetail.cashbackProcessingHint", { defaultValue: "Your order is delivered. Cashback is being added to your wallet." })
                       : t("orderDetail.cashbackPendingHint", {
-                          defaultValue: "Will be added to your wallet as soon as this order is delivered (membership plan must be active then).",
+                          defaultValue: "Will be added to your wallet as soon as this order is delivered.",
                         })}
                 </p>
               </div>

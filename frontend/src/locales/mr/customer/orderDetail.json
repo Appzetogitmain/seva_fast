@@ -113,5 +113,10 @@
     "ARRIVED_TOO_LATE": "खूप उशिरा पोहोचले",
     "CHANGED_MY_MIND": "माझा विचार बदलला",
     "OTHER": "इतर"
-  }
+  },
+  "cashbackCredited": "{{amount}} कॅशबॅक जमा झाला",
+  "cashbackCreditedHint": "तुमच्या वॉलेटमध्ये जोडला आहे. पुढच्या ऑर्डरवर वापरा.",
+  "cashbackPending": "या ऑर्डरवर {{amount}} कॅशबॅक",
+  "cashbackProcessingHint": "तुमची ऑर्डर डिलिव्हर झाली आहे. कॅशबॅक तुमच्या वॉलेटमध्ये जोडला जात आहे.",
+  "cashbackPendingHint": "ऑर्डर डिलिव्हर होताच तो तुमच्या वॉलेटमध्ये जोडला जाईल."
 }

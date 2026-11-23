@@ -139,23 +139,12 @@ export async function applyDeliveredSettlement(order, orderIdString) {
   let estimatedCashback = Number(settled.paymentBreakdown?.estimatedCashback || 0);
   if (estimatedCashback > 0 && settled.customer && !settled.financeFlags?.cashbackCredited) {
     const User = (await import("../models/customer.js")).default;
-    const user = await User.findById(settled.customer).populate("currentPlan");
-    const hasActivePlan =
-      user?.currentPlan &&
-      user.planExpiry &&
-      new Date(user.planExpiry) > new Date();
-    const cashbackFeature = user?.currentPlan?.features?.find(
-      (feature) => feature.key === "CASHBACK",
-    );
-    const planCashbackPct =
-      hasActivePlan && cashbackFeature?.value
-        ? parseFloat(cashbackFeature.value) || 0
-        : 0;
+    const user = await User.findById(settled.customer);
 
-    if (!hasActivePlan || planCashbackPct <= 0) {
-      estimatedCashback = 0;
-    }
-
+    // The cashback amount was fixed at checkout, when the customer's plan was
+    // verified as active and the amount was shown to them. Pay exactly that
+    // promised amount at delivery, even if the plan expired in the meantime.
+    // (Previously this re-checked the plan and silently dropped the cashback.)
     if (estimatedCashback > 0 && user) {
       user.walletBalance = (user.walletBalance || 0) + estimatedCashback;
       await user.save();
