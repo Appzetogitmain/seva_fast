@@ -23,6 +23,30 @@ export const buildAppReferUrl = (siteOrigin, referralCode) =>
         ? `${siteOrigin}/signup?ref=${encodeURIComponent(referralCode)}&install=1`
         : siteOrigin;
 
+const packageIdFromStoreLink = (storeLink, fallback) => {
+    try {
+        return new URL(storeLink).searchParams.get('id') || fallback;
+    } catch {
+        return fallback;
+    }
+};
+
+// Android Chrome "intent:" link: opens the seller app on this exact signup URL
+// (code included) when it is installed; otherwise Chrome follows the fallback
+// to the seller app's Play Store page with the code as install referrer.
+export const buildSellerAppIntentUrl = (signupUrl, sellerPlayStoreLink, referralCode) => {
+    const storeLink = sellerPlayStoreLink || DEFAULT_SELLER_PLAY_STORE_LINK;
+    const pkg = packageIdFromStoreLink(storeLink, 'com.sevafast.seller');
+    const target = new URL(signupUrl);
+    target.searchParams.delete('install'); // the app must not bounce to the store again
+    const fallback = buildSellerPlayStoreReferUrl(storeLink, referralCode);
+    return (
+        `intent://${target.host}${target.pathname}${target.search}` +
+        `#Intent;scheme=${target.protocol.replace(':', '')};package=${pkg};` +
+        `S.browser_fallback_url=${encodeURIComponent(fallback)};end`
+    );
+};
+
 // Same idea for the seller app: opens the seller app on signup when installed; on an
 // Android browser it redirects to the seller app's Play Store page with the code as
 // install referrer; elsewhere it stays on the web seller signup with the code filled.

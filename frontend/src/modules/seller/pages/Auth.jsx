@@ -30,7 +30,7 @@ import Lottie from "lottie-react";
 import sellerAnimation from "../../../assets/INSTANT_6.json";
 import { sellerApi } from "../services/sellerApi";
 import MapPicker from "../../../shared/components/MapPicker";
-import { buildSellerPlayStoreReferUrl } from "../../customer/utils/referralLinks";
+import { buildSellerAppIntentUrl, buildSellerPlayStoreReferUrl } from "../../customer/utils/referralLinks";
 
 // Referral code from a "refer a seller" link (?ref=) or pushed in by the seller Flutter
 // app from the Play Install Referrer. Kept in sessionStorage so it survives the
@@ -269,7 +269,12 @@ const Auth = () => {
     } catch {
       /* ignore */
     }
-    window.location.href = buildSellerPlayStoreReferUrl(settings?.sellerPlayStoreLink, urlReferral);
+    // Chrome: opens the installed seller app on this link, else the Play Store.
+    // Other Android browsers ignore intent: links, so go straight to the store there.
+    const isChrome = /Chrome\/\d+/i.test(navigator.userAgent) && !/SamsungBrowser|Firefox|OPR\//i.test(navigator.userAgent);
+    window.location.href = isChrome
+      ? buildSellerAppIntentUrl(window.location.href, settings?.sellerPlayStoreLink, urlReferral)
+      : buildSellerPlayStoreReferUrl(settings?.sellerPlayStoreLink, urlReferral);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
