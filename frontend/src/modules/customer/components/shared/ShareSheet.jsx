@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Copy, Download, MessageCircle, Send, Smartphone, X } from 'lucide-react';
+import { Copy, Download, MessageCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Share helper for places where the native share sheet may be missing.
@@ -83,35 +83,6 @@ const ShareSheet = ({ payload, onClose }) => {
     const message = payload ? [payload.text, payload.url].filter(Boolean).join(' ') : '';
     const encoded = encodeURIComponent(message);
 
-    const targets = payload
-        ? [
-              {
-                  key: 'whatsapp',
-                  label: 'WhatsApp',
-                  icon: MessageCircle,
-                  className: 'bg-emerald-500 text-white',
-                  onClick: () => openExternal(`https://api.whatsapp.com/send?text=${encoded}`),
-              },
-              {
-                  key: 'telegram',
-                  label: 'Telegram',
-                  icon: Send,
-                  className: 'bg-sky-500 text-white',
-                  onClick: () =>
-                      openExternal(
-                          `https://t.me/share/url?url=${encodeURIComponent(payload.url || '')}&text=${encodeURIComponent(payload.text || '')}`,
-                      ),
-              },
-              {
-                  key: 'sms',
-                  label: t('profile.shareSheet.sms', { defaultValue: 'SMS' }),
-                  icon: Smartphone,
-                  className: 'bg-slate-700 text-white',
-                  onClick: () => openExternal(`sms:?body=${encoded}`),
-              },
-          ]
-        : [];
-
     const handleCopy = async () => {
         const ok = await copyText(message);
         if (ok) {
@@ -160,21 +131,14 @@ const ShareSheet = ({ payload, onClose }) => {
                             {message}
                         </p>
 
-                        <div className="mb-3 grid grid-cols-3 gap-3">
-                            {targets.map(({ key, label, icon: Icon, className, onClick }) => (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    onClick={onClick}
-                                    className="flex flex-col items-center gap-1.5 rounded-2xl p-2 hover:bg-slate-50"
-                                >
-                                    <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${className}`}>
-                                        <Icon size={22} />
-                                    </span>
-                                    <span className="text-[11px] font-bold text-slate-700">{label}</span>
-                                </button>
-                            ))}
-                        </div>
+                        <button
+                            type="button"
+                            onClick={() => openExternal(`https://api.whatsapp.com/send?text=${encoded}`)}
+                            className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-bold text-white hover:bg-emerald-600"
+                        >
+                            <MessageCircle size={18} />
+                            {t('profile.shareSheet.whatsapp', { defaultValue: 'Share on WhatsApp' })}
+                        </button>
 
                         <button
                             type="button"

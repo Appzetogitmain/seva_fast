@@ -128,9 +128,9 @@
   },
   "shareSheet": {
     "title": "Share",
-    "sms": "SMS",
     "copy": "Copy message with link",
     "copied": "Message with link copied",
-    "saveImage": "Save card image"
+    "saveImage": "Save card image",
+    "whatsapp": "Share on WhatsApp"
   }
 }
