@@ -6,6 +6,7 @@ import { useSettings } from '@core/context/SettingsContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import Card from '@shared/components/ui/Card';
 import Badge from '@shared/components/ui/Badge';
+import ShipmentTrackingCard from '@shared/components/ShipmentTrackingCard';
 import { adminApi } from '../services/adminApi';
 import {
     ChevronLeft,
@@ -401,6 +402,15 @@ const OrderDetail = () => {
                             </div>
                         )}
                     </Card>
+
+                    {/* Shiprocket shipment: AWB, courier, live status and scan history */}
+                    {(order.deliveryType === 'scheduled' || order.shipmentDetails?.provider === 'shiprocket') && (
+                        <ShipmentTrackingCard
+                            orderId={order.orderId || orderId}
+                            fallback={order.shipmentDetails}
+                            className="bg-white shadow-xl ring-1 ring-slate-100 border-none"
+                        />
+                    )}
 
                     {/* Logistical Nodes */}
                     <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl p-6">

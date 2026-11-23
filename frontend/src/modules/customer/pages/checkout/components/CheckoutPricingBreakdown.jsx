@@ -143,6 +143,14 @@ const CheckoutPricingBreakdown = React.memo(function CheckoutPricingBreakdown({
               <span className="font-black text-green-600 text-sm">+₹{pricingPreview.estimatedCashback}</span>
             </motion.div>
           )}
+          {pricingPreview?.estimatedCashback > 0 && pricingPreview?.cashbackPercentage > 0 && (
+            <p className="px-3 -mt-0.5 text-[11px] font-medium text-green-700">
+              {t('checkout.pricing.cashbackWhen', {
+                amount: `₹${pricingPreview.estimatedCashback}`,
+                defaultValue: '{{amount}} will be added to your wallet after the order is delivered.',
+              })}
+            </p>
+          )}
 
           {walletAmountToUse > 0 && (
             <motion.div

@@ -38,6 +38,7 @@ import {
   RefreshCw,
   ExternalLink,
   Copy,
+  Wallet,
 } from "lucide-react";
 import { customerApi } from "../services/customerApi";
 import { useAuth } from "@/core/context/AuthContext";
@@ -1483,6 +1484,50 @@ const OrderDetailPage = () => {
             ))}
           </div>
         </motion.div>
+
+        {/* Plan cashback: how much, and when it reaches the wallet */}
+        {(() => {
+          const cashbackAmount = Number(order.paymentBreakdown?.estimatedCashback || 0);
+          const legacy = getLegacyStatusFromOrder(order);
+          if (cashbackAmount <= 0 || legacy === "cancelled") return null;
+          const credited = order.financeFlags?.cashbackCredited === true;
+          const delivered = legacy === "delivered";
+          const amountLabel = `₹${Math.round(cashbackAmount * 100) / 100}`;
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className={`rounded-3xl p-4 border flex items-start gap-3 ${
+                credited ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
+              }`}
+            >
+              <div
+                className={`h-10 w-10 shrink-0 rounded-2xl flex items-center justify-center ${
+                  credited ? "bg-emerald-500 text-white" : "bg-amber-400 text-white"
+                }`}
+              >
+                {credited ? <CheckCircle size={20} /> : <Wallet size={20} />}
+              </div>
+              <div className="min-w-0">
+                <p className={`text-sm font-black ${credited ? "text-emerald-800" : "text-amber-900"}`}>
+                  {credited
+                    ? t("orderDetail.cashbackCredited", { amount: amountLabel, defaultValue: "{{amount}} cashback credited" })
+                    : t("orderDetail.cashbackPending", { amount: amountLabel, defaultValue: "{{amount}} cashback on this order" })}
+                </p>
+                <p className={`text-xs font-medium mt-0.5 ${credited ? "text-emerald-700" : "text-amber-800"}`}>
+                  {credited
+                    ? t("orderDetail.cashbackCreditedHint", { defaultValue: "Added to your wallet. Use it on your next order." })
+                    : delivered
+                      ? t("orderDetail.cashbackProcessingHint", { defaultValue: "Your order is delivered. Cashback is being added to your wallet." })
+                      : t("orderDetail.cashbackPendingHint", {
+                          defaultValue: "Will be added to your wallet as soon as this order is delivered (membership plan must be active then).",
+                        })}
+                </p>
+              </div>
+            </motion.div>
+          );
+        })()}
 
         {/* Bill Summary - Cleaner Design */}
         <motion.div

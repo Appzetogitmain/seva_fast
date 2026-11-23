@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Card from '@shared/components/ui/Card';
 import Button from '@shared/components/ui/Button';
+import ShipmentTrackingCard from '@shared/components/ShipmentTrackingCard';
 import Badge from '@shared/components/ui/Badge';
 import Input from '@shared/components/ui/Input';
 import {
@@ -139,6 +140,9 @@ const Orders = () => {
             const formattedOrders = (rawOrders || []).map(order => ({
                 id: order.orderId,
                 _id: order._id,
+                // Needed to tell Shiprocket (scheduled) orders apart from local delivery.
+                deliveryType: order.deliveryType || (order.shipmentDetails?.provider === 'shiprocket' ? 'scheduled' : 'instant'),
+                shipmentDetails: order.shipmentDetails || null,
                 customer: {
                     name: order.customer?.name || 'Unknown',
                     phone: order.customer?.phone || '',
@@ -1629,20 +1633,11 @@ const Orders = () => {
                                                     <h4 className="text-xs font-black text-slate-600 uppercase tracking-widest mb-2 flex items-center gap-2">
                                                         <HiOutlineTruck className="h-3 w-3 text-indigo-500" /> Shipment Details
                                                     </h4>
-                                                    <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100 shadow-sm space-y-2">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Shiprocket Fulfillment</span>
-                                                        </div>
-                                                        {selectedOrder.shipmentDetails?.awbCode ? (
-                                                            <div className="text-xs font-semibold text-slate-700 mt-2 space-y-1">
-                                                                <p><span className="text-slate-500 font-bold">Courier:</span> {selectedOrder.shipmentDetails.courierName || "Standard"}</p>
-                                                                <p><span className="text-slate-500 font-bold">AWB Code:</span> {selectedOrder.shipmentDetails.awbCode}</p>
-                                                                <p><span className="text-slate-500 font-bold">Status:</span> <span className="uppercase text-indigo-600 font-black">{selectedOrder.shipmentDetails.status || "Created"}</span></p>
-                                                            </div>
-                                                        ) : (
-                                                            <p className="text-[10px] text-slate-500 font-medium italic mt-2">Awaiting shipment details (creates on status packed)</p>
-                                                        )}
-                                                    </div>
+                                                    <ShipmentTrackingCard
+                                                        key={selectedOrder.id}
+                                                        orderId={selectedOrder.id}
+                                                        fallback={selectedOrder.shipmentDetails}
+                                                    />
                                                 </div>
                                             )}
 
