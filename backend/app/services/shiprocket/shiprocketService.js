@@ -202,6 +202,16 @@ export async function trackByShipmentId(shipmentId) {
   });
 }
 
+// City/state for an Indian pincode (read-only lookup). Used to fill addresses
+// that were saved without a state, which Shiprocket rejects.
+export async function getPostcodeDetails(postcode) {
+  return request({
+    method: "get",
+    path: "/open/postcode/details",
+    params: { postcode },
+  });
+}
+
 export async function getShipmentDetails(shipmentId) {
   return request({
     method: "get",

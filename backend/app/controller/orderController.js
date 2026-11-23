@@ -586,6 +586,50 @@ export const getOrderDetails = async (req, res) => {
 /* ===============================
    GET ORDER SHIPPING TRACKING (SHIPROCKET)
 ================================ */
+/* ===============================
+   RETRY SHIPROCKET BOOKING (seller owner / admin)
+================================ */
+export const retryShiprocketShipment = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const role = String(req.user?.role || "").toLowerCase();
+    const uid = String(req.user?.id ?? req.user?._id ?? "").trim();
+
+    const orderKey = orderMatchQueryFlexible(orderId);
+    const order = orderKey ? await Order.findOne(orderKey) : null;
+    if (!order) return handleResponse(res, 404, "Order not found");
+
+    const isOwnerSeller = role === "seller" && String(order.seller || "") === uid;
+    const isAdmin = role === "admin" || role === "sub-admin";
+    if (!isOwnerSeller && !isAdmin) return handleResponse(res, 403, "Access denied");
+
+    if (order.deliveryType !== "scheduled") {
+      return handleResponse(res, 400, "This order is not shipped via Shiprocket.");
+    }
+    const status = String(order.status || "").toLowerCase();
+    if (!["confirmed", "packed"].includes(status)) {
+      return handleResponse(res, 400, `Shipment can only be booked for confirmed or packed orders (current: ${status}).`);
+    }
+    if (order.shipmentDetails?.awbCode) {
+      return handleResponse(res, 200, "AWB already assigned", order.shipmentDetails);
+    }
+
+    try {
+      const details = await createShiprocketShipmentForOrder(order._id);
+      return handleResponse(res, 200, details?.awbCode ? "Shipment booked" : "Shipment created, AWB pending", details);
+    } catch (err) {
+      const fresh = await Order.findById(order._id).select("shipmentDetails").lean();
+      return handleResponse(
+        res,
+        err.statusCode && err.statusCode < 500 ? err.statusCode : 502,
+        fresh?.shipmentDetails?.lastError || err.message,
+      );
+    }
+  } catch (error) {
+    return handleResponse(res, 500, error.message);
+  }
+};
+
 export const getOrderShippingTracking = async (req, res) => {
   try {
     const { orderId } = req.params;

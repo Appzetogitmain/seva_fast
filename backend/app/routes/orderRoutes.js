@@ -4,6 +4,7 @@ import {
   getMyOrders,
   getOrderDetails,
   getOrderShippingTracking,
+  retryShiprocketShipment,
   cancelOrder,
   updateOrderStatus,
   getAvailableRiders,
@@ -155,6 +156,7 @@ router.post(
 router.get("/my-orders", verifyToken, getMyOrders);
 router.get("/details/:orderId", verifyToken, getOrderDetails);
 router.get("/:orderId/shipping-tracking", verifyToken, getOrderShippingTracking);
+router.post("/:orderId/shiprocket/retry", verifyToken, allowRoles("seller", "admin", "sub-admin"), retryShiprocketShipment);
 router.get("/shipping-tracking/:orderId", verifyToken, getOrderShippingTracking);
 router.put("/cancel/:orderId", verifyToken, cancelOrder);
 router.post("/:orderId/returns", verifyToken, requestReturn);

@@ -21,11 +21,29 @@ const formatDate = (value) => {
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-const ShipmentTrackingCard = ({ orderId, fallback = null, className }) => {
+const ShipmentTrackingCard = ({ orderId, fallback = null, className, canRetry = false, orderStatus = '' }) => {
     const [tracking, setTracking] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
+    const [retrying, setRetrying] = useState(false);
+    const [retryMessage, setRetryMessage] = useState('');
+
+    const retryBooking = async () => {
+        const id = String(orderId || '').trim();
+        if (!id || retrying) return;
+        setRetrying(true);
+        setRetryMessage('');
+        try {
+            const res = await axiosInstance.post(`/orders/${encodeURIComponent(id)}/shiprocket/retry`);
+            setRetryMessage(res.data?.message || 'Shipment booked');
+        } catch (err) {
+            setRetryMessage('');
+        } finally {
+            setRetrying(false);
+            load();
+        }
+    };
 
     const load = useCallback(async () => {
         const id = String(orderId || '').trim();
@@ -125,6 +143,23 @@ const ShipmentTrackingCard = ({ orderId, fallback = null, className }) => {
                             Shiprocket could not create this shipment: {tracking?.lastError || fallback?.lastError}
                         </p>
                     )}
+                    {!loading && !(tracking?.lastError || fallback?.lastError) && (
+                        <p className="text-[11px] text-slate-500">
+                            Booking is attempted when the order is accepted. If it doesn't appear in a minute, retry below.
+                        </p>
+                    )}
+                    {canRetry && ['confirmed', 'packed'].includes(String(orderStatus).toLowerCase()) && (
+                        <button
+                            type="button"
+                            onClick={retryBooking}
+                            disabled={retrying || loading}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-[11px] font-black uppercase tracking-wider text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                            <RefreshCw className={cn('h-3 w-3', retrying && 'animate-spin')} />
+                            {retrying ? 'Booking with Shiprocket…' : 'Retry shipment booking'}
+                        </button>
+                    )}
+                    {retryMessage && <p className="text-[11px] font-bold text-emerald-700">{retryMessage}</p>}
                 </div>
             )}
 

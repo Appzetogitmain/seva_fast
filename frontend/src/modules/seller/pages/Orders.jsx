@@ -1637,6 +1637,8 @@ const Orders = () => {
                                                         key={selectedOrder.id}
                                                         orderId={selectedOrder.id}
                                                         fallback={selectedOrder.shipmentDetails}
+                                                        canRetry
+                                                        orderStatus={selectedOrder.status}
                                                     />
                                                 </div>
                                             )}

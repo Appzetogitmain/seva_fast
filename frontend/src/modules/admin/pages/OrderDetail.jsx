@@ -408,6 +408,8 @@ const OrderDetail = () => {
                         <ShipmentTrackingCard
                             orderId={order.orderId || orderId}
                             fallback={order.shipmentDetails}
+                            canRetry
+                            orderStatus={order.status}
                             className="bg-white shadow-xl ring-1 ring-slate-100 border-none"
                         />
                     )}

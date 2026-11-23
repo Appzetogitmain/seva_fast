@@ -15,6 +15,7 @@ import {
   trackByShipmentId,
   trackByAWB,
   getShipmentDetails,
+  getPostcodeDetails,
   addPickupLocation,
   ShiprocketError,
 } from "./shiprocketService.js";
@@ -258,6 +259,25 @@ function resolveOrderDeliveryAddress(order = {}) {
   return { ...resolveDeliveryPincodeCityState(addr), raw: addr };
 }
 
+// Saved addresses can lack a state, or hold the pincode in the city field.
+// Shiprocket rejects those, so fill city/state from Shiprocket's pincode lookup.
+async function completeDeliveryCityState(delivery) {
+  const cityLooksWrong = !delivery.city || /^\d+$/.test(String(delivery.city).trim());
+  if (!cityLooksWrong && delivery.state) return delivery;
+  try {
+    const res = await getPostcodeDetails(delivery.pincode);
+    const details = res?.postcode_details || {};
+    return {
+      ...delivery,
+      city: cityLooksWrong ? details.city || delivery.city : delivery.city,
+      state: delivery.state || details.state || "",
+    };
+  } catch (err) {
+    console.warn(`[Shiprocket] Pincode lookup failed for ${delivery.pincode}:`, err.message);
+    return delivery;
+  }
+}
+
 function normalizeCourierOptions(serviceabilityResponse) {
   const roots = [
     serviceabilityResponse?.data?.available_courier_companies,
@@ -368,7 +388,40 @@ function buildAdhocOrderPayload({ order, seller, customerEmail, pickupLocation, 
  * Creates the Shiprocket shipment for a scheduled order using the seller's pickup location.
  * Instant (local rider) orders are skipped.
  */
+// One booking at a time per order (double-clicks, accept + retry racing).
+const shipmentCreationsInFlight = new Map();
+
 export async function createShiprocketShipmentForOrder(orderId) {
+  const key = String(orderId);
+  if (shipmentCreationsInFlight.has(key)) return shipmentCreationsInFlight.get(key);
+  const run = (async () => {
+    try {
+      return await createShiprocketShipmentForOrderInner(orderId);
+    } catch (err) {
+      const reason =
+        err?.details?.message ||
+        (err?.details?.errors ? JSON.stringify(err.details.errors) : null) ||
+        err.message;
+      await Order.updateOne(
+        { _id: orderId },
+        {
+          $set: {
+            "shipmentDetails.provider": "shiprocket",
+            "shipmentDetails.lastError": String(reason).slice(0, 500),
+            "shipmentDetails.lastErrorAt": new Date(),
+          },
+        },
+      ).catch(() => {});
+      throw err;
+    } finally {
+      shipmentCreationsInFlight.delete(key);
+    }
+  })();
+  shipmentCreationsInFlight.set(key, run);
+  return run;
+}
+
+async function createShiprocketShipmentForOrderInner(orderId) {
   const order = await Order.findById(orderId);
   if (!order) {
     throw new ShiprocketError("Order not found", { statusCode: 404 });
@@ -400,10 +453,17 @@ export async function createShiprocketShipmentForOrder(orderId) {
     );
   }
 
-  const delivery = resolveOrderDeliveryAddress(order);
+  let delivery = resolveOrderDeliveryAddress(order);
   if (!delivery.pincode || delivery.pincode.length < 6) {
     throw new ShiprocketError(
       "Customer delivery pincode is required for scheduled Shiprocket orders",
+      { statusCode: 400 },
+    );
+  }
+  delivery = await completeDeliveryCityState(delivery);
+  if (!delivery.state) {
+    throw new ShiprocketError(
+      `Could not find the state for delivery pincode ${delivery.pincode}. Please check the customer's address.`,
       { statusCode: 400 },
     );
   }
