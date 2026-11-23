@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Gift, Share2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useShareSheet } from '../shared/ShareSheet';
 import { customerApi } from '../../services/customerApi';
 
 const money = (v) => Number(v || 0).toLocaleString('en-IN');
@@ -35,6 +35,8 @@ const ReferEarnCard = ({ config, referUrl, appName }) => {
         };
     }, [enabled]);
 
+    const { share: openShare, sheet: shareSheet } = useShareSheet();
+
     if (!enabled) return null;
 
     const isPercent = config.rewardType === 'percent';
@@ -44,23 +46,12 @@ const ReferEarnCard = ({ config, referUrl, appName }) => {
             ? t('profile.referEarn.offerPercentCap', { percent: config.rewardValue, cap: money(config.maxRewardAmount) })
             : t('profile.referEarn.offerPercent', { percent: config.rewardValue });
 
-    const handleShare = async () => {
-        const text = t('profile.referEarn.shareText', { app: appName || 'SevaFast' });
-        try {
-            if (navigator.share) {
-                await navigator.share({ title: appName || 'SevaFast', text, url: referUrl });
-                return;
-            }
-        } catch (error) {
-            if (error?.name === 'AbortError') return;
-        }
-        try {
-            await navigator.clipboard.writeText(`${text} ${referUrl}`);
-            toast.success(t('profile.referEarn.copied'));
-        } catch {
-            toast.error(referUrl);
-        }
-    };
+    const handleShare = () =>
+        openShare({
+            title: appName || 'SevaFast',
+            text: t('profile.referEarn.shareText', { app: appName || 'SevaFast' }),
+            url: referUrl,
+        });
 
     const statusLabel = {
         credited: t('profile.referEarn.credited'),
@@ -70,6 +61,7 @@ const ReferEarnCard = ({ config, referUrl, appName }) => {
 
     return (
         <div className="mb-4 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 text-white shadow-lg">
+            {shareSheet}
             <div className="flex items-start gap-3">
                 <div className="rounded-2xl bg-white/20 p-2.5 shrink-0">
                     <Gift className="h-5 w-5" />

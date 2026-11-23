@@ -125,5 +125,12 @@
     "credited": "Credited",
     "notEligible": "Not eligible",
     "empty": "No referral cashback yet. Share your link to start earning!"
+  },
+  "shareSheet": {
+    "title": "Share",
+    "sms": "SMS",
+    "copy": "Copy message with link",
+    "copied": "Message with link copied",
+    "saveImage": "Save card image"
   }
 }

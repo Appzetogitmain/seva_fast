@@ -21,6 +21,7 @@ import { formatDate } from '@shared/utils/formatDate';
 import LanguageSwitcher from '@shared/components/LanguageSwitcher';
 import { buildAppReferUrl, buildPlayStoreReferUrl, buildSellerReferUrl } from '../utils/referralLinks';
 import ReferEarnCard from '../components/profile/ReferEarnCard';
+import { useShareSheet } from '../components/shared/ShareSheet';
 import { CustomPhotoOrderModal } from '../components/shared/CustomPhotoOrderModal';
 import { CustomerNotificationsModal } from '../components/shared/CustomerNotificationsModal';
 import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
@@ -126,25 +127,14 @@ const ProfilePage = () => {
         fetchUnreadCount();
     }, []);
 
+    const { share: openShare, sheet: shareSheet } = useShareSheet();
+
     const handleShare = async (url, label = appName) => {
-        const shareUrl = url || window.location.origin;
-        const shareData = {
-            title: appName,
+        await openShare({
+            title: label,
             text: t('profile.share.checkOut', { label }),
-            url: shareUrl,
-        };
-        try {
-            if (navigator.share) {
-                await navigator.share(shareData);
-            } else {
-                await navigator.clipboard.writeText(shareUrl);
-                toast.success(t('profile.share.linkCopied'));
-            }
-        } catch (error) {
-            if (error?.name !== 'AbortError') {
-                toast.error(t('profile.share.couldNotShare'));
-            }
-        }
+            url: url || window.location.origin,
+        });
     };
 
     /**
@@ -183,56 +173,27 @@ const ProfilePage = () => {
             const file = new File([blob], fileName, { type: 'image/png' });
 
             const shareUrl = url || window.location.origin;
-            const shareText = t('profile.share.joinNow', { label, url: shareUrl });
 
-            // Try sharing with file (mobile native share)
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    title: appName,
-                    text: shareText,
-                    files: [file],
-                });
-                return;
-            }
-
-            // Fallback: Web share without file or download
-            if (navigator.share) {
-                try {
-                    await navigator.share({
-                        title: appName,
-                        text: shareText,
-                        url: shareUrl,
-                    });
-                } catch (fallbackErr) {
-                    if (fallbackErr?.name !== 'AbortError') {
-                        downloadBlob(blob, fileName);
-                    }
-                }
-                return;
-            }
-
-            // Final fallback: direct download
-            downloadBlob(blob, fileName);
-            toast.success(t('profile.share.downloaded'));
+            // Native share with the card image where supported; otherwise our
+            // own share sheet (WhatsApp / Telegram / SMS / copy / save image).
+            await openShare({
+                title: label,
+                text: t('profile.share.checkOut', { label }),
+                url: shareUrl,
+                file,
+            });
         } catch (error) {
             if (error?.name !== 'AbortError') {
                 console.error('Card share error:', error);
-                toast.error(t('profile.share.cardShareFailed'));
+                await openShare({
+                    title: label,
+                    text: t('profile.share.checkOut', { label }),
+                    url: url || window.location.origin,
+                });
             }
         } finally {
             setIsSharingCard(false);
         }
-    };
-
-    /** Helper: trigger download of the blob as PNG */
-    const downloadBlob = (blob, fileName) => {
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(link.href), 1500);
     };
 
     const formatIndiaPhone = (value) => {
@@ -348,6 +309,7 @@ const ProfilePage = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 pb-24 md:pb-12 font-sans">
+            {shareSheet}
             {/* Profile top bar: back, title, language switcher (no home header on this page) */}
             <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur pt-[env(safe-area-inset-top)]">
             <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
@@ -572,10 +534,10 @@ const ProfilePage = () => {
                                             e.stopPropagation();
                                             handleShareCardAsImage(appReferUrl, t('profile.card.appReferral'));
                                         }}
-                                        className="mb-0.5 self-start text-[#2f6fed] disabled:opacity-50"
+                                        className="-m-1.5 mb-0 self-start rounded-full p-1.5 text-[#2f6fed] disabled:opacity-50"
                                         title={t('profile.card.shareAppReferral')}
                                     >
-                                        <Share2 size={11} />
+                                        <Share2 size={14} />
                                     </button>
                                     <div className="rounded-[2px] bg-white p-0.5 shadow-sm">
                                         <img
@@ -597,10 +559,10 @@ const ProfilePage = () => {
                                             e.stopPropagation();
                                             handleShareCardAsImage(siteReferUrl, t('profile.card.siteReferral'));
                                         }}
-                                        className="mb-0.5 self-start text-[#2f6fed] disabled:opacity-50"
+                                        className="-m-1.5 mb-0 self-start rounded-full p-1.5 text-[#2f6fed] disabled:opacity-50"
                                         title={t('profile.card.shareSiteReferral')}
                                     >
-                                        <Share2 size={11} />
+                                        <Share2 size={14} />
                                     </button>
                                     <div className="rounded-[2px] bg-white p-0.5 shadow-sm">
                                         <img
@@ -718,8 +680,10 @@ const ProfilePage = () => {
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            navigator.clipboard.writeText(sellerReferUrl);
-                                            toast.success(t('profile.share.linkCopied'));
+                                            navigator.clipboard
+                                                .writeText(`${t('profile.share.checkOut', { label: t('profile.sellerRefer.shareLabel') })} ${sellerReferUrl}`)
+                                                .then(() => toast.success(t('profile.share.linkCopied')))
+                                                .catch(() => handleShare(sellerReferUrl, t('profile.sellerRefer.shareLabel')));
                                         }}
                                         className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-700 transition hover:bg-slate-200 active:scale-95"
                                     >
