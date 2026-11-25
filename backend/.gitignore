@@ -5,3 +5,5 @@ logs/
 *.log
 
 coverage/
+# Locally stored uploads (STORAGE_PROVIDER=local)
+uploads/

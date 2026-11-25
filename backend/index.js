@@ -9,6 +9,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
 import setupRoutes from "./app/routes/index.js";
+import { getUploadDir } from "./app/services/localStorageService.js";
 import { initSocket, getIO } from "./app/socket/socketManager.js";
 import { registerOrderSocketGetter } from "./app/services/orderSocketEmitter.js";
 import { registerTicketSocketGetter } from "./app/services/ticketSocketEmitter.js";
@@ -122,6 +123,27 @@ function createApp() {
       return compression.filter(req, res);
     },
   }));
+  // Locally stored uploads (STORAGE_PROVIDER=local). Mounted before helmet and the
+  // rate limiter so images load cross-origin (mobile apps) and aren't throttled.
+  app.use(
+    "/api/uploads",
+    (req, res, next) => {
+      if (req.method !== "GET" && req.method !== "HEAD") return res.status(405).end();
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      next();
+    },
+    express.static(getUploadDir(), {
+      index: false,
+      dotfiles: "deny",
+      redirect: false,
+      immutable: true,
+      maxAge: "365d",
+    }),
+    (req, res) => res.status(404).json({ success: false, error: true, message: "File not found" }),
+  );
+
   app.use(helmet());
   app.use(cors(corsOptions));
   app.use(globalApiRateLimiter);

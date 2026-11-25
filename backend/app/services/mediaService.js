@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { v2 as cloudinary } from "cloudinary";
 import MediaMetadata from "../models/mediaMetadata.js";
 import logger from "./logger.js";
+import { saveToLocalStorage, isLocalStorageReady } from "./localStorageService.js";
 
 function getMaxUploadBytes() {
   const raw = parseInt(process.env.MEDIA_MAX_FILE_SIZE || "20971520", 10);
@@ -80,12 +81,8 @@ function storageProvider() {
   return String(process.env.STORAGE_PROVIDER || "cloudinary").trim().toLowerCase();
 }
 
+// Used by the signed direct-to-Cloudinary upload flow only.
 function validateStorageConfig() {
-  if (storageProvider() !== "cloudinary") {
-    const err = new Error("Unsupported storage provider configuration");
-    err.statusCode = 500;
-    throw err;
-  }
   if (
     !process.env.CLOUDINARY_CLOUD_NAME ||
     !process.env.CLOUDINARY_API_KEY ||
@@ -489,8 +486,44 @@ async function deleteMedia(publicId, userId, userModel) {
   await media.softDelete();
 }
 
+function hasCloudinaryCredentials() {
+  return Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET,
+  );
+}
+
+/**
+ * Store an uploaded file and return its public URL.
+ * STORAGE_PROVIDER=local  -> compressed copy on this server (falls back to Cloudinary on disk errors)
+ * otherwise               -> Cloudinary
+ * Name kept for backward compatibility with all existing callers.
+ */
 async function uploadToCloudinary(fileBuffer, folder = "categories", options = {}) {
-  validateStorageConfig();
+  if (storageProvider() === "local") {
+    if (isLocalStorageReady()) {
+      try {
+        return await saveToLocalStorage(fileBuffer, folder, options);
+      } catch (err) {
+        // Invalid files are the uploader's problem: report them, don't retry elsewhere.
+        if (err.statusCode === 400) throw err;
+        if (!hasCloudinaryCredentials()) throw err;
+        logger.error("Local storage failed, falling back to Cloudinary", { error: err.message, folder });
+      }
+    } else {
+      logger.warn("STORAGE_PROVIDER=local but PUBLIC_UPLOAD_BASE_URL is not set; using Cloudinary");
+    }
+  }
+  return uploadToCloudinaryRemote(fileBuffer, folder, options);
+}
+
+async function uploadToCloudinaryRemote(fileBuffer, folder = "categories", options = {}) {
+  if (!hasCloudinaryCredentials()) {
+    const err = new Error("No file storage is configured. Set STORAGE_PROVIDER=local with PUBLIC_UPLOAD_BASE_URL, or Cloudinary credentials.");
+    err.statusCode = 503;
+    throw err;
+  }
   configureCloudinary();
   const mimeType = String(options.mimeType || "").trim().toLowerCase();
   const resourceType = String(options.resourceType || "").trim().toLowerCase();
