@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { adminApi } from '../services/adminApi';
 import { toast } from 'sonner';
 import { formatDate } from '@shared/utils/formatDate';
+import Modal from '@shared/components/ui/Modal';
 
 const groupLabels = {
     platform: 'Platform Splits',
@@ -37,6 +38,18 @@ const statusStyles = {
 const CommissionSplitsReport = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
+    // Sub-admin wallet popup
+    const [walletView, setWalletView] = useState(null); // { name, loading, data, error }
+
+    const openSubAdminWallet = async (sa) => {
+        setWalletView({ name: sa.name, loading: true, data: null, error: null });
+        try {
+            const res = await adminApi.getSubadminWallet(sa._id);
+            setWalletView({ name: sa.name, loading: false, data: res.data?.result || null, error: null });
+        } catch (error) {
+            setWalletView({ name: sa.name, loading: false, data: null, error: error.response?.data?.message || 'Failed to load wallet' });
+        }
+    };
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [report, setReport] = useState({
@@ -269,8 +282,8 @@ const CommissionSplitsReport = () => {
                                         </td>
                                         <td className="px-5 py-4 text-right">
                                             <button
-                                                onClick={() => navigate('/admin/users')}
-                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase bg-slate-900 text-white"
+                                                onClick={() => openSubAdminWallet(sa)}
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase bg-slate-900 text-white hover:bg-slate-700"
                                             >
                                                 <Wallet className="h-3 w-3" /> Wallet
                                             </button>
@@ -331,6 +344,73 @@ const CommissionSplitsReport = () => {
                     <span className="flex items-center gap-1"><Store className="h-3 w-3" /> Admin Commission = platform earning</span>
                 </div>
             </Card>
+            <Modal
+                isOpen={Boolean(walletView)}
+                onClose={() => setWalletView(null)}
+                title={walletView ? `${walletView.name} — Wallet` : 'Wallet'}
+                size="lg"
+            >
+                {walletView?.loading && (
+                    <div className="py-12 text-center text-sm font-bold text-slate-400">Loading wallet…</div>
+                )}
+                {walletView?.error && (
+                    <div className="py-12 text-center text-sm font-bold text-rose-500">{walletView.error}</div>
+                )}
+                {walletView?.data && (() => {
+                    const { subadmin = {}, wallet = {}, transactions = [] } = walletView.data;
+                    const zones = (subadmin.assignedZones || []).map((z) => z?.name || z).filter(Boolean);
+                    const categories = (subadmin.assignedCategories || []).map((c) => c?.name || c).filter(Boolean);
+                    return (
+                        <div className="space-y-5">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {[
+                                    { label: 'Available', value: wallet.availableBalance, tone: 'text-emerald-600' },
+                                    { label: 'Pending', value: wallet.pendingBalance, tone: 'text-amber-600' },
+                                    { label: 'Total Credited', value: wallet.totalCredited, tone: 'text-slate-900' },
+                                    { label: 'Total Paid Out', value: wallet.totalDebited, tone: 'text-slate-900' },
+                                ].map((item) => (
+                                    <div key={item.label} className="rounded-xl bg-slate-50 ring-1 ring-slate-100 p-3">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.label}</p>
+                                        <p className={cn('text-lg font-black mt-0.5', item.tone)}>₹{Number(item.value || 0).toLocaleString('en-IN')}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="rounded-xl ring-1 ring-slate-100 p-3 text-xs font-semibold text-slate-600 space-y-1">
+                                <p><span className="text-slate-400">Email:</span> {subadmin.email || '—'}{subadmin.phone ? ` · ${subadmin.phone}` : ''}</p>
+                                <p><span className="text-slate-400">Zones:</span> {zones.length ? zones.join(', ') : '—'}</p>
+                                <p><span className="text-slate-400">Categories:</span> {categories.length ? categories.join(', ') : 'All categories'}</p>
+                                <p>
+                                    <span className="text-slate-400">Commission rate:</span>{' '}
+                                    {subadmin.categoryCommissionRate != null ? `${subadmin.categoryCommissionRate}%` : 'Global sub-admin rate'} of the admin commission
+                                    (shared equally with other sub-admins covering the same items)
+                                </p>
+                            </div>
+
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Commission history</p>
+                                {transactions.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-8 text-center text-xs font-bold text-slate-400">
+                                        No commission credited yet. Commission is credited when an order in this sub-admin&apos;s zone is delivered.
+                                    </div>
+                                ) : (
+                                    <div className="max-h-72 overflow-y-auto rounded-xl ring-1 ring-slate-100 divide-y divide-slate-50" data-lenis-prevent>
+                                        {transactions.map((t) => (
+                                            <div key={t.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-bold text-slate-800 truncate">{t.description}</p>
+                                                    <p className="text-[10px] font-semibold text-slate-400">{formatDate(t.date)} · {t.reference}</p>
+                                                </div>
+                                                <span className="text-sm font-black text-emerald-600 shrink-0">+₹{Number(t.amount || 0).toLocaleString('en-IN')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })()}
+            </Modal>
         </div>
     );
 };
