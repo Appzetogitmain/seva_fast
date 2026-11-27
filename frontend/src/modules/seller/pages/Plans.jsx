@@ -282,7 +282,7 @@ const SellerPlans = () => {
                                 </div>
                                 <div className="flex items-center gap-2 mt-1 text-slate-500 text-xs font-bold">
                                     <Clock className="h-4 w-4 text-slate-400 shrink-0" />
-                                    {plan.validityDays} Days Pass ({Math.round(plan.validityDays / 30) || 1} Months)
+                                    {plan.validityDays} {plan.validityDays === 1 ? "Day" : "Days"} Pass{plan.validityDays >= 30 && plan.validityDays % 30 === 0 ? ` (${plan.validityDays / 30} ${plan.validityDays === 30 ? "Month" : "Months"})` : ""}
                                 </div>
 
                                 {/* Pricing */}
@@ -291,7 +291,7 @@ const SellerPlans = () => {
                                     {plan.originalPrice && (
                                         <span className="text-xs sm:text-sm font-bold text-slate-400 line-through">₹{plan.originalPrice}</span>
                                     )}
-                                    <span className="text-xs font-bold text-slate-400">/ {plan.validityDays} days</span>
+                                    <span className="text-xs font-bold text-slate-400">/ {plan.validityDays} {plan.validityDays === 1 ? "day" : "days"}</span>
                                 </div>
 
                                 {plan.description && (

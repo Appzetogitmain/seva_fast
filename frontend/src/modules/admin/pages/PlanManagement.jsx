@@ -287,7 +287,7 @@ const PlanManagement = () => {
                             <h3 className="text-xl font-black text-slate-900 tracking-tight">{plan.name}</h3>
                             <div className="flex items-center gap-2 mt-1 text-slate-500 text-xs font-bold">
                                 <Clock className="h-3.5 w-3.5 text-slate-400" />
-                                {plan.validityDays} Days Pass ({Math.round(plan.validityDays / 30)} Months)
+                                {plan.validityDays} {plan.validityDays === 1 ? "Day" : "Days"} Pass{plan.validityDays >= 30 && plan.validityDays % 30 === 0 ? ` (${plan.validityDays / 30} ${plan.validityDays === 30 ? "Month" : "Months"})` : ""}
                             </div>
 
                             {/* Price */}
