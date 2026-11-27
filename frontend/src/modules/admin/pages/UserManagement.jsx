@@ -24,6 +24,7 @@ import { getOrderSocket } from '@/core/services/orderSocket';
 
 const ALL_PERMISSIONS = [
     "Dashboard",
+    "Advanced Analytics",
     "Categories",
     "Professional Directory",
     "Products",
@@ -38,7 +39,6 @@ const ALL_PERMISSIONS = [
     "Rider Payouts",
     "Chatbot Analytics",
     "Customers",
-    "Sub-Admins",
     "Zones",
     "Referrals & Plans",
     "FAQs",

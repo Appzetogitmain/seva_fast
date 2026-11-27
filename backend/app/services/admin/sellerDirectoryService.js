@@ -610,6 +610,7 @@ export async function getActiveSellersData({
       officialKycDocumentUrl: seller.officialKycDocumentUrl || "",
       kycUploadedAt: seller.kycUploadedAt || null,
       acceptsPhotoOrders: seller.acceptsPhotoOrders || false,
+      zoneId: seller.zoneId ? String(seller.zoneId) : null,
       commissionModel: seller.commissionModel || "CATEGORY_WISE",
       subscription: seller.subscription || null,
       oneTimeChargePaid: seller.oneTimeChargePaid || false,

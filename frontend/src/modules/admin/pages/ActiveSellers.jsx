@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@core/context/AuthContext";
 import Card from "@shared/components/ui/Card";
 import Badge from "@shared/components/ui/Badge";
 import Pagination from "@shared/components/ui/Pagination";
@@ -94,6 +95,22 @@ const ActiveSellers = () => {
   const requestSeq = useRef(0);
 
   const [sellers, setSellers] = useState([]);
+  // Zones (main admin can assign a seller/rider to a zone; sub-admins only see their zones)
+  const { user: authUser } = useAuth();
+  const isMainAdmin = authUser?.role !== "sub-admin";
+  const [zoneOptions, setZoneOptions] = useState([]);
+  useEffect(() => {
+    if (!isMainAdmin) return;
+    adminApi
+      .getZones()
+      .then((res) => {
+        const raw = res?.data?.result ?? res?.data?.results ?? [];
+        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.zones) ? raw.zones : Array.isArray(raw?.items) ? raw.items : [];
+        setZoneOptions(list);
+      })
+      .catch(() => {});
+  }, [isMainAdmin]);
+
   const [stats, setStats] = useState(emptyStats);
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -930,6 +947,39 @@ const ActiveSellers = () => {
                         </div>
                       </div>
                     </div>
+
+                    {isMainAdmin && (
+                      <div className="space-y-3">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                          Zone
+                        </p>
+                        <div className="p-4 bg-white rounded-2xl ring-1 ring-slate-100 space-y-2">
+                          <select
+                            value={selectedSeller.zoneId || ""}
+                            onChange={async (e) => {
+                              const zoneId = e.target.value || null;
+                              try {
+                                await adminApi.updateSellerDetails(selectedSeller.id || selectedSeller._id, { zoneId });
+                                setSelectedSeller((prev) => ({ ...prev, zoneId }));
+                                setSellers((prev) => prev.map((s) => ((s.id || s._id) === (selectedSeller.id || selectedSeller._id) ? { ...s, zoneId } : s)));
+                                toast.success("Zone updated");
+                              } catch (err) {
+                                toast.error(err?.response?.data?.message || "Failed to update zone");
+                              }
+                            }}
+                            className="w-full px-3 py-2.5 bg-slate-50 rounded-xl text-sm font-bold text-slate-800 outline-none ring-1 ring-slate-200"
+                          >
+                            <option value="">No zone</option>
+                            {zoneOptions.map((z) => (
+                              <option key={z._id} value={z._id}>{z.name}</option>
+                            ))}
+                          </select>
+                          <p className="text-[10px] font-semibold text-slate-400">
+                            Sub-admins only see sellers, orders and returns in their assigned zones. New sellers get a zone automatically when their city matches a zone name.
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-3">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">

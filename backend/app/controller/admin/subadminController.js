@@ -1,4 +1,5 @@
 import Admin from "../../models/admin.js";
+import { clearSubadminPermissionCache } from "../../middleware/subadminPermissions.js";
 import handleResponse from "../../utils/helper.js";
 import { ensureSubAdminWallet } from "../../services/finance/commissionSplitsReportService.js";
 import { OWNER_TYPE } from "../../constants/finance.js";
@@ -176,6 +177,7 @@ export const updateSubadmin = async (req, res) => {
     }
 
     await subadmin.save();
+    clearSubadminPermissionCache(subadmin._id);
     await ensureSubAdminWallet(subadmin._id);
 
     const sanitized = subadmin.toObject();
@@ -194,6 +196,7 @@ export const deleteSubadmin = async (req, res) => {
     if (!subadmin) {
       return handleResponse(res, 404, "Sub-admin not found");
     }
+    clearSubadminPermissionCache(req.params.id);
     return handleResponse(res, 200, "Sub-admin deleted successfully");
   } catch (error) {
     return handleResponse(res, 500, error.message);

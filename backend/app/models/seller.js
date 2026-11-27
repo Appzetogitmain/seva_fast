@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { resolveZoneIdByCity } from "../utils/zoneResolver.js";
 import bcrypt from "bcrypt";
 import { normalizeIndian10DigitPhone } from "../utils/phone.js";
 
@@ -315,5 +316,18 @@ sellerSchema.pre("save", async function (next) {
 sellerSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+// Auto-assign the seller's zone from their city (zones are named after
+// cities). Admin can still set/override zoneId explicitly.
+sellerSchema.pre("save", async function (next) {
+  try {
+    if (!this.zoneId && this.city && (this.isNew || this.isModified("city"))) {
+      this.zoneId = await resolveZoneIdByCity(this.city);
+    }
+  } catch {
+    // never block a save over zone matching
+  }
+  next();
+});
 
 export default mongoose.model("Seller", sellerSchema);

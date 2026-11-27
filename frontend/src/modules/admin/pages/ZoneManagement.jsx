@@ -21,6 +21,8 @@ import { formatDate } from '@shared/utils/formatDate';
 const ZoneManagement = () => {
     const { showToast } = useToast();
     const [zones, setZones] = useState([]);
+    // Seller cities (from real seller data) — used to spot typos and suggest zone names.
+    const [sellerCities, setSellerCities] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,6 +45,7 @@ const ZoneManagement = () => {
             const res = await adminApi.getZones();
             if (res.data.success) {
                 setZones(res.data.result?.zones || res.data.results || []);
+                setSellerCities(res.data.result?.sellerCities || []);
             }
         } catch (error) {
             showToast('Failed to load zones', 'error');
@@ -87,12 +90,12 @@ const ZoneManagement = () => {
             if (editingZone?._id) {
                 const res = await adminApi.updateZone(editingZone._id, payload);
                 if (res.data.success) {
-                    showToast('Zone updated successfully', 'success');
+                    showToast(res.data.message || 'Zone updated successfully', 'success');
                 }
             } else {
                 const res = await adminApi.createZone(payload);
                 if (res.data.success) {
-                    showToast('New geographical zone created successfully', 'success');
+                    showToast(res.data.message || 'New geographical zone created successfully', 'success');
                 }
             }
             setIsModalOpen(false);
@@ -157,6 +160,29 @@ const ZoneManagement = () => {
                 </Card>
             </div>
 
+            {sellerCities.some((c) => !c.hasZone) && (
+                <Card className="border-none shadow-sm ring-1 ring-amber-100 bg-amber-50/60 rounded-xl p-4">
+                    <p className="text-xs font-black text-amber-800 uppercase tracking-widest">Seller cities without a zone</p>
+                    <p className="text-[11px] font-semibold text-amber-700 mt-1">
+                        These sellers (and their orders) are not visible to any zone-limited sub-admin. Click a city to create a zone for it, or set the seller's zone by hand in Sellers.
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                        {sellerCities.filter((c) => !c.hasZone).map((c) => (
+                            <button
+                                key={c.city}
+                                onClick={() => {
+                                    handleOpenModal();
+                                    setFormData({ name: c.city, description: '', status: 'active' });
+                                }}
+                                className="px-3 py-1.5 rounded-full bg-white ring-1 ring-amber-200 text-[11px] font-bold text-amber-800 hover:bg-amber-100"
+                            >
+                                {c.city} · {c.sellers} seller(s)
+                            </button>
+                        ))}
+                    </div>
+                </Card>
+            )}
+
             {/* Table/Card Area */}
             <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
                 {/* Search Bar */}
@@ -201,6 +227,16 @@ const ZoneManagement = () => {
                                             </div>
                                             <div>
                                                 <span className="text-sm font-black text-slate-900 tracking-wide">{zone.name}</span>
+                                                {zone.sellerCount !== undefined && (
+                                                    <p className="text-[10px] font-bold text-slate-500 mt-1">
+                                                        {zone.sellerCount} seller(s) · {zone.riderCount || 0} rider(s)
+                                                    </p>
+                                                )}
+                                                {zone.sellerCount === 0 && zone.cityMatchCount === 0 && (
+                                                    <p className="text-[10px] font-bold text-amber-600 mt-1">
+                                                        ⚠ No seller's city matches this name — check the spelling
+                                                    </p>
+                                                )}
                                                 <p className="text-[10px] font-bold text-slate-400 mt-1 flex items-center gap-1">
                                                     <HiOutlineClock className="h-3.5 w-3.5 text-slate-400" />
                                                     Created: {formatDate(zone.createdAt)}
@@ -300,8 +336,28 @@ const ZoneManagement = () => {
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             placeholder="e.g. Indore, Bhopal, Delhi"
+                            list="zone-city-suggestions"
                             className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none"
                         />
+                        <datalist id="zone-city-suggestions">
+                            {sellerCities.map((c) => (
+                                <option key={c.city} value={c.city}>{`${c.sellers} seller(s)`}</option>
+                            ))}
+                        </datalist>
+                        {(() => {
+                            const typed = formData.name.trim().toLowerCase();
+                            if (!typed) return null;
+                            const match = sellerCities.find((c) => c.city.trim().toLowerCase() === typed);
+                            return match ? (
+                                <p className="text-[10px] font-bold text-emerald-600 ml-1">
+                                    ✓ Matches {match.sellers} seller(s) with city "{match.city}" — they will be added to this zone automatically.
+                                </p>
+                            ) : (
+                                <p className="text-[10px] font-bold text-amber-600 ml-1">
+                                    ⚠ No seller has this city. Sellers are matched by city name, so check the spelling (pick from the suggestions).
+                                </p>
+                            );
+                        })()}
                     </div>
 
                     <div className="space-y-2">

@@ -1,4 +1,5 @@
 import Order from "../models/order.js";
+import { subadminZoneIds } from "../middleware/subadminPermissions.js";
 import Cart from "../models/cart.js";
 import Product from "../models/product.js";
 import Transaction from "../models/transaction.js";
@@ -334,7 +335,11 @@ export const getSellerReturns = async (req, res) => {
 
     const query = {};
 
-    if (role !== "admin") {
+    if (role === "sub-admin") {
+      // Sub-admins see returns from their zones (previously they were treated
+      // as a seller and always got an empty list).
+      query.zoneId = { $in: subadminZoneIds(req) };
+    } else if (role !== "admin") {
       query.seller = userId;
     }
 

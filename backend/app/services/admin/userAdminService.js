@@ -4,9 +4,14 @@ import Order from "../../models/order.js";
 import { emitNotificationEvent } from "../../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
 
-export async function getUsersData({ page, limit, skip }) {
+export async function getUsersData({ page, limit, skip, zoneIds = null }) {
+  const baseMatch = { role: { $in: ["user", "customer"] } };
+  if (Array.isArray(zoneIds)) {
+    const customerIds = await Order.distinct("customer", { zoneId: { $in: zoneIds } });
+    baseMatch._id = { $in: customerIds };
+  }
   const pipeline = [
-    { $match: { role: { $in: ["user", "customer"] } } },
+    { $match: baseMatch },
     {
       $lookup: {
         from: "orders",

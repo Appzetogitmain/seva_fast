@@ -1,4 +1,5 @@
 import handleResponse from "../../utils/helper.js";
+import { subadminZoneIds } from "../../middleware/subadminPermissions.js";
 import getPagination from "../../utils/pagination.js";
 import {
   getUserByIdData,
@@ -17,7 +18,10 @@ export const getUsers = async (req, res) => {
       maxLimit: 200,
     });
 
-    const data = await getUsersData({ page, limit, skip });
+    // Customers have no zone of their own: a sub-admin sees customers who
+    // have ordered in one of their zones.
+    const zoneIds = subadminZoneIds(req);
+    const data = await getUsersData({ page, limit, skip, zoneIds });
     return handleResponse(res, 200, "Users fetched successfully", data);
   } catch (error) {
     return handleResponse(res, 500, error.message);

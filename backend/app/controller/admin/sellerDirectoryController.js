@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import handleResponse from "../../utils/helper.js";
 import getPagination from "../../utils/pagination.js";
 import Seller from "../../models/seller.js";
@@ -96,6 +97,15 @@ export const updateSellerDetails = async (req, res) => {
     if (oneTimeChargeInterval !== undefined) updateData.oneTimeChargeInterval = oneTimeChargeInterval;
     if (categoryCommissionOverrides !== undefined) updateData.categoryCommissionOverrides = categoryCommissionOverrides;
     if (acceptsPhotoOrders !== undefined) updateData.acceptsPhotoOrders = acceptsPhotoOrders;
+    // Zone can only be changed by the main admin (a sub-admin could otherwise
+    // move a seller out of / into their own zones).
+    if (req.body.zoneId !== undefined && req.user?.role === "admin") {
+      const z = req.body.zoneId;
+      if (z && !mongoose.Types.ObjectId.isValid(z)) {
+        return handleResponse(res, 400, "Invalid zone");
+      }
+      updateData.zoneId = z || null;
+    }
 
     const seller = await Seller.findByIdAndUpdate(id, { $set: updateData }, { new: true });
     

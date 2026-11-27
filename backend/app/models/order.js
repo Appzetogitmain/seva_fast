@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { resolveSellerZoneId } from "../utils/zoneResolver.js";
 import { WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
 import { ALL_RETURN_REASON_CODES } from "../constants/returnReasons.js";
 import {
@@ -709,6 +710,19 @@ orderSchema.pre('findOneAndUpdate', function(next) {
     const error = new Error('Cannot set customer field to null');
     error.name = 'ValidationError';
     return next(error);
+  }
+  next();
+});
+
+// Every new order belongs to its seller's zone, so zone-limited sub-admins
+// see it. (Nothing set Order.zoneId before, so zone filters matched nothing.)
+orderSchema.pre("save", async function (next) {
+  try {
+    if (this.isNew && !this.zoneId && this.seller) {
+      this.zoneId = await resolveSellerZoneId(this.seller);
+    }
+  } catch {
+    // never block order placement over zone matching
   }
   next();
 });

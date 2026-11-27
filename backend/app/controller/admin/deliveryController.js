@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import Delivery from "../../models/delivery.js";
+import { subadminZoneIds } from "../../middleware/subadminPermissions.js";
 import Order from "../../models/order.js";
 import Wallet from "../../models/wallet.js";
 import Transaction from "../../models/transaction.js";
@@ -13,6 +15,8 @@ export const getDeliveryPartners = async (req, res) => {
   try {
     const { status, verified, search } = req.query;
     const query = {};
+    const zoneIds = subadminZoneIds(req);
+    if (zoneIds) query.zoneId = { $in: zoneIds };
 
     if (status === "online" || status === "available") {
       query.isOnline = true;
@@ -247,6 +251,13 @@ export const updateDeliveryPartner = async (req, res) => {
     if (vehicleNumber !== undefined) rider.vehicleNumber = vehicleNumber;
     if (currentArea !== undefined) rider.currentArea = currentArea;
     if (typeof isOnline === "boolean") rider.isOnline = isOnline;
+    if (req.body?.zoneId !== undefined && req.user?.role === "admin") {
+      const z = req.body.zoneId;
+      if (z && !mongoose.Types.ObjectId.isValid(z)) {
+        return handleResponse(res, 400, "Invalid zone");
+      }
+      rider.zoneId = z || null;
+    }
 
     await rider.save();
 
@@ -276,6 +287,8 @@ export const getActiveFleet = async (req, res) => {
     if (req.user.role === "seller") {
       query.seller = req.user.id;
     }
+    const zoneIds = subadminZoneIds(req);
+    if (zoneIds) query.zoneId = { $in: zoneIds };
 
     const [activeOrders, total] = await Promise.all([
       Order.find(query)

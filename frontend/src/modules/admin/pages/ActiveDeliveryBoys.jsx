@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useAuth } from '@core/context/AuthContext';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import Card from '@shared/components/ui/Card';
@@ -63,6 +64,22 @@ const ActiveDeliveryBoys = () => {
     const location = useLocation();
     const isSellerView = location.pathname.startsWith('/seller/');
     const [riders, setRiders] = useState([]);
+    // Zones: main admin can assign a rider to a zone (sub-admins only see riders in their zones)
+    const { user: authUser } = useAuth();
+    const isMainAdmin = authUser?.role !== 'sub-admin';
+    const [zoneOptions, setZoneOptions] = useState([]);
+    useEffect(() => {
+        if (!isMainAdmin) return;
+        adminApi
+            .getZones()
+            .then((res) => {
+                const raw = res?.data?.result ?? res?.data?.results ?? [];
+                const list = Array.isArray(raw) ? raw : Array.isArray(raw?.zones) ? raw.zones : Array.isArray(raw?.items) ? raw.items : [];
+                setZoneOptions(list);
+            })
+            .catch(() => {});
+    }, [isMainAdmin]);
+
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(25);
     const [total, setTotal] = useState(0);
@@ -99,6 +116,7 @@ const ActiveDeliveryBoys = () => {
                 const loc = String(r.preferredArea || r.currentArea || r.address || '').trim() || 'Not Specified';
                 return {
                     id: r._id,
+                    zoneId: r.zoneId ? String(r.zoneId) : '',
                     name: r.name,
                     phone: r.phone,
                     email: r.email,
@@ -219,6 +237,7 @@ const ActiveDeliveryBoys = () => {
                 vehicleType: formState.vehicle,
                 vehicleNumber: formState.vehicleNum,
                 currentArea: formState.location,
+                ...(isMainAdmin ? { zoneId: formState.zoneId || null } : {}),
             };
             const res = await adminApi.updateDeliveryPartner(selectedRider.id, payload);
             if (res.data?.success) {
@@ -234,6 +253,7 @@ const ActiveDeliveryBoys = () => {
                                 vehicle: formState.vehicle,
                                 vehicleNum: formState.vehicleNum,
                                 location: formState.location,
+                                zoneId: isMainAdmin ? (formState.zoneId || "") : r.zoneId,
                             }
                             : r,
                     ),
@@ -962,6 +982,21 @@ const ActiveDeliveryBoys = () => {
                                                 placeholder="e.g. Bandra West, Mumbai"
                                             />
                                         </div>
+                                        {isMainAdmin && isEditModalOpen && (
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Zone</label>
+                                                <select
+                                                    value={formState.zoneId || ''}
+                                                    onChange={(e) => setFormState({ ...formState, zoneId: e.target.value })}
+                                                    className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/10 transition-all"
+                                                >
+                                                    <option value="">No zone</option>
+                                                    {zoneOptions.map((z) => (
+                                                        <option key={z._id} value={z._id}>{z.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <button

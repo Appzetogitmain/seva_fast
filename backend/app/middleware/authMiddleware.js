@@ -3,6 +3,7 @@ import handleResponse from "../utils/helper.js";
 import Seller from "../models/seller.js";
 import Delivery from "../models/delivery.js";
 import Customer from "../models/customer.js";
+import { checkSubadminAccess } from "./subadminPermissions.js";
 
 function extractJwtFromHeaders(req) {
   const authHeader = String(req.headers.authorization || "").trim();
@@ -115,13 +116,23 @@ export const optionalVerifyToken = (req, res, next) => {
    Role Based Access
 ================================ */
 export const allowRoles = (...roles) => {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const userRole = req.user?.role;
-    const effectiveRoles = roles.includes("admin") && !roles.includes("sub-admin")
-      ? [...roles, "sub-admin"]
-      : roles;
 
-    if (!effectiveRoles.includes(userRole)) {
+    // Sub-admins: any route open to admins is open to them ONLY if their
+    // assigned permissions cover it (see subadminPermissions.js). Previously
+    // allowRoles("admin") let every sub-admin through to everything.
+    if (userRole === "sub-admin" && (roles.includes("admin") || roles.includes("sub-admin"))) {
+      try {
+        const access = await checkSubadminAccess(req);
+        if (!access.allowed) return handleResponse(res, 403, access.reason);
+        return next();
+      } catch (error) {
+        return handleResponse(res, 500, "Permission check failed");
+      }
+    }
+
+    if (!roles.includes(userRole)) {
       return handleResponse(res, 403, "Access denied");
     }
     next();

@@ -332,6 +332,7 @@ const AdminRoutes = () => {
       const allowedPerms = Array.isArray(user.allowedPermissions) ? user.allowedPermissions : [];
       filteredItems = navItems.filter(item => {
         if (item.label === "My Profile") return true;
+        if (item.label === "Sub-Admins") return false; // main admin only
         return allowedPerms.includes(item.permission || item.label);
       });
     }
@@ -349,7 +350,7 @@ const AdminRoutes = () => {
       <Routes>
         <Route path="/" element={<SubadminRoute permission="Dashboard"><Dashboard /></SubadminRoute>} />
         <Route path="/analytics" element={<SubadminRoute permission="Advanced Analytics"><AdvancedAnalytics /></SubadminRoute>} />
-        <Route path="/users" element={<SubadminRoute permission="Sub-Admins"><UserManagement /></SubadminRoute>} />
+        <Route path="/users" element={<SubadminRoute permission="__MAIN_ADMIN_ONLY__"><UserManagement /></SubadminRoute>} />
         <Route path="/zones" element={<SubadminRoute permission="Zones"><ZoneManagement /></SubadminRoute>} />
         <Route path="/profile" element={<AdminProfile />} />
         {/* Lazy routes for new sections */}
