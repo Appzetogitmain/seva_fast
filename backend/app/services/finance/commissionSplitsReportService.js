@@ -57,7 +57,7 @@ export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
   const [orders, financeSettings] = await Promise.all([
     Order.find(match)
       .select(
-        "paymentBreakdown.productSubtotal paymentBreakdown.adminProductCommissionTotal paymentBreakdown.grandTotal paymentBreakdown.sellerPayoutTotal paymentBreakdown.riderPayoutTotal paymentBreakdown.commissionBreakdown",
+        "paymentBreakdown.productSubtotal paymentBreakdown.membershipDiscountAmount paymentBreakdown.adminProductCommissionTotal paymentBreakdown.grandTotal paymentBreakdown.sellerPayoutTotal paymentBreakdown.riderPayoutTotal paymentBreakdown.commissionBreakdown",
       )
       .lean(),
     getOrCreateFinanceSettings(),
@@ -93,7 +93,8 @@ export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
     for (const [key, [amountField]] of Object.entries(SPLIT_FIELDS)) {
       sums[key] += stored ? Number(cb[amountField] || 0) : (adminCommission * rates[key]) / 100;
     }
-    sums.membershipDiscount += Number(cb?.membershipDiscountAmount || 0);
+    // Stored at the top of paymentBreakdown (not inside commissionBreakdown).
+    sums.membershipDiscount += Number(pb.membershipDiscountAmount ?? cb?.membershipDiscountAmount ?? 0);
   }
 
   const splitTotal = Object.keys(SPLIT_FIELDS).reduce((s, k) => s + sums[k], 0);

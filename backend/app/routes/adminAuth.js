@@ -1,4 +1,14 @@
 import express from "express";
+import {
+    getCustomerRewardConfig,
+    updateCustomerRewardConfig,
+    getCustomerRewards,
+    simulateCustomerRewards,
+    approveCustomerReward,
+    creditCustomerReward,
+    reverseCustomerReward,
+    exportCustomerRewards,
+} from "../controller/admin/customerRewardController.js";
 import multer from "multer";
 
 const upload = multer({
@@ -217,6 +227,15 @@ router.get("/users/:id", verifyToken, allowRoles("admin", "sub-admin"), getUserB
 router.get("/users/:id/referral-tree", verifyToken, allowRoles("admin", "sub-admin"), getUserReferralTree);
 router.put("/users/:id/wallet", verifyToken, allowRoles("admin"), updateUserWallet);
 router.patch("/users/:id/status", verifyToken, allowRoles("admin"), setUserStatus);
+// Customer reward programs (Site Cashback + Direct Buy Slab) — main admin only
+router.get("/customer-rewards/config", verifyToken, allowRoles("admin"), getCustomerRewardConfig);
+router.put("/customer-rewards/config", verifyToken, allowRoles("admin"), updateCustomerRewardConfig);
+router.get("/customer-rewards/export", verifyToken, allowRoles("admin"), exportCustomerRewards);
+router.get("/customer-rewards", verifyToken, allowRoles("admin"), getCustomerRewards);
+router.post("/customer-rewards/simulate", verifyToken, allowRoles("admin"), simulateCustomerRewards);
+router.post("/customer-rewards/:id/approve", verifyToken, allowRoles("admin"), approveCustomerReward);
+router.post("/customer-rewards/:id/credit", verifyToken, allowRoles("admin"), creditCustomerReward);
+router.post("/customer-rewards/:id/reverse", verifyToken, allowRoles("admin"), reverseCustomerReward);
 router.delete("/users/:id", verifyToken, allowRoles("admin"), deleteUser);
 router.get("/sellers", verifyToken, allowRoles("admin", "sub-admin"), getSellers);
 router.get("/sellers/locations", verifyToken, allowRoles("admin", "sub-admin"), getSellerLocations);

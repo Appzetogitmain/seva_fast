@@ -298,6 +298,18 @@ async function startScheduler() {
     getReferralCashbackJobHandler()
   );
 
+  // Register customer reward programs job (Site Cashback + Direct Buy Slab).
+  // No-op until the admin enables reward payouts.
+  const {
+    getCustomerRewardJobInterval,
+    getCustomerRewardJobHandler,
+  } = await import("./app/jobs/customerRewardJob.js");
+  registerScheduledJob(
+    'customerRewardJob',
+    getCustomerRewardJobInterval(),
+    getCustomerRewardJobHandler()
+  );
+
   // Register seller plan expiry housekeeping job (auto-reverts an expired
   // PLAN_BASED seller back to CATEGORY_WISE commission)
   const {

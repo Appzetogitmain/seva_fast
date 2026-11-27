@@ -463,6 +463,43 @@ const settingSchema = new mongoose.Schema(
             effectiveFrom: { type: Date, default: null },
         },
 
+        // Customer reward programs funded from the admin commission:
+        //  - Site Cashback: per eligible order, up to siteCashbackPercent of
+        //    that order's admin commission.
+        //  - Direct Customer Buy Slab: monthly purchase-value slabs, funded by
+        //    a pool of directSlabCommissionPercent of the month's commission.
+        // payoutsEnabled is OFF by default: rewards are calculated and tracked
+        // but no customer wallet is credited until the admin switches it on.
+        customerRewards: {
+            payoutsEnabled: { type: Boolean, default: false },
+            // Stamped when payouts are first enabled; only orders delivered
+            // on/after this date earn rewards (no retroactive payouts).
+            effectiveFrom: { type: Date, default: null },
+            siteCashback: {
+                enabled: { type: Boolean, default: true },
+                minOrderValue: { type: Number, default: 0, min: 0 },
+                maxPerOrder: { type: Number, default: 0, min: 0 }, // 0 = no cap
+                maxPerCustomerPerMonth: { type: Number, default: 0, min: 0 }, // 0 = no cap
+                // Fallback wait after delivery when the order has no return deadline.
+                holdDaysAfterDelivery: { type: Number, default: 1, min: 0 },
+            },
+            directSlab: {
+                enabled: { type: Boolean, default: true },
+                // Days after month end before the month is evaluated (lets
+                // the last return windows close).
+                verificationDaysAfterMonthEnd: { type: Number, default: 3, min: 0 },
+                slabs: [
+                    {
+                        _id: false,
+                        minMonthlySpend: { type: Number, min: 0 },
+                        // Minimum number of eligible orders in the month (0 = no minimum).
+                        minOrders: { type: Number, min: 0, default: 0 },
+                        reward: { type: Number, min: 0 },
+                    },
+                ],
+            },
+        },
+
         // MLM Promotional Section Configuration
         mlmPromo: {
             enabled: {

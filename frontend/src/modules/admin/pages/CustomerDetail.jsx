@@ -20,6 +20,7 @@ import {
     CheckCircle2,
     Clock,
     Copy,
+    Gift,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Modal from '@shared/components/ui/Modal';
@@ -72,6 +73,8 @@ const CustomerDetail = () => {
     const [submittingWallet, setSubmittingWallet] = useState(false);
 
     const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+    // Customer reward history (Site Cashback + Direct Buy Slab) — main admin only
+    const [rewards, setRewards] = useState({ items: [], total: 0, summary: [], loaded: false });
     const [submittingBlock, setSubmittingBlock] = useState(false);
 
     const fetchCustomer = useCallback(async () => {
@@ -87,6 +90,13 @@ const CustomerDetail = () => {
             .finally(() => setLoading(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
+
+    useEffect(() => {
+        if (!id || !isMainAdmin) return;
+        adminApi.getCustomerRewards({ customer: id, limit: 5 })
+            .then((res) => setRewards({ ...(res.data?.result || {}), loaded: true }))
+            .catch(() => setRewards((r) => ({ ...r, loaded: true })));
+    }, [id, isMainAdmin]);
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
@@ -363,6 +373,74 @@ const CustomerDetail = () => {
                     )}
                 </Card>
             </div>
+
+            {/* Rewards */}
+            {isMainAdmin && (
+                <Card className="rounded-xl border-none bg-white p-4 ring-1 ring-slate-100">
+                    <SectionTitle
+                        icon={Gift}
+                        right={(
+                            <button
+                                onClick={() => navigate(`/admin/customer-rewards?tab=rewards&q=${encodeURIComponent(customer.phone || customer.name || '')}`)}
+                                className="flex items-center gap-1 text-[11px] font-bold text-brand-600 hover:underline"
+                            >
+                                View all <ChevronRight className="h-3 w-3" />
+                            </button>
+                        )}
+                    >
+                        Rewards
+                    </SectionTitle>
+                    {(() => {
+                        const byStatus = {};
+                        (rewards.summary || []).forEach((row) => {
+                            const k = row._id.status;
+                            byStatus[k] = { count: (byStatus[k]?.count || 0) + row.count, amount: (byStatus[k]?.amount || 0) + row.amount };
+                        });
+                        return (
+                            <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                {['pending', 'approved', 'credited', 'reversed'].map((st) => (
+                                    <div key={st} className="rounded-lg bg-slate-50 p-2.5 ring-1 ring-slate-100">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{st}</p>
+                                        <p className="text-sm font-black text-slate-900">{inr(byStatus[st]?.amount)}</p>
+                                        <p className="text-[10px] text-slate-400">{byStatus[st]?.count || 0} reward(s)</p>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })()}
+                    {rewards.loaded && (rewards.items || []).length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 py-6 text-center text-[11px] font-bold text-slate-400">
+                            No cashback or slab rewards yet.
+                        </p>
+                    ) : (
+                        <div className="divide-y divide-slate-50">
+                            {(rewards.items || []).map((r) => (
+                                <div key={r._id} className="flex items-center justify-between gap-3 py-2.5">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-bold text-slate-800">
+                                            {r.program === 'site_cashback' ? `Site Cashback · ${r.orderId}` : `Buy Slab · ${r.period}`}
+                                        </p>
+                                        <p className="text-[11px] text-slate-400">
+                                            {formatDate(r.createdAt)}
+                                            {r.program === 'direct_slab' ? ` · spend ${inr(r.monthlySpend)}, ${r.monthlyOrders || 0} order(s)` : ''}
+                                            {r.reason && r.status === 'pending' ? ` · ${r.reason}` : ''}
+                                        </p>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        <span className="text-sm font-black text-slate-900">{inr(r.amount)}</span>
+                                        <Badge
+                                            variant={{ pending: 'warning', approved: 'primary', credited: 'success', reversed: 'error' }[r.status]}
+                                            className="text-[9px] font-black uppercase"
+                                        >
+                                            {r.status}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </Card>
+            )}
 
             {/* Block / unblock */}
             <Modal isOpen={isBlockModalOpen} onClose={() => !submittingBlock && setIsBlockModalOpen(false)} title={isActive ? 'Block this customer?' : 'Unblock this customer?'}>

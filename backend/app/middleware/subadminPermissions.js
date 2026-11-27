@@ -23,6 +23,7 @@ const ADMIN_ONLY = "ADMIN_ONLY";
 const RULES = [
   // ---- main-admin only (privilege / money-sensitive) ----
   { path: /^\/admin\/subadmins(\/|$)/, perms: ADMIN_ONLY },
+  { path: /^\/admin\/customer-rewards(\/|$)/, perms: ADMIN_ONLY },
   { path: /^\/admin\/users\/[^/]+\/(wallet|status)$/, perms: ADMIN_ONLY },
   { method: "DELETE", path: /^\/admin\/users\/[^/]+$/, perms: ADMIN_ONLY },
   { path: /^\/admin\/signup$/, perms: ADMIN_ONLY },

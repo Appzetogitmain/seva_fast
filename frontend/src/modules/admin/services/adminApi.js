@@ -35,6 +35,15 @@ export const adminApi = {
     getFinanceLedger: (params) => axiosInstance.get('/admin/finance/ledger', { params }),
     getFinanceOrderEarnings: (params) => axiosInstance.get('/admin/finance/order-earnings', { params }),
     getCommissionSplitsReport: (params) => axiosInstance.get('/admin/finance/commission-splits', { params }),
+    // Customer reward programs (Site Cashback + Direct Buy Slab)
+    getCustomerRewardConfig: () => axiosInstance.get('/admin/customer-rewards/config'),
+    updateCustomerRewardConfig: (data) => axiosInstance.put('/admin/customer-rewards/config', data),
+    getCustomerRewards: (params) => axiosInstance.get('/admin/customer-rewards', { params }),
+    exportCustomerRewards: (params) => axiosInstance.get('/admin/customer-rewards/export', { params, responseType: 'blob' }),
+    simulateCustomerRewards: (data) => axiosInstance.post('/admin/customer-rewards/simulate', data),
+    approveCustomerReward: (id, note) => axiosInstance.post(`/admin/customer-rewards/${id}/approve`, { note }),
+    creditCustomerReward: (id) => axiosInstance.post(`/admin/customer-rewards/${id}/credit`),
+    reverseCustomerReward: (id, note) => axiosInstance.post(`/admin/customer-rewards/${id}/reverse`, { note }),
     getFinancePayouts: (params) => axiosInstance.get('/admin/finance/payouts', { params }),
     processFinancePayouts: (data) => axiosInstance.post('/admin/finance/payouts/process', data),
     exportFinanceStatement: (params) =>

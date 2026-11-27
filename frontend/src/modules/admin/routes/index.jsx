@@ -81,6 +81,7 @@ const CustomerManagement = React.lazy(
 const CustomerDetail = React.lazy(() => import("../pages/CustomerDetail"));
 const ReferralsAndSubscriptions = React.lazy(() => import("../pages/ReferralsAndSubscriptions"));
 const ReferralRewards = React.lazy(() => import("../pages/ReferralRewards"));
+const CustomerRewards = React.lazy(() => import("../pages/CustomerRewards"));
 const UserManagement = React.lazy(() => import("../pages/UserManagement"));
 const ZoneManagement = React.lazy(() => import("../pages/ZoneManagement"));
 const Profile = React.lazy(() => import("@/pages/Profile"));
@@ -246,7 +247,18 @@ const navItems = [
     color: "rose",
   },
   { label: "Referrals & Plans", path: "/admin/referrals-plans", icon: Sparkles, color: "amber" },
-  { label: "Referral Cashback", path: "/admin/referral-rewards", icon: Sparkles, color: "emerald", permission: "Referrals & Plans" },
+  {
+    label: "Loyalty & Rewards",
+    icon: Sparkles,
+    color: "emerald",
+    permission: "Referrals & Plans",
+    children: [
+      { label: "Reward Rules & Settings", path: "/admin/customer-rewards?tab=rules", permission: "__MAIN_ADMIN_ONLY__" },
+      { label: "Reward Transactions", path: "/admin/customer-rewards?tab=rewards", permission: "__MAIN_ADMIN_ONLY__" },
+      { label: "Rewards Test Report", path: "/admin/customer-rewards?tab=test", permission: "__MAIN_ADMIN_ONLY__" },
+      { label: "Referral Cashback", path: "/admin/referral-rewards", permission: "Referrals & Plans" },
+    ],
+  },
   { label: "FAQs", path: "/admin/faqs", icon: HelpCircle, color: "pink" },
   {
     label: "Orders",
@@ -330,7 +342,12 @@ const AdminRoutes = () => {
 
     if (user?.role === "sub-admin") {
       const allowedPerms = Array.isArray(user.allowedPermissions) ? user.allowedPermissions : [];
-      filteredItems = navItems.filter(item => {
+      filteredItems = navItems.map(item => (
+        Array.isArray(item.children)
+          ? { ...item, children: item.children.filter((child) => !child.permission || allowedPerms.includes(child.permission)) }
+          : item
+      )).filter(item => {
+        if (Array.isArray(item.children) && item.children.length === 0) return false;
         if (item.label === "My Profile") return true;
         if (item.label === "Sub-Admins") return false; // main admin only
         return allowedPerms.includes(item.permission || item.label);
@@ -398,6 +415,7 @@ const AdminRoutes = () => {
         <Route path="/customers/:id" element={<SubadminRoute permission="Customers"><CustomerDetail /></SubadminRoute>} />
         <Route path="/referrals-plans" element={<SubadminRoute permission="Referrals & Plans"><ReferralsAndSubscriptions /></SubadminRoute>} />
         <Route path="/referral-rewards" element={<SubadminRoute permission="Referrals & Plans"><ReferralRewards /></SubadminRoute>} />
+        <Route path="/customer-rewards" element={<SubadminRoute permission="__MAIN_ADMIN_ONLY__"><CustomerRewards /></SubadminRoute>} />
         <Route path="/faqs" element={<SubadminRoute permission="FAQs"><FAQManagement /></SubadminRoute>} />
         <Route path="/orders/:status" element={<SubadminRoute permission="Orders"><OrdersList /></SubadminRoute>} />
         <Route path="/orders/view/:orderId" element={<SubadminRoute permission="Orders"><OrderDetail /></SubadminRoute>} />

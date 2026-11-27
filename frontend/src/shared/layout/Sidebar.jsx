@@ -49,7 +49,15 @@ const SidebarItem = ({
   const hasChildren = item.children && item.children.length > 0;
   const isChildActive =
     hasChildren &&
-    item.children.some((child) => location.pathname === child.path);
+    item.children.some((child) => location.pathname === String(child.path).split("?")[0]);
+  // Links that carry a query (e.g. ?tab=rules) are active only when the query matches too.
+  const childIsActive = (child, navActive) => {
+    if (!String(child.path).includes("?")) return navActive;
+    const [path, query] = String(child.path).split("?");
+    const current = new URLSearchParams(location.search);
+    const wanted = new URLSearchParams(query);
+    return location.pathname === path && [...wanted.entries()].every(([k, v]) => current.get(k) === v);
+  };
 
   if (hasChildren) {
     return (
@@ -126,18 +134,18 @@ const SidebarItem = ({
                 to={child.path}
                 onClick={onClose}
                 end={child.end !== undefined ? child.end : false}
-                className={({ isActive }) =>
+                className={({ isActive: navActive }) =>
                   cn(
                     "block text-xs py-1.5 px-2.5 rounded-lg transition-all duration-300 relative",
-                    isActive
+                    childIsActive(child, navActive)
                       ? "text-white font-bold bg-white/10 shadow-sm ring-1 ring-white/5"
                       : "text-gray-500 hover:text-gray-300 hover:bg-white/5",
                     showChildBadge && "pr-9",
                   )
                 }>
-                {({ isActive }) => (
+                {({ isActive: navActive }) => (
                   <>
-                    {isActive && (
+                    {childIsActive(child, navActive) && (
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3 rounded-full bg-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
                     )}
                     {child.label}
