@@ -215,7 +215,15 @@ const BillingCharges = () => {
         fetchSettings();
     }, []);
 
+    // Admin Commission Sharing Model: these splits are % of the admin commission.
+    const SPLIT_KEYS = ['technicalChargePercent', 'otherMaintenancePercent', 'subAdminCommissionPercent', 'fieldWorkerCommissionPercent', 'affiliateMarketingPercent', 'advertiseChargePercent', 'siteCashbackPercent', 'directSlabCommissionPercent'];
+    const splitTotalPercent = Math.round(SPLIT_KEYS.reduce((sum, k) => sum + Number(commissions?.[k] || 0), 0) * 100) / 100;
+
     const handleSave = async () => {
+        if (splitTotalPercent > 100) {
+            showToast(`Commission splits total ${splitTotalPercent}% of the admin commission — they must be 100% or less.`, 'error');
+            return;
+        }
         try {
             setIsSaving(true);
             await Promise.all([
@@ -239,7 +247,7 @@ const BillingCharges = () => {
             showToast('Delivery finance settings updated', 'success');
         } catch (error) {
             console.error('Failed to update platform settings', error);
-            showToast('Failed to update fees settings', 'error');
+            showToast(error?.response?.data?.message || 'Failed to update fees settings', 'error');
         } finally {
             setIsSaving(false);
         }
@@ -598,6 +606,17 @@ const BillingCharges = () => {
                             </h3>
                         </div>
                         <div className="p-8 space-y-8">
+                            <div className={cn(
+                                "rounded-xl px-4 py-3 ring-1 text-xs font-semibold",
+                                splitTotalPercent > 100 ? "bg-rose-50 ring-rose-200 text-rose-700" : "bg-emerald-50 ring-emerald-200 text-emerald-800"
+                            )}>
+                                Split percentages below (technical, maintenance, sub-admin, field worker, affiliate, advertise, site cashback, direct slab) are a share of the
+                                <span className="font-black"> admin commission</span>, not of the product price.
+                                Total used: <span className="font-black">{splitTotalPercent}%</span>
+                                {splitTotalPercent > 100
+                                    ? ' — over 100%, reduce the splits before saving.'
+                                    : ` — platform keeps ${Math.round((100 - splitTotalPercent) * 100) / 100}% of the commission.`}
+                            </div>
                             {/* Platform splits */}
                             <div>
                                 <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">

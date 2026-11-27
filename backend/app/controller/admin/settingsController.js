@@ -1,4 +1,5 @@
 import Setting from "../../models/setting.js";
+import { validateSplitPercents } from "../../utils/commissionSplits.js";
 import handleResponse from "../../utils/helper.js";
 import { normalizeProductApprovalConfig } from "../../services/productModerationService.js";
 
@@ -52,6 +53,11 @@ export const getPlatformSettings = async (req, res) => {
 export const updatePlatformSettings = async (req, res) => {
   try {
     const payload = req.body || {};
+    const current = (await Setting.findOne({}).lean()) || {};
+    const splitError = validateSplitPercents(current, payload);
+    if (splitError) {
+      return handleResponse(res, 400, splitError);
+    }
     const toSet = {};
     for (const [key, value] of Object.entries(payload)) {
       flattenForMongoSet(key, value, toSet);

@@ -31,11 +31,14 @@ const statusStyles = {
     credited: 'success',
     tracked: 'warning',
     discount: 'secondary',
+    retained: 'primary',
 };
 
 const CommissionSplitsReport = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [report, setReport] = useState({
         totals: {},
         splits: [],
@@ -46,7 +49,10 @@ const CommissionSplitsReport = () => {
     const fetchReport = async () => {
         try {
             setLoading(true);
-            const res = await adminApi.getCommissionSplitsReport();
+            const params = {};
+            if (fromDate) params.fromDate = fromDate;
+            if (toDate) params.toDate = toDate;
+            const res = await adminApi.getCommissionSplitsReport(params);
             if (res.data.success) {
                 setReport(res.data.result || {});
             }
@@ -59,7 +65,8 @@ const CommissionSplitsReport = () => {
 
     useEffect(() => {
         fetchReport();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fromDate, toDate]);
 
     const totals = report.totals || {};
     const splitsByGroup = (report.splits || []).reduce((acc, split) => {
@@ -75,10 +82,34 @@ const CommissionSplitsReport = () => {
                 <div>
                     <h1 className="ds-h1">Commission Splits Report</h1>
                     <p className="ds-description mt-1">
-                        Billing rates applied on delivered orders — and where each ₹ went.
+                        Every split is a % of the <span className="font-bold text-slate-700">admin commission</span> on delivered orders (returned orders excluded).
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2 bg-white ring-1 ring-slate-200 rounded-xl px-3 py-1.5">
+                        <input
+                            type="date"
+                            value={fromDate}
+                            max={toDate || undefined}
+                            onChange={(e) => setFromDate(e.target.value)}
+                            className="text-xs font-bold text-slate-700 outline-none bg-transparent"
+                            aria-label="From date"
+                        />
+                        <span className="text-xs text-slate-400">to</span>
+                        <input
+                            type="date"
+                            value={toDate}
+                            min={fromDate || undefined}
+                            onChange={(e) => setToDate(e.target.value)}
+                            className="text-xs font-bold text-slate-700 outline-none bg-transparent"
+                            aria-label="To date"
+                        />
+                        {(fromDate || toDate) && (
+                            <button onClick={() => { setFromDate(''); setToDate(''); }} className="text-[10px] font-black text-slate-400 hover:text-slate-700 uppercase">
+                                Clear
+                            </button>
+                        )}
+                    </div>
                     <button
                         onClick={() => navigate('/admin/billing')}
                         className="px-4 py-2.5 bg-white ring-1 ring-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50"
@@ -99,9 +130,9 @@ const CommissionSplitsReport = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                     { label: 'Delivered Orders', value: totals.orderCount || 0, prefix: '' },
-                    { label: 'Product Base', value: totals.productBase || 0, prefix: '₹' },
-                    { label: 'Platform Earning', value: totals.platformEarning || 0, prefix: '₹', highlight: true },
-                    { label: 'Admin Commission', value: totals.adminCommission || 0, prefix: '₹' },
+                    { label: 'Admin Commission', value: totals.adminCommission || 0, prefix: '₹', highlight: true },
+                    { label: 'Distributed (Splits)', value: totals.distributedTotal || 0, prefix: '₹' },
+                    { label: 'Kept by Platform', value: totals.platformRetained || 0, prefix: '₹' },
                 ].map((card) => (
                     <Card
                         key={card.label}
@@ -118,6 +149,14 @@ const CommissionSplitsReport = () => {
                 ))}
             </div>
 
+            {Number(totals.estimatedOrders || 0) > 0 && (
+                <div className="rounded-xl bg-amber-50 ring-1 ring-amber-200 px-4 py-3 text-xs font-semibold text-amber-800">
+                    {totals.estimatedOrders} of {totals.orderCount} orders were placed before split tracking was fixed, so their split amounts are
+                    <span className="font-black"> estimated</span> from today&apos;s rates and were <span className="font-black">not paid out</span>.
+                    New orders store and pay their exact split on delivery.
+                </div>
+            )}
+
             {/* Split totals by billing category */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {Object.entries(splitsByGroup).map(([group, items]) => (
@@ -132,7 +171,12 @@ const CommissionSplitsReport = () => {
                             {items.map((split) => (
                                 <div key={split.key} className="px-5 py-3.5 flex items-start justify-between gap-4">
                                     <div>
-                                        <p className="text-sm font-bold text-slate-800">{split.label}</p>
+                                        <p className="text-sm font-bold text-slate-800">
+                                            {split.label}
+                                            {split.ratePercent !== undefined && (
+                                                <span className="ml-2 text-[10px] font-black text-slate-400">{split.ratePercent}% of commission</span>
+                                            )}
+                                        </p>
                                         <p className="text-[11px] font-semibold text-slate-400 mt-0.5">{split.creditedTo}</p>
                                     </div>
                                     <div className="text-right shrink-0">

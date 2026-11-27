@@ -914,34 +914,38 @@ export async function generateOrderPaymentBreakdown({
     adminCommissionAmount: totalCommissionAmount,
     
     technicalChargePercent: effectiveSettings.technicalChargePercent ?? 0,
-    technicalChargeAmount: isExempt ? 0 : roundCurrency((commissionBase * (effectiveSettings.technicalChargePercent ?? 0)) / 100),
+    technicalChargeAmount: isExempt ? 0 : roundCurrency((totalCommissionAmount * (effectiveSettings.technicalChargePercent ?? 0)) / 100),
     
     subAdminCommissionPercent: effectiveSettings.subAdminCommissionPercent ?? 0,
-    subAdminCommissionAmount: isExempt ? 0 : roundCurrency((commissionBase * (effectiveSettings.subAdminCommissionPercent ?? 0)) / 100),
+    subAdminCommissionAmount: isExempt ? 0 : roundCurrency((totalCommissionAmount * (effectiveSettings.subAdminCommissionPercent ?? 0)) / 100),
     
     fieldWorkerCommissionPercent: effectiveSettings.fieldWorkerCommissionPercent ?? 0,
-    fieldWorkerCommissionAmount: isExempt ? 0 : roundCurrency((commissionBase * (effectiveSettings.fieldWorkerCommissionPercent ?? 0)) / 100),
+    fieldWorkerCommissionAmount: isExempt ? 0 : roundCurrency((totalCommissionAmount * (effectiveSettings.fieldWorkerCommissionPercent ?? 0)) / 100),
     
     directSlabCommissionPercent: effectiveSettings.directSlabCommissionPercent ?? 0,
-    directSlabCommissionAmount: isExempt ? 0 : roundCurrency((commissionBase * (effectiveSettings.directSlabCommissionPercent ?? 0)) / 100),
+    directSlabCommissionAmount: isExempt ? 0 : roundCurrency((totalCommissionAmount * (effectiveSettings.directSlabCommissionPercent ?? 0)) / 100),
     
     advertiseChargePercent: effectiveSettings.advertiseChargePercent ?? 0,
-    advertiseChargeAmount: isExempt ? 0 : roundCurrency((commissionBase * (effectiveSettings.advertiseChargePercent ?? 0)) / 100),
+    advertiseChargeAmount: isExempt ? 0 : roundCurrency((totalCommissionAmount * (effectiveSettings.advertiseChargePercent ?? 0)) / 100),
     
     siteCashbackPercent: effectiveSettings.siteCashbackPercent ?? 0,
-    siteCashbackAmount: isExempt ? 0 : roundCurrency((commissionBase * (effectiveSettings.siteCashbackPercent ?? 0)) / 100),
+    siteCashbackAmount: isExempt ? 0 : roundCurrency((totalCommissionAmount * (effectiveSettings.siteCashbackPercent ?? 0)) / 100),
     
     otherMaintenancePercent: effectiveSettings.otherMaintenancePercent ?? 0,
-    otherMaintenanceAmount: isExempt ? 0 : roundCurrency((commissionBase * (effectiveSettings.otherMaintenancePercent ?? 0)) / 100),
+    otherMaintenanceAmount: isExempt ? 0 : roundCurrency((totalCommissionAmount * (effectiveSettings.otherMaintenancePercent ?? 0)) / 100),
     
     affiliateMarketingPercent: effectiveSettings.affiliateMarketingPercent ?? 0,
-    affiliateMarketingAmount: isExempt ? 0 : roundCurrency((commissionBase * (effectiveSettings.affiliateMarketingPercent ?? 0)) / 100),
+    affiliateMarketingAmount: isExempt ? 0 : roundCurrency((totalCommissionAmount * (effectiveSettings.affiliateMarketingPercent ?? 0)) / 100),
     
     membershipTier: tierClean,
     membershipDiscountPercent,
     membershipDiscountAmount,
     
     commissionBaseAmount: commissionBase,
+    // Admin Commission Sharing Model: every split % above is a share of the
+    // ADMIN COMMISSION (totalCommissionAmount), not of the product value.
+    splitBasis: "admin_commission",
+    splitBaseAmount: totalCommissionAmount,
     shippingDeductedAmount: shippingChargeToDeduct,
   };
 

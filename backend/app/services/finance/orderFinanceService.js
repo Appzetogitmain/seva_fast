@@ -566,27 +566,52 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
         const orderSubtotal = roundCurrency(
           breakdown.productSubtotal || lineItems.reduce((s, li) => s + (li.itemSubtotal || 0), 0) || 0,
         );
+        // Admin Commission Sharing Model: the sub-admin % applies to the ADMIN
+        // COMMISSION earned on the order (or on their categories' items), not
+        // on the product value.
+        const orderAdminCommission = roundCurrency(
+          breakdown.adminProductCommissionTotal ||
+            lineItems.reduce((s, li) => s + (li.adminProductCommission || 0), 0) ||
+            0,
+        );
+
+        // Shared Sub-Admin commission model: when several sub-admins cover the
+        // same item (same zone + category, or no category filter), that item's
+        // sub-admin share is split equally between them instead of each one
+        // receiving the full share.
+        const catsOf = (sa) => (sa.assignedCategories || []).map(String);
+        const coversLine = (sa, li) => {
+          const cats = catsOf(sa);
+          return cats.length === 0 || cats.includes(String(li.headerCategoryId));
+        };
+        const sharersPerLine = lineItems.map(
+          (li) => panelSubAdmins.filter((sa) => coversLine(sa, li)).length,
+        );
+        const unfilteredCount = panelSubAdmins.filter((sa) => catsOf(sa).length === 0).length;
 
         for (const panelSubAdmin of panelSubAdmins) {
-          const assignedCatIds = (panelSubAdmin.assignedCategories || []).map(String);
+          const assignedCatIds = catsOf(panelSubAdmin);
           const hasFilter = assignedCatIds.length > 0;
 
-          // Determine the commission base for this sub-admin
+          // This sub-admin's portion of the admin commission (already divided
+          // by the number of sub-admins sharing each item).
           let commissionBase = 0;
           let coveredLineItems = [];
+          let sharedWith = 1;
 
-          if (!hasFilter) {
-            // No category filter → gets commission on the entire order subtotal
-            commissionBase = orderSubtotal;
-            coveredLineItems = lineItems;
-          } else {
-            // Only items whose headerCategoryId is in this sub-admin's assigned categories
-            coveredLineItems = lineItems.filter((li) =>
-              assignedCatIds.includes(String(li.headerCategoryId)),
-            );
-            commissionBase = roundCurrency(
-              coveredLineItems.reduce((s, li) => s + (li.itemSubtotal || 0), 0),
-            );
+          if (lineItems.length > 0) {
+            lineItems.forEach((li, idx) => {
+              if (!coversLine(panelSubAdmin, li)) return;
+              coveredLineItems.push(li);
+              const sharers = Math.max(sharersPerLine[idx], 1);
+              sharedWith = Math.max(sharedWith, sharers);
+              commissionBase += Number(li.adminProductCommission || 0) / sharers;
+            });
+            commissionBase = roundCurrency(commissionBase);
+          } else if (!hasFilter) {
+            // Older orders without line items: split the whole order's commission
+            sharedWith = Math.max(unfilteredCount, 1);
+            commissionBase = roundCurrency(orderAdminCommission / sharedWith);
           }
 
           if (commissionBase <= 0) continue; // No matching items for this sub-admin
@@ -645,6 +670,8 @@ export async function distributeSlabCommissions(order, { session, actorId } = {}
                   orderId: order._id,
                   commissionRate: effectiveRate,
                   commissionBase,
+                  commissionBasis: "admin_commission",
+                  sharedWithSubAdmins: sharedWith,
                   orderAmount: orderSubtotal,
                   categoryFiltered: hasFilter,
                   assignedCategoryIds: assignedCatIds,

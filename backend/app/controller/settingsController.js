@@ -1,4 +1,5 @@
 import Joi from "joi";
+import { validateSplitPercents } from "../utils/commissionSplits.js";
 import Setting from "../models/setting.js";
 import handleResponse from "../utils/helper.js";
 import { buildKey, getOrSet, getTTL, invalidate } from "../services/cacheService.js";
@@ -368,6 +369,13 @@ export const updateSettings = async (req, res) => {
     const filter = tenantId
       ? { tenantId }
       : { $or: [{ tenantId: null }, { tenantId: { $exists: false } }] };
+    const splitError = validateSplitPercents(
+      (await Setting.findOne(filter).lean()) || {},
+      value,
+    );
+    if (splitError) {
+      return handleResponse(res, 400, splitError);
+    }
     const toSet = {};
     for (const [key, v] of Object.entries(value)) {
       if (v === undefined) continue;

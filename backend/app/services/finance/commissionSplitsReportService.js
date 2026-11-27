@@ -5,13 +5,43 @@ import Transaction from "../../models/transaction.js";
 import { OWNER_TYPE } from "../../constants/finance.js";
 import { roundCurrency } from "../../utils/money.js";
 import { getOrCreateWallet } from "./walletService.js";
+import { getOrCreateFinanceSettings } from "./financeSettingsService.js";
+
+// Orders that were returned / refunded are not earned revenue.
+const RETURNED_STATUSES = [
+  "returned",
+  "qc_passed",
+  "refund_completed",
+  "return_approved",
+  "return_in_transit",
+  "return_drop_pending",
+  "return_pickup_assigned",
+];
+
+// split key -> [amount field in commissionBreakdown, % setting key]
+const SPLIT_FIELDS = {
+  technical: ["technicalChargeAmount", "technicalChargePercent"],
+  maintenance: ["otherMaintenanceAmount", "otherMaintenancePercent"],
+  subAdmin: ["subAdminCommissionAmount", "subAdminCommissionPercent"],
+  fieldWorker: ["fieldWorkerCommissionAmount", "fieldWorkerCommissionPercent"],
+  affiliate: ["affiliateMarketingAmount", "affiliateMarketingPercent"],
+  advertise: ["advertiseChargeAmount", "advertiseChargePercent"],
+  siteCashback: ["siteCashbackAmount", "siteCashbackPercent"],
+  directSlab: ["directSlabCommissionAmount", "directSlabCommissionPercent"],
+};
 
 /**
- * Aggregate billing-split amounts from delivered orders + live sub-admin wallets.
+ * Commission Splits report — Admin Commission Sharing Model.
+ *
+ * Every split is a % of the ADMIN COMMISSION on delivered, non-returned
+ * orders. Orders placed after the fix carry their own stored split
+ * (splitBasis "admin_commission"); older orders never stored one, so their
+ * split is ESTIMATED from the current rates and counted in `estimatedOrders`.
  */
 export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
   const match = {
     status: "delivered",
+    returnStatus: { $nin: RETURNED_STATUSES },
   };
 
   if (fromDate || toDate) {
@@ -24,79 +54,69 @@ export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
     }
   }
 
-  const [agg] = await Order.aggregate([
-    { $match: match },
-    {
-      $group: {
-        _id: null,
-        orderCount: { $sum: 1 },
-        productBase: { $sum: { $ifNull: ["$paymentBreakdown.productSubtotal", 0] } },
-        adminCommission: {
-          $sum: { $ifNull: ["$paymentBreakdown.adminProductCommissionTotal", 0] },
-        },
-        platformEarning: {
-          $sum: { $ifNull: ["$paymentBreakdown.platformTotalEarning", 0] },
-        },
-        technical: {
-          $sum: { $ifNull: ["$paymentBreakdown.commissionBreakdown.technicalChargeAmount", 0] },
-        },
-        maintenance: {
-          $sum: { $ifNull: ["$paymentBreakdown.commissionBreakdown.otherMaintenanceAmount", 0] },
-        },
-        subAdmin: {
-          $sum: { $ifNull: ["$paymentBreakdown.commissionBreakdown.subAdminCommissionAmount", 0] },
-        },
-        fieldWorker: {
-          $sum: { $ifNull: ["$paymentBreakdown.commissionBreakdown.fieldWorkerCommissionAmount", 0] },
-        },
-        affiliate: {
-          $sum: { $ifNull: ["$paymentBreakdown.commissionBreakdown.affiliateMarketingAmount", 0] },
-        },
-        advertise: {
-          $sum: { $ifNull: ["$paymentBreakdown.commissionBreakdown.advertiseChargeAmount", 0] },
-        },
-        siteCashback: {
-          $sum: { $ifNull: ["$paymentBreakdown.commissionBreakdown.siteCashbackAmount", 0] },
-        },
-        directSlab: {
-          $sum: { $ifNull: ["$paymentBreakdown.commissionBreakdown.directSlabCommissionAmount", 0] },
-        },
-        membershipDiscount: {
-          $sum: { $ifNull: ["$paymentBreakdown.commissionBreakdown.membershipDiscountAmount", 0] },
-        },
-      },
-    },
+  const [orders, financeSettings] = await Promise.all([
+    Order.find(match)
+      .select(
+        "paymentBreakdown.productSubtotal paymentBreakdown.adminProductCommissionTotal paymentBreakdown.grandTotal paymentBreakdown.sellerPayoutTotal paymentBreakdown.riderPayoutTotal paymentBreakdown.commissionBreakdown",
+      )
+      .lean(),
+    getOrCreateFinanceSettings(),
   ]);
+  const rates = Object.fromEntries(
+    Object.entries(SPLIT_FIELDS).map(([key, [, pctKey]]) => [key, Number(financeSettings?.[pctKey] || 0)]),
+  );
 
-  const totals = {
-    orderCount: Number(agg?.orderCount || 0),
-    productBase: roundCurrency(agg?.productBase || 0),
-    adminCommission: roundCurrency(agg?.adminCommission || 0),
-    platformEarning: roundCurrency(agg?.platformEarning || 0),
-    technical: roundCurrency(agg?.technical || 0),
-    maintenance: roundCurrency(agg?.maintenance || 0),
-    subAdmin: roundCurrency(agg?.subAdmin || 0),
-    fieldWorker: roundCurrency(agg?.fieldWorker || 0),
-    affiliate: roundCurrency(agg?.affiliate || 0),
-    advertise: roundCurrency(agg?.advertise || 0),
-    siteCashback: roundCurrency(agg?.siteCashback || 0),
-    directSlab: roundCurrency(agg?.directSlab || 0),
-    membershipDiscount: roundCurrency(agg?.membershipDiscount || 0),
+  const sums = {
+    productBase: 0,
+    adminCommission: 0,
+    platformEarning: 0,
+    membershipDiscount: 0,
+    ...Object.fromEntries(Object.keys(SPLIT_FIELDS).map((k) => [k, 0])),
   };
+  let estimatedOrders = 0;
+
+  for (const order of orders) {
+    const pb = order.paymentBreakdown || {};
+    const adminCommission = Number(pb.adminProductCommissionTotal || 0);
+    sums.productBase += Number(pb.productSubtotal || 0);
+    sums.adminCommission += adminCommission;
+    // Same definition as Order-wise Platform Earnings: customer paid minus
+    // seller payout minus rider payout (net of discounts and rider extras).
+    if (Number(pb.grandTotal || 0) > 0) {
+      sums.platformEarning +=
+        Number(pb.grandTotal || 0) - Number(pb.sellerPayoutTotal || 0) - Number(pb.riderPayoutTotal || 0);
+    }
+
+    const cb = pb.commissionBreakdown;
+    const stored = cb && cb.splitBasis === "admin_commission";
+    if (!stored) estimatedOrders += 1;
+    for (const [key, [amountField]] of Object.entries(SPLIT_FIELDS)) {
+      sums[key] += stored ? Number(cb[amountField] || 0) : (adminCommission * rates[key]) / 100;
+    }
+    sums.membershipDiscount += Number(cb?.membershipDiscountAmount || 0);
+  }
+
+  const splitTotal = Object.keys(SPLIT_FIELDS).reduce((s, k) => s + sums[k], 0);
+  const totals = {
+    orderCount: orders.length,
+    estimatedOrders,
+    splitBasis: "admin_commission",
+    productBase: roundCurrency(sums.productBase),
+    adminCommission: roundCurrency(sums.adminCommission),
+    platformEarning: roundCurrency(sums.platformEarning),
+    distributedTotal: roundCurrency(splitTotal),
+    platformRetained: roundCurrency(sums.adminCommission - splitTotal),
+    membershipDiscount: roundCurrency(sums.membershipDiscount),
+    ...Object.fromEntries(Object.keys(SPLIT_FIELDS).map((k) => [k, roundCurrency(sums[k])])),
+  };
+  const ratePct = (key) => rates[key];
 
   const splits = [
-    {
-      key: "adminCommission",
-      label: "Admin Commission",
-      group: "platform",
-      amount: totals.adminCommission,
-      creditedTo: "Platform wallet (inside Platform Earning)",
-      status: "credited",
-    },
     {
       key: "technical",
       label: "Technical Charge",
       group: "platform",
+      ratePercent: ratePct("technical"),
       amount: totals.technical,
       creditedTo: "Internal allocation (tracked, not separate wallet)",
       status: "tracked",
@@ -105,14 +125,25 @@ export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
       key: "maintenance",
       label: "Other Maintenance",
       group: "platform",
+      ratePercent: ratePct("maintenance"),
       amount: totals.maintenance,
       creditedTo: "Internal allocation (tracked, not separate wallet)",
       status: "tracked",
     },
     {
+      key: "platformRetained",
+      label: "Kept by Platform",
+      group: "platform",
+      ratePercent: roundCurrency(100 - Object.values(rates).reduce((s, v) => s + v, 0)),
+      amount: totals.platformRetained,
+      creditedTo: "Remainder of admin commission after all splits",
+      status: "retained",
+    },
+    {
       key: "subAdmin",
       label: "Sub Admin",
       group: "operations",
+      ratePercent: ratePct("subAdmin"),
       amount: totals.subAdmin,
       creditedTo: "Sub-Admin wallets (by seller zone)",
       status: "credited",
@@ -121,6 +152,7 @@ export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
       key: "fieldWorker",
       label: "Field Worker",
       group: "operations",
+      ratePercent: ratePct("fieldWorker"),
       amount: totals.fieldWorker,
       creditedTo: "Onboarder customer wallet",
       status: "credited",
@@ -129,6 +161,7 @@ export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
       key: "affiliate",
       label: "Affiliate Marketing",
       group: "operations",
+      ratePercent: ratePct("affiliate"),
       amount: totals.affiliate,
       creditedTo: "Customer referrer wallet",
       status: "credited",
@@ -137,6 +170,7 @@ export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
       key: "advertise",
       label: "Advertise",
       group: "operations",
+      ratePercent: ratePct("advertise"),
       amount: totals.advertise,
       creditedTo: "Internal allocation (tracked, not separate wallet)",
       status: "tracked",
@@ -145,6 +179,7 @@ export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
       key: "siteCashback",
       label: "Site Cashback",
       group: "incentives",
+      ratePercent: ratePct("siteCashback"),
       amount: totals.siteCashback,
       creditedTo: "Internal allocation (tracked)",
       status: "tracked",
@@ -153,6 +188,7 @@ export async function getCommissionSplitsReport({ fromDate, toDate } = {}) {
       key: "directSlab",
       label: "Direct Customer Buy Slab",
       group: "incentives",
+      ratePercent: ratePct("directSlab"),
       amount: totals.directSlab,
       creditedTo: "Internal allocation (tracked)",
       status: "tracked",

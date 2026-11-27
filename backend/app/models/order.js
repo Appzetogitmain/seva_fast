@@ -282,6 +282,14 @@ const orderSchema = new mongoose.Schema(
         type: Array,
         default: [],
       },
+      // Commission split (technical / sub-admin / affiliate / …) computed at
+      // checkout by pricingService. Without this field Mongoose silently
+      // dropped it, so the Commission Splits report showed ₹0 and no split
+      // commission was ever paid at delivery.
+      commissionBreakdown: {
+        type: Object,
+        default: undefined,
+      },
     },
     sellerTimeoutAlert: { type: Boolean, default: false },
     sellerTimeoutAlertAt: { type: Date },
