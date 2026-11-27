@@ -2,8 +2,7 @@ import React, { useEffect } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import DashboardLayout from "@shared/layout/DashboardLayout";
 import Orders from "../pages/Orders";
-import { onNewPhotoOrder, onPhotoOrderMessage } from "@core/services/orderSocket";
-import { notificationSound } from "@core/utils/notificationSound";
+import { onPhotoOrderMessage } from "@core/services/orderSocket";
 import { toast } from "sonner";
 import { useAuth } from "@core/context/AuthContext";
 import SellerCertificateModal from "../components/SellerCertificateModal";
@@ -109,34 +108,7 @@ const SellerRoutes = () => {
   const { user, token } = useAuth();
 
   useEffect(() => {
-    const handleNewPhotoOrder = (order) => {
-      // Same audio element the FCM foreground listener uses, so a socket + push arriving together play once
-      notificationSound.playOrderAlertSound();
-      toast.custom((t) => (
-        <div className="bg-white p-4 rounded-xl shadow-lg border-2 border-indigo-500 flex flex-col gap-2 w-80">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
-              <HiOutlinePhoto size={20} />
-            </div>
-            <div>
-              <h4 className="font-bold text-gray-900">New Photo Order!</h4>
-              <p className="text-sm text-gray-500">From {order?.customer?.name || "a customer"}</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => {
-              toast.dismiss(t);
-              navigate("/seller/photo-orders");
-            }}
-            className="mt-2 w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-          >
-            View Order
-          </button>
-        </div>
-      ), { duration: 8000 });
-    };
-
-    const cleanupNewOrder = onNewPhotoOrder(token, handleNewPhotoOrder);
+    // New photo orders are alerted globally by DashboardLayout (full-screen popup + looping ringtone).
 
     const cleanupMessage = onPhotoOrderMessage(token, (payload) => {
       playBeep();
@@ -165,7 +137,6 @@ const SellerRoutes = () => {
     });
 
     return () => {
-      cleanupNewOrder();
       cleanupMessage();
     };
   }, [navigate, token]);

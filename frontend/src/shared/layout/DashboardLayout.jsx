@@ -8,12 +8,12 @@ import NotificationPermissionBanner from '@/shared/components/NotificationPermis
 import { sellerApi } from '@/modules/seller/services/sellerApi';
 import { useAuth } from "@core/context/AuthContext";
 import { motion, AnimatePresence } from 'framer-motion';
-import { BellRing, Check, X, Clock, Truck } from 'lucide-react';
+import { BellRing, Check, X, Clock, Truck, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import SellerOrdersContext from '@/modules/seller/context/SellerOrdersContext';
 import SellerEarningsContext, { defaultEarnings } from '@/modules/seller/context/SellerEarningsContext';
-import { getOrderSocket, onSellerOrderNew, onReturnDropOtp, onOrderStatusUpdate } from '@/core/services/orderSocket';
+import { getOrderSocket, onSellerOrderNew, onReturnDropOtp, onOrderStatusUpdate, onNewPhotoOrder } from '@/core/services/orderSocket';
 import { getSellerOrderEarning } from '@/shared/utils/sellerOrderEarning';
 import { useLockBodyScroll, preventBackdropScroll } from '@/shared/hooks/useLockBodyScroll';
 import orderAlertSound from '@/assets/sounds/order_alert.mp3';
@@ -48,6 +48,9 @@ const isEarningsRoute = (path) =>
 
 const DashboardLayout = ({ children, navItems, title }) => {
     const [newOrderAlert, setNewOrderAlert] = useState(null);
+    // Photo (custom) orders get the same full-screen popup + looping ringtone as normal orders.
+    const [photoOrderAlert, setPhotoOrderAlert] = useState(null);
+    const photoOrderAlertRef = useRef(null);
     const [newReturnAlert, setNewReturnAlert] = useState(null);
     const [shownOrderIds, setShownOrderIds] = useState(() => new Set());
     const [shownReturnOrderIds, setShownReturnOrderIds] = useState(() => new Set());
@@ -56,7 +59,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
     const acceptWindowTotalRef = useRef(60);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [returnDropOtpAlert, setReturnDropOtpAlert] = useState(null); // { orderId, otp, expiresAt }
-    useLockBodyScroll(Boolean(newOrderAlert || newReturnAlert || returnDropOtpAlert));
+    useLockBodyScroll(Boolean(newOrderAlert || photoOrderAlert || newReturnAlert || returnDropOtpAlert));
     const { user, logout, role } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
@@ -112,7 +115,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
 
         if (!ringtoneRetryTimerRef.current) {
             ringtoneRetryTimerRef.current = setInterval(() => {
-                if (!newOrderAlertRef.current) return;
+                if (!newOrderAlertRef.current && !photoOrderAlertRef.current) return;
                 const currentAudio = getOrderRingtone();
                 if (!currentAudio.paused) return;
                 currentAudio.play().catch(() => { });
@@ -121,7 +124,7 @@ const DashboardLayout = ({ children, navItems, title }) => {
 
         if (!ringtoneUnlockHandlerRef.current && typeof window !== 'undefined' && typeof document !== 'undefined') {
             const unlockPlayback = () => {
-                if (!newOrderAlertRef.current) return;
+                if (!newOrderAlertRef.current && !photoOrderAlertRef.current) return;
                 const currentAudio = getOrderRingtone();
                 if (!currentAudio.paused) return;
                 currentAudio.play().catch(() => { });
@@ -163,6 +166,9 @@ const DashboardLayout = ({ children, navItems, title }) => {
     useEffect(() => {
         newOrderAlertRef.current = newOrderAlert;
     }, [newOrderAlert]);
+    useEffect(() => {
+        photoOrderAlertRef.current = photoOrderAlert;
+    }, [photoOrderAlert]);
     useEffect(() => {
         newReturnAlertRef.current = newReturnAlert;
     }, [newReturnAlert]);
@@ -277,13 +283,33 @@ const DashboardLayout = ({ children, navItems, title }) => {
     }, [role, isSellerOrdersRoute]);
 
     useEffect(() => {
-        if (newOrderAlert) {
+        if (newOrderAlert || photoOrderAlert) {
             startOrderRingtone();
             return undefined;
         }
         stopOrderRingtone();
         return undefined;
-    }, [newOrderAlert]);
+    }, [newOrderAlert, photoOrderAlert]);
+
+    useEffect(() => {
+        if (role !== 'seller') return undefined;
+        const getToken = () => localStorage.getItem('auth_seller');
+        const unsubscribePhoto = onNewPhotoOrder(getToken, (order) => {
+            if (!order) return;
+            setPhotoOrderAlert(order);
+            photoOrderAlertRef.current = order;
+        });
+        return () => {
+            if (typeof unsubscribePhoto === 'function') unsubscribePhoto();
+        };
+    }, [role]);
+
+    const dismissPhotoOrderAlert = (goToOrders) => {
+        setPhotoOrderAlert(null);
+        photoOrderAlertRef.current = null;
+        if (!newOrderAlertRef.current) stopOrderRingtone();
+        if (goToOrders) navigate('/seller/photo-orders');
+    };
 
     useEffect(() => {
         return () => {
@@ -614,6 +640,56 @@ const DashboardLayout = ({ children, navItems, title }) => {
                                     >
                                         <Check className="h-5 w-5" />
                                         Accept
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {/* Global Photo Order Alert Modal */}
+                {photoOrderAlert && !newOrderAlert && (
+                    <div
+                        className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overscroll-contain"
+                        onWheel={preventBackdropScroll}
+                        onTouchMove={preventBackdropScroll}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            data-lenis-prevent
+                            data-lenis-prevent-wheel
+                            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 overscroll-contain"
+                        >
+                            <div className="flex flex-col items-center text-center">
+                                <div className="h-20 w-20 bg-indigo-100 rounded-full flex items-center justify-center mb-6 animate-bounce">
+                                    <Camera className="h-10 w-10 text-indigo-600" />
+                                </div>
+                                <h2 className="text-2xl font-black text-slate-900 mb-2">New Photo Order!</h2>
+                                <p className="text-slate-600 font-medium mb-2">
+                                    <span className="text-slate-900 font-bold">{photoOrderAlert.customer?.name || 'A customer'}</span> sent you a photo order.
+                                </p>
+                                {photoOrderAlert.notes && (
+                                    <p className="text-sm text-slate-500 italic mb-4 line-clamp-2">“{photoOrderAlert.notes}”</p>
+                                )}
+                                {photoOrderAlert.photoUrl && (
+                                    <img src={photoOrderAlert.photoUrl} alt="Photo order" className="w-full max-h-48 object-contain rounded-2xl bg-slate-50 mb-6" />
+                                )}
+                                <div className="grid grid-cols-2 gap-4 w-full mt-2">
+                                    <button
+                                        onClick={() => dismissPhotoOrderAlert(false)}
+                                        className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-colors"
+                                    >
+                                        <X className="h-5 w-5" />
+                                        Later
+                                    </button>
+                                    <button
+                                        onClick={() => dismissPhotoOrderAlert(true)}
+                                        className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 transition-all active:scale-95"
+                                    >
+                                        <Check className="h-5 w-5" />
+                                        View Order
                                     </button>
                                 </div>
                             </div>
