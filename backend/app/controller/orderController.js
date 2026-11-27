@@ -2603,7 +2603,7 @@ export const updateReturnStatus = async (req, res) => {
 export const getSellerOrders = async (req, res) => {
   try {
     const { id: userId, role } = req.user;
-    const { status: statusParam, dateFilter } = req.query;
+    const { status: statusParam, dateFilter, customerId, search } = req.query;
     let { startDate, endDate } = req.query;
     const assignedZones = req.assignedZones || [];
 
@@ -2640,6 +2640,8 @@ export const getSellerOrders = async (req, res) => {
       skip,
       limit,
       assignedZones,
+      customerId,
+      search,
     });
 
 

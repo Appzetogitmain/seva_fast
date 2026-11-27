@@ -17,6 +17,7 @@ import experienceRoute from "./experienceRoutes.js";
 import offerRoute from "./offerRoutes.js";
 import couponRoute from "./couponRoutes.js";
 import settingsRoute from "./settingsRoutes.js";
+import seoRoute from "./seoRoutes.js";
 import mapsRoute from "./mapsRoutes.js";
 import mediaRoute from "./mediaRoutes.js";
 import healthRoute from "./healthRoutes.js";
@@ -65,6 +66,7 @@ const setupRoutes = (app) => {
     router.use("/admin", adminRoute);
     router.use("/seller", sellerRoute);
     router.use("/settings", settingsRoute);
+    router.use("/seo", seoRoute);
     router.use("/categories", categoryRoute);
     router.use("/products", productRoute);
     router.use("/cart", cartRoute);

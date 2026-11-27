@@ -153,7 +153,6 @@ When the admin is unable to find ANY page or setting, provide the exact sidebar 
 - **Subscription Plans (Customer Memberships):** Sidebar → **Subscription Plans** (\`/admin/plans\`)
 - **My Profile:** Sidebar → **My Profile** (\`/admin/profile\`)
 - **Login Activity (Security Audit):** Sidebar → **Login Activity** (\`/admin/login-activity\`)
-- **System Settings (Environment Variables):** Sidebar → **System Settings** (\`/admin/env\`)
 
 ---
 

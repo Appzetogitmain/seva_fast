@@ -2,6 +2,7 @@ import Joi from "joi";
 import Setting from "../models/setting.js";
 import handleResponse from "../utils/helper.js";
 import { buildKey, getOrSet, getTTL, invalidate } from "../services/cacheService.js";
+import { clearSeoCache } from "../routes/seoRoutes.js";
 import { uploadToCloudinary } from "../services/mediaService.js";
 import {
   DEFAULT_PRODUCT_APPROVAL_CONFIG,
@@ -295,7 +296,7 @@ export const getPublicSettings = async (req, res) => {
       async () => {
         const existing = await Setting.findOne(filter)
           .select(
-            "appName supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName playStoreLink sellerPlayStoreLink appStoreLink returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderDiscountType firstOrderDiscountFlatAmount firstOrderFreeDelivery welcomeScratchCardEnabled showQuickCategoriesSection deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo referralCashback createdAt updatedAt",
+            "appName metaTitle metaDescription metaKeywords keywords supportEmail supportPhone currencySymbol currencyCode timezone logoUrl faviconUrl primaryColor secondaryColor signatureImageUrl sealImageUrl companyName termsAndConditions privacyPolicy returnPolicy sellerTermsAndConditions sellerPrivacyPolicy deliveryTermsAndConditions deliveryPrivacyPolicy adminPaymentQrUrl adminUpiId adminUpiName playStoreLink sellerPlayStoreLink appStoreLink returnDeliveryCommission deliveryPricingMode pricingMode customerBaseDeliveryFee riderBasePayout baseDeliveryCharge baseDistanceCapacityKm incrementalKmSurcharge deliveryPartnerRatePerKm fleetCommissionRatePerKm fixedDeliveryFee minimumOrderValue freeDeliveryThreshold handlingFeeStrategy codEnabled onlineEnabled lowStockAlertsEnabled productApproval adminCommissionPercent technicalChargePercent subAdminCommissionPercent fieldWorkerCommissionPercent goldCardMemberDiscountPercent silverCardMemberDiscountPercent bronzeCardMemberDiscountPercent directSlabCommissionPercent deductShippingBeforeCommission advertiseChargePercent siteCashbackPercent otherMaintenancePercent affiliateMarketingPercent professionalAdListingFee professionalAdListingFeePhoto professionalAdListingFeeVideo platformAdFeePhoto platformAdFeeVideo platformAdListingFee professionalAdValidityDays professionalAdSearchRadiusKm firstOrderDiscountPercent firstOrderDiscountType firstOrderDiscountFlatAmount firstOrderFreeDelivery welcomeScratchCardEnabled showQuickCategoriesSection deliveryFeeSlabs deliveryFeeBaseWeightKg deliveryFeeExtraFeePerKg expressDeliveryEnabled expressDeliveryFee expressDeliveryMaxWeightKg sellerDeliveryFeeSharePercent mlmPromo referralCashback createdAt updatedAt",
           )
           .lean();
         return existing || null;
@@ -393,6 +394,7 @@ export const updateSettings = async (req, res) => {
       { new: true, upsert: true },
     );
     await invalidate("cache:platform:settings:*");
+    clearSeoCache();
 
     const result = settings?.toObject?.() || settings || {};
     if (!result.productApproval) {

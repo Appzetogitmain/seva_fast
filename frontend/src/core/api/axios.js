@@ -87,6 +87,18 @@ axiosInstance.interceptors.response.use(
                 );
             }
         }
+        // Admin blocked (or deleted) this customer: end the customer session once.
+        if (
+            error.response?.status === 403 &&
+            ['ACCOUNT_BLOCKED', 'ACCOUNT_DELETED'].includes(error.response?.data?.result?.code) &&
+            localStorage.getItem('auth_customer')
+        ) {
+            localStorage.removeItem('auth_customer');
+            sessionStorage.setItem('account_blocked_notice', error.response?.data?.message || 'Your account has been blocked.');
+            window.alert(error.response?.data?.message || 'Your account has been blocked. Please contact support.');
+            window.location.href = '/login';
+            return Promise.reject(error);
+        }
         if (error.response?.status === 403 && error.response?.data?.requirePlan) {
             window.location.href = '/plans';
         }

@@ -14,13 +14,19 @@ import {
     UserPlus,
     RotateCw,
     Activity,
-    Loader2
+    Loader2,
+    Copy,
+    Ban,
+    CheckCircle2,
+    Trash2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import Pagination from '@shared/components/ui/Pagination';
 import { adminApi } from '../services/adminApi';
 import { toast } from 'sonner';
+import Modal from '@shared/components/ui/Modal';
+import { useAuth } from '@core/context/AuthContext';
 import { isSameCalendarDay } from '@shared/utils/formatDate';
 
 const CustomerManagement = () => {
@@ -33,6 +39,58 @@ const CustomerManagement = () => {
     const [pageSize, setPageSize] = useState(25);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [openMenuId, setOpenMenuId] = useState(null);
+    const { user } = useAuth();
+    // Block / delete are main-admin only (the backend enforces this too).
+    const isMainAdmin = user?.role !== 'sub-admin';
+    const [confirmAction, setConfirmAction] = useState(null); // { type: 'block'|'unblock'|'delete', customer }
+    const [actionLoading, setActionLoading] = useState(false);
+
+    const runConfirmedAction = async () => {
+        if (!confirmAction) return;
+        const { type, customer } = confirmAction;
+        setActionLoading(true);
+        try {
+            if (type === 'delete') {
+                await adminApi.deleteUser(customer.id);
+                setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+                setTotal((t) => Math.max(t - 1, 0));
+                toast.success(`${customer.name || 'Customer'} deleted permanently`);
+            } else {
+                const isActive = type === 'unblock';
+                await adminApi.setUserStatus(customer.id, isActive);
+                setCustomers((prev) => prev.map((c) => (c.id === customer.id ? { ...c, status: isActive ? 'active' : 'inactive' } : c)));
+                toast.success(isActive ? 'Customer unblocked' : 'Customer blocked: they are logged out and cannot log in');
+            }
+            setConfirmAction(null);
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Action failed');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // Close the row action menu on any outside click / Escape.
+    useEffect(() => {
+        if (!openMenuId) return undefined;
+        const close = () => setOpenMenuId(null);
+        const onKey = (e) => { if (e.key === 'Escape') close(); };
+        document.addEventListener('click', close);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('click', close);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [openMenuId]);
+
+    const copyPhone = async (phone) => {
+        try {
+            await navigator.clipboard.writeText(phone);
+            toast.success('Phone number copied');
+        } catch {
+            toast.error('Could not copy phone number');
+        }
+    };
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -227,7 +285,7 @@ const CustomerManagement = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredCustomers.map((cust) => (
+                                filteredCustomers.map((cust, rowIndex) => (
                                     <tr key={cust.id} className="ds-table-row">
                                         <td className="ds-table-cell">
                                             <div className="flex items-center gap-3">
@@ -279,9 +337,50 @@ const CustomerManagement = () => {
                                                 >
                                                     <Eye className="ds-icon-sm" />
                                                 </button>
-                                                <button className="p-2 bg-gray-50 text-gray-400 rounded-lg hover:bg-gray-900 hover:text-white transition-all">
-                                                    <MoreVertical className="ds-icon-sm" />
-                                                </button>
+                                                <div className="relative">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setOpenMenuId(openMenuId === cust.id ? null : cust.id);
+                                                        }}
+                                                        className={cn(
+                                                            "p-2 rounded-lg transition-all",
+                                                            openMenuId === cust.id ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-400 hover:bg-gray-900 hover:text-white"
+                                                        )}
+                                                        aria-label="More actions"
+                                                    >
+                                                        <MoreVertical className="ds-icon-sm" />
+                                                    </button>
+                                                    {openMenuId === cust.id && (
+                                                        <div
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className={cn("absolute right-0 w-48", rowIndex >= Math.max(filteredCustomers.length - 2, 2) ? "bottom-full mb-2" : "top-full mt-2", " bg-white rounded-xl shadow-xl ring-1 ring-gray-100 py-1.5 z-30 text-left")}
+                                                        >
+                                                            {[
+                                                                { label: 'View Details', icon: Eye, onClick: () => navigate(`/admin/customers/${cust.id}`) },
+                                                                { label: 'View Orders', icon: ShoppingBag, onClick: () => navigate(`/admin/orders/all?customerId=${cust.id}&customerName=${encodeURIComponent(cust.name || '')}`) },
+                                                                cust.phone && { label: 'Call Customer', icon: Phone, onClick: () => { window.location.href = `tel:${cust.phone}`; } },
+                                                                cust.phone && { label: 'Copy Phone', icon: Copy, onClick: () => copyPhone(cust.phone) },
+                                                                isMainAdmin && (cust.status === 'active'
+                                                                    ? { label: 'Block Customer', icon: Ban, danger: true, onClick: () => setConfirmAction({ type: 'block', customer: cust }) }
+                                                                    : { label: 'Unblock Customer', icon: CheckCircle2, onClick: () => setConfirmAction({ type: 'unblock', customer: cust }) }),
+                                                                isMainAdmin && { label: 'Delete Profile', icon: Trash2, danger: true, onClick: () => setConfirmAction({ type: 'delete', customer: cust }) },
+                                                            ].filter(Boolean).map((item) => (
+                                                                <button
+                                                                    key={item.label}
+                                                                    onClick={() => { setOpenMenuId(null); item.onClick(); }}
+                                                                    className={cn(
+                                                                        "w-full flex items-center gap-2.5 px-3.5 py-2 text-sm font-semibold hover:bg-gray-50",
+                                                                        item.danger ? "text-rose-600" : "text-gray-700"
+                                                                    )}
+                                                                >
+                                                                    <item.icon className={cn("h-4 w-4", item.danger ? "text-rose-500" : "text-gray-400")} />
+                                                                    {item.label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -305,6 +404,60 @@ const CustomerManagement = () => {
                     />
                 </div>
             </Card>
+
+            <Modal
+                isOpen={Boolean(confirmAction)}
+                onClose={() => !actionLoading && setConfirmAction(null)}
+                title={
+                    confirmAction?.type === 'delete' ? 'Delete customer permanently?'
+                        : confirmAction?.type === 'block' ? 'Block this customer?'
+                            : 'Unblock this customer?'
+                }
+                footer={
+                    <div className="flex justify-end gap-3">
+                        <button
+                            onClick={() => setConfirmAction(null)}
+                            disabled={actionLoading}
+                            className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold hover:bg-gray-200"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={runConfirmedAction}
+                            disabled={actionLoading}
+                            className={cn(
+                                "px-4 py-2 rounded-xl text-white text-sm font-bold flex items-center gap-2 disabled:opacity-60",
+                                confirmAction?.type === 'unblock' ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"
+                            )}
+                        >
+                            {actionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                            {confirmAction?.type === 'delete' ? 'Delete Permanently' : confirmAction?.type === 'block' ? 'Block' : 'Unblock'}
+                        </button>
+                    </div>
+                }
+            >
+                {confirmAction && (
+                    <div className="space-y-3 text-sm text-gray-600">
+                        <p>
+                            <span className="font-bold text-gray-900">{confirmAction.customer.name || 'Customer'}</span>
+                            {confirmAction.customer.phone ? ` (${confirmAction.customer.phone})` : ''}
+                        </p>
+                        {confirmAction.type === 'block' && (
+                            <p>They will be logged out within a minute and cannot log in or place orders until you unblock them. Their data is kept.</p>
+                        )}
+                        {confirmAction.type === 'unblock' && (
+                            <p>They will be able to log in and place orders again.</p>
+                        )}
+                        {confirmAction.type === 'delete' && (
+                            <>
+                                <p>This permanently removes their profile, cart, wishlist and notification settings. <span className="font-bold text-rose-600">This cannot be undone.</span></p>
+                                <p>Past orders, payments and wallet transactions are kept for accounting and will show as "Deleted customer". Any wallet balance is lost.</p>
+                                <p>Deletion is refused while they have active orders or open returns. If the same phone number signs up again, it becomes a brand-new account.</p>
+                            </>
+                        )}
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };

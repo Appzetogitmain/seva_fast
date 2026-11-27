@@ -48,8 +48,7 @@ const ALL_PERMISSIONS = [
     "Settings",
     "Subscription Plans",
     "Login Activity",
-    "My Profile",
-    "System Settings"
+    "My Profile"
 ];
 
 const UserManagement = () => {

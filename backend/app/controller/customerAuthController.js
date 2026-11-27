@@ -103,6 +103,10 @@ export const verifyCustomerOTP = async (req, res) => {
             ipAddress: req.ip,
         });
 
+        if (customer.isActive === false) {
+            return handleResponse(res, 403, "Your account has been blocked. Please contact support.", { code: "ACCOUNT_BLOCKED" });
+        }
+
         // Referral codes apply to brand-new signups only. An existing customer
         // logging in through someone's referral link must not become their
         // referral (and earn them cashback).

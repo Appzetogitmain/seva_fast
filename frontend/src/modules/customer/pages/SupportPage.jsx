@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import axiosInstance from '@core/api/axios';
 import { useLockBodyScroll, preventBackdropScroll } from '@shared/hooks/useLockBodyScroll';
 
-const FAQ_CACHE_KEY = 'customer_faqs_cache_v1';
+const FAQ_CACHE_KEY = 'customer_faqs_cache_v2';
 const FAQ_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const SupportPage = () => {
@@ -70,7 +70,7 @@ const SupportPage = () => {
 
             try {
                 const response = await axiosInstance.get('/public/faqs', {
-                    params: { category: 'Customer', status: 'published' }
+                    params: { category: 'Customer,Orders', status: 'published' }
                 });
                 const data = response.data?.result ?? response.data;
                 const list = Array.isArray(data?.items) ? data.items : Array.isArray(data?.results) ? data.results : [];

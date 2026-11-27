@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Order from "../models/order.js";
+import Customer from "../models/customer.js";
 import Delivery from "../models/delivery.js";
 import Seller from "../models/seller.js";
 import { WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
@@ -62,6 +63,10 @@ export function buildSellerOrdersQuery({
   startDate,
   endDate,
   assignedZones,
+  customerId,
+  search,
+  searchCustomerIds,
+  searchSellerIds,
 }) {
   let base = {};
   if (role === "sub-admin" && Array.isArray(assignedZones) && assignedZones.length > 0) {
@@ -79,6 +84,23 @@ export function buildSellerOrdersQuery({
       { paymentMode: "ONLINE", status: "pending", workflowStatus: { $exists: false } },
     ],
   };
+  // Admin-only extra filters: one customer's orders, and order-ID search.
+  if (role !== "seller" && customerId && mongoose.Types.ObjectId.isValid(customerId)) {
+    base.customer = new mongoose.Types.ObjectId(String(customerId));
+  }
+  const searchTerm = String(search || "").trim();
+  if (searchTerm) {
+    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    base.$or = [
+      { orderId: { $regex: escaped, $options: "i" } },
+      ...(Array.isArray(searchCustomerIds) && searchCustomerIds.length
+        ? [{ customer: { $in: searchCustomerIds } }]
+        : []),
+      ...(Array.isArray(searchSellerIds) && searchSellerIds.length
+        ? [{ seller: { $in: searchSellerIds } }]
+        : []),
+    ];
+  }
   const withStatus = {
     ...base,
     ...hideUnpaidOnline,
@@ -96,7 +118,28 @@ export async function fetchSellerOrdersPage({
   skip,
   limit,
   assignedZones,
+  customerId,
+  search,
 }) {
+  // Let the search box match customer name/phone too, not only order IDs.
+  let searchCustomerIds = [];
+  let searchSellerIds = [];
+  const rawSearch = String(search || "").trim();
+  if (rawSearch && role !== "seller") {
+    const esc = rawSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const matches = await Customer.find({
+      $or: [{ name: { $regex: esc, $options: "i" } }, { phone: { $regex: esc, $options: "i" } }],
+    })
+      .select("_id")
+      .limit(500)
+      .lean();
+    searchCustomerIds = matches.map((c) => c._id);
+    const sellerMatches = await Seller.find({ shopName: { $regex: esc, $options: "i" } })
+      .select("_id")
+      .limit(200)
+      .lean();
+    searchSellerIds = sellerMatches.map((sl) => sl._id);
+  }
   const query = buildSellerOrdersQuery({
     role,
     userId,
@@ -104,6 +147,10 @@ export async function fetchSellerOrdersPage({
     startDate,
     endDate,
     assignedZones,
+    customerId,
+    search,
+    searchCustomerIds,
+    searchSellerIds,
   });
   // Summary cards must not depend on the selected status tab, otherwise
   // totals jump to 0 on "Pending"/"Cancelled" tabs and change on every
@@ -115,6 +162,10 @@ export async function fetchSellerOrdersPage({
     startDate,
     endDate,
     assignedZones,
+    customerId,
+    search,
+    searchCustomerIds,
+    searchSellerIds,
   });
   const deliveredNotReturned = {
     $and: [

@@ -6,7 +6,11 @@ export const getFAQs = async (req, res) => {
     try {
         const { category, status, search } = req.query;
         const query = {};
-        if (category && category !== 'All') query.category = category;
+        if (category && category !== 'All') {
+            // Accept a comma-separated list, e.g. "Customer,Orders".
+            const list = String(category).split(',').map((c) => c.trim()).filter(Boolean);
+            query.category = list.length > 1 ? { $in: list } : list[0];
+        }
         if (status) query.status = status;
 
         if (search && search.trim()) {

@@ -44,6 +44,8 @@ import {
     getUsers,
     getUserById,
     updateUserWallet,
+    setUserStatus,
+    deleteUser,
     getUserReferralTree,
     getSellers,
     getSellerLocations,
@@ -214,6 +216,8 @@ router.get("/users", verifyToken, allowRoles("admin", "sub-admin"), getUsers);
 router.get("/users/:id", verifyToken, allowRoles("admin", "sub-admin"), getUserById);
 router.get("/users/:id/referral-tree", verifyToken, allowRoles("admin", "sub-admin"), getUserReferralTree);
 router.put("/users/:id/wallet", verifyToken, allowRoles("admin"), updateUserWallet);
+router.patch("/users/:id/status", verifyToken, allowRoles("admin"), setUserStatus);
+router.delete("/users/:id", verifyToken, allowRoles("admin"), deleteUser);
 router.get("/sellers", verifyToken, allowRoles("admin", "sub-admin"), getSellers);
 router.get("/sellers/locations", verifyToken, allowRoles("admin", "sub-admin"), getSellerLocations);
 router.get("/sellers/active", verifyToken, allowRoles("admin", "sub-admin"), getActiveSellers);

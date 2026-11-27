@@ -37,6 +37,9 @@ const OrdersList = () => {
     const { showToast } = useToast();
     const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') || '');
     const [dateRange, setDateRange] = useState('All Time');
+    // Set by Customers → ⋮ → View Orders: show exactly one customer's orders.
+    const customerIdFilter = searchParams.get('customerId') || '';
+    const customerNameFilter = searchParams.get('customerName') || '';
     const [orders, setOrders] = useState([]);
     const [summary, setSummary] = useState({
         totalOrders: 0,
@@ -94,6 +97,7 @@ const OrdersList = () => {
             const params = { page: requestedPage, limit: pageSize };
             if (status !== 'all') params.status = status;
             if (searchTerm.trim()) params.search = searchTerm.trim();
+            if (customerIdFilter) params.customerId = customerIdFilter;
             if (dateRange !== 'All Time') {
                 params.dateFilter = dateRange.toLowerCase().replace(/ /g, '_');
             }
@@ -165,7 +169,7 @@ const OrdersList = () => {
             fetchOrders(1);
         }, 500);
         return () => clearTimeout(timer);
-    }, [pageSize, status, searchTerm, dateRange]);
+    }, [pageSize, status, searchTerm, dateRange, customerIdFilter]);
 
     useEffect(() => {
         const qFromUrl = searchParams.get('search') || '';
@@ -195,18 +199,10 @@ const OrdersList = () => {
 
     const filteredOrders = useMemo(() => {
         return safeOrders.filter(order => {
-            const safeLower = (value) => String(value || '').toLowerCase();
-            const query = safeLower(searchTerm);
-            const matchesSearch =
-                safeLower(order.id).includes(query) ||
-                safeLower(order.customer).includes(query) ||
-                safeLower(order.seller).includes(query);
-
-            const matchesStatus = adminRouteMatchesOrder(status, order);
-
-            return matchesSearch && matchesStatus;
+            // Search (order ID / customer name or phone / seller shop) is applied by the server.
+            return adminRouteMatchesOrder(status, order);
         });
-    }, [safeOrders, searchTerm, status]);
+    }, [safeOrders, status]);
 
     const getStatusStyles = (status) => {
         switch (String(status || '').toLowerCase()) {
@@ -269,6 +265,23 @@ const OrdersList = () => {
                         </div>
                     </h1>
                     <p className="ds-description mt-1">View and manage all orders.</p>
+                    {customerIdFilter && (
+                        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-brand-50 ring-1 ring-brand-100 px-3 py-1.5 text-xs font-bold text-brand-700">
+                            Showing orders for: {customerNameFilter || 'selected customer'}
+                            <button
+                                onClick={() => {
+                                    const next = new URLSearchParams(searchParams);
+                                    next.delete('customerId');
+                                    next.delete('customerName');
+                                    setSearchParams(next);
+                                }}
+                                className="ml-1 rounded-full px-1.5 hover:bg-brand-100"
+                                aria-label="Clear customer filter"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-3">
                     <button
