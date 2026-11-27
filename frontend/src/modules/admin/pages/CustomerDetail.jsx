@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { adminApi } from '../services/adminApi';
 import Card from '@shared/components/ui/Card';
@@ -7,110 +7,97 @@ import {
     Mail,
     Phone,
     MapPin,
-    Calendar,
     ShoppingBag,
     TrendingUp,
-    MessageSquare,
     ChevronLeft,
-    History,
-    RotateCw,
-    Edit3,
-    ArrowUpRight,
-    ExternalLink,
-    Map as MapIcon,
-    MoreVertical,
     ChevronRight,
-    User,
+    RotateCw,
     Ban,
     Search,
-    Bell,
     Package,
     IndianRupee,
-    CheckCircle2
+    Wallet,
+    CheckCircle2,
+    Clock,
+    Copy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Modal from '@shared/components/ui/Modal';
 import { useToast } from '@shared/components/ui/Toast';
+import { useAuth } from '@core/context/AuthContext';
 import { formatDate, formatDateTime } from '@shared/utils/formatDate';
+
+const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
+const StatTile = ({ icon: Icon, label, value, hint, action }) => (
+    <div className="flex items-start gap-3 rounded-xl bg-white p-4 ring-1 ring-slate-100">
+        <div className="rounded-lg bg-brand-50 p-2 text-brand-600">
+            <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+            <p className="mt-0.5 truncate text-lg font-black text-slate-900">{value}</p>
+            {hint && <p className="text-[11px] font-medium text-slate-400">{hint}</p>}
+            {action}
+        </div>
+    </div>
+);
+
+const SectionTitle = ({ icon: Icon, children, right }) => (
+    <div className="mb-3 flex items-center justify-between gap-3">
+        <h4 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-900">
+            <Icon className="h-4 w-4 text-brand-500" />
+            {children}
+        </h4>
+        {right}
+    </div>
+);
 
 const CustomerDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { showToast } = useToast();
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [orderSearch, setOrderSearch] = useState('');
-    const [visibleOrders, setVisibleOrders] = useState(3);
-
-    // Modal states
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
-    const [isRestrictModalOpen, setIsRestrictModalOpen] = useState(false);
-    const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
-
-    // Form states
-    const [walletForm, setWalletForm] = useState({ amount: '', action: 'add', reason: '' });
-    const [submittingWallet, setSubmittingWallet] = useState(false);
-    const [notifMessage, setNotifMessage] = useState('');
-    const [notes, setNotes] = useState('Prefer morning deliveries. Use the building entrance on the north side.');
+    const { user } = useAuth();
+    // Wallet changes and block/unblock are main-admin only (enforced by the server too).
+    const isMainAdmin = user?.role !== 'sub-admin';
 
     const [customer, setCustomer] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [orders, setOrders] = useState([]);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [orderSearch, setOrderSearch] = useState('');
+    const [showAllOrders, setShowAllOrders] = useState(false);
 
-    const [editForm, setEditForm] = useState({ name: '', email: '', phone: '' });
+    const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+    const [walletForm, setWalletForm] = useState({ amount: '', action: 'add', reason: '' });
+    const [submittingWallet, setSubmittingWallet] = useState(false);
 
-    useEffect(() => {
-        const fetchCustomerDetails = async () => {
-            try {
-                setLoading(true);
-                const { data } = await adminApi.getUserById(id);
-                if (data.success) {
-                    const customerData = data.result;
-                    setCustomer(customerData);
-                    setOrders(customerData.recentOrders || []);
-                    setEditForm({
-                        name: customerData.name,
-                        email: customerData.email,
-                        phone: customerData.phone
-                    });
-                }
-            } catch (error) {
-                console.error("Error fetching customer details:", error);
-                showToast("Failed to load customer profile", "error");
-            } finally {
-                setLoading(false);
-            }
-        };
-        if (id) fetchCustomerDetails();
+    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+    const [submittingBlock, setSubmittingBlock] = useState(false);
+
+    const fetchCustomer = useCallback(async () => {
+        const { data } = await adminApi.getUserById(id);
+        if (data.success) setCustomer(data.result);
     }, [id]);
 
-    const handleRefresh = () => {
+    useEffect(() => {
+        if (!id) return;
+        setLoading(true);
+        fetchCustomer()
+            .catch(() => showToast('Failed to load customer profile', 'error'))
+            .finally(() => setLoading(false));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
+
+    const handleRefresh = async () => {
         setIsRefreshing(true);
-        setTimeout(() => {
+        try {
+            await fetchCustomer();
+            showToast('Customer data refreshed', 'success');
+        } catch {
+            showToast('Failed to refresh', 'error');
+        } finally {
             setIsRefreshing(false);
-            showToast('Customer data synchronized with main server', 'success');
-        }, 1000);
-    };
-
-    const handleUpdateProfile = (e) => {
-        e.preventDefault();
-        setCustomer({ ...editForm });
-        setIsEditModalOpen(false);
-        showToast('Profile updated successfully', 'success');
-    };
-
-    const handleSendNotif = () => {
-        if (!notifMessage.trim()) return;
-        setIsNotifModalOpen(false);
-        setNotifMessage('');
-        showToast('Notification sent to user', 'success');
-    };
-
-    const handleRestrictAccount = () => {
-        const newStatus = customer.status === 'active' ? 'restricted' : 'active';
-        setCustomer({ ...customer, status: newStatus });
-        setIsRestrictModalOpen(false);
-        showToast(`Account successfully ${newStatus === 'restricted' ? 'restricted' : 'activated'}`, newStatus === 'restricted' ? 'warning' : 'success');
+        }
     };
 
     const handleWalletUpdate = async (e) => {
@@ -120,520 +107,338 @@ const CustomerDetail = () => {
             const { amount, action, reason } = walletForm;
             const { data } = await adminApi.updateUserWallet(id, { amount, action, reason });
             if (data.success) {
-                setCustomer(prev => ({ ...prev, walletBalance: data.result.walletBalance }));
+                setCustomer((prev) => ({ ...prev, walletBalance: data.result.walletBalance }));
                 showToast(`Successfully ${action === 'add' ? 'added' : 'deducted'} ₹${amount}`, 'success');
                 setIsWalletModalOpen(false);
                 setWalletForm({ amount: '', action: 'add', reason: '' });
             }
         } catch (err) {
-            console.error("Wallet update error", err);
             showToast(err.response?.data?.message || 'Failed to update wallet', 'error');
         } finally {
             setSubmittingWallet(false);
         }
     };
 
-    const handleSaveNotes = () => {
-        showToast('Internal CRM notes updated', 'info');
+    const handleToggleBlock = async () => {
+        const block = customer.status === 'active';
+        try {
+            setSubmittingBlock(true);
+            await adminApi.setUserStatus(id, !block);
+            setCustomer((prev) => ({ ...prev, status: block ? 'inactive' : 'active' }));
+            showToast(block ? 'Customer blocked — logged out and cannot log in' : 'Customer unblocked', block ? 'warning' : 'success');
+            setIsBlockModalOpen(false);
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Action failed', 'error');
+        } finally {
+            setSubmittingBlock(false);
+        }
     };
 
-    const handleExportCSV = () => {
-        showToast('Archive export initiated. CSV will be ready shortly.', 'info');
+    const copyText = async (text, label) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast(`${label} copied`, 'success');
+        } catch {
+            showToast(`Could not copy ${label.toLowerCase()}`, 'error');
+        }
     };
 
-
-    const safeOrders = useMemo(
-        () => (Array.isArray(orders) ? orders : []),
-        [orders]
-    );
-
+    const orders = useMemo(() => (Array.isArray(customer?.recentOrders) ? customer.recentOrders : []), [customer]);
     const filteredOrders = useMemo(() => {
-        return safeOrders.filter(o =>
-            (o.id || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
-            (o.status || '').toLowerCase().includes(orderSearch.toLowerCase())
-        ).slice(0, visibleOrders);
-    }, [safeOrders, orderSearch, visibleOrders]);
+        const q = orderSearch.trim().toLowerCase();
+        const list = q
+            ? orders.filter((o) => (o.id || '').toLowerCase().includes(q) || (o.status || '').toLowerCase().includes(q))
+            : orders;
+        return showAllOrders ? list : list.slice(0, 5);
+    }, [orders, orderSearch, showAllOrders]);
 
     if (loading) {
         return (
-            <div className="h-[80vh] flex flex-col items-center justify-center space-y-4">
-                <RotateCw className="h-10 w-10 text-primary animate-spin" />
-                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Loading Profile...</p>
+            <div className="flex h-[70vh] flex-col items-center justify-center gap-3">
+                <RotateCw className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Loading profile…</p>
             </div>
         );
     }
 
     if (!customer) {
         return (
-            <div className="h-[80vh] flex flex-col items-center justify-center space-y-4">
-                <p className="text-lg font-bold text-gray-400">Customer not found</p>
-                <button onClick={() => navigate('/admin/customers')} className="text-primary font-bold">Back to Customers</button>
+            <div className="flex h-[70vh] flex-col items-center justify-center gap-3">
+                <p className="text-lg font-bold text-slate-400">Customer not found</p>
+                <button onClick={() => navigate('/admin/customers')} className="font-bold text-primary">Back to Customers</button>
             </div>
         );
     }
 
+    const isActive = customer.status === 'active';
+    const addresses = Array.isArray(customer.addresses) ? customer.addresses : [];
+    const avgOrder = customer.totalOrders > 0 ? customer.totalSpent / customer.totalOrders : 0;
+    const initials = String(customer.name || '?').trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+
     return (
-        <div className="ds-section-spacing animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
-            {/* Action Bar */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-1">
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => navigate('/admin/customers')}
-                        className="p-2.5 bg-white ring-1 ring-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
-                    >
-                        <ChevronLeft className="h-5 w-5 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
-                    </button>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="ds-h1">Customer Profile</h1>
-                            <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest">{customer.id}</Badge>
-                        </div>
-                        <p className="ds-description mt-1">Full profile and shopping history for this customer.</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={handleRefresh}
-                        className="flex items-center gap-2 px-5 py-3 bg-white ring-1 ring-slate-200 text-slate-700 rounded-2xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm"
-                    >
-                        <RotateCw className={cn("h-4 w-4 text-brand-500", isRefreshing && "animate-spin")} />
-                        REFRESH
-                    </button>
-                    <button
-                        onClick={() => {
-                            setEditForm({ ...customer });
-                            setIsEditModalOpen(true);
-                        }}
-                        className="flex items-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl text-xs font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95 shadow-slate-200"
-                    >
-                        <Edit3 className="h-4 w-4" />
-                        EDIT PROFILE
-                    </button>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Main Profile Info */}
-                <Card className="lg:col-span-2 bg-white rounded-xl p-4 border-none shadow-xl ring-1 ring-slate-100 overflow-hidden relative">
-                    <div className="flex flex-col md:flex-row items-center md:items-start gap-4 relative z-10">
-                        <div className="relative shrink-0">
-                            <img
-                                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=BaseUser&backgroundColor=f1f5f9`}
-                                alt=""
-                                className="h-32 w-32 rounded-xl ring-4 ring-slate-50 shadow-lg bg-slate-100"
-                            />
-                            <div className={cn(
-                                "absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-4 ring-white shadow-sm",
-                                customer.status === 'active' ? "bg-brand-500" : "bg-rose-500"
-                            )}></div>
-                        </div>
-                        <div className="flex-1 text-center md:text-left space-y-6">
-                            <div>
-                                <h3 className="text-3xl font-black text-slate-900">{customer.name}</h3>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                    Customer since {formatDate(customer.joinedDate)}
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                {[
-                                    { label: 'Total Spend', value: `₹${(customer.totalSpent || 0).toLocaleString()}`, trend: 'Lifetime', icon: IndianRupee, color: 'emerald' },
-                                    { label: 'Orders Placed', value: customer.totalOrders || 0, trend: 'Lifetime', icon: ShoppingBag, color: 'blue' },
-                                    { label: 'Average Spend', value: `₹${customer.totalOrders > 0 ? Math.round(customer.totalSpent / customer.totalOrders).toLocaleString() : 0}`, trend: 'Per Order', icon: TrendingUp, color: 'indigo' },
-                                    { label: 'Account Status', value: (customer.status || '').toUpperCase(), trend: 'Current', icon: CheckCircle2, color: 'fuchsia' },
-                                ].map((stat, i) => (
-                                    <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center">
-                                        <div className={cn("p-2 rounded-full mb-2",
-                                            stat.color === 'emerald' && 'bg-brand-100 text-brand-600',
-                                            stat.color === 'blue' && 'bg-brand-100 text-brand-600',
-                                            stat.color === 'indigo' && 'bg-brand-100 text-brand-600',
-                                            stat.color === 'fuchsia' && 'bg-fuchsia-100 text-fuchsia-600',
-                                        )}>
-                                            <stat.icon className="h-4 w-4" />
-                                        </div>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                                        <h5 className="text-lg font-black text-slate-900 mt-1">{stat.value}</h5>
-                                        <p className="text-xs font-bold text-slate-500 mt-0.5">{stat.trend}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </Card>
-
-                {/* Quick Stats */}
-                <div className="space-y-4">
-                    <Card className="p-6 !bg-black  text-primary-foreground rounded-xl border-none shadow-lg shadow-brand-200 relative overflow-hidden group">
-                        <div className="relative z-10">
-                            <p className="text-[10px] font-black opacity-90 uppercase tracking-widest mb-1">Lifetime Value</p>
-                            <h4 className="text-3xl font-black text-white">₹{(customer.totalSpent || 0).toLocaleString()}</h4>
-                            <div className="mt-4 flex items-center gap-2">
-                                <div className="p-1 px-2 rounded-full bg-white/25 text-white text-[10px] font-black uppercase tracking-tighter">
-                                    {customer.totalOrders} Orders
-                                </div>
-                                <TrendingUp className="h-4 w-4 text-white/90" />
-                            </div>
-                        </div>
-                        <ShoppingBag className="absolute -bottom-4 -right-4 h-24 w-24 text-white/10 group-hover:scale-110 transition-transform" />
-                    </Card>
-
-                    <Card className="p-6 bg-white rounded-xl border-none shadow-md ring-1 ring-slate-100 flex flex-col justify-between">
-                        <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Wallet Balance</p>
-                            <h4 className="text-3xl font-black text-slate-900">₹{(customer.walletBalance || 0).toLocaleString('en-IN')}</h4>
-                        </div>
+        <div className="space-y-4 pb-10 animate-in fade-in duration-500">
+            {/* Header */}
+            <Card className="rounded-xl border-none bg-white p-4 ring-1 ring-slate-100 sm:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-center gap-4">
                         <button
-                            onClick={() => setIsWalletModalOpen(true)}
-                            className="mt-4 w-full py-3 bg-brand-50 hover:bg-brand-100 text-brand-700 rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-brand-200"
+                            onClick={() => navigate('/admin/customers')}
+                            className="rounded-lg p-2 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+                            aria-label="Back to customers"
                         >
-                            Manage Funds
+                            <ChevronLeft className="h-4 w-4 text-slate-500" />
                         </button>
-                    </Card>
-
-                    <Card className="p-6 bg-white rounded-xl border-none shadow-md ring-1 ring-slate-100">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Recent Activity</p>
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-amber-50 rounded-xl text-amber-500">
-                                <RotateCw className="h-4 w-4" />
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-lg font-black text-brand-600">
+                            {initials}
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h1 className="truncate text-xl font-black text-slate-900">{customer.name || 'Customer'}</h1>
+                                <Badge variant={isActive ? 'success' : 'error'} className="text-[9px] font-black uppercase">
+                                    {isActive ? 'Active' : 'Blocked'}
+                                </Badge>
                             </div>
-                            <div>
-                                <p className="text-xs font-bold text-slate-700">Last Order placed</p>
-                                <p className="text-[10px] font-semibold text-slate-400">
-                                    {customer.lastOrderDate ? formatDateTime(customer.lastOrderDate) : 'Never'}
-                                </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                                {customer.phone && (
+                                    <button onClick={() => copyText(customer.phone, 'Phone')} className="flex items-center gap-1.5 hover:text-slate-800" title="Copy phone">
+                                        <Phone className="h-3.5 w-3.5" /> {customer.phone}
+                                    </button>
+                                )}
+                                {customer.email && (
+                                    <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> {customer.email}</span>
+                                )}
+                                <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Since {formatDate(customer.joinedDate)}</span>
+                                <button onClick={() => copyText(String(customer.id), 'Customer ID')} className="flex items-center gap-1 font-mono text-[10px] text-slate-400 hover:text-slate-700" title="Copy customer ID">
+                                    <Copy className="h-3 w-3" /> {String(customer.id).slice(-8).toUpperCase()}
+                                </button>
                             </div>
                         </div>
-                    </Card>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            onClick={handleRefresh}
+                            className="flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+                        >
+                            <RotateCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+                            Refresh
+                        </button>
+                        <button
+                            onClick={() => navigate(`/admin/orders/all?customerId=${customer.id}&customerName=${encodeURIComponent(customer.name || '')}`)}
+                            className="flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+                        >
+                            <ShoppingBag className="h-3.5 w-3.5" />
+                            All Orders
+                        </button>
+                        {isMainAdmin && (
+                            <button
+                                onClick={() => setIsBlockModalOpen(true)}
+                                className={cn(
+                                    'flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors',
+                                    isActive ? 'bg-rose-50 text-rose-600 ring-1 ring-rose-200 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100'
+                                )}
+                            >
+                                {isActive ? <Ban className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                {isActive ? 'Block' : 'Unblock'}
+                            </button>
+                        )}
+                    </div>
                 </div>
+            </Card>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatTile icon={IndianRupee} label="Total Spend" value={inr(customer.totalSpent)} hint="Lifetime" />
+                <StatTile icon={ShoppingBag} label="Orders" value={customer.totalOrders || 0} hint={customer.lastOrderDate ? `Last: ${formatDateTime(customer.lastOrderDate)}` : 'No orders yet'} />
+                <StatTile icon={TrendingUp} label="Average Order" value={inr(Math.round(avgOrder))} hint="Per order" />
+                <StatTile
+                    icon={Wallet}
+                    label="Wallet Balance"
+                    value={inr(customer.walletBalance)}
+                    action={isMainAdmin && (
+                        <button onClick={() => setIsWalletModalOpen(true)} className="mt-1 text-[11px] font-bold text-brand-600 hover:underline">
+                            Manage funds →
+                        </button>
+                    )}
+                />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Delivery & Order History */}
-                <div className="lg:col-span-2 space-y-8">
-                    {/* Delivery addresses */}
-                    <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-8">
-                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                                <MapIcon className="h-4 w-4 text-brand-500" />
-                                Saved Addresses
-                            </h4>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {(Array.isArray(customer.addresses) ? customer.addresses : []).length > 0 ? (
-                                (Array.isArray(customer.addresses) ? customer.addresses : []).map((addr, idx) => {
-                                    const type = (addr.label || addr.type || 'other').toUpperCase();
-                                    const parts = [addr.fullAddress || addr.address, addr.landmark, addr.city, addr.state, addr.pincode].filter(Boolean);
-                                    const fullAddress = parts.length > 0 ? parts.join(', ') : 'No address';
-                                    const isDefault = addr.isDefault ?? (idx === 0);
-                                    return (
-                                        <div key={addr._id || addr.id || idx} className={cn(
-                                            "p-5 rounded-2xl ring-1 transition-all",
-                                            isDefault ? "bg-slate-50 ring-slate-200 shadow-sm" : "bg-white ring-slate-100 hover:ring-brand-100"
-                                        )}>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <Badge variant={isDefault ? 'primary' : 'secondary'} className="text-[9px] font-black">
-                                                    {type}
-                                                </Badge>
-                                                <MapPin className="h-3.5 w-3.5 text-slate-300" />
-                                            </div>
-                                            <p className="text-xs font-bold text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{fullAddress}</p>
-                                        </div>
-                                    );
-                                })
-                            ) : (
-                                <div className="col-span-2 py-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                    <MapPin className="h-10 w-10 text-slate-200 mx-auto mb-3" />
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No saved addresses</p>
-                                </div>
-                            )}
-                        </div>
-                    </Card>
-
-                    {/* Order history */}
-                    <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl overflow-hidden">
-                        <div className="p-4 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                                <History className="h-4 w-4 text-brand-500" />
-                                Recent Orders
-                            </h4>
-                            <div className="flex items-center gap-3">
-                                <div className="relative group">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 group-focus-within:text-brand-500" />
+            {/* Orders + addresses */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <Card className="overflow-hidden rounded-xl border-none bg-white ring-1 ring-slate-100 lg:col-span-2">
+                    <div className="p-4 pb-0">
+                        <SectionTitle
+                            icon={Package}
+                            right={(
+                                <div className="relative">
+                                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                                     <input
                                         type="text"
-                                        placeholder="Search Orders..."
+                                        placeholder="Search order ID or status"
                                         value={orderSearch}
                                         onChange={(e) => setOrderSearch(e.target.value)}
-                                        className="pl-8 pr-4 py-2 bg-slate-50 border-none rounded-xl text-[10px] font-bold outline-none ring-1 ring-transparent focus:ring-brand-500/20 w-40"
+                                        className="w-48 rounded-lg bg-slate-50 py-1.5 pl-8 pr-3 text-xs font-semibold outline-none ring-1 ring-slate-100 focus:ring-brand-500/30"
                                     />
                                 </div>
-                                <button
-                                    onClick={handleExportCSV}
-                                    className="text-[10px] font-black text-brand-600 uppercase hover:underline"
-                                >
-                                    Export CSV
-                                </button>
-                            </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <tbody className="divide-y divide-slate-50">
-                                    {filteredOrders.map((order, i) => (
-                                        <tr
-                                            key={i}
-                                            onClick={() => navigate(`/admin/orders/view/${order.id.replace('#', '')}`)}
-                                            className="group hover:bg-slate-50/50 transition-all cursor-pointer"
-                                        >
-                                            <td className="px-4 py-5">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-2 bg-slate-50 rounded-xl group-hover:bg-white group-hover:shadow-sm transition-all text-slate-400 group-hover:text-brand-500">
-                                                        <Package className="h-4 w-4" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-black text-slate-900">{order.id}</p>
-                                                        <p className="text-[10px] font-bold text-slate-400">{order.itemsCount} Items</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-5">
-                                                <p className="text-[10px] font-black text-slate-400 uppercase">
-                                                    {formatDateTime(order.date)}
-                                                </p>
-                                            </td>
-                                            <td className="py-5 text-center">
-                                                <Badge variant={order.status === 'delivered' ? 'success' : order.status === 'cancelled' ? 'danger' : 'warning'} className="text-[8px] font-black">
-                                                    {order.status.toUpperCase()}
-                                                </Badge>
-                                            </td>
-                                            <td className="py-5 text-right font-black text-slate-900 pr-8">
-                                                ₹{(order.amount || 0).toLocaleString()}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {filteredOrders.length === 0 && (
-                                        <tr>
-                                            <td colSpan="4" className="px-4 py-5 text-center text-xs font-bold text-slate-400">
-                                                No orders found matching your search.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                        {visibleOrders < safeOrders.length && (
-                            <div className="p-4 bg-slate-50/50 flex justify-center border-t border-slate-50">
-                                <button
-                                    onClick={() => setVisibleOrders(safeOrders.length)}
-                                    className="text-[10px] font-black text-brand-600 uppercase hover:underline flex items-center gap-2"
-                                >
-                                    SHOW ALL ORDERS
-                                    <ChevronRight className="h-3 w-3" />
-                                </button>
-                            </div>
-                        )}
-                    </Card>
-                </div>
-
-                {/* Sidebar Notes */}
-                <div className="space-y-6">
-                    <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-white rounded-xl p-4">
-                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
-                            <MessageSquare className="h-4 w-4 text-brand-500" />
-                            Internal Notes
-                        </h4>
-                        <textarea
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            className="w-full bg-slate-50 p-6 rounded-2xl min-h-[140px] text-sm font-bold text-slate-600 leading-relaxed italic border border-slate-100 outline-none focus:bg-white focus:ring-2 focus:ring-brand-500/10 transition-all"
-                        />
-                        <button
-                            onClick={handleSaveNotes}
-                            className="w-full mt-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                            )}
                         >
-                            UPDATE NOTES
-                        </button>
-                    </Card>
-
-                    <Card className="border-none shadow-xl ring-1 ring-slate-100 bg-slate-900 rounded-xl p-4 text-white">
-                        <h4 className="text-xs font-black opacity-40 uppercase tracking-widest mb-6">Account Control</h4>
-                        <div className="space-y-4">
-                            <button
-                                onClick={() => setIsNotifModalOpen(true)}
-                                className="w-full py-4 bg-black  hover:bg-brand-500 text-primary-foreground rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-xl shadow-brand-900/20 flex items-center justify-center gap-2"
-                            >
-                                <MessageSquare className="h-4 w-4" />
-                                SEND NOTIFICATION
-                            </button>
-                            <button
-                                onClick={() => setIsRestrictModalOpen(true)}
-                                className="w-full py-4 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-2xl font-black text-[11px] uppercase tracking-widest border border-rose-500/20 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Ban className="h-4 w-4" />
-                                {customer.status === 'active' ? 'BLOCK ACCOUNT' : 'UNBLOCK ACCOUNT'}
+                            Recent Orders
+                        </SectionTitle>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-y border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                    <th className="px-4 py-2">Order</th>
+                                    <th className="px-4 py-2">Date</th>
+                                    <th className="px-4 py-2">Status</th>
+                                    <th className="px-4 py-2 text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {filteredOrders.map((order, i) => (
+                                    <tr
+                                        key={order.id || i}
+                                        onClick={() => navigate(`/admin/orders/view/${String(order.id || '').replace('#', '')}`)}
+                                        className="cursor-pointer transition-colors hover:bg-slate-50/70"
+                                    >
+                                        <td className="px-4 py-3">
+                                            <p className="text-sm font-bold text-slate-900">{order.id}</p>
+                                            <p className="text-[11px] font-medium text-slate-400">{order.itemsCount} item(s)</p>
+                                        </td>
+                                        <td className="px-4 py-3 text-xs font-semibold text-slate-500">{formatDateTime(order.date)}</td>
+                                        <td className="px-4 py-3">
+                                            <Badge variant={order.status === 'delivered' ? 'success' : order.status === 'cancelled' ? 'danger' : 'warning'} className="text-[9px] font-black uppercase">
+                                                {String(order.status || '').replace(/_/g, ' ')}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-4 py-3 text-right text-sm font-black text-slate-900">{inr(order.amount)}</td>
+                                    </tr>
+                                ))}
+                                {filteredOrders.length === 0 && (
+                                    <tr>
+                                        <td colSpan="4" className="px-4 py-8 text-center text-xs font-bold text-slate-400">
+                                            {orders.length === 0 ? 'No orders yet.' : 'No orders match your search.'}
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                    {!showAllOrders && orders.length > 5 && !orderSearch && (
+                        <div className="flex justify-center border-t border-slate-100 p-3">
+                            <button onClick={() => setShowAllOrders(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-600 hover:underline">
+                                Show all {orders.length} recent orders <ChevronRight className="h-3 w-3" />
                             </button>
                         </div>
-                    </Card>
-                </div>
+                    )}
+                </Card>
+
+                <Card className="rounded-xl border-none bg-white p-4 ring-1 ring-slate-100">
+                    <SectionTitle icon={MapPin}>Saved Addresses</SectionTitle>
+                    {addresses.length > 0 ? (
+                        <div className="space-y-2.5">
+                            {addresses.map((addr, idx) => {
+                                const type = (addr.label || addr.type || 'other').toUpperCase();
+                                const parts = [addr.fullAddress || addr.address, addr.landmark, addr.city, addr.state, addr.pincode].filter(Boolean);
+                                const isDefault = addr.isDefault ?? idx === 0;
+                                return (
+                                    <div key={addr._id || addr.id || idx} className={cn('rounded-lg p-3 ring-1', isDefault ? 'bg-slate-50 ring-slate-200' : 'bg-white ring-slate-100')}>
+                                        <div className="mb-1 flex items-center gap-2">
+                                            <Badge variant={isDefault ? 'primary' : 'secondary'} className="text-[9px] font-black">{type}</Badge>
+                                            {isDefault && <span className="text-[10px] font-bold text-slate-400">Default</span>}
+                                        </div>
+                                        <p className="break-words text-xs font-medium leading-relaxed text-slate-600">
+                                            {parts.length ? parts.join(', ') : 'No address'}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 py-8 text-center">
+                            <MapPin className="mx-auto mb-2 h-6 w-6 text-slate-300" />
+                            <p className="text-[11px] font-bold text-slate-400">No saved addresses</p>
+                        </div>
+                    )}
+                </Card>
             </div>
 
-            {/* Modals */}
-            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Profile Details">
-                <form onSubmit={handleUpdateProfile} className="space-y-6">
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Full Name</label>
-                            <input
-                                type="text"
-                                value={editForm.name}
-                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand-500/10 transition-all shadow-sm"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Phone Number</label>
-                            <input
-                                type="text"
-                                value={editForm.phone}
-                                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand-500/10 transition-all shadow-sm"
-                            />
-                        </div>
+            {/* Block / unblock */}
+            <Modal isOpen={isBlockModalOpen} onClose={() => !submittingBlock && setIsBlockModalOpen(false)} title={isActive ? 'Block this customer?' : 'Unblock this customer?'}>
+                <div className="space-y-5">
+                    <p className="text-sm text-slate-600">
+                        {isActive
+                            ? 'They will be logged out within a minute and cannot log in or place orders until you unblock them. Their data is kept.'
+                            : 'They will be able to log in and place orders again.'}
+                    </p>
+                    <div className="flex gap-3">
+                        <button onClick={() => setIsBlockModalOpen(false)} disabled={submittingBlock} className="flex-1 rounded-xl bg-slate-100 py-3 text-xs font-bold text-slate-600 hover:bg-slate-200">
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleToggleBlock}
+                            disabled={submittingBlock}
+                            className={cn('flex-1 rounded-xl py-3 text-xs font-bold text-white disabled:opacity-60', isActive ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700')}
+                        >
+                            {submittingBlock ? 'Please wait…' : isActive ? 'Block' : 'Unblock'}
+                        </button>
                     </div>
-                    <button type="submit" className="w-full py-4 bg-black  hover:bg-brand-500 text-primary-foreground rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95">
-                        SAVE CHANGES
-                    </button>
-                </form>
+                </div>
             </Modal>
 
-            <Modal isOpen={isNotifModalOpen} onClose={() => setIsNotifModalOpen(false)} title="Send Notification">
-                <div className="space-y-6">
-                    <div className="p-4 bg-brand-50 rounded-2xl flex items-start gap-3">
-                        <Bell className="h-5 w-5 text-brand-500 shrink-0 mt-0.5" />
-                        <p className="text-xs font-bold text-brand-700 leading-relaxed">
-                            We will send notifications via app and SMS immediately.
-                        </p>
+            {/* Wallet */}
+            <Modal isOpen={isWalletModalOpen} onClose={() => !submittingWallet && setIsWalletModalOpen(false)} title="Manage Customer Wallet">
+                <form onSubmit={handleWalletUpdate} className="space-y-5">
+                    <div className="flex items-center justify-between rounded-xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Current Balance</p>
+                        <p className="text-xl font-black text-slate-900">{inr(customer.walletBalance)}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        {['add', 'deduct'].map((action) => (
+                            <button
+                                key={action}
+                                type="button"
+                                onClick={() => setWalletForm({ ...walletForm, action })}
+                                className={cn(
+                                    'rounded-xl py-2.5 text-xs font-bold transition-colors',
+                                    walletForm.action === action
+                                        ? action === 'add' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                                        : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                )}
+                            >
+                                {action === 'add' ? 'Add Funds' : 'Deduct Funds'}
+                            </button>
+                        ))}
                     </div>
                     <div>
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Message</label>
+                        <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-400">Amount (₹)</label>
+                        <input
+                            type="number"
+                            required
+                            min="1"
+                            value={walletForm.amount}
+                            onKeyDown={(e) => { if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault(); }}
+                            onChange={(e) => setWalletForm({ ...walletForm, amount: e.target.value.replace('-', '') })}
+                            placeholder="Enter amount"
+                            className="w-full rounded-xl bg-slate-50 px-4 py-3 text-sm font-bold outline-none ring-1 ring-slate-100 focus:ring-brand-500/30"
+                        />
+                    </div>
+                    <div>
+                        <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-400">Reason (optional)</label>
                         <textarea
-                            value={notifMessage}
-                            onChange={(e) => setNotifMessage(e.target.value)}
-                            placeholder="Type your message here..."
-                            className="w-full px-5 py-5 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand-500/10 transition-all shadow-sm min-h-[120px]"
+                            value={walletForm.reason}
+                            onChange={(e) => setWalletForm({ ...walletForm, reason: e.target.value })}
+                            placeholder="E.g. Refund for damaged item"
+                            className="min-h-[72px] w-full rounded-xl bg-slate-50 px-4 py-3 text-sm font-medium outline-none ring-1 ring-slate-100 focus:ring-brand-500/30"
                         />
                     </div>
                     <button
-                        onClick={handleSendNotif}
-                        disabled={!notifMessage.trim()}
-                        className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                    >
-                        SEND MESSAGE
-                    </button>
-                </div>
-            </Modal>
-
-            <Modal isOpen={isRestrictModalOpen} onClose={() => setIsRestrictModalOpen(false)} title="Confirm Action">
-                <div className="space-y-6">
-                    <div className="p-6 bg-rose-50 rounded-xl border border-rose-100 flex flex-col items-center text-center gap-4">
-                        <div className="p-3 bg-rose-500 text-white rounded-full">
-                            <Ban className="h-6 w-6" />
-                        </div>
-                        <h5 className="text-lg font-black text-slate-900 uppercase tracking-tight">
-                            Confirm Account {customer.status === 'active' ? 'Block' : 'Unblock'}?
-                        </h5>
-                        <p className="text-sm font-bold text-slate-500 leading-relaxed">
-                            {customer.status === 'active'
-                                ? 'This will block the customer from placing orders or logging in.'
-                                : 'This will allow the customer to use all platform features again.'
-                            }
-                        </p>
-                    </div>
-                    <div className="flex gap-3">
-                        <button onClick={() => setIsRestrictModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-200 transition-all">
-                            CANCEL
-                        </button>
-                        <button onClick={handleRestrictAccount} className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-rose-600 shadow-xl shadow-rose-200 transition-all">
-                            CONFIRM
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-
-            <Modal isOpen={isWalletModalOpen} onClose={() => !submittingWallet && setIsWalletModalOpen(false)} title="Manage Customer Wallet">
-                <form onSubmit={handleWalletUpdate} className="space-y-6">
-                    <div className="p-4 bg-slate-50 rounded-2xl flex items-center justify-between border border-slate-100">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Balance</p>
-                        <p className="text-xl font-black text-slate-900">₹{(customer?.walletBalance || 0).toLocaleString('en-IN')}</p>
-                    </div>
-                    
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Action</label>
-                            <div className="grid grid-cols-2 gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setWalletForm({ ...walletForm, action: 'add' })}
-                                    className={cn(
-                                        "py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                                        walletForm.action === 'add' ? "bg-emerald-500 text-white shadow-lg shadow-emerald-200" : "bg-slate-50 text-slate-500 hover:bg-slate-100"
-                                    )}
-                                >
-                                    Add Funds
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setWalletForm({ ...walletForm, action: 'deduct' })}
-                                    className={cn(
-                                        "py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                                        walletForm.action === 'deduct' ? "bg-rose-500 text-white shadow-lg shadow-rose-200" : "bg-slate-50 text-slate-500 hover:bg-slate-100"
-                                    )}
-                                >
-                                    Deduct Funds
-                                </button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Amount (₹)</label>
-                            <input
-                                type="number"
-                                required
-                                min="1"
-                                value={walletForm.amount}
-                                onKeyDown={(e) => {
-                                    if (['-', '+', 'e', 'E'].includes(e.key)) {
-                                        e.preventDefault();
-                                    }
-                                }}
-                                onChange={(e) => {
-                                    let val = e.target.value;
-                                    if (val !== '' && Number(val) < 0) {
-                                        val = Math.abs(Number(val)).toString();
-                                    }
-                                    setWalletForm({ ...walletForm, amount: val });
-                                }}
-                                placeholder="Enter amount"
-                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand-500/10 transition-all shadow-sm"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Reason (Optional)</label>
-                            <textarea
-                                value={walletForm.reason}
-                                onChange={(e) => setWalletForm({ ...walletForm, reason: e.target.value })}
-                                placeholder="E.g. Refund for damaged item..."
-                                className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand-500/10 transition-all shadow-sm min-h-[80px]"
-                            />
-                        </div>
-                    </div>
-                    
-                    <button 
-                        type="submit" 
+                        type="submit"
                         disabled={!walletForm.amount || submittingWallet}
-                        className="w-full py-4 bg-black hover:bg-brand-500 text-primary-foreground rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                        className="w-full rounded-xl bg-slate-900 py-3 text-xs font-bold text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
                     >
-                        {submittingWallet ? 'PROCESSING...' : 'CONFIRM TRANSACTION'}
+                        {submittingWallet ? 'Processing…' : 'Confirm'}
                     </button>
                 </form>
             </Modal>

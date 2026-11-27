@@ -501,7 +501,9 @@ const ActiveDeliveryBoys = () => {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: '100%' }}
                                 transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-                                className="fixed inset-0 z-10 flex h-[100dvh] flex-col bg-white sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[90vh] sm:w-[calc(100%-2rem)] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[48px] sm:shadow-3xl"
+                                data-lenis-prevent
+                                data-lenis-prevent-wheel
+                                className="fixed inset-0 z-10 flex h-[100dvh] flex-col overflow-hidden bg-white sm:inset-auto sm:left-1/2 sm:top-1/2 sm:h-[88vh] sm:w-[calc(100%-2rem)] sm:max-w-6xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:shadow-2xl"
                             >
                                 {/* Mobile sticky header */}
                                 <div className="lg:hidden sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3">
@@ -520,11 +522,13 @@ const ActiveDeliveryBoys = () => {
                                 </div>
 
                                 <div
-                                    className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden lg:flex lg:flex-row"
+                                    data-lenis-prevent
+                                    data-lenis-prevent-wheel
+                                    className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:flex lg:flex-row lg:overflow-hidden"
                                     style={{ WebkitOverflowScrolling: 'touch' }}
                                 >
                                     {/* Left: Driver Profile Info */}
-                                    <div className="lg:w-80 lg:min-h-0 bg-slate-50 p-5 border-b lg:border-b-0 lg:border-r border-slate-100 lg:overflow-y-auto lg:shrink-0">
+                                    <div data-lenis-prevent className="lg:w-72 lg:min-h-0 bg-slate-50 p-6 border-b lg:border-b-0 lg:border-r border-slate-100 lg:overflow-y-auto overscroll-contain lg:shrink-0">
                                         <div className="text-center mb-6">
                                             <img
                                                 src={viewingRider.avatar && !viewingRider.avatar.includes('emoji') && !viewingRider.avatar.includes('avatar') ? viewingRider.avatar : "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
@@ -534,25 +538,33 @@ const ActiveDeliveryBoys = () => {
                                             <h3 className="ds-h2 mt-3">{viewingRider.name}</h3>
                                             <p className="text-[10px] font-mono font-bold text-slate-400 mt-0.5">ID: RD-{String(viewingRider.id || '').slice(-6).toUpperCase()}</p>
                                             <p className="text-[11px] font-bold text-slate-500 mt-0.5">Joined: {viewingRider.joinDate}</p>
+                                            <div className="mt-3 flex justify-center">
+                                                <Badge variant={viewingRider.status === 'available' ? 'success' : viewingRider.status === 'busy' ? 'warning' : 'neutral'} className="text-[9px] font-black uppercase">
+                                                    {viewingRider.status}
+                                                </Badge>
+                                            </div>
+                                            <div className="mt-4 grid grid-cols-2 gap-2">
+                                                <a
+                                                    href={viewingRider.phone ? `tel:${viewingRider.phone}` : undefined}
+                                                    className={cn("flex items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] font-black ring-1 transition-all", viewingRider.phone ? "bg-white ring-slate-200 text-slate-700 hover:bg-slate-100" : "pointer-events-none opacity-40 bg-white ring-slate-200 text-slate-400")}
+                                                >
+                                                    <Phone className="h-3.5 w-3.5" /> Call
+                                                </a>
+                                                <a
+                                                    href={viewingRider.email ? `mailto:${viewingRider.email}` : undefined}
+                                                    className={cn("flex items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] font-black ring-1 transition-all", viewingRider.email ? "bg-white ring-slate-200 text-slate-700 hover:bg-slate-100" : "pointer-events-none opacity-40 bg-white ring-slate-200 text-slate-400")}
+                                                >
+                                                    <Mail className="h-3.5 w-3.5" /> Email
+                                                </a>
+                                            </div>
                                         </div>
 
-                                        {/* Quick Financial Summary Pill */}
-                                        <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs mb-5 space-y-2.5">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Wallet Balance</span>
-                                                <span className="text-sm font-black text-brand-600">₹{viewingRider.walletBalance.toLocaleString('en-IN')}</span>
+                                        {viewingRider.cashInHand > 0 && (
+                                            <div className="p-3.5 bg-amber-50 rounded-2xl ring-1 ring-amber-200 mb-5 flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider">COD Cash in Hand</span>
+                                                <span className="text-sm font-black text-amber-700">₹{viewingRider.cashInHand.toLocaleString('en-IN')}</span>
                                             </div>
-                                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Today Earnings</span>
-                                                <span className="text-xs font-black text-emerald-600">₹{viewingRider.todayEarnings.toLocaleString('en-IN')}</span>
-                                            </div>
-                                            {viewingRider.cashInHand > 0 && (
-                                                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                                                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider">COD Cash in Hand</span>
-                                                    <span className="text-xs font-black text-amber-700">₹{viewingRider.cashInHand.toLocaleString('en-IN')}</span>
-                                                </div>
-                                            )}
-                                        </div>
+                                        )}
 
                                         <div className="space-y-4">
                                             <div className="space-y-1">
@@ -569,21 +581,22 @@ const ActiveDeliveryBoys = () => {
                                                     {renderVal(viewingRider.vehicle)}
                                                 </div>
                                             </div>
-                                            <div className="pt-4 border-t border-slate-200">
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Driver Status</p>
-                                                <Badge variant={viewingRider.status === 'available' ? 'success' : viewingRider.status === 'busy' ? 'warning' : 'neutral'} className="text-[9px] font-black uppercase">
-                                                    {viewingRider.status}
-                                                </Badge>
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Zone</p>
+                                                <div className="flex items-center gap-2 text-slate-700">
+                                                    <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                                                    {renderVal(zoneOptions.find((z) => String(z._id) === String(viewingRider.zoneId))?.name || (viewingRider.zoneId ? 'Assigned' : ''))}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Right: Performance & Registration Details */}
-                                    <div className="flex-1 p-5 lg:p-14 bg-white lg:min-h-0 lg:overflow-y-auto">
-                                        <div className="flex justify-between items-start gap-3 mb-6">
+                                    <div data-lenis-prevent className="flex-1 p-5 lg:p-8 bg-white lg:min-h-0 lg:overflow-y-auto overscroll-contain">
+                                        <div className="flex justify-between items-start gap-3 mb-6 lg:sticky lg:-top-8 lg:-mx-8 lg:-mt-8 lg:px-8 lg:pt-8 lg:pb-4 lg:bg-white/95 lg:backdrop-blur lg:z-10 lg:border-b lg:border-slate-100">
                                             <div className="min-w-0">
-                                                <h2 className="ds-h1 text-xl sm:text-2xl">Driver Intelligence & KYC</h2>
-                                                <p className="ds-description mt-1 text-sm">Live performance stats, earnings, wallet balances, and registered KYC credentials.</p>
+                                                <h2 className="text-lg sm:text-xl font-black text-slate-900">Driver Profile & KYC</h2>
+                                                <p className="text-xs font-medium text-slate-500 mt-1">Performance, earnings, wallet and registered documents.</p>
                                             </div>
                                             <button
                                                 type="button"
@@ -596,7 +609,7 @@ const ActiveDeliveryBoys = () => {
                                         </div>
 
                                         {/* Dynamic Live Analytics & Financials Grid */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 sm:p-5 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl shadow-xl mb-8">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl shadow-md mb-6">
                                             <div className="text-center p-2">
                                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Lifetime Rating</p>
                                                 <div className="flex items-center justify-center gap-1.5">
