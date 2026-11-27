@@ -2603,8 +2603,28 @@ export const updateReturnStatus = async (req, res) => {
 export const getSellerOrders = async (req, res) => {
   try {
     const { id: userId, role } = req.user;
-    const { startDate, endDate, status: statusParam } = req.query;
+    const { status: statusParam, dateFilter } = req.query;
+    let { startDate, endDate } = req.query;
     const assignedZones = req.assignedZones || [];
+
+    // Admin orders page sends a preset (today / yesterday / last_7_days / this_month).
+    if (!startDate && !endDate && dateFilter) {
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (dateFilter === "today") {
+        startDate = startOfToday;
+        endDate = now;
+      } else if (dateFilter === "yesterday") {
+        startDate = new Date(startOfToday.getTime() - 86400000);
+        endDate = new Date(startOfToday.getTime() - 86400000);
+      } else if (dateFilter === "last_7_days") {
+        startDate = new Date(startOfToday.getTime() - 6 * 86400000);
+        endDate = now;
+      } else if (dateFilter === "this_month") {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = now;
+      }
+    }
 
     const { page, limit, skip } = getPagination(req, {
       defaultLimit: 25,

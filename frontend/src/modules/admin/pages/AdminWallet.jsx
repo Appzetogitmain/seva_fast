@@ -696,7 +696,7 @@ const AdminWallet = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mt-5">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mt-5">
                         {[
                             { label: 'Delivered Orders', value: orderEarnings.summary?.orderCount || 0, suffix: '' },
                             { label: 'Product Value', value: orderEarnings.summary?.totalProductSubtotal || 0, prefix: '₹' },
@@ -704,6 +704,7 @@ const AdminWallet = () => {
                             { label: 'Discount Subsidized', value: orderEarnings.summary?.totalDiscountGiven || 0, prefix: '₹', highlightDanger: true },
                             { label: 'Platform Earning', value: orderEarnings.summary?.totalPlatformEarning || 0, prefix: '₹', highlight: true },
                             { label: 'Seller Payouts', value: orderEarnings.summary?.totalSellerPayout || 0, prefix: '₹' },
+                            { label: 'Rider Payouts', value: orderEarnings.summary?.totalRiderPayout || 0, prefix: '₹' },
                         ].map((item) => (
                             <div
                                 key={item.label}
@@ -728,8 +729,13 @@ const AdminWallet = () => {
 
                 <div className="px-6 pb-3">
                     <p className="text-[11px] font-bold text-slate-500">
-                        Split rule: <span className="text-slate-800">Seller Payout + Platform Earning = Customer Paid</span>
-                        <span className="text-slate-400 font-semibold"> · Discounts are absorbed by platform · Detail on row click</span>
+                        Split rule: <span className="text-slate-800">Seller Payout + Rider Payout + Platform Earning = Customer Paid</span>
+                        <span className="text-slate-400 font-semibold"> · Platform Earning is net of discounts and extra rider pay · Detail on row click</span>
+                        {Number(orderEarnings.summary?.legacyOrderCount || 0) > 0 && (
+                            <span className="block mt-1 text-amber-600 font-semibold">
+                                {orderEarnings.summary.legacyOrderCount} older order(s) worth ₹{Number(orderEarnings.summary.legacyCustomerPaid || 0).toLocaleString('en-IN')} have no price breakdown and are excluded from these totals.
+                            </span>
+                        )}
                     </p>
                 </div>
 
@@ -1225,15 +1231,19 @@ const AdminWallet = () => {
                                     <span className="text-xs font-bold text-slate-600">Seller Payout</span>
                                     <span className="text-sm font-black text-slate-900">₹{Number(selectedOrderEarning.sellerPayout || 0).toLocaleString('en-IN')}</span>
                                 </div>
+                                <div className="flex justify-between bg-slate-50 rounded-xl px-3 py-2.5">
+                                    <span className="text-xs font-bold text-slate-600">Rider Payout</span>
+                                    <span className="text-sm font-black text-slate-900">₹{Number(selectedOrderEarning.riderPayout || 0).toLocaleString('en-IN')}</span>
+                                </div>
                                 <div className="flex justify-between bg-fuchsia-50 ring-1 ring-fuchsia-100 rounded-xl px-3 py-2.5">
                                     <span className="text-xs font-bold text-fuchsia-700">Platform Earning</span>
                                     <span className="text-sm font-black text-fuchsia-700">₹{Number(selectedOrderEarning.platformEarning || 0).toLocaleString('en-IN')}</span>
                                 </div>
                                 <div className="flex justify-between text-[10px] font-bold text-slate-400 px-1">
-                                    <span>Check: Seller + Platform</span>
+                                    <span>Check: Seller + Rider + Platform</span>
                                     <span className="text-emerald-600">
-                                        ₹{(Number(selectedOrderEarning.sellerPayout || 0) + Number(selectedOrderEarning.platformEarning || 0)).toLocaleString('en-IN')}
-                                        {Math.round((Number(selectedOrderEarning.sellerPayout || 0) + Number(selectedOrderEarning.platformEarning || 0)) * 100) / 100 === Number(selectedOrderEarning.customerPaid || 0) ? ' = Order ✓' : ''}
+                                        ₹{(Math.round((Number(selectedOrderEarning.sellerPayout || 0) + Number(selectedOrderEarning.riderPayout || 0) + Number(selectedOrderEarning.platformEarning || 0)) * 100) / 100).toLocaleString('en-IN')}
+                                        {Math.abs((Number(selectedOrderEarning.sellerPayout || 0) + Number(selectedOrderEarning.riderPayout || 0) + Number(selectedOrderEarning.platformEarning || 0)) - Number(selectedOrderEarning.customerPaid || 0)) < 0.01 ? ' = Order ✓' : ''}
                                     </span>
                                 </div>
                             </div>
@@ -1296,11 +1306,12 @@ const AdminWallet = () => {
                                     { label: 'Delivery Fee (customer)', value: selectedOrderEarning.deliveryFee },
                                     { label: 'Handling Fee', value: selectedOrderEarning.handlingFee },
                                     { label: 'Tip', value: selectedOrderEarning.tip },
-                                    { label: 'Rider Payout', value: selectedOrderEarning.riderPayout },
+                                    { label: 'Less: Rider Payout', value: selectedOrderEarning.riderPayout, minus: true },
+                                    { label: 'Less: Discount', value: selectedOrderEarning.discountTotal, minus: true },
                                 ].filter((item) => Number(item.value) > 0).map((item) => (
-                                    <div key={item.label} className="bg-slate-50 rounded-xl p-3">
+                                    <div key={item.label} className={cn("rounded-xl p-3", item.minus ? "bg-rose-50" : "bg-slate-50")}>
                                         <p className="text-[10px] font-black text-slate-400 uppercase">{item.label}</p>
-                                        <p className="text-sm font-black text-slate-900 mt-1">₹{Number(item.value || 0).toLocaleString('en-IN')}</p>
+                                        <p className={cn("text-sm font-black mt-1", item.minus ? "text-rose-600" : "text-slate-900")}>{item.minus ? '−' : ''}₹{Number(item.value || 0).toLocaleString('en-IN')}</p>
                                     </div>
                                 ))}
                             </div>

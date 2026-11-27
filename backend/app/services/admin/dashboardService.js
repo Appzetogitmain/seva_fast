@@ -42,20 +42,26 @@ export async function getAdminAnalyticsOverview({ range = "7d", assignedZones } 
 
   const [currentOrders, previousOrders, activeSellers, prevActiveSellers] = await Promise.all([
     Order.find({ ...zoneFilter, createdAt: { $gte: rangeStart } })
-      .select("pricing.total status createdAt")
+      .select("pricing.total status returnStatus createdAt")
       .lean(),
     Order.find({ ...zoneFilter, createdAt: { $gte: prevRangeStart, $lt: rangeStart } })
-      .select("pricing.total status createdAt")
+      .select("pricing.total status returnStatus createdAt")
       .lean(),
     Seller.countDocuments({ ...zoneFilter, isVerified: true }),
     Seller.countDocuments({ ...zoneFilter, isVerified: true, createdAt: { $lt: rangeStart } }),
   ]);
 
+  // Returned / refunded orders are not earned revenue.
+  const RETURNED = new Set([
+    "returned", "qc_passed", "refund_completed", "return_approved",
+    "return_in_transit", "return_drop_pending", "return_pickup_assigned",
+  ]);
+  const isEarned = (o) => o.status === "delivered" && !RETURNED.has(o.returnStatus || "none");
   const sumDeliveredRevenue = (orders) =>
     orders
-      .filter((o) => o.status === "delivered")
+      .filter(isEarned)
       .reduce((sum, o) => sum + (o.pricing?.total || 0), 0);
-  const countDeliveredOrders = (orders) => orders.filter((o) => o.status === "delivered").length;
+  const countDeliveredOrders = (orders) => orders.filter(isEarned).length;
 
   const grossRevenue = sumDeliveredRevenue(currentOrders);
   const prevGrossRevenue = sumDeliveredRevenue(previousOrders);
@@ -82,7 +88,7 @@ export async function getAdminAnalyticsOverview({ range = "7d", assignedZones } 
     const createdAt = new Date(order.createdAt);
     const bucket = buckets.find((b) => createdAt >= b.start && createdAt < b.end) || buckets[buckets.length - 1];
     bucket.orders += 1;
-    if (order.status === "delivered") {
+    if (isEarned(order)) {
       bucket.revenue += order.pricing?.total || 0;
     }
   }
@@ -121,8 +127,8 @@ export async function getAdminDashboardStats(assignedZones) {
   const activeSellers = await Seller.countDocuments(activeSellerQuery);
 
   const revenueMatch = hasZones 
-    ? { status: "delivered", zoneId: { $in: assignedZones } } 
-    : { status: "delivered" };
+    ? { status: "delivered", returnStatus: { $nin: ["returned", "qc_passed", "refund_completed", "return_approved", "return_in_transit", "return_drop_pending", "return_pickup_assigned"] }, zoneId: { $in: assignedZones } }
+    : { status: "delivered", returnStatus: { $nin: ["returned", "qc_passed", "refund_completed", "return_approved", "return_in_transit", "return_drop_pending", "return_pickup_assigned"] } };
 
   const revenueData = await Order.aggregate([
     { $match: revenueMatch },

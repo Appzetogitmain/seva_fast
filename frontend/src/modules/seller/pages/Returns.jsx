@@ -404,11 +404,17 @@ const Returns = () => {
             ) : (
                 <>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                        {["Requested", "Approved", "Rejected", "Completed"].map(
-                            (label, i) => {
-                                const count = returns.filter(
-                                    (r) => mapReturnStatusLabel(r.returnStatus) === label
-                                ).length;
+                        {[
+                            // Each card counts a whole stage, not one exact status —
+                            // otherwise a return at "Pickup Assigned"/"In Transit"
+                            // appears in no card at all.
+                            { label: "Requested", statuses: ["return_requested"] },
+                            { label: "Approved", statuses: ["return_approved", "return_pickup_assigned", "picked_up", "return_in_transit", "return_drop_pending", "qc_passed"] },
+                            { label: "Rejected", statuses: ["return_rejected", "qc_failed"] },
+                            { label: "Completed", statuses: ["returned", "refund_completed"] },
+                        ].map(
+                            ({ label, statuses }, i) => {
+                                const count = returns.filter((r) => statuses.includes(r.returnStatus)).length;
                                 return (
                                     <BlurFade key={label} delay={0.1 + i * 0.05}>
                                         <MagicCard

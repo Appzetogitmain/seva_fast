@@ -17,7 +17,6 @@ import {
     IndianRupee,
     ChevronDown,
     ShoppingBag,
-    Clock,
     CheckCircle2,
     XCircle
 } from 'lucide-react';
@@ -120,6 +119,8 @@ const OrdersList = () => {
                 setSummary({
                     totalOrders: Number(payload.summary?.totalOrders || payload.total || formatted.length || 0),
                     totalAmount: Number(payload.summary?.totalAmount || 0),
+                    grossRevenue: Number(payload.summary?.grossRevenue || 0),
+                    platformEarning: Number(payload.summary?.platformEarning || 0),
                     pending: Number(payload.summary?.pending || 0),
                     confirmed: Number(payload.summary?.confirmed || 0),
                     packed: Number(payload.summary?.packed || 0),
@@ -180,14 +181,15 @@ const OrdersList = () => {
     );
 
     const stats = useMemo(() => {
-        const totalEarnings = summary.totalAmount;
-        const activeOrders = summary.activeOrders;
+        const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+        const closed = summary.delivered + summary.cancelled;
+        const deliveryRate = closed > 0 ? `${((summary.delivered / closed) * 100).toFixed(1)}%` : '—';
 
         return [
-            { label: 'Total Earnings', value: `₹${totalEarnings.toLocaleString('en-IN')}`, trend: '+12.5%', icon: IndianRupee, color: 'emerald' },
-            { label: 'Active Orders', value: activeOrders, trend: '+5', icon: ShoppingBag, color: 'blue' },
-            { label: 'Average Prep Time', value: '18m', trend: '-2m', icon: Clock, color: 'amber' },
-            { label: 'Delivery Rate', value: '98.2%', trend: '+0.4%', icon: CheckCircle2, color: 'fuchsia' },
+            { label: 'Gross Revenue', value: fmt(summary.grossRevenue), icon: IndianRupee, color: 'emerald' },
+            { label: 'Platform Earning', value: fmt(summary.platformEarning), icon: IndianRupee, color: 'amber' },
+            { label: 'Active Orders', value: summary.activeOrders, icon: ShoppingBag, color: 'blue' },
+            { label: 'Delivery Rate', value: deliveryRate, icon: CheckCircle2, color: 'fuchsia' },
         ];
     }, [summary]);
 

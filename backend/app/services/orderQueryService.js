@@ -105,6 +105,38 @@ export async function fetchSellerOrdersPage({
     endDate,
     assignedZones,
   });
+  // Summary cards must not depend on the selected status tab, otherwise
+  // totals jump to 0 on "Pending"/"Cancelled" tabs and change on every
+  // approve/reject. Only role/zone/date scoping applies to the summary.
+  const summaryQuery = buildSellerOrdersQuery({
+    role,
+    userId,
+    statusParam: "all",
+    startDate,
+    endDate,
+    assignedZones,
+  });
+  const deliveredNotReturned = {
+    $and: [
+      { $eq: ["$status", "delivered"] },
+      {
+        $not: {
+          $in: [
+            { $ifNull: ["$returnStatus", "none"] },
+            [
+              "returned",
+              "qc_passed",
+              "refund_completed",
+              "return_approved",
+              "return_in_transit",
+              "return_drop_pending",
+              "return_pickup_assigned",
+            ],
+          ],
+        },
+      },
+    ],
+  };
 
   const [orders, total, summaryRows] = await Promise.all([
     Order.find(query)
@@ -118,11 +150,36 @@ export async function fetchSellerOrdersPage({
       .lean(),
     Order.countDocuments(query),
     Order.aggregate([
-      { $match: query },
+      { $match: summaryQuery },
       {
         $group: {
           _id: null,
           totalOrders: { $sum: 1 },
+          // Gross order value actually earned (delivered, not returned).
+          grossRevenue: {
+            $sum: {
+              $cond: [
+                deliveredNotReturned,
+                {
+                  $ifNull: [
+                    "$pricing.total",
+                    { $ifNull: ["$paymentBreakdown.grandTotal", 0] },
+                  ],
+                },
+                0,
+              ],
+            },
+          },
+          // Platform (admin) earning from delivered, non-returned orders.
+          platformEarning: {
+            $sum: {
+              $cond: [
+                deliveredNotReturned,
+                { $ifNull: ["$paymentBreakdown.platformTotalEarning", 0] },
+                0,
+              ],
+            },
+          },
           totalAmount: {
             $sum: {
               $cond: [
@@ -258,6 +315,8 @@ export async function fetchSellerOrdersPage({
   const summary = {
     totalOrders: Number(rawSummary.totalOrders || 0),
     totalAmount: Number(rawSummary.totalAmount || 0),
+    grossRevenue: Math.round(Number(rawSummary.grossRevenue || 0) * 100) / 100,
+    platformEarning: Math.round(Number(rawSummary.platformEarning || 0) * 100) / 100,
     pending: Number(rawSummary.pending || 0),
     confirmed: Number(rawSummary.confirmed || 0),
     packed: Number(rawSummary.packed || 0),

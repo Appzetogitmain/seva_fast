@@ -46,8 +46,17 @@ export async function getAdminOrderEarnings({
     Order.aggregate([
       { $match: query },
       {
+        // Old orders created before paymentBreakdown existed have no split
+        // (seller/rider/platform all 0). Mixing them into the totals made
+        // Customer Paid larger than the sum of its parts, so they are
+        // reported separately as "legacy".
+        $addFields: {
+          _hasBreakdown: { $gt: [{ $ifNull: ["$paymentBreakdown.grandTotal", 0] }, 0] },
+        },
+      },
+      {
         $group: {
-          _id: null,
+          _id: "$_hasBreakdown",
           orderCount: { $sum: 1 },
           totalCustomerPaid: {
             $sum: { $ifNull: ["$paymentBreakdown.grandTotal", "$pricing.total"] },
@@ -82,6 +91,7 @@ export async function getAdminOrderEarnings({
     const pb = order.paymentBreakdown || {};
     const comm = pb.commissionBreakdown || {};
     const settlement = order.settlementStatus || {};
+    const hasBreakdown = Number(pb.grandTotal || 0) > 0;
 
     return {
       orderId: order.orderId,
@@ -99,7 +109,20 @@ export async function getAdminOrderEarnings({
       // Core amounts
       productSubtotal: roundCurrency(pb.productSubtotal ?? order.pricing?.subtotal ?? 0),
       customerPaid: roundCurrency(pb.grandTotal ?? order.pricing?.total ?? 0),
-      platformEarning: roundCurrency(pb.platformTotalEarning ?? 0),
+      // Exact net: what the customer paid minus what is paid out to the
+      // seller and the rider. This already absorbs discounts and any rider
+      // payout above the delivery fee charged (the stored
+      // platformTotalEarning ignores both, so it over-states earning).
+      platformEarning: hasBreakdown
+        ? roundCurrency(
+            (pb.grandTotal ?? 0) - (pb.sellerPayoutTotal ?? 0) - (pb.riderPayoutTotal ?? 0),
+          )
+        : 0,
+      platformGrossEarning: roundCurrency(pb.platformTotalEarning ?? 0),
+      riderExtraOverDeliveryFee: roundCurrency(
+        Math.max((pb.riderPayoutTotal ?? 0) - (pb.deliveryFeeCharged ?? 0), 0),
+      ),
+      hasBreakdown,
       adminCommission: roundCurrency(pb.adminProductCommissionTotal ?? 0),
       deliveryFee: roundCurrency(pb.deliveryFeeCharged ?? order.pricing?.deliveryFee ?? 0),
       handlingFee: roundCurrency(pb.handlingFeeCharged ?? 0),
@@ -145,7 +168,12 @@ export async function getAdminOrderEarnings({
     };
   });
 
-  const summaryRow = summaryAgg[0] || {};
+  const summaryRow = summaryAgg.find((row) => row._id === true) || {};
+  const legacyRow = summaryAgg.find((row) => row._id === false) || {};
+  const netPlatformEarning =
+    Number(summaryRow.totalCustomerPaid || 0) -
+    Number(summaryRow.totalSellerPayout || 0) -
+    Number(summaryRow.totalRiderPayout || 0);
 
   return {
     items,
@@ -157,7 +185,10 @@ export async function getAdminOrderEarnings({
       orderCount: Number(summaryRow.orderCount || 0),
       totalCustomerPaid: roundCurrency(summaryRow.totalCustomerPaid || 0),
       totalProductSubtotal: roundCurrency(summaryRow.totalProductSubtotal || 0),
-      totalPlatformEarning: roundCurrency(summaryRow.totalPlatformEarning || 0),
+      totalPlatformEarning: roundCurrency(netPlatformEarning),
+      totalPlatformGrossEarning: roundCurrency(summaryRow.totalPlatformEarning || 0),
+      legacyOrderCount: Number(legacyRow.orderCount || 0),
+      legacyCustomerPaid: roundCurrency(legacyRow.totalCustomerPaid || 0),
       totalAdminCommission: roundCurrency(summaryRow.totalAdminCommission || 0),
       totalSellerPayout: roundCurrency(summaryRow.totalSellerPayout || 0),
       totalRiderPayout: roundCurrency(summaryRow.totalRiderPayout || 0),
