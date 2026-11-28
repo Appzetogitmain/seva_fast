@@ -14,6 +14,7 @@ import {
   sellerOrderSellingPriceAmount,
   sellerOrderCommissionAmount,
   sellerOrderDeliveryEarningAmount,
+  sellerOrderShippingChargeAmount,
   sellerOrderCommissionExemptFlag,
 } from "../utils/sellerRevenue.js";
 import { releaseExpiredHeldSellerPayouts } from "../services/finance/orderFinanceService.js";
@@ -473,6 +474,7 @@ const emptyProfitBucket = () => ({
     purchaseCost: 0,
     commission: 0,
     deliveryEarning: 0,
+    shippingCharge: 0,
     totalDeduction: 0,
     netProfit: 0,
     payout: 0,
@@ -484,13 +486,15 @@ function normalizeProfitBucket(raw) {
     const purchaseCost = roundMoney(raw.purchaseCost);
     const commission = roundMoney(raw.commission);
     const deliveryEarning = roundMoney(raw.deliveryEarning);
+    const shippingCharge = roundMoney(raw.shippingCharge);
     return {
         orderCount: Number(raw.orderCount || 0),
         sellingPrice,
         purchaseCost,
         commission,
         deliveryEarning,
-        totalDeduction: roundMoney(purchaseCost + commission),
+        shippingCharge,
+        totalDeduction: roundMoney(purchaseCost + commission + shippingCharge),
         netProfit: roundMoney(raw.netProfit),
         payout: roundMoney(raw.payout),
     };
@@ -504,6 +508,7 @@ function divideBucket(bucket, count) {
         purchaseCost: roundMoney(bucket.purchaseCost / count),
         commission: roundMoney(bucket.commission / count),
         deliveryEarning: roundMoney(bucket.deliveryEarning / count),
+        shippingCharge: roundMoney(bucket.shippingCharge / count),
         totalDeduction: roundMoney(bucket.totalDeduction / count),
         netProfit: roundMoney(bucket.netProfit / count),
         payout: roundMoney(bucket.payout / count),
@@ -545,6 +550,7 @@ export const getSellerProfitSummary = async (req, res) => {
                 purchaseCost: { $sum: sellerOrderCostAmount() },
                 commission: { $sum: sellerOrderCommissionAmount() },
                 deliveryEarning: { $sum: sellerOrderDeliveryEarningAmount() },
+                shippingCharge: { $sum: sellerOrderShippingChargeAmount() },
                 netProfit: { $sum: sellerOrderProfitAmount() },
                 payout: { $sum: sellerOrderEarningAmount() },
             },
@@ -576,6 +582,9 @@ export const getSellerProfitSummary = async (req, res) => {
                                 purchaseCost: sellerOrderCostAmount(),
                                 commission: sellerOrderCommissionAmount(),
                                 deliveryEarning: sellerOrderDeliveryEarningAmount(),
+                                shippingCharge: sellerOrderShippingChargeAmount(),
+                                deliveryType: { $ifNull: ["$deliveryType", "instant"] },
+                                courierName: "$shipmentDetails.courierName",
                                 netProfit: sellerOrderProfitAmount(),
                                 payout: sellerOrderEarningAmount(),
                             },
@@ -610,6 +619,9 @@ export const getSellerProfitSummary = async (req, res) => {
                 purchaseCost: roundMoney(order.purchaseCost),
                 commission: roundMoney(order.commission),
                 deliveryEarning: roundMoney(order.deliveryEarning),
+                shippingCharge: roundMoney(order.shippingCharge),
+                deliveryType: order.deliveryType,
+                courierName: order.courierName || null,
                 netProfit: roundMoney(order.netProfit),
                 payout: roundMoney(order.payout),
             })),

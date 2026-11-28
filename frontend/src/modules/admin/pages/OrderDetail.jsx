@@ -195,13 +195,22 @@ const OrderDetail = () => {
     const tip = Number(paymentBreakdown.tipTotal ?? paymentBreakdown.riderTipAmount ?? 0);
     const riderPayout = Number(paymentBreakdown.riderPayoutTotal ?? 0);
     const productSubtotal = Number(paymentBreakdown.productSubtotal ?? order.pricing?.subtotal ?? 0);
-    const splitCheck = Math.round((sellerPayout + platformEarning) * 100) / 100;
+    const isPanIndia = order.deliveryType === "scheduled";
+    const shiprocketCharge = Number(paymentBreakdown.shiprocketShippingCharge ?? 0);
+    const shippingRecovered = Number(paymentBreakdown.sellerShippingRecoveredFromWallet ?? 0);
+    const shippingOutstanding = Number(paymentBreakdown.sellerShippingDueOutstanding ?? 0);
+    const discountForCheck = Number(paymentBreakdown.discountTotal ?? order.pricing?.discount ?? 0);
+    // Every rupee the customer paid ends up with seller, platform, the rider
+    // (local) or Shiprocket (Pan-India); discounts are funded by the platform.
+    const splitCheck = Math.round(
+        (sellerPayout + platformEarning + (isPanIndia ? shiprocketCharge : riderPayout) - discountForCheck) * 100,
+    ) / 100;
     const platformParts = [
         { label: "Admin Commission (from products)", value: adminCommission },
-        { label: "Admin Delivery Share (after rider payout)", value: adminDeliveryShare },
+        { label: isPanIndia ? "Delivery fee waiver funded by admin" : "Admin Delivery Share (after rider payout)", value: adminDeliveryShare },
         { label: "Handling Fee", value: handlingFee },
         { label: "Tip (to platform)", value: tip },
-    ].filter((row) => Number(row.value) > 0);
+    ].filter((row) => Number(row.value) !== 0);
     const internalSplits = [
         { label: "Affiliate Marketing", value: commissionBreakdown.affiliateMarketingAmount },
         { label: "Sub Admin", value: commissionBreakdown.subAdminCommissionAmount },
@@ -585,7 +594,7 @@ const OrderDetail = () => {
                                                 <span className="text-sm font-black text-fuchsia-700">₹{platformEarning.toLocaleString("en-IN")}</span>
                                             </div>
                                             <div className="flex items-center justify-between px-3 py-2 text-[10px] font-bold text-slate-400">
-                                                <span>Check: Seller + Platform</span>
+                                                <span>Check: Seller + Platform + {isPanIndia ? "Shiprocket" : "Rider"} − Discount</span>
                                                 <span className={splitCheck === customerPaid ? "text-emerald-600" : "text-amber-600"}>
                                                     ₹{splitCheck.toLocaleString("en-IN")} {splitCheck === customerPaid ? "= Order ✓" : "≠ Order"}
                                                 </span>
@@ -701,7 +710,7 @@ const OrderDetail = () => {
                                             <div className="space-y-1.5 pl-2 border-l-2 border-slate-100">
                                                 {sellerDeliveryShare > 0 && (
                                                     <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
-                                                        <span>Seller Delivery Share (80%)</span>
+                                                        <span>{isPanIndia ? "Delivery Fee → Seller (Pan-India)" : "Seller Delivery Share"}</span>
                                                         <span>₹{sellerDeliveryShare.toLocaleString("en-IN")}</span>
                                                     </div>
                                                 )}
@@ -709,6 +718,66 @@ const OrderDetail = () => {
                                                     <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
                                                         <span>Rider Payout</span>
                                                         <span>₹{riderPayout.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {isPanIndia && (
+                                        <div>
+                                            <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 px-1">
+                                                Shiprocket Shipping (Pan-India)
+                                            </p>
+                                            <div className="space-y-1.5 pl-2 border-l-2 border-sky-200">
+                                                <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                    <span>Delivery fee paid by customer → Seller</span>
+                                                    <span className="text-emerald-600">+₹{sellerDeliveryShare.toLocaleString("en-IN")}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                    <span>
+                                                        Shiprocket charge{order.shipmentDetails?.courierName ? ` (${order.shipmentDetails.courierName})` : ""}
+                                                        {paymentBreakdown.shiprocketShippingChargeSource === "shiprocket_cheapest_rate_estimate" ? " · estimate" : ""}
+                                                    </span>
+                                                    <span className="text-rose-600">
+                                                        {shiprocketCharge > 0 ? `-₹${shiprocketCharge.toLocaleString("en-IN")}` : "Pending AWB"}
+                                                    </span>
+                                                </div>
+                                                {(paymentBreakdown.shippingCharges || []).length > 0 && (
+                                                    <div className="mt-1 space-y-1">
+                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-2">All Shiprocket charges</p>
+                                                        {paymentBreakdown.shippingCharges.map((c) => (
+                                                            <div key={c.key} className="flex justify-between text-[11px] font-bold text-slate-500 px-2 py-0.5">
+                                                                <span>
+                                                                    {String(c.kind).replace(/_/g, " ").toLowerCase()} · {c.bearer === "SELLER" ? "seller" : "platform"}
+                                                                    {c.source === "shiprocket_final_bill" ? " · final bill" : ""}
+                                                                </span>
+                                                                <span className={Number(c.amount) < 0 ? "text-emerald-600" : "text-rose-600"}>
+                                                                    {Number(c.amount) < 0 ? "+" : "-"}₹{Math.abs(Number(c.amount)).toLocaleString("en-IN")}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                        {Number(paymentBreakdown.platformShippingExpenseTotal || 0) !== 0 && (
+                                                            <div className="flex justify-between text-[11px] font-black text-fuchsia-700 px-2 py-0.5">
+                                                                <span>Platform shipping expense</span>
+                                                                <span>₹{Number(paymentBreakdown.platformShippingExpenseTotal).toLocaleString("en-IN")}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                <p className="text-[9px] font-bold text-slate-400 px-2 py-1 italic">
+                                                    Admin pays Shiprocket; seller-borne charges are deducted from the seller payout (or wallet / later payouts).
+                                                </p>
+                                                {shippingRecovered > 0 && (
+                                                    <div className="flex justify-between text-xs font-bold text-slate-600 px-2 py-1">
+                                                        <span>Recovered from seller wallet</span>
+                                                        <span>₹{shippingRecovered.toLocaleString("en-IN")}</span>
+                                                    </div>
+                                                )}
+                                                {shippingOutstanding > 0 && (
+                                                    <div className="flex justify-between text-xs font-black text-rose-700 px-2 py-1.5 bg-rose-50 rounded-lg">
+                                                        <span>Seller still owes admin</span>
+                                                        <span>₹{shippingOutstanding.toLocaleString("en-IN")}</span>
                                                     </div>
                                                 )}
                                             </div>

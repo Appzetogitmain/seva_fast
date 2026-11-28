@@ -5,6 +5,7 @@ import {
   generateOrderPaymentBreakdown,
   hydrateOrderItems,
   recalculateLogisticsEarnings,
+  computeSellerPayoutTotal,
 } from "./finance/pricingService.js";
 import { getOrCreateFinanceSettings } from "./finance/financeSettingsService.js";
 import { resolveSellerDeliveryDecision } from "./deliveryDecisionService.js";
@@ -249,11 +250,18 @@ function applyGlobalHandlingFeeToSellerBreakdowns(
       riderPayoutDistance: breakdown.riderPayoutDistance || 0,
       riderPayoutBonus: breakdown.riderPayoutBonus || 0,
       riderPayoutTotal: breakdown.riderPayoutTotal || 0,
+      deliveryType: breakdown.deliveryType || "instant",
+      deliveryFeeBase: breakdown.deliveryFeeBase,
     });
     Object.assign(breakdown, logistics);
-    breakdown.sellerPayoutTotal = round2(
-      Math.max(productSubtotal - adminProductCommissionTotal, 0) +
-        logistics.sellerDeliveryFeeShare,
+    breakdown.sellerPayoutTotal = computeSellerPayoutTotal({
+      productSubtotal,
+      adminProductCommissionTotal,
+      sellerDeliveryFeeShare: logistics.sellerDeliveryFeeShare,
+      shiprocketShippingCharge: breakdown.shiprocketShippingCharge || 0,
+    });
+    breakdown.sellerNetProfit = round2(
+      breakdown.sellerPayoutTotal - Number(breakdown.totalCostPrice || 0),
     );
   }
 }

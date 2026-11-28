@@ -60,7 +60,7 @@ const SellerCertificateModal = ({ seller, onAccepted }) => {
 
     return (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-md">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full flex flex-col h-[90dvh] max-h-[90dvh] overflow-hidden border border-amber-200 animate-in fade-in zoom-in-95 duration-300">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full flex flex-col h-[90dvh] max-h-[90dvh] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
                 {/* Modal Header */}
                 <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 px-6 py-4 text-white flex items-center justify-between shrink-0 shadow">
                     <div className="flex items-center gap-3">

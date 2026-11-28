@@ -2,6 +2,10 @@ import crypto from "crypto";
 import Order from "../models/order.js";
 import { WORKFLOW_STATUS } from "../constants/orderWorkflow.js";
 import { applyDeliveredSettlement } from "../services/orderSettlement.js";
+import {
+  markCodCollectedByCourier,
+  recoverShippingChargeOnRto,
+} from "../services/finance/orderFinanceService.js";
 import { emitOrderStatusUpdate } from "../services/orderSocketEmitter.js";
 import { emitNotificationEvent } from "../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../modules/notifications/notification.constants.js";
@@ -338,6 +342,18 @@ export async function handleShiprocketWebhook(req, res) {
         order.deliveredAt = new Date();
         await order.save();
 
+        // COD: the courier collected the cash and Shiprocket remits it to the
+        // platform — record that so settlement doesn't wait for a rider/seller
+        // cash hand-off that never happens on Pan-India orders.
+        try {
+          await markCodCollectedByCourier(order._id);
+        } catch (codErr) {
+          logger.error(
+            `[Shiprocket Webhook] COD courier collection failed for ${order.orderId}:`,
+            codErr.message,
+          );
+        }
+
         try {
           await applyDeliveredSettlement(order, order.orderId);
         } catch (settlementErr) {
@@ -378,6 +394,20 @@ export async function handleShiprocketWebhook(req, res) {
       }
     } else {
       await order.save();
+    }
+
+    // RTO: seller bears forward + RTO freight. Runs on every RTO status
+    // (even if the order was already cancelled another way) — the charge
+    // engine's per-order keys make repeats a no-op.
+    if (rawStatus.startsWith("RTO")) {
+      try {
+        await recoverShippingChargeOnRto(order._id, { rtoStatus: rawStatus });
+      } catch (rtoErr) {
+        logger.error(
+          `[Shiprocket Webhook] RTO shipping recovery failed for ${order.orderId}:`,
+          rtoErr.message,
+        );
+      }
     }
 
     notifyShipmentStatus(order, rawStatus);

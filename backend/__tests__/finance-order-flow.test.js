@@ -117,6 +117,8 @@ jest.unstable_mockModule("../app/models/seller.js", () => ({
 jest.unstable_mockModule("../app/models/order.js", () => ({
   default: {
     findOne: mockOrderFindOne,
+    // Seller-dues lookup during payout creation (no outstanding dues here).
+    find: () => ({ sort: async () => [] }),
   },
 }));
 

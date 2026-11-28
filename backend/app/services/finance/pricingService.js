@@ -37,8 +37,27 @@ export const DELIVERY_FEE_ADMIN_SHARE = 1;
  * remains — admin gets ₹0 too (admin funds the rider's shortfall from its
  * other earnings, not from this split).
  */
-export function splitDeliveryFee(deliveryFeeCharged = 0, riderPayoutTotal = 0) {
+export function splitDeliveryFee(
+  deliveryFeeCharged = 0,
+  riderPayoutTotal = 0,
+  { deliveryType = "instant", deliveryFeeBase = null } = {},
+) {
   const fee = roundCurrency(deliveryFeeCharged || 0);
+
+  // Pan-India (Shiprocket, deliveryType "scheduled"): the seller pays the
+  // Shiprocket bill (deducted from their payout once the AWB is assigned —
+  // see applyShiprocketShippingCharge), so the seller receives the full
+  // delivery fee. If the customer got free/discounted delivery (membership,
+  // promo), admin funds the waived part so the seller is never short:
+  // seller gets the full base fee, admin share goes negative by the waiver.
+  if (deliveryType === "scheduled") {
+    const base = roundCurrency(Math.max(Number(deliveryFeeBase ?? fee) || 0, fee));
+    return {
+      sellerDeliveryFeeShare: base,
+      adminDeliveryFeeShare: roundCurrency(fee - base),
+    };
+  }
+
   const rider = roundCurrency(riderPayoutTotal || 0);
   const remaining = Math.max(roundCurrency(fee - rider), 0);
   return { sellerDeliveryFeeShare: 0, adminDeliveryFeeShare: remaining };
@@ -48,7 +67,9 @@ export function resolveSellerOrderEarning(order) {
   if (!order) return 0;
 
   const fromBreakdown = Number(order.paymentBreakdown?.sellerPayoutTotal);
-  if (Number.isFinite(fromBreakdown) && fromBreakdown >= 0) {
+  if (Number.isFinite(fromBreakdown)) {
+    // Can be negative for a Pan-India order whose Shiprocket charge exceeded
+    // what the seller earned on it — callers clamp where a payout is made.
     return roundCurrency(fromBreakdown);
   }
 
@@ -62,10 +83,32 @@ export function resolveSellerOrderEarning(order) {
     order.pricing?.deliveryFee ?? order.paymentBreakdown?.deliveryFeeCharged ?? 0,
   );
   const riderPayoutTotal = Number(order.paymentBreakdown?.riderPayoutTotal ?? 0);
-  const { sellerDeliveryFeeShare } = splitDeliveryFee(deliveryFee, riderPayoutTotal);
+  const { sellerDeliveryFeeShare } = splitDeliveryFee(deliveryFee, riderPayoutTotal, {
+    deliveryType: order.deliveryType,
+    deliveryFeeBase: order.paymentBreakdown?.deliveryFeeBase,
+  });
+  const shippingCharge = Number(order.paymentBreakdown?.shiprocketShippingCharge ?? 0);
 
   return roundCurrency(
-    Math.max(subtotal - commission, 0) + sellerDeliveryFeeShare,
+    Math.max(subtotal - commission, 0) + sellerDeliveryFeeShare - shippingCharge,
+  );
+}
+
+/**
+ * Seller payout formula, the single place it's defined:
+ *   product subtotal − admin commission + seller's delivery-fee share
+ *   − Shiprocket shipping charge (Pan-India only, known after AWB).
+ */
+export function computeSellerPayoutTotal({
+  productSubtotal = 0,
+  adminProductCommissionTotal = 0,
+  sellerDeliveryFeeShare = 0,
+  shiprocketShippingCharge = 0,
+} = {}) {
+  return roundCurrency(
+    Math.max(roundCurrency(productSubtotal) - roundCurrency(adminProductCommissionTotal), 0) +
+      roundCurrency(sellerDeliveryFeeShare) -
+      roundCurrency(shiprocketShippingCharge),
   );
 }
 
@@ -84,10 +127,13 @@ export function recalculateLogisticsEarnings({
   riderPayoutDistance = 0,
   riderPayoutBonus = 0,
   riderPayoutTotal = 0,
+  deliveryType = "instant",
+  deliveryFeeBase = null,
 } = {}) {
   const { sellerDeliveryFeeShare, adminDeliveryFeeShare } = splitDeliveryFee(
     deliveryFeeCharged,
     riderPayoutTotal,
+    { deliveryType, deliveryFeeBase },
   );
   const handling = roundCurrency(handlingFeeCharged || 0);
   const tip = roundCurrency(tipTotal || 0);
@@ -995,6 +1041,8 @@ export async function generateOrderPaymentBreakdown({
     riderPayoutDistance: rider.riderPayoutDistance,
     riderPayoutBonus: rider.riderPayoutBonus,
     riderPayoutTotal: rider.riderPayoutTotal,
+    deliveryType: isScheduled ? "scheduled" : "instant",
+    deliveryFeeBase: delivery.deliveryFeeBase,
   });
 
   const adminProductCommissionTotal = totalCommissionAmount;
@@ -1009,9 +1057,14 @@ export async function generateOrderPaymentBreakdown({
     riderPayoutTotal,
   } = logisticsEarnings;
 
-  const sellerPayoutTotal = roundCurrency(
-    Math.max(productSubtotal - totalCommissionAmount, 0) + sellerDeliveryFeeShare,
-  );
+  // Shiprocket charge isn't known until the AWB is assigned after the order
+  // is placed — it's deducted then (applyShiprocketShippingCharge).
+  const sellerPayoutTotal = computeSellerPayoutTotal({
+    productSubtotal,
+    adminProductCommissionTotal: totalCommissionAmount,
+    sellerDeliveryFeeShare,
+    shiprocketShippingCharge: 0,
+  });
   const totalCostPrice = roundCurrency(
     lineItems.reduce((sum, line) => sum + Number(line.itemCostTotal || 0), 0),
   );
@@ -1058,6 +1111,8 @@ export async function generateOrderPaymentBreakdown({
     adminProductCommissionTotal,
     sellerDeliveryFeeShare,
     adminDeliveryFeeShare,
+    deliveryType: isScheduled ? "scheduled" : "instant",
+    shiprocketShippingCharge: 0,
     riderPayoutBase,
     riderPayoutDistance,
     riderPayoutBonus,

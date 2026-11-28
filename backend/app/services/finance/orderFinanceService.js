@@ -20,6 +20,15 @@ import {
 } from "./walletService.js";
 import { createPendingPayoutForOrder } from "./payoutService.js";
 import { resolveSellerOrderEarning } from "./pricingService.js";
+import {
+  SHIPPING_BEARER,
+  SHIPPING_CHARGE_KIND,
+  applyShippingCharge,
+  nettOutstandingSellerDues,
+  recoverPayoutNettedCharges,
+  recoverSellerDueInSession,
+  resolveRtoShippingBearer,
+} from "./shippingChargeService.js";
 import { emitNotificationEvent } from "../../modules/notifications/notification.emitter.js";
 import { NOTIFICATION_EVENTS } from "../../modules/notifications/notification.constants.js";
 import { issueRazorpayRefund } from "../paymentService.js";
@@ -221,10 +230,53 @@ export async function createPendingSellerPayout(order, { session, actorId } = {}
   if (order.financeFlags?.sellerPayoutQueued) return null;
   assertCodWalletEligible(order, "seller payout");
 
-  const amount = roundCurrency(
-    order.paymentBreakdown?.sellerPayoutTotal || resolveSellerOrderEarning(order) || 0,
+  // Optional strict mode: hold a Pan-India COD seller payout until admin
+  // confirms Shiprocket actually remitted the cash (markShiprocketCodRemitted).
+  if (
+    String(process.env.SHIPROCKET_COD_HOLD_UNTIL_REMITTED || "false").toLowerCase() === "true" &&
+    order.deliveryType === "scheduled" &&
+    isCodOrder(order) &&
+    !order.financeFlags?.shiprocketCodRemitted
+  ) {
+    order.financeFlags = { ...(order.financeFlags || {}), sellerPayoutHeld: true };
+    order.settlementStatus = { ...(order.settlementStatus || {}), sellerPayout: "HOLD" };
+    return null;
+  }
+
+  const breakdownPayout = order.paymentBreakdown?.sellerPayoutTotal;
+  let amount = roundCurrency(
+    breakdownPayout != null && Number.isFinite(Number(breakdownPayout))
+      ? Number(breakdownPayout)
+      : resolveSellerOrderEarning(order) || 0,
   );
+
+  if (amount < 0) {
+    // Shiprocket charges exceeded what the seller earned on this order —
+    // recover the difference (wallet first, then outstanding due).
+    await recoverSellerDueInSession(order, roundCurrency(-amount), {
+      session,
+      reason: "Shiprocket charges exceeded order payout",
+      reference: `SHIP-NEGPAYOUT-${order.orderId}`,
+    });
+    amount = 0;
+  } else if (amount > 0) {
+    // Settle this seller's outstanding shipping dues from earlier orders
+    // before paying out.
+    const netted = await nettOutstandingSellerDues(order.seller, amount, {
+      session,
+      payingOrder: order,
+    });
+    if (netted > 0) {
+      order.paymentBreakdown.sellerDuesNettedFromPayout = roundCurrency(netted);
+      amount = roundCurrency(amount - netted);
+    }
+  }
+
   if (amount <= 0) {
+    order.financeFlags = {
+      ...(order.financeFlags || {}),
+      sellerPayoutQueued: true,
+    };
     order.settlementStatus = {
       ...(order.settlementStatus || {}),
       sellerPayout: "NOT_APPLICABLE",
@@ -238,7 +290,10 @@ export async function createPendingSellerPayout(order, { session, actorId } = {}
       payoutType: PAYOUT_TYPE.SELLER,
       beneficiaryId: order.seller,
       amount,
-      metadata: { flow: "order_delivered" },
+      metadata: {
+        flow: "order_delivered",
+        sellerDuesNetted: roundCurrency(order.paymentBreakdown?.sellerDuesNettedFromPayout || 0),
+      },
     },
     { session },
   );
@@ -252,6 +307,168 @@ export async function createPendingSellerPayout(order, { session, actorId } = {}
     sellerPayout: "PENDING",
   };
   return payout;
+}
+
+/**
+ * Forward Shiprocket freight for a Pan-India order (seller bears it).
+ * Idempotent: key "FORWARD" can only ever be applied once per order.
+ */
+export async function applyShiprocketShippingCharge(
+  orderOrId,
+  { charge, source = "shiprocket_rate", courierName = null, actorId = null } = {},
+) {
+  const amount = roundCurrency(charge);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return applyShippingCharge(orderOrId, {
+    kind: SHIPPING_CHARGE_KIND.FORWARD,
+    amount,
+    key: "FORWARD",
+    bearer: SHIPPING_BEARER.SELLER,
+    source,
+    courierName,
+    actorId,
+  });
+}
+
+/**
+ * RTO (parcel returned to seller, order cancelled): no seller payout will
+ * ever happen, so
+ *   1. charges that were netted from that payout (forward freight) are
+ *      re-homed to the seller's wallet / outstanding dues, and
+ *   2. Shiprocket's RTO freight is charged (estimated at the forward rate
+ *      until the final bill is reconciled).
+ * Both steps are idempotent per order.
+ */
+export async function recoverShippingChargeOnRto(orderOrId, { actorId = null, rtoStatus = "" } = {}) {
+  const rehomed = await recoverPayoutNettedCharges(orderOrId, {
+    kinds: [SHIPPING_CHARGE_KIND.FORWARD, SHIPPING_CHARGE_KIND.FORWARD_ADJUSTMENT],
+    key: "RTO_REHOME_FORWARD",
+    reason: `Order RTO (${rtoStatus || "returned to origin"}) — forward freight no longer covered by a payout`,
+    actorId,
+  });
+
+  const query = mongoose.Types.ObjectId.isValid(orderOrId?._id || orderOrId)
+    ? { _id: orderOrId?._id || orderOrId }
+    : { orderId: String(orderOrId) };
+  const order = await Order.findOne(query).lean();
+  const forward = roundCurrency(order?.paymentBreakdown?.shiprocketShippingCharge || 0);
+  let rto = null;
+  if (order && order.deliveryType === "scheduled" && forward > 0) {
+    rto = await applyShippingCharge(order._id, {
+      kind: SHIPPING_CHARGE_KIND.RTO,
+      amount: forward,
+      key: "RTO",
+      bearer: resolveRtoShippingBearer(order),
+      source: "rto_estimate_forward_rate",
+      courierName: order.shipmentDetails?.courierName || null,
+      note: `RTO status ${rtoStatus}; estimate at forward rate — correct via final bill reconciliation`,
+      actorId,
+    });
+  }
+  return { rehomed, rto };
+}
+
+/**
+ * Pan-India COD: the Shiprocket courier collected the cash from the customer
+ * and Shiprocket remits it to the platform's Shiprocket account — there's
+ * no rider QR / seller cash hand-off. Mark admin as having the money (same
+ * as the QR path) so seller/admin settlement proceeds. The seller payout
+ * still sits on HOLD for the return window, which also covers Shiprocket's
+ * COD remittance cycle.
+ */
+export async function markCodCollectedByCourier(orderOrId, { actorId = null } = {}) {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const order = await findOrderForUpdate(orderOrId, session);
+    if (!isCodOrder(order) || order.deliveryType !== "scheduled") {
+      await session.commitTransaction();
+      return null;
+    }
+    if (!isOrderDelivered(order)) {
+      throw new Error("Order must be delivered first");
+    }
+    if (order.financeFlags?.codOnlinePaid || order.financeFlags?.codCashRemittedToAdmin) {
+      await session.commitTransaction();
+      return order;
+    }
+
+    const gross = getCodGrossAmount(order);
+    if (gross <= 0) {
+      throw new Error("COD amount must be greater than 0");
+    }
+
+    const credit = await creditWallet({
+      ownerType: OWNER_TYPE.ADMIN,
+      ownerId: null,
+      amount: gross,
+      bucket: "available",
+      session,
+    });
+    await createLedgerEntry(
+      {
+        orderId: order._id,
+        walletId: credit.wallet._id,
+        actorType: OWNER_TYPE.ADMIN,
+        actorId: null,
+        type: LEDGER_TRANSACTION_TYPE.COD_COLLECTED_BY_COURIER,
+        direction: LEDGER_DIRECTION.CREDIT,
+        amount: gross,
+        paymentMode: "COD",
+        metadata: {
+          courierName: order.shipmentDetails?.courierName || null,
+          awbCode: order.shipmentDetails?.awbCode || null,
+          // Order value recognised (same convention as online/QR orders);
+          // the courier physically collects only the cash part.
+          cashCollectedByCourier: roundCurrency(gross - Number(order.pricing?.walletAmount || 0)),
+          customerWalletPortion: roundCurrency(order.pricing?.walletAmount || 0),
+          remittanceConfirmed: false,
+        },
+        description: "COD collected by Shiprocket courier — remitted to platform Shiprocket account",
+        reference: `COD-SR-${order.orderId}`,
+        balanceBefore: credit.before,
+        balanceAfter: credit.after,
+      },
+      { session },
+    );
+
+    order.paymentBreakdown.codCollectedAmount = gross;
+    order.paymentBreakdown.codRemittedAmount = gross;
+    order.paymentBreakdown.codPendingAmount = 0;
+    ensurePaymentBreakdownSnapshots(order);
+
+    order.paymentStatus = ORDER_PAYMENT_STATUS.COD_RECONCILED;
+    order.payment = {
+      ...(order.payment?.toObject?.() || order.payment || {}),
+      method: "cash",
+      status: "completed",
+    };
+    order.financeFlags = {
+      ...(order.financeFlags || {}),
+      codMarkedCollected: true,
+      codCashRemittedToAdmin: true,
+    };
+
+    await createFinanceAuditLog(
+      {
+        action: "COD_COLLECTED_BY_COURIER",
+        actorType: OWNER_TYPE.ADMIN,
+        actorId: actorId || null,
+        orderId: order._id,
+        metadata: { amountGross: gross, awbCode: order.shipmentDetails?.awbCode || null },
+      },
+      { session },
+    );
+
+    await order.save({ session });
+    await session.commitTransaction();
+    return order;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
 }
 
 export async function releaseHeldSellerPayout(orderOrId, { actorId = null } = {}) {
@@ -272,10 +489,12 @@ export async function releaseHeldSellerPayout(orderOrId, { actorId = null } = {}
     }
 
     const payout = await createPendingSellerPayout(order, { session, actorId });
-    order.financeFlags = {
-      ...(order.financeFlags || {}),
-      sellerPayoutHeld: false,
-    };
+    if (order.financeFlags?.sellerPayoutQueued) {
+      order.financeFlags = {
+        ...(order.financeFlags || {}),
+        sellerPayoutHeld: false,
+      };
+    }
     if (payout) {
       order.settlementStatus = {
         ...(order.settlementStatus || {}),

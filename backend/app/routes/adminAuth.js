@@ -96,6 +96,11 @@ import {
 } from "../controller/adminFinanceController.js";
 
 import { verifyToken, allowRoles } from "../middleware/authMiddleware.js";
+import {
+    reconcileShiprocketChargesController,
+    markShiprocketCodRemittedController,
+    getSellerShippingDuesController,
+} from "../controller/admin/shiprocketFinanceController.js";
 import { loadSubadminZones } from "../middleware/zoneRestrictionMiddleware.js";
 import {
     adminBootstrapRateLimiter,
@@ -191,6 +196,24 @@ router.post(
     verifyToken,
     allowRoles("admin"),
     processAdminFinancePayoutsController,
+);
+router.post(
+    "/finance/shiprocket/reconcile",
+    verifyToken,
+    allowRoles("admin"),
+    reconcileShiprocketChargesController,
+);
+router.post(
+    "/finance/shiprocket/cod-remitted",
+    verifyToken,
+    allowRoles("admin"),
+    markShiprocketCodRemittedController,
+);
+router.get(
+    "/finance/shiprocket/seller-dues",
+    verifyToken,
+    allowRoles("admin", "sub-admin"),
+    getSellerShippingDuesController,
 );
 router.get(
     "/finance/export-statement",

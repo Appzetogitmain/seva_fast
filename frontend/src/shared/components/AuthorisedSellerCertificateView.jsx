@@ -1,6 +1,7 @@
 import React from 'react';
 import { HiPrinter } from 'react-icons/hi2';
 import { useSettings } from '@core/context/SettingsContext';
+import Logo from '@/assets/Logo.png';
 
 const AuthorisedSellerCertificateView = ({ certificate, seller, showPrintButton = true }) => {
     const { settings } = useSettings();
@@ -56,19 +57,14 @@ const AuthorisedSellerCertificateView = ({ certificate, seller, showPrintButton 
             )}
 
             {/* Print-friendly container */}
-            <div className="certificate-print-area w-full max-w-3xl bg-white p-6 sm:p-10 border-[3px] border-amber-500 rounded-xl shadow-2xl relative text-slate-800 text-sm font-sans print:border-2 print:shadow-none print:max-w-none print:w-full print:p-6">
+            <div className="certificate-print-area w-full max-w-3xl bg-white p-6 sm:p-10 rounded-xl shadow-2xl relative text-slate-800 text-sm font-sans print:shadow-none print:max-w-none print:w-full print:p-6">
                 {/* Outer decorative line */}
-                <div className="border border-amber-300 p-4 sm:p-6 rounded-lg h-full flex flex-col justify-between">
+                <div className="p-4 sm:p-6 rounded-lg h-full flex flex-col justify-between">
                     
                     {/* Header with Logo */}
                     <div className="text-center mb-6">
                         <div className="flex justify-center items-center mb-2">
-                            {/* SEVAFAST Runner Logo graphic */}
-                            <div className="w-14 h-14 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-full flex items-center justify-center shadow-md">
-                                <svg className="w-9 h-9 text-white fill-current" viewBox="0 0 24 24">
-                                    <path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7z"/>
-                                </svg>
-                            </div>
+                            <img src={Logo} alt="SEVAFAST" className="h-16 w-auto object-contain" />
                         </div>
                         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-orange-600 uppercase">
                             SEVAFAST

@@ -2401,19 +2401,43 @@ export const completeReturnAndRefund = async (order) => {
       } catch (error) {
         console.error(`[ReturnFinance] Payout cancellation failed for seller ${order.seller}`, error.message);
       }
+
+      // The held payout won't be paid, so a seller-borne return-pickup
+      // charge that was netted from it must be recovered another way.
+      // (Forward freight is not re-homed: the platform keeps the customer's
+      // delivery fee, which the cancelled payout would have passed on.)
+      if (order.deliveryType === "scheduled") {
+        try {
+          const { recoverPayoutNettedCharges, SHIPPING_CHARGE_KIND } = await import(
+            "../services/finance/shippingChargeService.js"
+          );
+          await recoverPayoutNettedCharges(order._id, {
+            kinds: [SHIPPING_CHARGE_KIND.RETURN_PICKUP, SHIPPING_CHARGE_KIND.RETURN_PICKUP_ADJUSTMENT],
+            key: "RETURN_REHOME_PICKUP",
+            reason: "Return QC passed — seller payout cancelled; seller-fault return pickup charge recovered",
+          });
+          const fresh = await Order.findById(order._id).select("paymentBreakdown").lean();
+          if (fresh?.paymentBreakdown) order.paymentBreakdown = fresh.paymentBreakdown;
+        } catch (error) {
+          console.error(`[ReturnFinance] Return pickup charge recovery failed for ${order.orderId}`, error.message);
+        }
+      }
     } else {
-      // If payment was already released (Available balance), we must debit to recover funds.
+      // Payment was already released to the seller's wallet — claw it back.
+      // Idempotent, and never silently lost on low balance: whatever the
+      // wallet can't cover becomes an outstanding due netted from the
+      // seller's next payouts.
       const adjustment = Math.max(0, refundAmount);
       try {
-        const { debitWallet } = await import("../services/finance/walletService.js");
-        await debitWallet({
-          ownerType: "SELLER",
-          ownerId: order.seller,
-          amount: adjustment,
-          bucket: "available",
+        const { recoverSellerDue } = await import("../services/finance/shippingChargeService.js");
+        await recoverSellerDue(order._id, adjustment, {
+          key: "RETURN_REFUND_CLAWBACK",
+          reason: `Return refund clawback for ${order.orderId}`,
         });
+        const fresh = await Order.findById(order._id).select("paymentBreakdown").lean();
+        if (fresh?.paymentBreakdown) order.paymentBreakdown = fresh.paymentBreakdown;
       } catch (error) {
-        console.warn(`[ReturnFinance] Wallet debit failed for seller ${order.seller}.`, error.message);
+        console.error(`[ReturnFinance] Seller clawback failed for ${order.orderId}.`, error.message);
       }
     }
 

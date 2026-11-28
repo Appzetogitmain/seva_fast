@@ -128,14 +128,32 @@ export function sellerOrderCommissionAmount() {
   return { $ifNull: ["$paymentBreakdown.adminProductCommissionTotal", 0] };
 }
 
-// Seller's share of the delivery fee (see DELIVERY_FEE_SELLER_SHARE in pricingService.js) —
-// not persisted as its own field, so it's derived the same way sellerPayoutTotal was built:
+// Seller's share of the delivery fee. Persisted explicitly on newer orders
+// (Pan-India orders: the full delivery fee goes to the seller). Older orders
+// fall back to deriving it from the payout the same way it was built:
 // sellerPayoutTotal = max(sellingPrice - commission, 0) + deliveryEarning.
 export function sellerOrderDeliveryEarningAmount() {
   return {
-    $subtract: [
-      sellerOrderEarningAmount(),
-      { $max: [{ $subtract: [sellerOrderSellingPriceAmount(), sellerOrderCommissionAmount()] }, 0] },
+    $ifNull: [
+      "$paymentBreakdown.sellerDeliveryFeeShare",
+      {
+        $subtract: [
+          sellerOrderEarningAmount(),
+          { $max: [{ $subtract: [sellerOrderSellingPriceAmount(), sellerOrderCommissionAmount()] }, 0] },
+        ],
+      },
+    ],
+  };
+}
+
+// Shiprocket freight the seller bears on Pan-India orders (deducted from payout).
+export function sellerOrderShippingChargeAmount() {
+  // All seller-borne Shiprocket charges (forward, RTO, return pickup and
+  // final-bill adjustments); falls back to the forward-only field.
+  return {
+    $ifNull: [
+      "$paymentBreakdown.sellerShippingChargesTotal",
+      { $ifNull: ["$paymentBreakdown.shiprocketShippingCharge", 0] },
     ],
   };
 }

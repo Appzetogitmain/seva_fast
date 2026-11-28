@@ -341,6 +341,51 @@ async function getPreferredSurfaceCourierId({
   }
 }
 
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+/** What the customer still owes on delivery (COD collectable). */
+function resolveCustomerPayableAmount(order) {
+  const grandTotal = Number(order.paymentBreakdown?.grandTotal || order.pricing?.total || 0);
+  const walletPaid = Number(order.pricing?.walletAmount || order.paymentBreakdown?.walletAmount || 0);
+  return roundMoney(Math.max(grandTotal - walletPaid, 0));
+}
+
+/**
+ * Freight for the courier Shiprocket actually assigned, looked up from the
+ * rate list fetched for this shipment. Falls back to the cheapest quoted
+ * rate (flagged as an estimate) when the assigned courier isn't in the list.
+ */
+function resolveAssignedCourierCharge(courierOptions = [], assignedCourierId, assignedCourierName) {
+  const options = courierOptions
+    .map((item) => ({
+      courierId: item?.courier_company_id ?? item?.courier_id ?? item?.id ?? null,
+      courierName: String(item?.courier_name || item?.courier_company_name || item?.name || "").trim(),
+      // `rate` is what Shiprocket bills (freight + COD charges for COD);
+      // freight_charge alone excludes the COD fee.
+      charge:
+        Number(item?.rate) ||
+        Number(item?.total_charge) ||
+        (Number(item?.freight_charge) || 0) + (Number(item?.cod_charges) || 0) ||
+        0,
+    }))
+    .filter((o) => o.charge > 0);
+  if (!options.length) return null;
+
+  const byId = assignedCourierId != null
+    ? options.find((o) => String(o.courierId) === String(assignedCourierId))
+    : null;
+  const byName = !byId && assignedCourierName
+    ? options.find((o) => o.courierName.toLowerCase() === String(assignedCourierName).toLowerCase())
+    : null;
+  const match = byId || byName;
+  if (match) return { charge: roundMoney(match.charge), source: "shiprocket_assigned_courier_rate" };
+
+  const cheapest = options.reduce((a, b) => (b.charge < a.charge ? b : a));
+  return { charge: roundMoney(cheapest.charge), source: "shiprocket_cheapest_rate_estimate" };
+}
+
 function buildAdhocOrderPayload({ order, seller, customerEmail, pickupLocation, packageItems, delivery }) {
   const { firstName, lastName } = splitName(order.address?.name);
   const isCOD = order.paymentMode === "COD" || order.payment?.method === "cash";
@@ -353,6 +398,18 @@ function buildAdhocOrderPayload({ order, seller, customerEmail, pickupLocation, 
   }));
 
   const pkg = resolvePackageFromOrderItems(packageItems || order.items || []);
+
+  // Shiprocket's order total = sub_total + shipping_charges − total_discount,
+  // and for COD that total is what the courier collects. It must equal what
+  // the customer actually owes (grand total incl. delivery/handling, minus
+  // discounts and any wallet amount already paid) — not just the item
+  // subtotal, otherwise the delivery fee is never collected.
+  const itemsSubTotal = roundMoney(
+    orderItems.reduce((sum, i) => sum + Number(i.selling_price || 0) * Number(i.units || 0), 0),
+  );
+  const collectable = resolveCustomerPayableAmount(order);
+  const shippingCharges = roundMoney(Math.max(collectable - itemsSubTotal, 0));
+  const totalDiscount = roundMoney(Math.max(itemsSubTotal - collectable, 0));
 
   return {
     order_id: order.orderId,
@@ -375,7 +432,9 @@ function buildAdhocOrderPayload({ order, seller, customerEmail, pickupLocation, 
     order_items: orderItems,
 
     payment_method: isCOD ? "COD" : "Prepaid",
-    sub_total: order.pricing?.subtotal ?? order.paymentBreakdown?.productSubtotal ?? 0,
+    sub_total: itemsSubTotal,
+    shipping_charges: shippingCharges,
+    total_discount: totalDiscount,
 
     length: pkg.length,
     breadth: pkg.breadth,
@@ -511,20 +570,33 @@ async function createShiprocketShipmentForOrderInner(orderId) {
   }
 
   let awbResponse = null;
+  // Rate list for this exact shipment — used both to prefer a surface
+  // courier and to know what Shiprocket will bill for the assigned one.
+  let courierOptions = [];
   try {
     let preferredCourierId = null;
     const shouldPreferSurface =
       String(process.env.SHIPROCKET_PREFER_SURFACE || "true").toLowerCase() !== "false";
 
-    if (shouldPreferSurface) {
-      const pickupPincodeForRate =
-        String(seller.pincode || "").trim() || extractIndianPincode(seller.address, seller.locality);
-      const picked = await getPreferredSurfaceCourierId({
-        pickupPincode: pickupPincodeForRate,
-        deliveryPincode: delivery.pincode,
+    const pickupPincodeForRate =
+      String(seller.pincode || "").trim() || extractIndianPincode(seller.address, seller.locality);
+    try {
+      const serviceability = await checkServiceability({
+        pickupPostcode: pickupPincodeForRate,
+        deliveryPostcode: delivery.pincode,
         weightKg: pkg.weight,
-        codAmount: payload.payment_method === "COD" ? payload.sub_total : 0,
+        codAmount:
+          payload.payment_method === "COD"
+            ? roundMoney(payload.sub_total + payload.shipping_charges - payload.total_discount)
+            : 0,
       });
+      courierOptions = normalizeCourierOptions(serviceability);
+    } catch (rateErr) {
+      console.warn(`[Shiprocket] Rate lookup failed for ${order.orderId}:`, rateErr.message);
+    }
+
+    if (shouldPreferSurface) {
+      const picked = pickSurfaceCourier(courierOptions);
       if (picked?.courierId) {
         preferredCourierId = picked.courierId;
         console.log(
@@ -554,6 +626,11 @@ async function createShiprocketShipmentForOrderInner(orderId) {
 
   const awbCode = awbResponse?.response?.data?.awb_code;
   const courierName = awbResponse?.response?.data?.courier_name;
+  const assignedCourierId =
+    awbResponse?.response?.data?.courier_company_id ?? awbResponse?.response?.data?.courier_id ?? null;
+  const shippingChargeInfo = awbCode
+    ? resolveAssignedCourierCharge(courierOptions, assignedCourierId, courierName)
+    : null;
 
   let pickupResponse = null;
   try {
@@ -572,6 +649,9 @@ async function createShiprocketShipmentForOrderInner(orderId) {
     awbAssigned: Boolean(awbCode),
     pickupScheduled: Boolean(pickupResponse),
     pickupTokenNumber: pickupResponse?.response?.pickup_scheduled_date || null,
+    courierId: assignedCourierId,
+    shippingCharge: shippingChargeInfo?.charge ?? null,
+    shippingChargeSource: shippingChargeInfo?.source ?? null,
     lastSyncedStatus: null,
     lastError: null,
     lastErrorAt: null,
@@ -580,6 +660,27 @@ async function createShiprocketShipmentForOrderInner(orderId) {
 
   order.shipmentDetails = shipmentDetails;
   await order.save();
+
+  // Seller bears the Shiprocket bill: deduct it from their payout now.
+  if (shippingChargeInfo?.charge > 0) {
+    try {
+      const { applyShiprocketShippingCharge } = await import("../finance/orderFinanceService.js");
+      await applyShiprocketShippingCharge(order._id, {
+        charge: shippingChargeInfo.charge,
+        source: shippingChargeInfo.source,
+        courierName: courierName || null,
+      });
+    } catch (chargeErr) {
+      console.error(
+        `[Shiprocket] Failed to apply shipping charge ₹${shippingChargeInfo.charge} to ${order.orderId}:`,
+        chargeErr.message,
+      );
+    }
+  } else if (awbCode) {
+    console.warn(
+      `[Shiprocket] ${order.orderId}: AWB assigned but no rate found — shipping charge NOT deducted from seller; admin must apply it manually`,
+    );
+  }
 
   if (awbCode) {
     emitNotificationEvent(NOTIFICATION_EVENTS.SHIPMENT_AWB_ASSIGNED, {
@@ -804,9 +905,60 @@ export async function createShiprocketReturnShipmentForOrder(orderId) {
     createdAt: new Date(),
   };
 
+  // Reverse-pickup freight: rate for customer pincode → seller pincode.
+  // Estimate at booking; corrected later by final-bill reconciliation.
+  let returnChargeInfo = null;
+  if (awbCode) {
+    try {
+      const returnPkg = resolvePackageFromOrderItems(packageItems || order.items || []);
+      const serviceability = await checkServiceability({
+        pickupPostcode: customerAddress.pincode,
+        deliveryPostcode: sellerPincode,
+        weightKg: returnPkg.weight,
+        codAmount: 0,
+      });
+      returnChargeInfo = resolveAssignedCourierCharge(
+        normalizeCourierOptions(serviceability),
+        awbResponse?.response?.data?.courier_company_id ?? null,
+        courierName,
+      );
+    } catch (rateErr) {
+      console.warn(`[Shiprocket] Return rate lookup failed for ${order.orderId}:`, rateErr.message);
+    }
+  }
+  returnShipmentDetails.shippingCharge = returnChargeInfo?.charge ?? null;
+  returnShipmentDetails.shippingChargeSource = returnChargeInfo
+    ? `return_${returnChargeInfo.source}`
+    : null;
+
   order.returnShipmentDetails = returnShipmentDetails;
   order.returnFulfillmentMode = "shiprocket";
   await order.save();
+
+  if (returnChargeInfo?.charge > 0) {
+    try {
+      const { applyShippingCharge, resolveReturnShippingBearer, SHIPPING_CHARGE_KIND } =
+        await import("../finance/shippingChargeService.js");
+      await applyShippingCharge(order._id, {
+        kind: SHIPPING_CHARGE_KIND.RETURN_PICKUP,
+        amount: returnChargeInfo.charge,
+        key: "RETURN_PICKUP",
+        bearer: resolveReturnShippingBearer(order),
+        source: `return_${returnChargeInfo.source}`,
+        courierName: courierName || null,
+        note: `Return reason: ${order.returnReasonCode || "OTHER"}`,
+      });
+    } catch (chargeErr) {
+      console.error(
+        `[Shiprocket] Failed to apply return pickup charge ₹${returnChargeInfo.charge} to ${order.orderId}:`,
+        chargeErr.message,
+      );
+    }
+  } else if (awbCode) {
+    console.warn(
+      `[Shiprocket] ${order.orderId}: return AWB assigned but no rate found — apply via final-bill reconciliation`,
+    );
+  }
 
   return returnShipmentDetails;
 }

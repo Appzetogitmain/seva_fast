@@ -1,5 +1,7 @@
-// Sellers no longer receive any share of the delivery fee — admin keeps the
-// full remainder after the rider is paid (COD flow overhaul).
+// Local orders: sellers get no share of the delivery fee (admin keeps the
+// remainder after the rider is paid). Pan-India (Shiprocket) orders: the
+// seller gets the full delivery fee and bears the Shiprocket charge — the
+// backend sends both in sellerEarningBreakdown.
 const DELIVERY_FEE_SELLER_SHARE = 0;
 
 function roundMoney(value) {
@@ -9,18 +11,20 @@ function roundMoney(value) {
 export function getSellerOrderEarning(order) {
   if (!order) return 0;
 
+  // Can be negative on a Pan-India order whose Shiprocket charge exceeded
+  // the seller's earning — that shortfall is recovered from their wallet.
   const direct = Number(order.sellerEarning);
-  if (Number.isFinite(direct) && direct >= 0) {
+  if (order.sellerEarning != null && Number.isFinite(direct)) {
     return roundMoney(direct);
   }
 
   const fromApiBreakdown = Number(order.sellerEarningBreakdown?.total);
-  if (Number.isFinite(fromApiBreakdown) && fromApiBreakdown >= 0) {
+  if (order.sellerEarningBreakdown?.total != null && Number.isFinite(fromApiBreakdown)) {
     return roundMoney(fromApiBreakdown);
   }
 
   const fromPayout = Number(order.paymentBreakdown?.sellerPayoutTotal);
-  if (Number.isFinite(fromPayout) && fromPayout >= 0) {
+  if (order.paymentBreakdown?.sellerPayoutTotal != null && Number.isFinite(fromPayout)) {
     return roundMoney(fromPayout);
   }
 
@@ -50,6 +54,25 @@ export function getSellerOrderEarning(order) {
 
 export function getSellerEarningBreakdown(order) {
   const total = getSellerOrderEarning(order);
+  const api = order?.sellerEarningBreakdown;
+  if (api && api.productSubtotal != null) {
+    const totalCostPrice = roundMoney(api.totalCostPrice);
+    const sellerNetProfit =
+      api.sellerNetProfit != null ? roundMoney(api.sellerNetProfit) : roundMoney(total - totalCostPrice);
+    return {
+      total,
+      deliveryShare: roundMoney(api.deliveryShare),
+      shippingCharge: roundMoney(api.shippingCharge),
+      shippingDueOutstanding: roundMoney(api.shippingDueOutstanding),
+      isPanIndia: Boolean(api.isPanIndia),
+      productEarning: roundMoney(api.productEarning),
+      productSubtotal: roundMoney(api.productSubtotal),
+      adminCommission: roundMoney(api.adminCommission),
+      totalCostPrice,
+      sellerNetProfit,
+      profitMarginPercent: total > 0 ? roundMoney((sellerNetProfit / total) * 100) : 0,
+    };
+  }
   const deliveryFee = Number(
     order?.pricing?.deliveryFee ?? order?.paymentBreakdown?.deliveryFeeCharged ?? 0,
   );
@@ -99,6 +122,9 @@ export function getSellerEarningBreakdown(order) {
   return {
     total,
     deliveryShare,
+    shippingCharge: roundMoney(order?.paymentBreakdown?.shiprocketShippingCharge || 0),
+    shippingDueOutstanding: 0,
+    isPanIndia: order?.deliveryType === "scheduled",
     productEarning,
     productSubtotal: roundMoney(productSubtotal),
     adminCommission: roundMoney(adminCommission),

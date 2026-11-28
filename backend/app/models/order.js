@@ -258,6 +258,35 @@ const orderSchema = new mongoose.Schema(
       totalCostPrice: { type: Number, default: 0 },
       sellerNetProfit: { type: Number, default: 0 },
       adminProductCommissionTotal: { type: Number, default: 0 },
+      // Delivery-fee split. Local: seller 0, admin = fee − rider payout.
+      // Pan-India (Shiprocket): seller gets the full base fee (admin funds
+      // any free-delivery waiver) because the seller pays Shiprocket.
+      deliveryType: { type: String, default: "instant" },
+      sellerDeliveryFeeShare: { type: Number, default: 0 },
+      adminDeliveryFeeShare: { type: Number, default: 0 },
+      // Actual Shiprocket freight for the assigned courier — paid by admin to
+      // Shiprocket, recovered from the seller by deducting it from
+      // sellerPayoutTotal. Set once at AWB assignment.
+      shiprocketShippingCharge: { type: Number, default: 0 },
+      shiprocketShippingChargeSource: { type: String, default: null },
+      shiprocketShippingChargeAppliedAt: { type: Date, default: null },
+      // If the charge exceeded the seller's order payout, the shortfall is
+      // recovered from the seller's wallet; anything still unrecovered is
+      // tracked here (seller owes admin).
+      sellerShippingRecoveredFromWallet: { type: Number, default: 0 },
+      sellerShippingDueOutstanding: { type: Number, default: 0 },
+      // Every Shiprocket charge/adjustment (FORWARD, RTO, RETURN_PICKUP and
+      // their final-bill adjustments) — see shippingChargeService.js.
+      shippingCharges: { type: Array, default: [] },
+      // Idempotency keys already applied (atomic $ne guard).
+      shippingChargeKeys: { type: [String], default: [] },
+      shiprocketRtoCharge: { type: Number, default: 0 },
+      shiprocketReturnPickupCharge: { type: Number, default: 0 },
+      sellerShippingChargesTotal: { type: Number, default: 0 },
+      platformShippingExpenseTotal: { type: Number, default: 0 },
+      sellerShippingRecoveredFromPayouts: { type: Number, default: 0 },
+      sellerDuesNettedFromPayout: { type: Number, default: 0 },
+      shiprocketCodRemittance: { type: Object, default: undefined },
       riderPayoutBase: { type: Number, default: 0 },
       riderPayoutDistance: { type: Number, default: 0 },
       riderPayoutBonus: { type: Number, default: 0 },
@@ -329,6 +358,8 @@ const orderSchema = new mongoose.Schema(
       codCashWithSeller: { type: Boolean, default: false },
       codCashRemittedToAdmin: { type: Boolean, default: false },
       codWalletsPending: { type: Boolean, default: false },
+      // Admin confirmed Shiprocket remitted this order's COD cash.
+      shiprocketCodRemitted: { type: Boolean, default: false },
       returnPickupCommissionPaid: { type: Boolean, default: false },
     },
     status: {
@@ -644,6 +675,10 @@ orderSchema.index({ deliveryBoy: 1, workflowStatus: 1 });
 orderSchema.index({ paymentMode: 1, paymentStatus: 1, createdAt: -1 });
 orderSchema.index({ orderStatus: 1, "settlementStatus.overall": 1, createdAt: -1 });
 orderSchema.index({ seller: 1, "settlementStatus.sellerPayout": 1, status: 1 });
+orderSchema.index(
+  { seller: 1, "paymentBreakdown.sellerShippingDueOutstanding": 1 },
+  { partialFilterExpression: { "paymentBreakdown.sellerShippingDueOutstanding": { $gt: 0 } } },
+);
 orderSchema.index({ deliveryBoy: 1, "settlementStatus.riderPayout": 1, status: 1 });
 orderSchema.index(
   { customer: 1, "placement.idempotencyKey": 1, createdAt: -1 },

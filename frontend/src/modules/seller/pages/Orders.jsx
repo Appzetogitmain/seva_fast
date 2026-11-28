@@ -1652,7 +1652,7 @@ const Orders = () => {
                                                         <h4 className="text-xs font-black text-primary uppercase tracking-widest">Financial Breakdown & Net Profit</h4>
                                                         <div className="space-y-2">
                                                             {(() => {
-                                                                const { productSubtotal, adminCommission, productEarning, deliveryShare, total, totalCostPrice, sellerNetProfit, profitMarginPercent } = getSellerEarningBreakdown(selectedOrder);
+                                                                const { productSubtotal, adminCommission, productEarning, deliveryShare, shippingCharge, shippingDueOutstanding, isPanIndia, total, totalCostPrice, sellerNetProfit, profitMarginPercent } = getSellerEarningBreakdown(selectedOrder);
                                                                 return (
                                                                     <>
                                                                         <div className="flex justify-between text-xs">
@@ -1667,8 +1667,21 @@ const Orders = () => {
                                                                         )}
                                                                         {deliveryShare > 0 && (
                                                                             <div className="flex justify-between text-xs text-brand-600">
-                                                                                <span className="font-semibold">Delivery Share (80%)</span>
+                                                                                <span className="font-semibold">{isPanIndia ? "Delivery Fee (paid by customer)" : "Delivery Share"}</span>
                                                                                 <span className="font-bold">+₹{deliveryShare.toFixed(2)}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {isPanIndia && (
+                                                                            <div className="flex justify-between text-xs text-rose-600">
+                                                                                <span className="font-semibold">Shiprocket Shipping Charge</span>
+                                                                                <span className="font-bold">
+                                                                                    {shippingCharge > 0 ? `-₹${shippingCharge.toFixed(2)}` : "Pending AWB"}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                        {shippingDueOutstanding > 0 && (
+                                                                            <div className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2">
+                                                                                You owe ₹{shippingDueOutstanding.toFixed(2)} shipping to admin (charge exceeded this order's payout and your wallet balance).
                                                                             </div>
                                                                         )}
                                                                         <div className="flex justify-between text-xs font-bold text-slate-800 bg-white/60 p-2 rounded-xl border border-slate-100">

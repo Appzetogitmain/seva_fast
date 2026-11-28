@@ -73,14 +73,37 @@ export function sanitizeOrderForSellerView(order) {
   if (!order || typeof order !== "object") return order;
 
   const earning = resolveSellerOrderEarning(order);
+  const pb = order.paymentBreakdown || {};
   const deliveryFee = Number(
-    order.pricing?.deliveryFee ?? order.paymentBreakdown?.deliveryFeeCharged ?? 0,
+    order.pricing?.deliveryFee ?? pb.deliveryFeeCharged ?? 0,
   );
-  const riderPayoutTotal = Number(order.paymentBreakdown?.riderPayoutTotal ?? 0);
-  const { sellerDeliveryFeeShare } = splitDeliveryFee(deliveryFee, riderPayoutTotal);
+  const riderPayoutTotal = Number(pb.riderPayoutTotal ?? 0);
+  const sellerDeliveryFeeShare =
+    pb.sellerDeliveryFeeShare != null
+      ? roundCurrency(pb.sellerDeliveryFeeShare)
+      : splitDeliveryFee(deliveryFee, riderPayoutTotal, {
+          deliveryType: order.deliveryType,
+          deliveryFeeBase: pb.deliveryFeeBase,
+        }).sellerDeliveryFeeShare;
+  const shippingCharge = roundCurrency(
+    pb.sellerShippingChargesTotal ?? pb.shiprocketShippingCharge ?? 0,
+  );
   const productEarning = roundCurrency(
-    Math.max(earning - sellerDeliveryFeeShare, 0),
+    Math.max(
+      Number(pb.productSubtotal ?? order.pricing?.subtotal ?? 0) -
+        Number(pb.adminProductCommissionTotal || 0),
+      0,
+    ),
   );
+  const shippingChargeLines = (pb.shippingCharges || [])
+    .filter((e) => e.bearer === "SELLER")
+    .map((e) => ({
+      kind: e.kind,
+      amount: roundCurrency(e.amount),
+      courierName: e.courierName || null,
+      source: e.source || null,
+      appliedAt: e.appliedAt || null,
+    }));
   const customerBill = buildCustomerBill(order);
 
   const { pricing: _pricing, paymentBreakdown: _paymentBreakdown, ...rest } =
@@ -92,6 +115,16 @@ export function sanitizeOrderForSellerView(order) {
     sellerEarningBreakdown: {
       productEarning,
       deliveryShare: sellerDeliveryFeeShare,
+      shippingCharge,
+      shippingChargeLines,
+      shippingChargeSource: pb.shiprocketShippingChargeSource || null,
+      shippingRecoveredFromWallet: roundCurrency(pb.sellerShippingRecoveredFromWallet || 0),
+      shippingDueOutstanding: roundCurrency(pb.sellerShippingDueOutstanding || 0),
+      adminCommission: roundCurrency(pb.adminProductCommissionTotal || 0),
+      productSubtotal: roundCurrency(pb.productSubtotal ?? order.pricing?.subtotal ?? 0),
+      totalCostPrice: roundCurrency(pb.totalCostPrice || 0),
+      sellerNetProfit: pb.sellerNetProfit != null ? roundCurrency(pb.sellerNetProfit) : null,
+      isPanIndia: order.deliveryType === "scheduled",
       total: earning,
     },
     customerBill,

@@ -36,7 +36,8 @@ const SUMMARY_ROWS = [
   { key: "sellingPrice", label: "Selling Price", tone: "default" },
   { key: "purchaseCost", label: "Purchase Cost", tone: "deduction" },
   { key: "commission", label: "Commission Charged", tone: "deduction" },
-  { key: "deliveryEarning", label: "Delivery Fee Earned", tone: "credit" },
+  { key: "deliveryEarning", label: "Delivery Fee Earned (Pan-India)", tone: "credit" },
+  { key: "shippingCharge", label: "Shiprocket Shipping Charge", tone: "deduction" },
   { key: "totalDeduction", label: "Total Deduction", tone: "deduction-strong" },
   { key: "netProfit", label: "Net Profit (Your Earning)", tone: "profit" },
 ];
@@ -153,6 +154,10 @@ const ProfitSummarySection = () => {
               Profit Summary
             </h3>
           </div>
+          <p className="px-6 py-2.5 text-[11px] font-medium text-slate-500 bg-amber-50/60 border-b border-amber-100">
+            Pan-India (Shiprocket) orders: the delivery fee the customer pays is credited to you, and the actual
+            Shiprocket shipping charge is deducted from your payout (admin pays Shiprocket on your behalf).
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm whitespace-nowrap">
               <thead>
@@ -223,6 +228,7 @@ const ProfitSummarySection = () => {
                     <th className="text-right px-4 py-3">Purchase Cost</th>
                     <th className="text-right px-4 py-3">Commission</th>
                     <th className="text-right px-4 py-3">Delivery Earning</th>
+                    <th className="text-right px-4 py-3">Shipping Charge</th>
                     <th className="text-right px-4 py-3">Net Profit</th>
                     <th className="text-right px-6 py-3">Wallet</th>
                   </tr>
@@ -252,6 +258,17 @@ const ProfitSummarySection = () => {
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-emerald-600">
                           {order.deliveryEarning > 0 ? `+${money(order.deliveryEarning)}` : money(order.deliveryEarning)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-red-600">
+                          {order.shippingCharge > 0 ? (
+                            <span title={order.courierName ? `Shiprocket · ${order.courierName}` : "Shiprocket"}>
+                              -{money(order.shippingCharge)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs font-bold">
+                              {order.deliveryType === "scheduled" ? "₹0" : "Local"}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right font-black text-emerald-700">
                           {money(order.netProfit)}
