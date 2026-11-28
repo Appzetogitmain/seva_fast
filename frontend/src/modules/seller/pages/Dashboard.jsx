@@ -218,7 +218,7 @@ const Dashboard = () => {
       path: "/seller/orders",
     },
     {
-      label: "Total Orders",
+      label: "Delivered Orders",
       value: statsData?.overview?.totalOrders || "0",
       change: statsData?.overview?.ordersTrend ? `${statsData.overview.ordersTrend}` : "0%",
       changeType: (statsData?.overview?.ordersTrend || "").startsWith("-") ? "decrease" : "increase",
@@ -526,11 +526,11 @@ const Dashboard = () => {
               <div className="flex-1">
                 <p className="text-base font-medium text-slate-600">{stat.label}</p>
                 <p className="text-2xl font-bold text-slate-900 mt-2">{stat.value}</p>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-2">
                   {stat.change && (
                     <span
                       className={cn(
-                        "text-xs font-semibold flex items-center gap-1",
+                        "text-xs font-semibold flex items-center gap-1 whitespace-nowrap",
                         stat.changeType === "increase" ? "text-brand-600" : stat.changeType === "decrease" ? "text-red-600" : "text-slate-500"
                       )}
                     >
@@ -540,7 +540,7 @@ const Dashboard = () => {
                       {stat.change}
                     </span>
                   )}
-                  <span className="text-sm text-slate-600">{stat.description}</span>
+                  <span className="text-sm text-slate-600 whitespace-nowrap">{stat.description}</span>
                 </div>
               </div>
               <div className={cn("p-3 rounded-lg", stat.iconBg)}>
