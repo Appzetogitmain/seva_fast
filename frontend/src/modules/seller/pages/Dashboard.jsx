@@ -16,6 +16,7 @@ import {
   Eye,
   Sparkles,
   ArrowRight,
+  Bike,
 } from "lucide-react";
 import {
   HiOutlineTruck,
@@ -73,6 +74,9 @@ const Dashboard = () => {
   const [ownDeliveryPhone, setOwnDeliveryPhone] = useState('');
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [promoStatus, setPromoStatus] = useState(null);
+  // COD cash collected by riders but not yet handed to this seller.
+  const [riderCash, setRiderCash] = useState({ total: 0, rows: [] });
+  const [isRiderCashOpen, setIsRiderCashOpen] = useState(false);
 
   useEffect(() => {
     const fetchSubStatus = async () => {
@@ -126,6 +130,40 @@ const Dashboard = () => {
   useEffect(() => {
     fetchStats(true);
   }, [fetchStats]);
+
+  const fetchRiderCash = useCallback(async () => {
+    try {
+      const res = await sellerApi.getCodCashSummary();
+      const result = res.data?.result || {};
+      setRiderCash({
+        total: Number(result.totalHeldByRiders || 0),
+        rows: Array.isArray(result.heldByRider) ? result.heldByRider : [],
+      });
+    } catch (error) {
+      console.error("Rider cash fetch error:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRiderCash();
+  }, [fetchRiderCash, ordersFromContext?.length]);
+
+  useLockBodyScroll(isRiderCashOpen);
+
+  // Group the held-cash orders by rider for the detail popup.
+  const riderCashGroups = React.useMemo(() => {
+    const groups = new Map();
+    for (const row of riderCash.rows) {
+      const key = String(row.riderId || row.riderName || "unassigned");
+      if (!groups.has(key)) {
+        groups.set(key, { key, riderName: row.riderName || "Unassigned", riderPhone: row.riderPhone || "", total: 0, orders: [] });
+      }
+      const g = groups.get(key);
+      g.total += Number(row.amountOwedBySeller || 0);
+      g.orders.push(row);
+    }
+    return [...groups.values()].sort((a, b) => b.total - a.total);
+  }, [riderCash.rows]);
 
   useEffect(() => {
     if (!ordersLoading) {
@@ -200,6 +238,19 @@ const Dashboard = () => {
       iconColor: "text-purple-600",
       description: "per order",
       path: "/seller/orders",
+    },
+    {
+      label: "Cash With Riders",
+      value: `₹${Number(riderCash.total || 0).toLocaleString("en-IN")}`,
+      change: riderCash.rows.length > 0
+        ? `${riderCash.rows.length} order${riderCash.rows.length > 1 ? "s" : ""} · ${riderCashGroups.length} rider${riderCashGroups.length > 1 ? "s" : ""}`
+        : "Nothing pending",
+      changeType: riderCash.rows.length > 0 ? "decrease" : "neutral",
+      icon: Bike,
+      iconBg: "bg-blue-50",
+      iconColor: "text-blue-600",
+      description: "COD not handed over",
+      onClick: () => setIsRiderCashOpen(true),
     },
   ];
 
@@ -464,12 +515,12 @@ const Dashboard = () => {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
         {stats.map((stat) => (
           <Card
             key={stat.label}
             className="hover:shadow-lg transition-shadow cursor-pointer"
-            onClick={() => stat.path && navigate(stat.path)}
+            onClick={() => (stat.onClick ? stat.onClick() : stat.path && navigate(stat.path))}
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -499,6 +550,112 @@ const Dashboard = () => {
           </Card>
         ))}
       </div>
+
+      {/* Cash With Riders — per rider, per order */}
+      {isRiderCashOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setIsRiderCashOpen(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-2xl max-h-[85dvh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900">Cash With Riders</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  COD cash riders collected from your customers and have not handed to you yet.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRiderCashOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-500"
+                aria-label="Close"
+              >
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="px-5 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+              <span className="text-xs font-bold text-blue-800 uppercase tracking-wide">Total held</span>
+              <span className="text-lg font-black text-blue-700">
+                ₹{Number(riderCash.total || 0).toLocaleString("en-IN")}
+              </span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
+              {riderCashGroups.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-400">
+                  No rider is holding COD cash for you right now.
+                </div>
+              ) : (
+                riderCashGroups.map((group) => (
+                  <div key={group.key} className="rounded-2xl border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-3 bg-slate-50 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-2 rounded-lg bg-blue-100 shrink-0">
+                          <Bike className="h-4 w-4 text-blue-700" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900 truncate">{group.riderName}</p>
+                          {group.riderPhone && (
+                            <a
+                              href={`tel:${group.riderPhone}`}
+                              className="text-xs text-blue-600 font-semibold flex items-center gap-1"
+                            >
+                              <HiOutlinePhone className="h-3 w-3" /> {group.riderPhone}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">
+                          {group.orders.length} order{group.orders.length > 1 ? "s" : ""}
+                        </p>
+                        <p className="text-base font-black text-blue-700">
+                          ₹{group.total.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {group.orders.map((row) => (
+                        <div key={row.orderId} className="px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-800 break-all">#{row.orderId}</p>
+                            <p className="text-[11px] text-slate-500">
+                              {row.deliveredAt ? `Delivered ${formatDate(row.deliveredAt)}` : formatDate(row.createdAt)}
+                              {" · "}COD ₹{Number(row.amountGross || 0).toLocaleString("en-IN")}
+                            </p>
+                          </div>
+                          <span className="font-black text-slate-900 shrink-0">
+                            ₹{Number(row.amountOwedBySeller || 0).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRiderCashOpen(false);
+                  navigate("/seller/cod-cash");
+                }}
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold flex items-center justify-center gap-2"
+              >
+                Open COD Cash to mark cash received <ArrowRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
