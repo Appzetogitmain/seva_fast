@@ -1309,6 +1309,11 @@ const ProductManagement = () => {
                               <option value="gm">gm</option>
                             </select>
                           </div>
+                          {formData.availability === "pan_india" && (
+                            <p className="text-[11px] text-amber-700 font-semibold ml-1">
+                              Use the packed parcel weight — it decides your courier shipping charge.
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -1317,9 +1322,17 @@ const ProductManagement = () => {
                           <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-widest ml-1">
                             Package Size (cm) <span className="text-rose-500">*</span>
                           </label>
-                          <p className="text-[11px] text-slate-500 font-medium ml-1">
-                            Required for Shiprocket delivery rate &amp; AWB calculation when this ships nationwide.
-                          </p>
+                          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                            <span className="text-amber-600 text-sm leading-none mt-0.5" aria-hidden="true">⚠️</span>
+                            <div className="text-[11px] leading-relaxed text-amber-900">
+                              <p className="font-bold">Enter weight &amp; size carefully — the courier charges you based on these.</p>
+                              <p className="mt-0.5 font-medium">
+                                Shiprocket calculates your shipping charge from the packed parcel&apos;s weight and its
+                                volumetric weight (L × B × H ÷ 5000), whichever is higher. Measure the box after packing.
+                                If the courier finds a bigger weight/size, the extra charge is deducted from your payout.
+                              </p>
+                            </div>
+                          </div>
                           <div className="grid grid-cols-3 gap-3">
                             <div className="space-y-1 flex flex-col">
                               <span className="text-[10px] font-bold text-slate-500 uppercase ml-1">Length</span>
